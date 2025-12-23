@@ -1,0 +1,270 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Location for all resources"
+      }
+    },
+    "applicationName": {
+      "type": "string",
+      "defaultValue": "iLuminara-Core",
+      "metadata": {
+        "description": "Name of the iLuminara application"
+      }
+    },
+    "jurisdiction": {
+      "type": "string",
+      "defaultValue": "KDPA_KE",
+      "allowedValues": [
+        "KDPA_KE",
+        "GDPR_EU",
+        "HIPAA_US",
+        "POPIA_ZA",
+        "PIPEDA_CA"
+      ],
+      "metadata": {
+        "description": "Primary jurisdiction for data sovereignty"
+      }
+    },
+    "enableTamperProofAudit": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Enable tamper-proof audit trail"
+      }
+    },
+    "enableGenAIGovernance": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Enable GenAI governance per Microsoft DSPM 2026"
+      }
+    }
+  },
+  "variables": {
+    "storageAccountName": "[concat('iluminara', uniqueString(resourceGroup().id))]",
+    "appServicePlanName": "[concat(parameters('applicationName'), '-plan')]",
+    "webAppName": "[concat(parameters('applicationName'), '-app')]",
+    "applicationInsightsName": "[concat(parameters('applicationName'), '-insights')]",
+    "keyVaultName": "[concat('kv-', uniqueString(resourceGroup().id))]",
+    "purviewAccountName": "[concat('purview-', uniqueString(resourceGroup().id))]",
+    "logAnalyticsWorkspaceName": "[concat(parameters('applicationName'), '-logs')]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-01-01",
+      "name": "[variables('storageAccountName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "encryption": {
+          "services": {
+            "blob": {
+              "enabled": true
+            },
+            "file": {
+              "enabled": true
+            }
+          },
+          "keySource": "Microsoft.Storage"
+        },
+        "supportsHttpsTrafficOnly": true,
+        "minimumTlsVersion": "TLS1_3"
+      },
+      "tags": {
+        "application": "iLuminara-Core",
+        "jurisdiction": "[parameters('jurisdiction')]",
+        "compliance": "HIPAA,GDPR,KDPA"
+      }
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults",
+      "apiVersion": "2023-02-01",
+      "name": "[variables('keyVaultName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "sku": {
+          "family": "A",
+          "name": "standard"
+        },
+        "tenantId": "[subscription().tenantId]",
+        "enabledForDeployment": true,
+        "enabledForDiskEncryption": true,
+        "enabledForTemplateDeployment": true,
+        "enableSoftDelete": true,
+        "softDeleteRetentionInDays": 90,
+        "enablePurgeProtection": true,
+        "accessPolicies": []
+      },
+      "tags": {
+        "application": "iLuminara-Core",
+        "purpose": "Crypto Shredder Key Management"
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2022-10-01",
+      "name": "[variables('logAnalyticsWorkspaceName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "sku": {
+          "name": "PerGB2018"
+        },
+        "retentionInDays": 2555,
+        "features": {
+          "enableLogAccessUsingOnlyResourcePermissions": true
+        }
+      },
+      "tags": {
+        "application": "iLuminara-Core",
+        "purpose": "Tamper-Proof Audit Trail",
+        "retention": "7 years (HIPAA)"
+      }
+    },
+    {
+      "type": "Microsoft.Insights/components",
+      "apiVersion": "2020-02-02",
+      "name": "[variables('applicationInsightsName')]",
+      "location": "[parameters('location')]",
+      "kind": "web",
+      "properties": {
+        "Application_Type": "web",
+        "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName'))]",
+        "IngestionMode": "LogAnalytics",
+        "publicNetworkAccessForIngestion": "Enabled",
+        "publicNetworkAccessForQuery": "Enabled"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName'))]"
+      ],
+      "tags": {
+        "application": "iLuminara-Core",
+        "purpose": "DSPM Telemetry"
+      }
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2022-09-01",
+      "name": "[variables('appServicePlanName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "P1v3",
+        "tier": "PremiumV3",
+        "size": "P1v3",
+        "family": "Pv3",
+        "capacity": 1
+      },
+      "kind": "linux",
+      "properties": {
+        "reserved": true
+      },
+      "tags": {
+        "application": "iLuminara-Core"
+      }
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2022-09-01",
+      "name": "[variables('webAppName')]",
+      "location": "[parameters('location')]",
+      "kind": "app,linux",
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
+        "siteConfig": {
+          "linuxFxVersion": "PYTHON|3.11",
+          "alwaysOn": true,
+          "ftpsState": "Disabled",
+          "minTlsVersion": "1.3",
+          "http20Enabled": true,
+          "appSettings": [
+            {
+              "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
+              "value": "[reference(resourceId('Microsoft.Insights/components', variables('applicationInsightsName'))).ConnectionString]"
+            },
+            {
+              "name": "NODE_ID",
+              "value": "AZURE-001"
+            },
+            {
+              "name": "JURISDICTION",
+              "value": "[parameters('jurisdiction')]"
+            },
+            {
+              "name": "ENABLE_TAMPER_PROOF_AUDIT",
+              "value": "[parameters('enableTamperProofAudit')]"
+            },
+            {
+              "name": "ENABLE_GENAI_GOVERNANCE",
+              "value": "[parameters('enableGenAIGovernance')]"
+            },
+            {
+              "name": "AZURE_KEY_VAULT_URI",
+              "value": "[reference(resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))).vaultUri]"
+            }
+          ]
+        },
+        "httpsOnly": true
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
+        "[resourceId('Microsoft.Insights/components', variables('applicationInsightsName'))]",
+        "[resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))]"
+      ],
+      "tags": {
+        "application": "iLuminara-Core",
+        "jurisdiction": "[parameters('jurisdiction')]"
+      }
+    },
+    {
+      "type": "Microsoft.Purview/accounts",
+      "apiVersion": "2021-07-01",
+      "name": "[variables('purviewAccountName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard",
+        "capacity": 1
+      },
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "publicNetworkAccess": "Enabled",
+        "managedResourceGroupName": "[concat('managed-rg-', variables('purviewAccountName'))]"
+      },
+      "tags": {
+        "application": "iLuminara-Core",
+        "purpose": "Data Classification & DSPM"
+      }
+    }
+  ],
+  "outputs": {
+    "webAppUrl": {
+      "type": "string",
+      "value": "[concat('https://', reference(resourceId('Microsoft.Web/sites', variables('webAppName'))).defaultHostName)]"
+    },
+    "applicationInsightsInstrumentationKey": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Insights/components', variables('applicationInsightsName'))).InstrumentationKey]"
+    },
+    "keyVaultUri": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))).vaultUri]"
+    },
+    "purviewAccountName": {
+      "type": "string",
+      "value": "[variables('purviewAccountName')]"
+    },
+    "storageAccountName": {
+      "type": "string",
+      "value": "[variables('storageAccountName')]"
+    }
+  }
+}
