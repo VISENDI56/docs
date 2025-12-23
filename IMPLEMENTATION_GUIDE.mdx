@@ -1,618 +1,400 @@
 ---
-title: iLuminara-Core Technical Evolution - Implementation Guide
-description: Complete guide for implementing Steps 36-42 of the Sovereign Health Fortress
+title: Implementation guide
+description: Deploy the Sovereign Health Fortress to your iLuminara-Core repository
 ---
 
 ## Overview
 
-This guide provides the complete implementation for the final technical evolution of iLuminara-Core, transforming it into a NIST-compliant Sovereign Fortress with edge-computing resilience, regulatory mastery, and extreme hardware efficiency.
+This guide walks you through implementing the complete **Sovereign Health Fortress** security stack in your iLuminara-Core repository.
 
-## Implementation Summary
+All necessary files have been created in the `repository-files/` directory of this documentation repository. You'll copy them to your main repository.
 
-### ✅ Completed Components
+## Prerequisites
 
-1. **HSML Offline-First Sync Agents** (`edge_node/sync_agent.py`)
-   - Vector Clock conflict resolution
-   - 0% data loss during offline operations
-   - SQLite local buffer
-   - Automatic reconciliation with Golden Thread
+1. **GitHub repository access** with write permissions
+2. **GitHub CLI** installed and authenticated
+3. **Python 3.8+** installed
+4. **Git** configured
 
-2. **HSML Reconciler** (`edge_node/hsml_reconciler.py`)
-   - Three-way merge for concurrent updates
-   - Semantic conflict detection
-   - Automatic resolution strategies
-   - Manual review queue
+## Step 1: Authenticate GitHub CLI
 
-3. **Compliance Bundle Generator** (`scripts/generate_compliance_bundle.py`)
-   - NIST SP 800-53 control mappings
-   - ISO 27001 Annex A mappings
-   - SOC 2 Trust Service Criteria evidence
-   - Procurement-ready compliance pack
-
-4. **Security Workflows**
-   - CodeQL SAST scanning (`.github/workflows/codeql.yml`)
-   - Gitleaks secret detection (`.github/workflows/gitleaks.yml`)
-   - Dependabot daily updates (`.github/dependabot.yml`)
-
-5. **Crypto Shredder** (`governance_kernel/crypto_shredder.py`)
-   - IP-02: Data dissolution (not deletion)
-   - Ephemeral key management
-   - Automatic key shredding
-   - Retention policy enforcement
-
-6. **SovereignGuardrail Configuration** (`config/sovereign_guardrail.yaml`)
-   - 14 global legal frameworks
-   - Data sovereignty rules
-   - Consent management
-   - Audit trail configuration
-
-7. **Fortress Validation Script** (`scripts/validate_fortress.sh`)
-   - 7-phase validation
-   - Nuclear IP Stack status
-   - Dependency checking
-   - Environment configuration
-
-## Remaining Components to Implement
-
-### Step 38: Modular Signed HSML Event Logs
-
-**File:** `core/hsml_logger.py`
-
-```python
-"""
-Modular Signed HSML Event Logger
-Turns audit trail into portable, verifiable asset.
-
-Features:
-- Hash + sign every event with Cloud KMS
-- Compact JSONL format
-- Multi-backend push (Blockchain, S3, Regional Ledger)
-"""
-
-import json
-import hashlib
-from datetime import datetime
-from typing import Dict, List, Optional
-from google.cloud import kms
-import boto3
-
-class HSMLLogger:
-    def __init__(self, kms_key_path: str, s3_bucket: str, blockchain_endpoint: str):
-        self.kms_client = kms.KeyManagementServiceClient()
-        self.kms_key_path = kms_key_path
-        self.s3_client = boto3.client('s3')
-        self.s3_bucket = s3_bucket
-        self.blockchain_endpoint = blockchain_endpoint
-    
-    def log_event(self, event: Dict) -> str:
-        # Hash event
-        event_hash = hashlib.sha256(
-            json.dumps(event, sort_keys=True).encode()
-        ).hexdigest()
-        
-        # Sign with Cloud KMS
-        signature = self._sign_with_kms(event_hash)
-        
-        # Create signed event
-        signed_event = {
-            **event,
-            "_hash": event_hash,
-            "_signature": signature,
-            "_signed_at": datetime.utcnow().isoformat()
-        }
-        
-        # Multi-backend push
-        self._push_to_s3(signed_event)
-        self._push_to_blockchain(event_hash)
-        self._push_to_regional_ledger(signed_event)
-        
-        return event_hash
-    
-    def _sign_with_kms(self, data: str) -> str:
-        response = self.kms_client.asymmetric_sign(
-            request={
-                "name": self.kms_key_path,
-                "digest": {"sha256": hashlib.sha256(data.encode()).digest()}
-            }
-        )
-        return response.signature.hex()
-    
-    def _push_to_s3(self, event: Dict):
-        # S3 with Object Lock
-        self.s3_client.put_object(
-            Bucket=self.s3_bucket,
-            Key=f"hsml/{event['_hash']}.jsonl",
-            Body=json.dumps(event),
-            ObjectLockMode='GOVERNANCE',
-            ObjectLockRetainUntilDate=datetime.utcnow() + timedelta(days=2555)
-        )
-    
-    def _push_to_blockchain(self, event_hash: str):
-        # Anchor to Polygon/Ethereum
-        # Implementation depends on blockchain SDK
-        pass
-    
-    def _push_to_regional_ledger(self, event: Dict):
-        # Push to Cloud Spanner regional ledger
-        pass
-```
-
-### Step 39: HSTPU Policy Sandbox (Digital Twin)
-
-**File:** `hstpu/sandbox_engine.py`
-
-```python
-"""
-HSTPU Policy Sandbox - Digital Twin Environment
-Pre-impact simulation for health policy changes.
-
-Features:
-- Time-bound dry runs
-- 30-day outcome forecasting
-- Policy impact analysis
-- Safe testing before production
-"""
-
-from datetime import datetime, timedelta
-from typing import Dict, List
-import numpy as np
-
-class PolicySandbox:
-    def __init__(self, intelligence_engine):
-        self.intelligence_engine = intelligence_engine
-        self.simulations = []
-    
-    def create_digital_twin(self, current_state: Dict) -> Dict:
-        """Create digital twin of current system state"""
-        return {
-            "population": current_state["population"],
-            "disease_prevalence": current_state["disease_prevalence"],
-            "healthcare_capacity": current_state["healthcare_capacity"],
-            "policies": current_state["policies"].copy(),
-            "timestamp": datetime.utcnow().isoformat()
-        }
-    
-    def simulate_policy_change(
-        self,
-        policy_change: Dict,
-        simulation_days: int = 30
-    ) -> Dict:
-        """
-        Simulate policy change over time period.
-        
-        Args:
-            policy_change: New policy parameters
-            simulation_days: Days to simulate
-        
-        Returns:
-            Simulation results with forecasted outcomes
-        """
-        # Create digital twin
-        twin = self.create_digital_twin(self.get_current_state())
-        
-        # Apply policy change to twin
-        twin["policies"].update(policy_change)
-        
-        # Run simulation
-        results = {
-            "policy_change": policy_change,
-            "simulation_period": simulation_days,
-            "forecasts": [],
-            "impact_analysis": {}
-        }
-        
-        for day in range(simulation_days):
-            # Forecast outcomes
-            forecast = self.intelligence_engine.forecast(
-                state=twin,
-                horizon_days=1
-            )
-            results["forecasts"].append(forecast)
-            
-            # Update twin state
-            twin = self._update_state(twin, forecast)
-        
-        # Analyze impact
-        results["impact_analysis"] = self._analyze_impact(results["forecasts"])
-        
-        return results
-    
-    def _analyze_impact(self, forecasts: List[Dict]) -> Dict:
-        """Analyze policy impact from forecasts"""
-        return {
-            "avg_case_reduction": np.mean([f["cases"] for f in forecasts]),
-            "peak_cases": max([f["cases"] for f in forecasts]),
-            "healthcare_utilization": np.mean([f["capacity_used"] for f in forecasts]),
-            "recommendation": "APPROVE" if self._is_beneficial(forecasts) else "REJECT"
-        }
-```
-
-### Step 40: Quantized LoRA Pipelines (Rank=16)
-
-**File:** `intelligence_engine/lora_factory.py`
-
-```python
-"""
-Quantized LoRA Pipeline Factory
-Enables iLuminara models on consumer-grade hardware.
-
-Features:
-- PEFT with Rank=16 profiles
-- 4-bit/8-bit quantization (bitsandbytes)
-- Edge device compatibility (<2 GPUs)
-- Chain-of-Thought reasoning preservation
-"""
-
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-import torch
-
-class LoRAFactory:
-    def __init__(self, base_model: str = "meta-llama/Llama-2-7b-hf"):
-        self.base_model = base_model
-        
-        # Quantization config
-        self.bnb_config = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_quant_type="nf4",
-            bnb_4bit_compute_dtype=torch.float16,
-            bnb_4bit_use_double_quant=True
-        )
-        
-        # LoRA config (Rank=16)
-        self.lora_config = LoraConfig(
-            r=16,  # Rank
-            lora_alpha=32,
-            target_modules=["q_proj", "v_proj"],
-            lora_dropout=0.05,
-            bias="none",
-            task_type="CAUSAL_LM"
-        )
-    
-    def create_quantized_model(self):
-        """Create 4-bit quantized model with LoRA"""
-        # Load base model with quantization
-        model = AutoModelForCausalLM.from_pretrained(
-            self.base_model,
-            quantization_config=self.bnb_config,
-            device_map="auto"
-        )
-        
-        # Prepare for k-bit training
-        model = prepare_model_for_kbit_training(model)
-        
-        # Add LoRA adapters
-        model = get_peft_model(model, self.lora_config)
-        
-        return model
-    
-    def fine_tune(self, model, dataset, output_dir: str):
-        """Fine-tune with LoRA on health data"""
-        from transformers import Trainer, TrainingArguments
-        
-        training_args = TrainingArguments(
-            output_dir=output_dir,
-            per_device_train_batch_size=4,
-            gradient_accumulation_steps=4,
-            num_train_epochs=3,
-            learning_rate=2e-4,
-            fp16=True,
-            logging_steps=10,
-            save_strategy="epoch"
-        )
-        
-        trainer = Trainer(
-            model=model,
-            args=training_args,
-            train_dataset=dataset
-        )
-        
-        trainer.train()
-        return model
-```
-
-### Step 41: Legal/Compliance Telemetry Layer
-
-**File:** `governance_kernel/telemetry_bridge.py`
-
-```python
-"""
-Legal/Compliance Telemetry Bridge
-Maps live audit events to RMF/SOC2 policy artifacts.
-
-Features:
-- Real-time compliance mapping
-- Automated weekly PDF reports
-- 14 Global Data Laws tracking
-"""
-
-from datetime import datetime, timedelta
-from typing import Dict, List
-import json
-
-class TelemetryBridge:
-    def __init__(self, audit_trail_client):
-        self.audit_trail = audit_trail_client
-        self.compliance_mappings = self._load_mappings()
-    
-    def map_event_to_controls(self, event: Dict) -> List[Dict]:
-        """Map audit event to compliance controls"""
-        mappings = []
-        
-        event_type = event.get("action_type")
-        
-        # Map to NIST controls
-        if event_type == "Data_Transfer":
-            mappings.append({
-                "framework": "NIST SP 800-53",
-                "control": "SC-8",
-                "status": "ENFORCED" if event["blocked"] else "VIOLATED"
-            })
-        
-        # Map to GDPR articles
-        if event.get("jurisdiction") == "GDPR_EU":
-            mappings.append({
-                "framework": "GDPR",
-                "article": "Art. 32",
-                "status": "COMPLIANT"
-            })
-        
-        return mappings
-    
-    def generate_weekly_report(self) -> str:
-        """Generate weekly compliance report"""
-        # Fetch last 7 days of events
-        events = self.audit_trail.get_events(
-            start_date=datetime.utcnow() - timedelta(days=7)
-        )
-        
-        # Aggregate by framework
-        report = {
-            "period": "Last 7 days",
-            "frameworks": {},
-            "violations": 0,
-            "total_events": len(events)
-        }
-        
-        for event in events:
-            mappings = self.map_event_to_controls(event)
-            for mapping in mappings:
-                framework = mapping["framework"]
-                if framework not in report["frameworks"]:
-                    report["frameworks"][framework] = {
-                        "enforced": 0,
-                        "violated": 0
-                    }
-                
-                if mapping["status"] == "ENFORCED":
-                    report["frameworks"][framework]["enforced"] += 1
-                else:
-                    report["frameworks"][framework]["violated"] += 1
-                    report["violations"] += 1
-        
-        return self._format_report_pdf(report)
-```
-
-### Step 42: System Integrity Verification
-
-**File:** `scripts/verify_system_integrity.py`
-
-```python
-"""
-Nuclear Stack System Integrity Verification
-Ensures no clashing logic between IP components.
-
-Verifies:
-- IP-02 Crypto Shredder
-- IP-06 5DM Bridge
-- HSML Sync Agents
-- SovereignGuardrail
-"""
-
-import sys
-import json
-from pathlib import Path
-
-class SystemIntegrityVerifier:
-    def __init__(self):
-        self.errors = []
-        self.warnings = []
-    
-    def verify_crypto_shredder(self) -> bool:
-        """Verify IP-02 Crypto Shredder integrity"""
-        try:
-            from governance_kernel.crypto_shredder import CryptoShredder
-            shredder = CryptoShredder(sovereignty_zone="KENYA")
-            # Test encryption/shredding
-            return True
-        except Exception as e:
-            self.errors.append(f"Crypto Shredder: {e}")
-            return False
-    
-    def verify_hsml_sync(self) -> bool:
-        """Verify HSML Sync Agents"""
-        try:
-            from edge_node.sync_agent import HSMLSyncAgent
-            agent = HSMLSyncAgent(node_id="TEST")
-            return True
-        except Exception as e:
-            self.errors.append(f"HSML Sync: {e}")
-            return False
-    
-    def verify_no_conflicts(self) -> bool:
-        """Verify no conflicting logic"""
-        # Check for conflicting configurations
-        conflicts = []
-        
-        # Example: Check if Crypto Shredder and Sync Agent use same DB
-        # Implementation specific to your architecture
-        
-        return len(conflicts) == 0
-    
-    def run_full_verification(self) -> Dict:
-        """Run complete system integrity check"""
-        results = {
-            "crypto_shredder": self.verify_crypto_shredder(),
-            "hsml_sync": self.verify_hsml_sync(),
-            "no_conflicts": self.verify_no_conflicts(),
-            "errors": self.errors,
-            "warnings": self.warnings
-        }
-        
-        if all([results["crypto_shredder"], results["hsml_sync"], results["no_conflicts"]]):
-            print("✅ System integrity verified - Nuclear Stack operational")
-            return results
-        else:
-            print("❌ System integrity check failed")
-            for error in self.errors:
-                print(f"  - {error}")
-            sys.exit(1)
-
-if __name__ == "__main__":
-    verifier = SystemIntegrityVerifier()
-    verifier.run_full_verification()
-```
-
-## Deployment Instructions
-
-### 1. Copy Files to Repository
-
-Copy all files from `repository-files/` to your iLuminara-Core repository:
+Elevate your GitHub CLI permissions to enable workflow and security settings:
 
 ```bash
-# Security workflows
-cp repository-files/.github/workflows/* .github/workflows/
-cp repository-files/.github/dependabot.yml .github/
-cp repository-files/.gitleaks.toml .
-
-# Governance kernel
-cp repository-files/governance_kernel/* governance_kernel/
-
-# Edge node
-cp repository-files/edge_node/* edge_node/
-
-# Configuration
-cp repository-files/config/* config/
-
-# Scripts
-cp repository-files/scripts/* scripts/
-chmod +x scripts/*.sh
+gh auth refresh -s workflow,repo,write:packages,admin:repo_hook
 ```
 
-### 2. Install Dependencies
+## Step 2: Copy repository files
+
+All implementation files are in the `repository-files/` directory. Copy them to your iLuminara-Core repository:
+
+### Security workflows
+
+```bash
+# From your iLuminara-Core repository root
+mkdir -p .github/workflows
+
+# Copy CodeQL workflow
+cp /path/to/docs/repository-files/.github/workflows/codeql.yml .github/workflows/
+
+# Copy Gitleaks workflow
+cp /path/to/docs/repository-files/.github/workflows/gitleaks.yml .github/workflows/
+
+# Copy Gitleaks config
+cp /path/to/docs/repository-files/.gitleaks.toml .
+
+# Copy Dependabot config
+cp /path/to/docs/repository-files/.github/dependabot.yml .github/
+```
+
+### Governance kernel
+
+```bash
+# Copy Crypto Shredder (IP-02)
+cp /path/to/docs/repository-files/governance_kernel/crypto_shredder.py governance_kernel/
+
+# Copy SovereignGuardrail config
+mkdir -p config
+cp /path/to/docs/repository-files/config/sovereign_guardrail.yaml config/
+```
+
+### Validation script
+
+```bash
+# Copy fortress validation script
+mkdir -p scripts
+cp /path/to/docs/repository-files/scripts/validate_fortress.sh scripts/
+chmod +x scripts/validate_fortress.sh
+```
+
+## Step 3: Install dependencies
+
+Add required dependencies to your `requirements.txt`:
+
+```txt
+# Crypto Shredder dependencies
+cryptography>=41.0.0
+
+# Existing dependencies
+flask>=2.3.0
+flask-cors>=4.0.0
+streamlit>=1.28.0
+pandas>=2.0.0
+pydeck>=0.8.0
+numpy>=1.24.0
+google-cloud-bigquery>=3.11.0
+google-cloud-spanner>=3.40.0
+google-cloud-kms>=2.19.0
+```
+
+Install dependencies:
 
 ```bash
 pip install -r requirements.txt
-
-# Additional dependencies for new features
-pip install cryptography google-cloud-kms google-cloud-spanner
-pip install transformers peft bitsandbytes accelerate
-pip install boto3  # For S3 integration
 ```
 
-### 3. Configure Environment
+## Step 4: Configure environment
+
+Set up environment variables:
 
 ```bash
+# Node identification
 export NODE_ID=JOR-47
 export JURISDICTION=KDPA_KE
+
+# API configuration
+export API_HOST=0.0.0.0
+export API_PORT=8080
+
+# GCP configuration (if using cloud)
 export GOOGLE_CLOUD_PROJECT=your-project-id
+export GCP_REGION=us-central1
+
+# Governance configuration
 export ENABLE_TAMPER_PROOF_AUDIT=true
+export RETENTION_MAX_DAYS=1825
+export DATA_SOVEREIGNTY_REQUIRED=true
 ```
 
-### 4. Validate Installation
+Add to your `.bashrc` or `.zshrc` for persistence:
 
 ```bash
-# Run fortress validation
-./scripts/validate_fortress.sh
-
-# Run system integrity check
-python scripts/verify_system_integrity.py --nuclear-stack
-
-# Generate compliance bundle
-python scripts/generate_compliance_bundle.py
+echo 'export NODE_ID=JOR-47' >> ~/.bashrc
+echo 'export JURISDICTION=KDPA_KE' >> ~/.bashrc
+source ~/.bashrc
 ```
 
-### 5. Enable GitHub Workflows
+## Step 5: Commit and push
+
+Commit all changes to your repository:
 
 ```bash
-# Refresh GitHub permissions
-gh auth refresh -s workflow,repo,write:packages,admin:repo_hook
+git add .
+git commit -m "feat: integrate SovereignGuardrail and Nuclear IP security stack
 
+- Add CodeQL SAST scanning workflow
+- Add Gitleaks secret detection workflow
+- Implement IP-02 Crypto Shredder
+- Add SovereignGuardrail configuration
+- Configure Dependabot for daily security updates
+- Add fortress validation script
+
+Compliance: GDPR Art. 32, HIPAA §164.312, ISO 27001 A.12.6"
+
+git push origin main
+```
+
+## Step 6: Enable branch protection
+
+Protect your main branch with required status checks:
+
+```bash
 # Enable branch protection
 gh api repos/:owner/:repo/branches/main/protection \
-  -X PUT \
-  -f required_status_checks[strict]=true \
-  -f required_status_checks[contexts][]=CodeQL \
-  -f required_status_checks[contexts][]=Gitleaks
+  --method PUT \
+  --field required_status_checks[strict]=true \
+  --field required_status_checks[contexts][]=CodeQL \
+  --field required_status_checks[contexts][]=Gitleaks \
+  --field required_pull_request_reviews[required_approving_review_count]=1 \
+  --field enforce_admins=true \
+  --field restrictions=null
 ```
 
-## Testing
+Or configure via GitHub UI:
+1. Go to **Settings** → **Branches**
+2. Add rule for `main` branch
+3. Enable:
+   - ✅ Require pull request reviews
+   - ✅ Require status checks (CodeQL, Gitleaks)
+   - ✅ Require branches to be up to date
 
-### Test HSML Sync Agent
+## Step 7: Validate the fortress
 
-```python
-from edge_node.sync_agent import HSMLSyncAgent, EventType
-
-agent = HSMLSyncAgent(node_id="JOR-47")
-
-# Create offline event
-event = agent.create_event(
-    event_type=EventType.CBS_REPORT,
-    payload={"location": "Dadaab", "symptom": "fever"}
-)
-
-# Check buffer stats
-stats = agent.get_buffer_stats()
-print(stats)
-```
-
-### Test Compliance Bundle
+Run the validation script to ensure everything is configured correctly:
 
 ```bash
-python scripts/generate_compliance_bundle.py
-ls -la compliance/artifacts/
+./scripts/validate_fortress.sh
 ```
 
-### Test Crypto Shredder
+Expected output:
+
+```
+╔════════════════════════════════════════════════════════════╗
+║     iLuminara-Core Sovereign Health Fortress Validator     ║
+╚════════════════════════════════════════════════════════════╝
+
+═══════════════════════════════════════════════════════════
+PHASE 1: Security Audit Layer
+═══════════════════════════════════════════════════════════
+
+🔍 Checking .github/workflows/codeql.yml... ✓ OPERATIONAL
+   └─ SAST security scanning (GDPR Art. 32, ISO 27001 A.12.6)
+
+🔍 Checking .github/workflows/gitleaks.yml... ✓ OPERATIONAL
+   └─ Secret scanning (NIST SP 800-53 IA-5)
+
+...
+
+╔════════════════════════════════════════════════════════════╗
+║                    VALIDATION SUMMARY                      ║
+╚════════════════════════════════════════════════════════════╝
+
+🛡️  FORTRESS STATUS: OPERATIONAL
+✓  All critical components validated
+✓  Security audit layer active
+✓  Governance kernel operational
+✓  Nuclear IP stack initialized
+
+The Sovereign Health Fortress is ready for deployment.
+```
+
+## Step 8: Test Crypto Shredder
+
+Test the IP-02 Crypto Shredder implementation:
 
 ```python
-from governance_kernel.crypto_shredder import CryptoShredder, RetentionPolicy
+from governance_kernel.crypto_shredder import CryptoShredder, RetentionPolicy, SovereigntyZone
 
-shredder = CryptoShredder()
-encrypted, key_id = shredder.encrypt_with_ephemeral_key(
-    data=b"Patient data",
-    retention_policy=RetentionPolicy.HOT
+# Initialize
+shredder = CryptoShredder(
+    sovereignty_zone=SovereigntyZone.KENYA,
+    enable_audit=True
 )
 
-# Shred key
+# Encrypt test data
+test_data = b"Test patient data"
+encrypted, key_id = shredder.encrypt_with_ephemeral_key(
+    data=test_data,
+    retention_policy=RetentionPolicy.HOT,
+    metadata={"test": True}
+)
+
+print(f"✅ Encrypted - Key ID: {key_id}")
+
+# Decrypt
+decrypted = shredder.decrypt_with_key(encrypted, key_id)
+print(f"✅ Decrypted: {decrypted.decode()}")
+
+# Shred
 shredder.shred_key(key_id)
+print(f"🔥 Key shredded")
+
+# Try to decrypt after shredding
+result = shredder.decrypt_with_key(encrypted, key_id)
+print(f"❌ After shred: {result}")  # None
 ```
 
-## Next Steps
+## Step 9: Configure GitHub secrets
 
-1. **Deploy to Production**
-   - Run `./deploy_gcp_prototype.sh`
-   - Configure Cloud KMS keys
-   - Set up Cloud Spanner for audit trail
+Add required secrets to your repository:
 
-2. **Enable Monitoring**
-   - Configure Prometheus metrics
-   - Set up Grafana dashboards
-   - Enable PubSub alerts
+```bash
+# Add Gitleaks license (if you have one)
+gh secret set GITLEAKS_LICENSE --body "your-license-key"
 
-3. **Train Operators**
-   - Review compliance bundle
-   - Practice offline scenarios
-   - Test incident response
+# Add Slack webhook for notifications (optional)
+gh secret set SLACK_WEBHOOK_URL --body "https://hooks.slack.com/services/..."
 
-4. **Obtain Certifications**
-   - Submit SOC 2 audit request
-   - Apply for ISO 27001 certification
-   - Complete NIST RMF assessment
+# Add GCP service account key (for cloud deployment)
+gh secret set GCP_SERVICE_ACCOUNT_KEY --body "$(cat service-account-key.json)"
+```
+
+## Step 10: Verify security workflows
+
+Trigger the security workflows manually to verify they work:
+
+```bash
+# Trigger CodeQL scan
+gh workflow run codeql.yml
+
+# Trigger Gitleaks scan
+gh workflow run gitleaks.yml
+
+# Check workflow status
+gh run list --workflow=codeql.yml
+gh run list --workflow=gitleaks.yml
+```
+
+## Architecture verification
+
+Your repository should now have this structure:
+
+```
+iLuminara-Core/
+├── .github/
+│   ├── workflows/
+│   │   ├── codeql.yml          ✅ SAST scanning
+│   │   └── gitleaks.yml        ✅ Secret detection
+│   └── dependabot.yml          ✅ Daily security updates
+├── .gitleaks.toml              ✅ Secret detection rules
+├── config/
+│   └── sovereign_guardrail.yaml ✅ Compliance configuration
+├── governance_kernel/
+│   ├── vector_ledger.py        ✅ SovereignGuardrail
+│   ├── crypto_shredder.py      ✅ IP-02 implementation
+│   └── ethical_engine.py       ✅ Humanitarian constraints
+├── scripts/
+│   └── validate_fortress.sh    ✅ Fortress validation
+└── edge_node/
+    ├── frenasa_engine/         ✅ Voice processing
+    ├── ai_agents/              ✅ Autonomous surveillance
+    └── sync_protocol/          ✅ Golden Thread (IP-05)
+```
+
+## Nuclear IP Stack status
+
+After implementation, your Nuclear IP Stack status:
+
+| IP | Name | Status | Notes |
+|----|------|--------|-------|
+| **IP-02** | Crypto Shredder | ✅ **ACTIVE** | Data dissolution implemented |
+| **IP-03** | Acorn Protocol | ⚠️ **REQUIRES HARDWARE** | TPM attestation needed |
+| **IP-04** | Silent Flux | ⚠️ **REQUIRES INTEGRATION** | Anxiety monitoring needed |
+| **IP-05** | Golden Thread | ✅ **ACTIVE** | Data fusion operational |
+| **IP-06** | 5DM Bridge | ⚠️ **REQUIRES MOBILE NETWORK** | API injection pending |
+
+## Troubleshooting
+
+### CodeQL workflow fails
+
+**Issue:** CodeQL analysis fails with "No code to analyze"
+
+**Solution:** Ensure you have Python and JavaScript code in your repository. Check `.github/workflows/codeql.yml` language matrix.
+
+### Gitleaks finds false positives
+
+**Issue:** Gitleaks flags test data or examples as secrets
+
+**Solution:** Add patterns to `.gitleaks.toml` allowlist:
+
+```toml
+[allowlist]
+paths = [
+  '''.*_test\.py''',
+  '''.*\.example''',
+]
+```
+
+### Crypto Shredder import error
+
+**Issue:** `ModuleNotFoundError: No module named 'cryptography'`
+
+**Solution:** Install dependencies:
+
+```bash
+pip install cryptography>=41.0.0
+```
+
+### Validation script fails
+
+**Issue:** `./scripts/validate_fortress.sh: Permission denied`
+
+**Solution:** Make script executable:
+
+```bash
+chmod +x scripts/validate_fortress.sh
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Deploy to GCP"
+    icon="google"
+    href="/deployment/gcp"
+  >
+    Deploy the Fortress to Google Cloud Platform
+  </Card>
+  <Card
+    title="Configure monitoring"
+    icon="chart-line"
+    href="/deployment/monitoring"
+  >
+    Set up Prometheus and Grafana dashboards
+  </Card>
+  <Card
+    title="Test AI agents"
+    icon="brain-circuit"
+    href="/ai-agents/overview"
+  >
+    Deploy autonomous surveillance agents
+  </Card>
+  <Card
+    title="Security workflows"
+    icon="workflow"
+    href="/security/workflows"
+  >
+    Deep dive into security automation
+  </Card>
+</CardGroup>
 
 ## Support
 
-For implementation assistance:
-- **Technical Support:** tech@iluminara.health
-- **Compliance Questions:** compliance@iluminara.health
-- **Security Issues:** security@iluminara.health
+If you encounter issues during implementation:
+
+1. **Check validation output**: `./scripts/validate_fortress.sh`
+2. **Review workflow logs**: `gh run list` and `gh run view <run-id>`
+3. **Verify environment**: Ensure all environment variables are set
+4. **Check dependencies**: `pip list | grep -E "cryptography|flask|streamlit"`
+
+The Sovereign Health Fortress is now operational. 🛡️
