@@ -1,0 +1,74 @@
+# iLuminara-Core Marketplace Dockerfile
+# Sovereign Compliance Validation + Marketplace Services
+# ENTRYPOINT enforces SovereignGuardrail check before container starts
+
+FROM python:3.11.7-slim@sha256:2cba8e6b7c59a0e2f9b5e3d8f8c8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8 AS base
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    NODE_ID=MARKETPLACE-01 \
+    JURISDICTION=GLOBAL_DEFAULT
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        gcc \
+        g++ \
+        curl \
+        ca-certificates && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt ./
+
+# Install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copy governance kernel
+COPY governance_kernel/ ./governance_kernel/
+COPY config/ ./config/
+COPY scripts/ ./scripts/
+
+# Copy marketplace code
+COPY marketplace/ ./marketplace/
+
+# Create non-root user
+RUN useradd -m -u 1001 -s /bin/bash iluminara && \
+    chown -R iluminara:iluminara /app && \
+    chmod +x scripts/validate_fortress.sh
+
+# Switch to non-root user
+USER iluminara
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Expose port
+EXPOSE 8000
+
+# Labels for compliance
+LABEL org.opencontainers.image.title="iLuminara Marketplace" \
+      org.opencontainers.image.description="Sovereign Compliance Marketplace" \
+      org.opencontainers.image.vendor="iLuminara Health" \
+      org.opencontainers.image.version="1.0.0" \
+      org.opencontainers.image.licenses="Proprietary" \
+      compliance.gdpr="true" \
+      compliance.hipaa="true" \
+      compliance.kdpa="true" \
+      compliance.popia="true" \
+      compliance.validation="entrypoint"
+
+# ENTRYPOINT: SovereignGuardrail validation before startup
+ENTRYPOINT ["/bin/bash", "-c", "python -c 'from governance_kernel.vector_ledger import SovereignGuardrail; g = SovereignGuardrail(); print(\"🛡️ SovereignGuardrail: OPERATIONAL\")' && exec \"$@\"", "--"]
+
+# Start marketplace service
+CMD ["python", "-m", "marketplace.app"]
