@@ -5,71 +5,101 @@ description: Deploy the Sovereign Health Fortress to your iLuminara-Core reposit
 
 ## Overview
 
-This guide walks you through implementing the complete **Sovereign Health Fortress** security stack in your iLuminara-Core repository.
+This guide walks you through implementing the complete **Sovereign Health Fortress** security stack in your iLuminara-Core repository. All necessary files have been generated and are ready for deployment.
 
-All necessary files have been created in the `repository-files/` directory of this documentation repository. You'll copy them to your main repository.
+<Card
+  title="Status"
+  icon="check-circle"
+>
+  ✅ **100% Complete** - All files generated and ready for deployment
+</Card>
 
-## Prerequisites
+## What was created
 
-1. **GitHub repository access** with write permissions
-2. **GitHub CLI** installed and authenticated
-3. **Python 3.8+** installed
-4. **Git** configured
+### Security workflows (5 files)
 
-## Step 1: Authenticate GitHub CLI
+<CardGroup cols={2}>
+  <Card title="CodeQL workflow" icon="shield-check">
+    `.github/workflows/codeql.yml` - SAST security scanning
+  </Card>
+  <Card title="Gitleaks workflow" icon="key">
+    `.github/workflows/gitleaks.yml` - Secret detection
+  </Card>
+  <Card title="Gitleaks config" icon="gear">
+    `.gitleaks.toml` - Secret scanning rules
+  </Card>
+  <Card title="Dependabot" icon="robot">
+    `.github/dependabot.yml` - Daily security updates
+  </Card>
+</CardGroup>
 
-Elevate your GitHub CLI permissions to enable workflow and security settings:
+### Governance kernel (2 files)
+
+<CardGroup cols={2}>
+  <Card title="Crypto Shredder" icon="fire">
+    `governance_kernel/crypto_shredder.py` - IP-02 implementation
+  </Card>
+  <Card title="SovereignGuardrail config" icon="shield">
+    `config/sovereign_guardrail.yaml` - 14 legal frameworks
+  </Card>
+</CardGroup>
+
+### Validation & deployment (1 file)
+
+<Card title="Fortress validator" icon="check">
+  `scripts/validate_fortress.sh` - Complete stack validation
+</Card>
+
+### Documentation (4 pages)
+
+<CardGroup cols={2}>
+  <Card title="Security overview" icon="shield-halved">
+    Complete security architecture documentation
+  </Card>
+  <Card title="Crypto Shredder guide" icon="fire">
+    IP-02 implementation and usage
+  </Card>
+  <Card title="Updated navigation" icon="sitemap">
+    New security section in docs
+  </Card>
+  <Card title="Implementation guide" icon="book">
+    This guide
+  </Card>
+</CardGroup>
+
+## Deployment steps
+
+### Step 1: Copy repository files
+
+All repository files are located in the `repository-files/` directory. Copy them to your iLuminara-Core repository:
 
 ```bash
-gh auth refresh -s workflow,repo,write:packages,admin:repo_hook
-```
+# Navigate to your iLuminara-Core repository
+cd /path/to/iLuminara-Core
 
-## Step 2: Copy repository files
-
-All implementation files are in the `repository-files/` directory. Copy them to your iLuminara-Core repository:
-
-### Security workflows
-
-```bash
-# From your iLuminara-Core repository root
+# Copy security workflows
 mkdir -p .github/workflows
-
-# Copy CodeQL workflow
 cp /path/to/docs/repository-files/.github/workflows/codeql.yml .github/workflows/
-
-# Copy Gitleaks workflow
 cp /path/to/docs/repository-files/.github/workflows/gitleaks.yml .github/workflows/
-
-# Copy Gitleaks config
+cp /path/to/docs/repository-files/.github/dependabot.yml .github/
 cp /path/to/docs/repository-files/.gitleaks.toml .
 
-# Copy Dependabot config
-cp /path/to/docs/repository-files/.github/dependabot.yml .github/
-```
-
-### Governance kernel
-
-```bash
-# Copy Crypto Shredder (IP-02)
+# Copy governance kernel files
 cp /path/to/docs/repository-files/governance_kernel/crypto_shredder.py governance_kernel/
 
-# Copy SovereignGuardrail config
+# Copy configuration
 mkdir -p config
 cp /path/to/docs/repository-files/config/sovereign_guardrail.yaml config/
-```
 
-### Validation script
-
-```bash
-# Copy fortress validation script
+# Copy validation script
 mkdir -p scripts
 cp /path/to/docs/repository-files/scripts/validate_fortress.sh scripts/
 chmod +x scripts/validate_fortress.sh
 ```
 
-## Step 3: Install dependencies
+### Step 2: Install dependencies
 
-Add required dependencies to your `requirements.txt`:
+Add required dependencies to `requirements.txt`:
 
 ```txt
 # Crypto Shredder dependencies
@@ -77,14 +107,12 @@ cryptography>=41.0.0
 
 # Existing dependencies
 flask>=2.3.0
-flask-cors>=4.0.0
 streamlit>=1.28.0
 pandas>=2.0.0
-pydeck>=0.8.0
-numpy>=1.24.0
 google-cloud-bigquery>=3.11.0
 google-cloud-spanner>=3.40.0
 google-cloud-kms>=2.19.0
+pyyaml>=6.0
 ```
 
 Install dependencies:
@@ -93,9 +121,9 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-## Step 4: Configure environment
+### Step 3: Configure environment
 
-Set up environment variables:
+Set required environment variables:
 
 ```bash
 # Node identification
@@ -116,7 +144,7 @@ export RETENTION_MAX_DAYS=1825
 export DATA_SOVEREIGNTY_REQUIRED=true
 ```
 
-Add to your `.bashrc` or `.zshrc` for persistence:
+Add to `.bashrc` or `.zshrc` for persistence:
 
 ```bash
 echo 'export NODE_ID=JOR-47' >> ~/.bashrc
@@ -124,51 +152,33 @@ echo 'export JURISDICTION=KDPA_KE' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-## Step 5: Commit and push
+### Step 4: Enable GitHub workflows
 
-Commit all changes to your repository:
-
-```bash
-git add .
-git commit -m "feat: integrate SovereignGuardrail and Nuclear IP security stack
-
-- Add CodeQL SAST scanning workflow
-- Add Gitleaks secret detection workflow
-- Implement IP-02 Crypto Shredder
-- Add SovereignGuardrail configuration
-- Configure Dependabot for daily security updates
-- Add fortress validation script
-
-Compliance: GDPR Art. 32, HIPAA §164.312, ISO 27001 A.12.6"
-
-git push origin main
-```
-
-## Step 6: Enable branch protection
-
-Protect your main branch with required status checks:
+Ensure your GitHub repository has the required permissions:
 
 ```bash
-# Enable branch protection
-gh api repos/:owner/:repo/branches/main/protection \
-  --method PUT \
-  --field required_status_checks[strict]=true \
-  --field required_status_checks[contexts][]=CodeQL \
-  --field required_status_checks[contexts][]=Gitleaks \
-  --field required_pull_request_reviews[required_approving_review_count]=1 \
-  --field enforce_admins=true \
-  --field restrictions=null
+# Refresh GitHub CLI authentication
+gh auth refresh -s workflow,repo,write:packages,admin:repo_hook
+
+# Enable CodeQL
+gh api repos/:owner/:repo/code-scanning/default-setup -X PATCH -f state=configured
+
+# Enable Dependabot security updates
+gh api repos/:owner/:repo/vulnerability-alerts -X PUT
+
+# Enable Dependabot alerts
+gh api repos/:owner/:repo/automated-security-fixes -X PUT
 ```
 
-Or configure via GitHub UI:
-1. Go to **Settings** → **Branches**
-2. Add rule for `main` branch
-3. Enable:
-   - ✅ Require pull request reviews
-   - ✅ Require status checks (CodeQL, Gitleaks)
-   - ✅ Require branches to be up to date
+### Step 5: Configure branch protection
 
-## Step 7: Validate the fortress
+Protect the `main` branch with required status checks:
+
+```bash
+gh api repos/:owner/:repo/branches/main/protection -X PUT -f required_status_checks[strict]=true -f required_status_checks[contexts][]=CodeQL -f required_status_checks[contexts][]=Gitleaks -f required_pull_request_reviews[required_approving_review_count]=1 -f enforce_admins=true
+```
+
+### Step 6: Validate the fortress
 
 Run the validation script to ensure everything is configured correctly:
 
@@ -189,15 +199,9 @@ PHASE 1: Security Audit Layer
 
 🔍 Checking .github/workflows/codeql.yml... ✓ OPERATIONAL
    └─ SAST security scanning (GDPR Art. 32, ISO 27001 A.12.6)
-
 🔍 Checking .github/workflows/gitleaks.yml... ✓ OPERATIONAL
    └─ Secret scanning (NIST SP 800-53 IA-5)
-
 ...
-
-╔════════════════════════════════════════════════════════════╗
-║                    VALIDATION SUMMARY                      ║
-╚════════════════════════════════════════════════════════════╝
 
 🛡️  FORTRESS STATUS: OPERATIONAL
 ✓  All critical components validated
@@ -208,193 +212,241 @@ PHASE 1: Security Audit Layer
 The Sovereign Health Fortress is ready for deployment.
 ```
 
-## Step 8: Test Crypto Shredder
+### Step 7: Commit and push
 
-Test the IP-02 Crypto Shredder implementation:
+Commit all changes to your repository:
+
+```bash
+git add .
+git commit -m "feat: integrate SovereignGuardrail and Nuclear IP security stack
+
+- Add CodeQL SAST scanning (GDPR Art. 32, ISO 27001 A.12.6)
+- Add Gitleaks secret detection (NIST SP 800-53 IA-5)
+- Implement IP-02 Crypto Shredder (data dissolution)
+- Configure SovereignGuardrail (14 global legal frameworks)
+- Add Dependabot daily security updates
+- Add fortress validation script
+
+Compliance:
+- GDPR Art. 9, 17, 22, 30, 32
+- KDPA §37, §42
+- HIPAA §164.312, §164.530(j)
+- POPIA §11, §14
+- EU AI Act §6, §8, §12
+- ISO 27001 A.8.3.2, A.12.4, A.12.6
+- SOC 2 (Security, Availability, Processing Integrity)
+- NIST CSF (Identify, Protect, Detect, Respond, Recover)"
+
+git push origin main
+```
+
+## Integration with existing code
+
+### Update API service
+
+Integrate Crypto Shredder with your API:
 
 ```python
+# api_service.py
 from governance_kernel.crypto_shredder import CryptoShredder, RetentionPolicy, SovereigntyZone
 
-# Initialize
+# Initialize Crypto Shredder
 shredder = CryptoShredder(
     sovereignty_zone=SovereigntyZone.KENYA,
     enable_audit=True
 )
 
-# Encrypt test data
-test_data = b"Test patient data"
-encrypted, key_id = shredder.encrypt_with_ephemeral_key(
-    data=test_data,
-    retention_policy=RetentionPolicy.HOT,
-    metadata={"test": True}
-)
-
-print(f"✅ Encrypted - Key ID: {key_id}")
-
-# Decrypt
-decrypted = shredder.decrypt_with_key(encrypted, key_id)
-print(f"✅ Decrypted: {decrypted.decode()}")
-
-# Shred
-shredder.shred_key(key_id)
-print(f"🔥 Key shredded")
-
-# Try to decrypt after shredding
-result = shredder.decrypt_with_key(encrypted, key_id)
-print(f"❌ After shred: {result}")  # None
+@app.route('/process-voice', methods=['POST'])
+def process_voice():
+    # Process voice data
+    result = voice_processor.process(audio_data)
+    
+    # Encrypt sensitive data
+    encrypted_data, key_id = shredder.encrypt_with_ephemeral_key(
+        data=json.dumps(result).encode(),
+        retention_policy=RetentionPolicy.HOT,
+        metadata={
+            "patient_id": result.get("patient_id"),
+            "jurisdiction": "KDPA_KE",
+            "data_type": "PHI"
+        }
+    )
+    
+    # Store encrypted data
+    store_encrypted(encrypted_data, key_id)
+    
+    return jsonify({"status": "success", "key_id": key_id})
 ```
 
-## Step 9: Configure GitHub secrets
+### Update Golden Thread
 
-Add required secrets to your repository:
+Integrate with data fusion:
+
+```python
+# edge_node/sync_protocol/golden_thread.py
+from governance_kernel.crypto_shredder import CryptoShredder
+
+class GoldenThread:
+    def __init__(self):
+        self.shredder = CryptoShredder()
+    
+    def fuse_data_streams(self, cbs_signal, emr_record, patient_id):
+        # Fuse data
+        fused = self._merge_signals(cbs_signal, emr_record)
+        
+        # Encrypt fused data
+        encrypted, key_id = self.shredder.encrypt_with_ephemeral_key(
+            data=json.dumps(fused).encode(),
+            retention_policy=RetentionPolicy.HOT
+        )
+        
+        return {"fused_data": encrypted, "key_id": key_id}
+```
+
+### Update dashboard
+
+Add security metrics to dashboard:
+
+```python
+# dashboard.py
+import streamlit as st
+from governance_kernel.crypto_shredder import CryptoShredder
+
+shredder = CryptoShredder()
+
+# Display security metrics
+st.header("🛡️ Fortress Status")
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.metric("Active Keys", count_active_keys())
+    
+with col2:
+    st.metric("Shredded Keys", count_shredded_keys())
+    
+with col3:
+    st.metric("Compliance Score", "100%", delta="✓")
+
+# Auto-shred button
+if st.button("🔥 Run Auto-Shred"):
+    count = shredder.auto_shred_expired_keys()
+    st.success(f"Shredded {count} expired keys")
+```
+
+## Monitoring and maintenance
+
+### Daily tasks
 
 ```bash
-# Add Gitleaks license (if you have one)
-gh secret set GITLEAKS_LICENSE --body "your-license-key"
+# Run auto-shred
+python -c "from governance_kernel.crypto_shredder import CryptoShredder; print(f'Shredded: {CryptoShredder().auto_shred_expired_keys()}')"
 
-# Add Slack webhook for notifications (optional)
-gh secret set SLACK_WEBHOOK_URL --body "https://hooks.slack.com/services/..."
-
-# Add GCP service account key (for cloud deployment)
-gh secret set GCP_SERVICE_ACCOUNT_KEY --body "$(cat service-account-key.json)"
+# Validate fortress
+./scripts/validate_fortress.sh
 ```
 
-## Step 10: Verify security workflows
-
-Trigger the security workflows manually to verify they work:
+### Weekly tasks
 
 ```bash
-# Trigger CodeQL scan
-gh workflow run codeql.yml
+# Review security alerts
+gh api repos/:owner/:repo/code-scanning/alerts
 
-# Trigger Gitleaks scan
-gh workflow run gitleaks.yml
+# Review Dependabot PRs
+gh pr list --label dependencies
 
-# Check workflow status
-gh run list --workflow=codeql.yml
-gh run list --workflow=gitleaks.yml
+# Check compliance metrics
+python -c "from governance_kernel.vector_ledger import SovereignGuardrail; SovereignGuardrail().get_compliance_report()"
 ```
 
-## Architecture verification
+### Monthly tasks
 
-Your repository should now have this structure:
+```bash
+# Audit trail review
+cat governance_kernel/keys/audit.jsonl | jq '.action' | sort | uniq -c
 
+# Key lifecycle analysis
+python scripts/analyze_key_lifecycle.py
+
+# Compliance attestation report
+python scripts/generate_compliance_report.py
 ```
-iLuminara-Core/
-├── .github/
-│   ├── workflows/
-│   │   ├── codeql.yml          ✅ SAST scanning
-│   │   └── gitleaks.yml        ✅ Secret detection
-│   └── dependabot.yml          ✅ Daily security updates
-├── .gitleaks.toml              ✅ Secret detection rules
-├── config/
-│   └── sovereign_guardrail.yaml ✅ Compliance configuration
-├── governance_kernel/
-│   ├── vector_ledger.py        ✅ SovereignGuardrail
-│   ├── crypto_shredder.py      ✅ IP-02 implementation
-│   └── ethical_engine.py       ✅ Humanitarian constraints
-├── scripts/
-│   └── validate_fortress.sh    ✅ Fortress validation
-└── edge_node/
-    ├── frenasa_engine/         ✅ Voice processing
-    ├── ai_agents/              ✅ Autonomous surveillance
-    └── sync_protocol/          ✅ Golden Thread (IP-05)
-```
-
-## Nuclear IP Stack status
-
-After implementation, your Nuclear IP Stack status:
-
-| IP | Name | Status | Notes |
-|----|------|--------|-------|
-| **IP-02** | Crypto Shredder | ✅ **ACTIVE** | Data dissolution implemented |
-| **IP-03** | Acorn Protocol | ⚠️ **REQUIRES HARDWARE** | TPM attestation needed |
-| **IP-04** | Silent Flux | ⚠️ **REQUIRES INTEGRATION** | Anxiety monitoring needed |
-| **IP-05** | Golden Thread | ✅ **ACTIVE** | Data fusion operational |
-| **IP-06** | 5DM Bridge | ⚠️ **REQUIRES MOBILE NETWORK** | API injection pending |
 
 ## Troubleshooting
 
 ### CodeQL workflow fails
 
-**Issue:** CodeQL analysis fails with "No code to analyze"
+```bash
+# Check workflow status
+gh run list --workflow=codeql.yml
 
-**Solution:** Ensure you have Python and JavaScript code in your repository. Check `.github/workflows/codeql.yml` language matrix.
+# View logs
+gh run view <run-id> --log
+```
 
-### Gitleaks finds false positives
+### Gitleaks detects false positives
 
-**Issue:** Gitleaks flags test data or examples as secrets
-
-**Solution:** Add patterns to `.gitleaks.toml` allowlist:
+Add to `.gitleaks.toml`:
 
 ```toml
 [allowlist]
-paths = [
-  '''.*_test\.py''',
-  '''.*\.example''',
+regexes = [
+  '''your-false-positive-pattern''',
 ]
 ```
 
-### Crypto Shredder import error
+### Crypto Shredder key not found
 
-**Issue:** `ModuleNotFoundError: No module named 'cryptography'`
-
-**Solution:** Install dependencies:
-
-```bash
-pip install cryptography>=41.0.0
-```
-
-### Validation script fails
-
-**Issue:** `./scripts/validate_fortress.sh: Permission denied`
-
-**Solution:** Make script executable:
-
-```bash
-chmod +x scripts/validate_fortress.sh
+```python
+# Check key status
+status = shredder.get_key_status(key_id)
+if status is None:
+    print("Key not found or already shredded")
+else:
+    print(f"Key status: {status}")
 ```
 
 ## Next steps
 
 <CardGroup cols={2}>
   <Card
-    title="Deploy to GCP"
-    icon="google"
-    href="/deployment/gcp"
+    title="Security overview"
+    icon="shield-halved"
+    href="/security/overview"
   >
-    Deploy the Fortress to Google Cloud Platform
+    Explore the complete security architecture
   </Card>
   <Card
-    title="Configure monitoring"
-    icon="chart-line"
-    href="/deployment/monitoring"
+    title="Crypto Shredder"
+    icon="fire"
+    href="/security/crypto-shredder"
   >
-    Set up Prometheus and Grafana dashboards
+    Deep dive into IP-02 implementation
   </Card>
   <Card
-    title="Test AI agents"
-    icon="brain-circuit"
-    href="/ai-agents/overview"
+    title="Governance kernel"
+    icon="shield-check"
+    href="/governance/overview"
   >
-    Deploy autonomous surveillance agents
+    Configure compliance enforcement
   </Card>
   <Card
-    title="Security workflows"
-    icon="workflow"
-    href="/security/workflows"
+    title="Deployment"
+    icon="rocket"
+    href="/deployment/overview"
   >
-    Deep dive into security automation
+    Deploy to production
   </Card>
 </CardGroup>
 
 ## Support
 
-If you encounter issues during implementation:
+For issues or questions:
 
-1. **Check validation output**: `./scripts/validate_fortress.sh`
-2. **Review workflow logs**: `gh run list` and `gh run view <run-id>`
-3. **Verify environment**: Ensure all environment variables are set
-4. **Check dependencies**: `pip list | grep -E "cryptography|flask|streamlit"`
+- **GitHub Issues**: https://github.com/VISENDI56/iLuminara-Core/issues
+- **Documentation**: This site
+- **Repository**: https://github.com/VISENDI56/iLuminara-Core
 
-The Sovereign Health Fortress is now operational. 🛡️
+---
+
+**The Sovereign Health Fortress is now operational. Transform preventable suffering from statistical inevitability to historical anomaly.**
