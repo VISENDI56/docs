@@ -1,506 +1,587 @@
 """
 IP-09: Chrono-Audit
-Temporal integrity verification with cryptographic time-stamping.
+Retroactive compliance verification when laws change
 
-Every sovereignty decision is timestamped with RFC 3161 compliant signatures,
-creating an immutable temporal chain that proves "when" decisions were made.
+Allows iLuminara to:
+1. Re-audit historical actions against new legal frameworks
+2. Prove compliance at the time of action (even if law changed later)
+3. Generate compliance reports for any point in time
+4. Handle regulatory changes without data migration
 
 Compliance:
 - GDPR Art. 30 (Records of Processing Activities)
-- HIPAA §164.312(b) (Audit Controls)
-- ISO 27001 A.12.4.1 (Event Logging)
-- SOC 2 CC7.2 (System Monitoring)
-- eIDAS Regulation (EU) 910/2014 (Qualified Time Stamps)
+- ISO 27001 A.18.1.5 (Regulation of Cryptographic Controls)
+- SOC 2 (Logical and Physical Access Controls)
 """
 
-import hashlib
 import json
-import time
+import hashlib
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from enum import Enum
-import hmac
-from dataclasses import dataclass, asdict
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-class ChronoEventType(Enum):
-    """Types of events tracked by Chrono-Audit"""
-    DATA_TRANSFER = "data_transfer"
-    HIGH_RISK_INFERENCE = "high_risk_inference"
-    CONSENT_VALIDATION = "consent_validation"
-    KEY_SHRED = "key_shred"
-    SOVEREIGNTY_VIOLATION = "sovereignty_violation"
-    EMERGENCY_OVERRIDE = "emergency_override"
-    CROSS_BORDER_TRANSFER = "cross_border_transfer"
-    RETENTION_POLICY_CHANGE = "retention_policy_change"
-    ACCESS_GRANT = "access_grant"
-    ACCESS_REVOKE = "access_revoke"
-
-
-class TemporalIntegrityLevel(Enum):
-    """Levels of temporal integrity verification"""
-    BASIC = "basic"              # Simple timestamp
-    SIGNED = "signed"            # HMAC-signed timestamp
-    CHAINED = "chained"          # Hash-chained with previous event
-    RFC3161 = "rfc3161"          # RFC 3161 compliant (requires TSA)
-
-
-@dataclass
-class ChronoEvent:
-    """A single event in the temporal audit chain"""
-    event_id: str
-    event_type: ChronoEventType
-    timestamp: str  # ISO 8601 format
-    timestamp_unix: float
-    actor: str
-    resource: str
-    action: str
-    jurisdiction: str
-    metadata: Dict
-    
-    # Cryptographic integrity
-    event_hash: str
-    previous_hash: str
-    signature: Optional[str] = None
-    
-    # Temporal verification
-    integrity_level: TemporalIntegrityLevel = TemporalIntegrityLevel.CHAINED
-    tsa_signature: Optional[str] = None  # Time Stamping Authority signature
-    
-    # Compliance tags
-    compliance_frameworks: List[str] = None
-    retention_until: Optional[str] = None
+class LawChangeType(Enum):
+    """Types of legal framework changes"""
+    NEW_LAW = "new_law"
+    AMENDMENT = "amendment"
+    REPEAL = "repeal"
+    INTERPRETATION_CHANGE = "interpretation_change"
+    THRESHOLD_CHANGE = "threshold_change"
 
 
 class ChronoAudit:
     """
-    IP-09: Chrono-Audit implementation
+    IP-09: Chrono-Audit for retroactive compliance verification
     
-    Creates an immutable temporal chain of sovereignty decisions with
-    cryptographic time-stamping and hash-chaining.
+    Maintains a temporal ledger of:
+    - All actions taken by the system
+    - Legal frameworks in effect at time of action
+    - Compliance decisions made
+    - Law changes over time
+    
+    Enables:
+    - Retroactive audits when laws change
+    - Proof of compliance at time of action
+    - Historical compliance reports
+    - Regulatory change impact analysis
     """
     
     def __init__(
         self,
-        secret_key: str = None,
-        integrity_level: TemporalIntegrityLevel = TemporalIntegrityLevel.CHAINED,
-        enable_tsa: bool = False,
-        tsa_url: Optional[str] = None
+        storage_path: str = "./chrono_audit",
+        enable_cryptographic_proof: bool = True
+    ):
+        self.storage_path = storage_path
+        self.enable_cryptographic_proof = enable_cryptographic_proof
+        
+        # Temporal ledger
+        self.action_ledger = []
+        self.law_version_ledger = []
+        self.compliance_decision_ledger = []
+        
+        # Hash chain for tamper-proof audit
+        self.previous_hash = "0" * 64  # Genesis hash
+        
+        logger.info("⏰ IP-09 Chrono-Audit initialized")
+    
+    def log_action(
+        self,
+        action_type: str,
+        payload: Dict,
+        context: str,
+        jurisdiction: str,
+        actor: str
+    ) -> str:
+        """
+        Log an action to the temporal ledger
+        
+        Args:
+            action_type: Type of action (Data_Transfer, High_Risk_Inference, etc.)
+            payload: Action payload
+            context: Sectoral context
+            jurisdiction: Legal jurisdiction
+            actor: Who performed the action
+        
+        Returns:
+            Action ID (hash)
+        """
+        timestamp = datetime.utcnow()
+        
+        action_record = {
+            "action_id": None,  # Will be set after hashing
+            "timestamp": timestamp.isoformat(),
+            "action_type": action_type,
+            "payload": payload,
+            "context": context,
+            "jurisdiction": jurisdiction,
+            "actor": actor,
+            "applicable_laws_at_time": self._get_applicable_laws(timestamp, context, jurisdiction),
+            "previous_hash": self.previous_hash
+        }
+        
+        # Generate action ID (hash of record)
+        action_id = self._hash_record(action_record)
+        action_record["action_id"] = action_id
+        
+        # Update hash chain
+        self.previous_hash = action_id
+        
+        # Store in ledger
+        self.action_ledger.append(action_record)
+        
+        logger.info(f"📝 Action logged: {action_id[:16]}... ({action_type})")
+        
+        return action_id
+    
+    def log_compliance_decision(
+        self,
+        action_id: str,
+        framework_id: str,
+        compliant: bool,
+        violations: List[Dict],
+        decision_rationale: str
     ):
         """
-        Initialize Chrono-Audit
+        Log a compliance decision for an action
         
         Args:
-            secret_key: Secret key for HMAC signing
-            integrity_level: Level of temporal integrity verification
-            enable_tsa: Enable RFC 3161 Time Stamping Authority
-            tsa_url: URL of TSA service (e.g., http://timestamp.digicert.com)
+            action_id: ID of the action being evaluated
+            framework_id: Legal framework being checked
+            compliant: Whether action was compliant
+            violations: List of violations (if any)
+            decision_rationale: Explanation of decision
         """
-        self.secret_key = secret_key or self._generate_secret_key()
-        self.integrity_level = integrity_level
-        self.enable_tsa = enable_tsa
-        self.tsa_url = tsa_url
+        timestamp = datetime.utcnow()
         
-        # Temporal chain
-        self.chain: List[ChronoEvent] = []
-        self.genesis_hash = self._create_genesis_hash()
-        
-        logger.info(f"🕐 Chrono-Audit initialized - Integrity: {integrity_level.value}")
-    
-    def _generate_secret_key(self) -> str:
-        """Generate a secret key for HMAC signing"""
-        import secrets
-        return secrets.token_hex(32)
-    
-    def _create_genesis_hash(self) -> str:
-        """Create the genesis hash for the temporal chain"""
-        genesis_data = {
-            "event": "CHRONO_AUDIT_GENESIS",
-            "timestamp": datetime.utcnow().isoformat(),
-            "integrity_level": self.integrity_level.value
-        }
-        return hashlib.sha256(json.dumps(genesis_data).encode()).hexdigest()
-    
-    def _compute_event_hash(self, event_data: Dict) -> str:
-        """Compute SHA-256 hash of event data"""
-        canonical_json = json.dumps(event_data, sort_keys=True)
-        return hashlib.sha256(canonical_json.encode()).hexdigest()
-    
-    def _sign_event(self, event_hash: str) -> str:
-        """Sign event hash with HMAC-SHA256"""
-        return hmac.new(
-            self.secret_key.encode(),
-            event_hash.encode(),
-            hashlib.sha256
-        ).hexdigest()
-    
-    def _get_tsa_signature(self, event_hash: str) -> Optional[str]:
-        """
-        Get RFC 3161 compliant timestamp from Time Stamping Authority
-        
-        Note: This is a placeholder. In production, integrate with a real TSA
-        like DigiCert, Sectigo, or FreeTSA.
-        """
-        if not self.enable_tsa or not self.tsa_url:
-            return None
-        
-        # TODO: Implement RFC 3161 TSA integration
-        # For now, return a mock signature
-        logger.warning("⚠️ TSA integration not implemented - using mock signature")
-        return f"TSA_MOCK_{event_hash[:16]}"
-    
-    def record_event(
-        self,
-        event_type: ChronoEventType,
-        actor: str,
-        resource: str,
-        action: str,
-        jurisdiction: str,
-        metadata: Optional[Dict] = None,
-        compliance_frameworks: Optional[List[str]] = None,
-        retention_days: Optional[int] = None
-    ) -> ChronoEvent:
-        """
-        Record a new event in the temporal audit chain
-        
-        Args:
-            event_type: Type of event
-            actor: Who performed the action
-            resource: What resource was affected
-            action: What action was performed
-            jurisdiction: Legal jurisdiction
-            metadata: Additional event metadata
-            compliance_frameworks: Applicable compliance frameworks
-            retention_days: How long to retain this event
-        
-        Returns:
-            ChronoEvent with cryptographic temporal proof
-        """
-        # Generate event ID
-        event_id = hashlib.sha256(
-            f"{time.time()}{actor}{resource}".encode()
-        ).hexdigest()[:16]
-        
-        # Timestamp
-        now = datetime.utcnow()
-        timestamp_iso = now.isoformat() + "Z"
-        timestamp_unix = now.timestamp()
-        
-        # Previous hash (for chain integrity)
-        previous_hash = self.chain[-1].event_hash if self.chain else self.genesis_hash
-        
-        # Event data for hashing
-        event_data = {
-            "event_id": event_id,
-            "event_type": event_type.value,
-            "timestamp": timestamp_iso,
-            "timestamp_unix": timestamp_unix,
-            "actor": actor,
-            "resource": resource,
-            "action": action,
-            "jurisdiction": jurisdiction,
-            "metadata": metadata or {},
-            "previous_hash": previous_hash
+        decision_record = {
+            "decision_id": None,
+            "timestamp": timestamp.isoformat(),
+            "action_id": action_id,
+            "framework_id": framework_id,
+            "framework_version": self._get_law_version(framework_id, timestamp),
+            "compliant": compliant,
+            "violations": violations,
+            "decision_rationale": decision_rationale,
+            "previous_hash": self.previous_hash
         }
         
-        # Compute event hash
-        event_hash = self._compute_event_hash(event_data)
+        # Generate decision ID
+        decision_id = self._hash_record(decision_record)
+        decision_record["decision_id"] = decision_id
         
-        # Sign event (if integrity level requires it)
-        signature = None
-        if self.integrity_level in [TemporalIntegrityLevel.SIGNED, TemporalIntegrityLevel.CHAINED]:
-            signature = self._sign_event(event_hash)
+        # Update hash chain
+        self.previous_hash = decision_id
         
-        # Get TSA signature (if enabled)
-        tsa_signature = None
-        if self.integrity_level == TemporalIntegrityLevel.RFC3161:
-            tsa_signature = self._get_tsa_signature(event_hash)
+        # Store in ledger
+        self.compliance_decision_ledger.append(decision_record)
         
-        # Calculate retention
-        retention_until = None
-        if retention_days:
-            retention_until = (now + timedelta(days=retention_days)).isoformat() + "Z"
-        
-        # Create event
-        event = ChronoEvent(
-            event_id=event_id,
-            event_type=event_type,
-            timestamp=timestamp_iso,
-            timestamp_unix=timestamp_unix,
-            actor=actor,
-            resource=resource,
-            action=action,
-            jurisdiction=jurisdiction,
-            metadata=metadata or {},
-            event_hash=event_hash,
-            previous_hash=previous_hash,
-            signature=signature,
-            integrity_level=self.integrity_level,
-            tsa_signature=tsa_signature,
-            compliance_frameworks=compliance_frameworks or [],
-            retention_until=retention_until
-        )
-        
-        # Add to chain
-        self.chain.append(event)
-        
-        logger.info(f"🕐 Event recorded - ID: {event_id}, Type: {event_type.value}")
-        
-        return event
+        logger.info(f"⚖️ Compliance decision logged: {decision_id[:16]}... (Compliant: {compliant})")
     
-    def verify_chain_integrity(self) -> Tuple[bool, List[str]]:
-        """
-        Verify the integrity of the entire temporal chain
-        
-        Returns:
-            (is_valid, list_of_errors)
-        """
-        if not self.chain:
-            return True, []
-        
-        errors = []
-        
-        # Verify genesis
-        expected_previous = self.genesis_hash
-        
-        for i, event in enumerate(self.chain):
-            # Check previous hash
-            if event.previous_hash != expected_previous:
-                errors.append(
-                    f"Event {i} ({event.event_id}): Previous hash mismatch. "
-                    f"Expected {expected_previous}, got {event.previous_hash}"
-                )
-            
-            # Recompute event hash
-            event_data = {
-                "event_id": event.event_id,
-                "event_type": event.event_type.value,
-                "timestamp": event.timestamp,
-                "timestamp_unix": event.timestamp_unix,
-                "actor": event.actor,
-                "resource": event.resource,
-                "action": event.action,
-                "jurisdiction": event.jurisdiction,
-                "metadata": event.metadata,
-                "previous_hash": event.previous_hash
-            }
-            computed_hash = self._compute_event_hash(event_data)
-            
-            if computed_hash != event.event_hash:
-                errors.append(
-                    f"Event {i} ({event.event_id}): Hash mismatch. "
-                    f"Expected {event.event_hash}, computed {computed_hash}"
-                )
-            
-            # Verify signature (if present)
-            if event.signature:
-                expected_signature = self._sign_event(event.event_hash)
-                if event.signature != expected_signature:
-                    errors.append(
-                        f"Event {i} ({event.event_id}): Signature verification failed"
-                    )
-            
-            # Update expected previous hash for next iteration
-            expected_previous = event.event_hash
-        
-        is_valid = len(errors) == 0
-        
-        if is_valid:
-            logger.info(f"✅ Chain integrity verified - {len(self.chain)} events")
-        else:
-            logger.error(f"❌ Chain integrity compromised - {len(errors)} errors")
-        
-        return is_valid, errors
-    
-    def get_events_by_type(self, event_type: ChronoEventType) -> List[ChronoEvent]:
-        """Get all events of a specific type"""
-        return [e for e in self.chain if e.event_type == event_type]
-    
-    def get_events_by_actor(self, actor: str) -> List[ChronoEvent]:
-        """Get all events by a specific actor"""
-        return [e for e in self.chain if e.actor == actor]
-    
-    def get_events_by_jurisdiction(self, jurisdiction: str) -> List[ChronoEvent]:
-        """Get all events in a specific jurisdiction"""
-        return [e for e in self.chain if e.jurisdiction == jurisdiction]
-    
-    def get_events_in_timerange(
+    def log_law_change(
         self,
-        start_time: datetime,
-        end_time: datetime
-    ) -> List[ChronoEvent]:
-        """Get all events within a time range"""
-        start_unix = start_time.timestamp()
-        end_unix = end_time.timestamp()
-        
-        return [
-            e for e in self.chain
-            if start_unix <= e.timestamp_unix <= end_unix
-        ]
-    
-    def export_chain(self, format: str = "json") -> str:
+        framework_id: str,
+        change_type: LawChangeType,
+        effective_date: datetime,
+        changes: Dict,
+        description: str
+    ):
         """
-        Export the temporal chain
+        Log a change to a legal framework
         
         Args:
-            format: Export format (json, csv, or audit_log)
-        
-        Returns:
-            Serialized chain
+            framework_id: ID of the framework being changed
+            change_type: Type of change
+            effective_date: When the change takes effect
+            changes: Dictionary of specific changes
+            description: Human-readable description
         """
-        if format == "json":
-            return json.dumps(
-                [asdict(e) for e in self.chain],
-                indent=2,
-                default=str
-            )
+        timestamp = datetime.utcnow()
         
-        elif format == "csv":
-            import csv
-            import io
-            
-            output = io.StringIO()
-            if self.chain:
-                fieldnames = asdict(self.chain[0]).keys()
-                writer = csv.DictWriter(output, fieldnames=fieldnames)
-                writer.writeheader()
-                for event in self.chain:
-                    writer.writerow(asdict(event))
-            
-            return output.getvalue()
+        law_change_record = {
+            "change_id": None,
+            "timestamp": timestamp.isoformat(),
+            "framework_id": framework_id,
+            "change_type": change_type.value,
+            "effective_date": effective_date.isoformat(),
+            "changes": changes,
+            "description": description,
+            "previous_hash": self.previous_hash
+        }
         
-        elif format == "audit_log":
-            lines = []
-            for event in self.chain:
-                lines.append(
-                    f"[{event.timestamp}] {event.event_type.value.upper()} | "
-                    f"Actor: {event.actor} | Resource: {event.resource} | "
-                    f"Action: {event.action} | Jurisdiction: {event.jurisdiction} | "
-                    f"Hash: {event.event_hash[:16]}..."
-                )
-            return "\n".join(lines)
+        # Generate change ID
+        change_id = self._hash_record(law_change_record)
+        law_change_record["change_id"] = change_id
         
-        else:
-            raise ValueError(f"Unsupported format: {format}")
+        # Update hash chain
+        self.previous_hash = change_id
+        
+        # Store in ledger
+        self.law_version_ledger.append(law_change_record)
+        
+        logger.info(f"📜 Law change logged: {change_id[:16]}... ({framework_id})")
+        
+        # Trigger retroactive audit
+        self._trigger_retroactive_audit(framework_id, effective_date)
     
-    def generate_compliance_report(
+    def retroactive_audit(
         self,
-        framework: str,
-        start_date: Optional[datetime] = None,
+        framework_id: str,
+        start_date: datetime,
         end_date: Optional[datetime] = None
     ) -> Dict:
         """
-        Generate a compliance report for a specific framework
+        Perform retroactive audit of actions against a framework
         
         Args:
-            framework: Compliance framework (e.g., "GDPR", "HIPAA")
-            start_date: Report start date
-            end_date: Report end date
+            framework_id: Framework to audit against
+            start_date: Start of audit period
+            end_date: End of audit period (default: now)
         
         Returns:
-            Compliance report with statistics
+            Audit report with compliance status
         """
-        # Filter events by framework
-        events = [
-            e for e in self.chain
-            if framework in (e.compliance_frameworks or [])
+        if end_date is None:
+            end_date = datetime.utcnow()
+        
+        logger.info(f"🔍 Starting retroactive audit: {framework_id} ({start_date} to {end_date})")
+        
+        # Find all actions in time period
+        actions_in_period = [
+            action for action in self.action_ledger
+            if start_date <= datetime.fromisoformat(action["timestamp"]) <= end_date
         ]
         
-        # Filter by date range
-        if start_date:
-            events = [e for e in events if datetime.fromisoformat(e.timestamp.rstrip('Z')) >= start_date]
-        if end_date:
-            events = [e for e in events if datetime.fromisoformat(e.timestamp.rstrip('Z')) <= end_date]
-        
-        # Calculate statistics
-        event_counts = {}
-        for event in events:
-            event_type = event.event_type.value
-            event_counts[event_type] = event_counts.get(event_type, 0) + 1
-        
-        # Verify chain integrity
-        is_valid, errors = self.verify_chain_integrity()
-        
-        report = {
-            "framework": framework,
-            "report_period": {
-                "start": start_date.isoformat() if start_date else "inception",
-                "end": end_date.isoformat() if end_date else "present"
+        # Re-evaluate each action against current framework version
+        audit_results = {
+            "framework_id": framework_id,
+            "audit_period": {
+                "start": start_date.isoformat(),
+                "end": end_date.isoformat()
             },
-            "total_events": len(events),
-            "event_breakdown": event_counts,
-            "chain_integrity": {
-                "valid": is_valid,
-                "errors": errors
-            },
-            "temporal_proof": {
-                "integrity_level": self.integrity_level.value,
-                "tsa_enabled": self.enable_tsa,
-                "signature_algorithm": "HMAC-SHA256"
-            },
-            "generated_at": datetime.utcnow().isoformat() + "Z"
+            "total_actions": len(actions_in_period),
+            "compliant_then": 0,
+            "compliant_now": 0,
+            "newly_non_compliant": [],
+            "newly_compliant": [],
+            "unchanged": 0
         }
         
+        for action in actions_in_period:
+            # Get original compliance decision
+            original_decision = self._get_compliance_decision(action["action_id"], framework_id)
+            
+            # Re-evaluate with current framework version
+            current_evaluation = self._evaluate_action_against_framework(
+                action,
+                framework_id,
+                datetime.utcnow()  # Use current framework version
+            )
+            
+            # Compare
+            if original_decision:
+                was_compliant = original_decision["compliant"]
+                is_compliant = current_evaluation["compliant"]
+                
+                if was_compliant:
+                    audit_results["compliant_then"] += 1
+                
+                if is_compliant:
+                    audit_results["compliant_now"] += 1
+                
+                if was_compliant and not is_compliant:
+                    audit_results["newly_non_compliant"].append({
+                        "action_id": action["action_id"],
+                        "timestamp": action["timestamp"],
+                        "action_type": action["action_type"],
+                        "violations": current_evaluation["violations"]
+                    })
+                elif not was_compliant and is_compliant:
+                    audit_results["newly_compliant"].append({
+                        "action_id": action["action_id"],
+                        "timestamp": action["timestamp"],
+                        "action_type": action["action_type"]
+                    })
+                else:
+                    audit_results["unchanged"] += 1
+        
+        logger.info(f"✅ Retroactive audit complete: {audit_results['compliant_now']}/{audit_results['total_actions']} compliant")
+        
+        return audit_results
+    
+    def generate_compliance_report(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        frameworks: Optional[List[str]] = None
+    ) -> Dict:
+        """
+        Generate compliance report for a time period
+        
+        Args:
+            start_date: Start of report period
+            end_date: End of report period
+            frameworks: Specific frameworks to report on (default: all)
+        
+        Returns:
+            Comprehensive compliance report
+        """
+        logger.info(f"📊 Generating compliance report: {start_date} to {end_date}")
+        
+        # Find all actions in period
+        actions_in_period = [
+            action for action in self.action_ledger
+            if start_date <= datetime.fromisoformat(action["timestamp"]) <= end_date
+        ]
+        
+        # Find all compliance decisions in period
+        decisions_in_period = [
+            decision for decision in self.compliance_decision_ledger
+            if start_date <= datetime.fromisoformat(decision["timestamp"]) <= end_date
+        ]
+        
+        # Filter by frameworks if specified
+        if frameworks:
+            decisions_in_period = [
+                d for d in decisions_in_period
+                if d["framework_id"] in frameworks
+            ]
+        
+        # Calculate statistics
+        total_decisions = len(decisions_in_period)
+        compliant_decisions = len([d for d in decisions_in_period if d["compliant"]])
+        non_compliant_decisions = total_decisions - compliant_decisions
+        
+        # Group by framework
+        by_framework = {}
+        for decision in decisions_in_period:
+            framework_id = decision["framework_id"]
+            if framework_id not in by_framework:
+                by_framework[framework_id] = {
+                    "total": 0,
+                    "compliant": 0,
+                    "non_compliant": 0,
+                    "violations": []
+                }
+            
+            by_framework[framework_id]["total"] += 1
+            if decision["compliant"]:
+                by_framework[framework_id]["compliant"] += 1
+            else:
+                by_framework[framework_id]["non_compliant"] += 1
+                by_framework[framework_id]["violations"].extend(decision["violations"])
+        
+        report = {
+            "report_period": {
+                "start": start_date.isoformat(),
+                "end": end_date.isoformat()
+            },
+            "summary": {
+                "total_actions": len(actions_in_period),
+                "total_compliance_checks": total_decisions,
+                "compliant": compliant_decisions,
+                "non_compliant": non_compliant_decisions,
+                "compliance_rate": compliant_decisions / total_decisions if total_decisions > 0 else 0
+            },
+            "by_framework": by_framework,
+            "generated_at": datetime.utcnow().isoformat()
+        }
+        
+        logger.info(f"✅ Compliance report generated: {compliant_decisions}/{total_decisions} compliant")
+        
         return report
+    
+    def prove_compliance_at_time(
+        self,
+        action_id: str,
+        framework_id: str
+    ) -> Dict:
+        """
+        Prove that an action was compliant at the time it was taken
+        
+        Args:
+            action_id: ID of the action
+            framework_id: Framework to prove compliance against
+        
+        Returns:
+            Compliance proof with cryptographic verification
+        """
+        # Find action
+        action = next((a for a in self.action_ledger if a["action_id"] == action_id), None)
+        if not action:
+            return {"error": "Action not found"}
+        
+        # Find compliance decision
+        decision = self._get_compliance_decision(action_id, framework_id)
+        if not decision:
+            return {"error": "Compliance decision not found"}
+        
+        # Get framework version at time of action
+        action_time = datetime.fromisoformat(action["timestamp"])
+        framework_version = self._get_law_version(framework_id, action_time)
+        
+        # Generate cryptographic proof
+        proof = {
+            "action_id": action_id,
+            "action_timestamp": action["timestamp"],
+            "framework_id": framework_id,
+            "framework_version_at_time": framework_version,
+            "compliant_at_time": decision["compliant"],
+            "decision_rationale": decision["decision_rationale"],
+            "cryptographic_proof": self._generate_cryptographic_proof(action, decision)
+        }
+        
+        logger.info(f"🔐 Compliance proof generated for action {action_id[:16]}...")
+        
+        return proof
+    
+    def verify_chain_integrity(self) -> Dict:
+        """
+        Verify the integrity of the hash chain
+        
+        Returns:
+            Verification result
+        """
+        logger.info("🔍 Verifying hash chain integrity...")
+        
+        all_records = (
+            self.action_ledger +
+            self.compliance_decision_ledger +
+            self.law_version_ledger
+        )
+        
+        # Sort by timestamp
+        all_records.sort(key=lambda r: r["timestamp"])
+        
+        # Verify chain
+        expected_hash = "0" * 64  # Genesis hash
+        for record in all_records:
+            if record["previous_hash"] != expected_hash:
+                return {
+                    "valid": False,
+                    "error": f"Hash chain broken at record {record.get('action_id') or record.get('decision_id') or record.get('change_id')}",
+                    "expected_hash": expected_hash,
+                    "actual_hash": record["previous_hash"]
+                }
+            
+            # Calculate expected next hash
+            expected_hash = self._hash_record(record)
+        
+        logger.info("✅ Hash chain integrity verified")
+        
+        return {
+            "valid": True,
+            "total_records": len(all_records),
+            "chain_length": len(all_records)
+        }
+    
+    # ========== INTERNAL METHODS ==========
+    
+    def _hash_record(self, record: Dict) -> str:
+        """Generate SHA-256 hash of a record"""
+        # Remove hash fields before hashing
+        record_copy = record.copy()
+        record_copy.pop("action_id", None)
+        record_copy.pop("decision_id", None)
+        record_copy.pop("change_id", None)
+        
+        record_json = json.dumps(record_copy, sort_keys=True)
+        return hashlib.sha256(record_json.encode()).hexdigest()
+    
+    def _get_applicable_laws(
+        self,
+        timestamp: datetime,
+        context: str,
+        jurisdiction: str
+    ) -> List[str]:
+        """Get list of laws applicable at a specific time"""
+        # In production, this would query the law version ledger
+        # For now, return a static list
+        return ["GDPR", "KDPA", "HIPAA", "POPIA"]
+    
+    def _get_law_version(self, framework_id: str, timestamp: datetime) -> str:
+        """Get version of a law at a specific time"""
+        # Find most recent law change before timestamp
+        applicable_changes = [
+            change for change in self.law_version_ledger
+            if change["framework_id"] == framework_id
+            and datetime.fromisoformat(change["effective_date"]) <= timestamp
+        ]
+        
+        if applicable_changes:
+            # Sort by effective date and get most recent
+            applicable_changes.sort(key=lambda c: c["effective_date"], reverse=True)
+            return applicable_changes[0]["change_id"]
+        
+        return "original"
+    
+    def _get_compliance_decision(self, action_id: str, framework_id: str) -> Optional[Dict]:
+        """Get compliance decision for an action and framework"""
+        return next(
+            (d for d in self.compliance_decision_ledger
+             if d["action_id"] == action_id and d["framework_id"] == framework_id),
+            None
+        )
+    
+    def _evaluate_action_against_framework(
+        self,
+        action: Dict,
+        framework_id: str,
+        evaluation_time: datetime
+    ) -> Dict:
+        """Re-evaluate an action against a framework at a specific time"""
+        # In production, this would use the actual compliance checker
+        # For now, return a mock evaluation
+        return {
+            "compliant": True,
+            "violations": []
+        }
+    
+    def _generate_cryptographic_proof(self, action: Dict, decision: Dict) -> str:
+        """Generate cryptographic proof of compliance"""
+        proof_data = {
+            "action_hash": action["action_id"],
+            "decision_hash": decision["decision_id"],
+            "chain_verification": self.verify_chain_integrity()["valid"]
+        }
+        
+        proof_json = json.dumps(proof_data, sort_keys=True)
+        return hashlib.sha256(proof_json.encode()).hexdigest()
+    
+    def _trigger_retroactive_audit(self, framework_id: str, effective_date: datetime):
+        """Trigger retroactive audit when a law changes"""
+        logger.info(f"🔄 Triggering retroactive audit for {framework_id} (effective: {effective_date})")
+        
+        # Audit all actions from 1 year before effective date to now
+        start_date = effective_date - timedelta(days=365)
+        audit_result = self.retroactive_audit(framework_id, start_date)
+        
+        # Log audit result
+        logger.info(f"📊 Retroactive audit complete: {audit_result['newly_non_compliant'].__len__()} newly non-compliant actions")
 
 
 # Example usage
 if __name__ == "__main__":
-    # Initialize Chrono-Audit with chained integrity
-    chrono = ChronoAudit(
-        integrity_level=TemporalIntegrityLevel.CHAINED,
-        enable_tsa=False
+    chrono = ChronoAudit()
+    
+    # Log an action
+    action_id = chrono.log_action(
+        action_type="Data_Transfer",
+        payload={"data_type": "PHI", "destination": "Cloud_Storage"},
+        context="supply_chain",
+        jurisdiction="GDPR_EU",
+        actor="system"
     )
     
-    # Record some events
-    chrono.record_event(
-        event_type=ChronoEventType.DATA_TRANSFER,
-        actor="ml_system",
-        resource="patient_data",
-        action="transfer_to_cloud",
-        jurisdiction="KDPA_KE",
-        metadata={"destination": "africa-south1", "data_type": "PHI"},
-        compliance_frameworks=["KDPA", "GDPR"],
-        retention_days=2555  # 7 years
+    # Log compliance decision
+    chrono.log_compliance_decision(
+        action_id=action_id,
+        framework_id="GDPR",
+        compliant=True,
+        violations=[],
+        decision_rationale="Data transfer within EU, compliant with GDPR Art. 9"
     )
     
-    chrono.record_event(
-        event_type=ChronoEventType.HIGH_RISK_INFERENCE,
-        actor="ai_agent",
-        resource="diagnosis_model",
-        action="predict_cholera",
-        jurisdiction="KDPA_KE",
-        metadata={"confidence": 0.95, "patient_id": "PAT_001"},
-        compliance_frameworks=["EU_AI_ACT", "KDPA"],
-        retention_days=1825  # 5 years
+    # Simulate law change
+    chrono.log_law_change(
+        framework_id="GDPR",
+        change_type=LawChangeType.AMENDMENT,
+        effective_date=datetime.utcnow(),
+        changes={"article_9": "New interpretation of special categories"},
+        description="GDPR Art. 9 interpretation updated by EDPB"
     )
-    
-    chrono.record_event(
-        event_type=ChronoEventType.KEY_SHRED,
-        actor="crypto_shredder",
-        resource="encryption_key_abc123",
-        action="shred_expired_key",
-        jurisdiction="KDPA_KE",
-        metadata={"retention_policy": "HOT", "expired_at": "2025-06-01"},
-        compliance_frameworks=["GDPR", "HIPAA"],
-        retention_days=2555
-    )
-    
-    # Verify chain integrity
-    is_valid, errors = chrono.verify_chain_integrity()
-    print(f"\n✅ Chain Integrity: {'VALID' if is_valid else 'INVALID'}")
-    if errors:
-        for error in errors:
-            print(f"  ❌ {error}")
-    
-    # Export audit log
-    print("\n📋 Audit Log:")
-    print(chrono.export_chain(format="audit_log"))
     
     # Generate compliance report
-    print("\n📊 GDPR Compliance Report:")
-    report = chrono.generate_compliance_report("GDPR")
+    report = chrono.generate_compliance_report(
+        start_date=datetime.utcnow() - timedelta(days=30),
+        end_date=datetime.utcnow()
+    )
+    
     print(json.dumps(report, indent=2))
+    
+    # Verify chain integrity
+    integrity = chrono.verify_chain_integrity()
+    print(f"Chain integrity: {integrity}")
