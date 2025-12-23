@@ -17,142 +17,192 @@ The Bio-Interface REST API enables mobile health applications to integrate with 
 ## Architecture
 
 ```
-┌─────────────────────────────────────┐
-│    MOBILE HEALTH APPS               │
-│  ┌──────────────────────────────┐  │
-│  │  CHV Mobile App              │  │
-│  │  - Voice recording           │  │
-│  │  - Symptom reporting         │  │
-│  │  - GPS location              │  │
-│  └──────────────────────────────┘  │
-│  ┌──────────────────────────────┐  │
-│  │  Clinic EMR App              │  │
-│  │  - Patient registration      │  │
-│  │  - Diagnosis entry           │  │
-│  │  - Treatment tracking        │  │
-│  └──────────────────────────────┘  │
-└─────────────────────────────────────┘
-              │
-              │ HTTPS/TLS 1.3
-              ▼
-┌─────────────────────────────────────┐
-│    BIO-INTERFACE REST API           │
-│  ┌──────────────────────────────┐  │
-│  │  /api/v1/cbs/report          │  │
-│  │  /api/v1/emr/record          │  │
-│  │  /api/v1/voice/process       │  │
-│  │  /api/v1/sync/status         │  │
-│  └──────────────────────────────┘  │
-└─────────────────────────────────────┘
-              │
-              │ Validation
-              ▼
-┌─────────────────────────────────────┐
-│    SOVEREIGN GUARDRAIL              │
-│  - Consent validation               │
-│  - Data sovereignty check           │
-│  - Audit logging                    │
-└─────────────────────────────────────┘
-              │
-              │ Fusion
-              ▼
-┌─────────────────────────────────────┐
-│    GOLDEN THREAD                    │
-│  - CBS + EMR fusion                 │
-│  - Verification scoring             │
-│  - Timeline construction            │
-└─────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│              MOBILE HEALTH APPS                         │
+│  - Community Health Volunteer (CHV) App                │
+│  - Patient Self-Reporting App                          │
+│  - Clinic EMR Mobile Interface                         │
+└─────────────────────────────────────────────────────────┘
+                        ▼
+┌─────────────────────────────────────────────────────────┐
+│              BIO-INTERFACE REST API                     │
+│  - /api/v1/cbs/report (CBS signals)                    │
+│  - /api/v1/emr/record (EMR records)                    │
+│  - /api/v1/voice/process (Voice alerts)                │
+│  - /api/v1/sync/status (Sync status)                   │
+└─────────────────────────────────────────────────────────┘
+                        ▼
+┌─────────────────────────────────────────────────────────┐
+│              GOLDEN THREAD FUSION                       │
+│  - Cross-source verification                           │
+│  - Verification score calculation                      │
+│  - Conflict resolution                                 │
+└─────────────────────────────────────────────────────────┘
+                        ▼
+┌─────────────────────────────────────────────────────────┐
+│              SOVEREIGNGUARDRAIL                         │
+│  - Consent validation                                  │
+│  - Data sovereignty enforcement                        │
+│  - Audit logging                                       │
+└─────────────────────────────────────────────────────────┘
 ```
 
-## API endpoints
+## Base URL
 
-### Submit CBS report
+```
+https://api.iluminara.health/v1
+```
 
-Community Health Volunteers submit field observations.
+For local development:
+```
+http://localhost:8080/v1
+```
 
-**Endpoint:** `POST /api/v1/cbs/report`
+## Authentication
 
-**Request:**
+All API requests require authentication using JWT tokens:
 
+```bash
+curl -X POST https://api.iluminara.health/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "chv_amina_hassan",
+    "password": "secure_password",
+    "device_id": "CHV_DEVICE_001"
+  }'
+```
+
+Response:
 ```json
 {
-  "chv_id": "CHV_AMINA_HASSAN",
-  "location": {
-    "lat": 0.0512,
-    "lng": 40.3129,
-    "name": "Dadaab Refugee Camp"
-  },
-  "timestamp": "2025-01-15T08:00:00Z",
-  "symptoms": ["fever", "diarrhea", "vomiting"],
-  "severity": 9,
-  "patient_count": 1,
-  "notes": "Patient reporting severe watery diarrhea",
-  "consent_token": "CONSENT_12345"
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "expires_in": 3600,
+  "token_type": "Bearer"
 }
 ```
 
-**Response:**
+## CBS report submission
+
+Submit Community-Based Surveillance reports from CHV mobile apps.
+
+### Endpoint
+
+```
+POST /api/v1/cbs/report
+```
+
+### Headers
+
+```
+Authorization: Bearer {access_token}
+Content-Type: application/json
+```
+
+### Request body
+
+```json
+{
+  "reporter_id": "CHV_AMINA_HASSAN",
+  "location": {
+    "lat": 0.0512,
+    "lng": 40.3129,
+    "name": "Dadaab Refugee Camp, Ifo Section"
+  },
+  "timestamp": "2025-12-23T10:30:00Z",
+  "symptoms": ["diarrhea", "vomiting", "dehydration"],
+  "severity": 9,
+  "patient_demographics": {
+    "age_group": "5-10",
+    "gender": "female"
+  },
+  "context": {
+    "water_source": "communal_tap",
+    "sanitation_access": false,
+    "recent_travel": false
+  },
+  "consent_token": "EMERGENCY_CHV_ALERT"
+}
+```
+
+### Response
 
 ```json
 {
   "status": "success",
-  "report_id": "CBS_20250115_001",
-  "verification_status": "PENDING",
-  "message": "CBS report submitted successfully",
-  "next_steps": [
-    "Report will be verified against EMR records",
-    "Verification score will be calculated within 24 hours"
-  ]
+  "report_id": "CBS_20251223_001",
+  "verification_score": 0.3,
+  "verification_status": "UNVERIFIED",
+  "message": "CBS report recorded. Awaiting EMR correlation for verification.",
+  "recommendations": [
+    "IMMEDIATE: Suspected cholera. Start ORS immediately.",
+    "Isolate patient to prevent spread",
+    "Notify district health officer"
+  ],
+  "alert_level": "CRITICAL"
 }
 ```
 
-### Submit EMR record
+## EMR record submission
 
-Clinics submit electronic medical records.
+Submit Electronic Medical Records from clinic systems.
 
-**Endpoint:** `POST /api/v1/emr/record`
+### Endpoint
 
-**Request:**
+```
+POST /api/v1/emr/record
+```
+
+### Request body
 
 ```json
 {
-  "facility_id": "DADAAB_CLINIC",
+  "facility_id": "DADAAB_CLINIC_001",
   "patient_id": "PAT_12345",
   "location": {
     "lat": 0.0512,
     "lng": 40.3129,
     "name": "Dadaab Refugee Camp"
   },
-  "timestamp": "2025-01-15T08:30:00Z",
+  "timestamp": "2025-12-23T10:45:00Z",
   "diagnosis": "cholera",
-  "symptoms": ["fever", "diarrhea", "vomiting", "dehydration"],
-  "treatment": "ORS, IV fluids, isolation",
-  "severity": 9,
-  "lab_confirmed": true,
-  "consent_token": "CONSENT_12345"
+  "symptoms": ["severe_diarrhea", "vomiting", "dehydration"],
+  "lab_results": {
+    "rapid_test": "positive",
+    "culture": "pending"
+  },
+  "treatment": {
+    "ors": true,
+    "iv_fluids": true,
+    "antibiotics": "doxycycline"
+  },
+  "consent_token": "PATIENT_CONSENT_12345"
 }
 ```
 
-**Response:**
+### Response
 
 ```json
 {
   "status": "success",
-  "record_id": "EMR_20250115_001",
-  "patient_id": "PAT_12345",
-  "golden_thread": {
-    "fused": true,
+  "record_id": "EMR_20251223_001",
+  "verification_score": 1.0,
+  "verification_status": "CONFIRMED",
+  "message": "EMR record correlated with CBS report CBS_20251223_001",
+  "fused_record": {
+    "patient_id": "PAT_12345",
+    "location": "Dadaab Refugee Camp",
+    "diagnosis": "cholera",
     "verification_score": 1.0,
-    "status": "CONFIRMED",
-    "matched_cbs_reports": ["CBS_20250115_001"],
+    "data_sources": ["CBS", "EMR"],
     "timeline": [
       {
-        "timestamp": "2025-01-15T08:00:00Z",
+        "timestamp": "2025-12-23T10:30:00Z",
         "source": "CBS",
         "event": "CHV reported symptoms"
       },
       {
-        "timestamp": "2025-01-15T08:30:00Z",
+        "timestamp": "2025-12-23T10:45:00Z",
         "source": "EMR",
         "event": "Clinic confirmed diagnosis"
       }
@@ -161,324 +211,250 @@ Clinics submit electronic medical records.
 }
 ```
 
-### Process voice alert
+## Voice alert processing
 
-Process voice recordings from CHVs.
+Process voice alerts from CHV field recordings.
 
-**Endpoint:** `POST /api/v1/voice/process`
+### Endpoint
 
-**Headers:**
-- `Content-Type: audio/wav`
-
-**Query Parameters:**
-- `chv_id` (required): CHV identifier
-- `language` (optional): Language code (default: "swahili")
-- `lat` (optional): Latitude
-- `lng` (optional): Longitude
-
-**Request:**
-
-```bash
-curl -X POST "http://localhost:8080/api/v1/voice/process?chv_id=CHV_AMINA&language=swahili&lat=0.0512&lng=40.3129" \
-  -H "Content-Type: audio/wav" \
-  --data-binary @alert.wav
+```
+POST /api/v1/voice/process
 ```
 
-**Response:**
+### Headers
+
+```
+Authorization: Bearer {access_token}
+Content-Type: audio/wav
+```
+
+### Request
+
+```bash
+curl -X POST https://api.iluminara.health/v1/voice/process \
+  -H "Authorization: Bearer {access_token}" \
+  -H "Content-Type: audio/wav" \
+  --data-binary @field_report.wav
+```
+
+### Response
 
 ```json
 {
   "status": "success",
-  "report_id": "CBS_20250115_002",
   "transcription": "Patient reporting severe watery diarrhea and vomiting",
   "language_detected": "swahili",
   "symptoms": ["diarrhea", "vomiting", "dehydration"],
   "severity": 9,
-  "alert_level": "CRITICAL",
-  "recommendations": [
-    "IMMEDIATE: Suspected cholera. Start ORS immediately.",
-    "Isolate patient to prevent spread",
-    "Notify district health officer"
-  ],
-  "cbs_report_created": true
+  "location": {
+    "lat": 0.0512,
+    "lng": 40.3129
+  },
+  "cbs_report_id": "CBS_20251223_002",
+  "alert_level": "CRITICAL"
 }
 ```
 
-### Check sync status
+## Sync status
 
-Check synchronization status between edge and cloud.
+Check synchronization status for offline-first mobile apps.
 
-**Endpoint:** `GET /api/v1/sync/status`
+### Endpoint
 
-**Query Parameters:**
-- `node_id` (required): Edge node identifier
+```
+GET /api/v1/sync/status
+```
 
-**Response:**
+### Response
 
 ```json
 {
   "status": "success",
-  "node_id": "JOR-47",
   "sync_status": "ONLINE",
-  "last_sync": "2025-01-15T09:00:00Z",
-  "pending_reports": 3,
-  "pending_records": 1,
-  "queue_size": 4,
+  "last_sync": "2025-12-23T10:50:00Z",
+  "pending_uploads": 0,
+  "pending_downloads": 2,
+  "queue_status": {
+    "cbs_reports": 0,
+    "emr_records": 0,
+    "voice_alerts": 0
+  },
   "connectivity": {
-    "online": true,
-    "latency_ms": 45,
-    "bandwidth_kbps": 512
+    "network_type": "4G",
+    "signal_strength": 0.85,
+    "estimated_bandwidth_kbps": 2500
   }
 }
 ```
 
 ## Golden Thread verification
 
-The Bio-Interface automatically triggers Golden Thread verification:
+The Bio-Interface automatically applies Golden Thread verification logic:
+
+### Verification rules
 
 <Steps>
-  <Step title="CBS report submitted">
-    CHV submits field observation via mobile app
+  <Step title="Location match">
+    CBS and EMR locations must be within 5km radius
   </Step>
-  <Step title="Pending verification">
-    Report stored with status "PENDING"
+  <Step title="Time delta">
+    Timestamps must be within 24 hours
   </Step>
-  <Step title="EMR record submitted">
-    Clinic submits diagnosis for same patient
+  <Step title="Symptom correlation">
+    Symptoms must have >70% overlap
   </Step>
-  <Step title="Automatic fusion">
-    Golden Thread matches CBS and EMR by location + time
-  </Step>
-  <Step title="Verification score">
-    Score calculated: 1.0 (CONFIRMED) if match, lower if conflicts
-  </Step>
-  <Step title="Timeline created">
-    Verified timeline constructed from multiple sources
+  <Step title="Source credibility">
+    EMR records have higher credibility than CBS signals
   </Step>
 </Steps>
 
-## Verification logic
+### Verification scores
 
-```python
-# Automatic verification when EMR record matches CBS report
+| Score | Status | Description |
+|-------|--------|-------------|
+| 1.0 | CONFIRMED | Perfect match (location + time + symptoms) |
+| 0.7-0.9 | PROBABLE | Good match with minor discrepancies |
+| 0.4-0.6 | POSSIBLE | Partial match, requires investigation |
+| 0.0-0.3 | UNVERIFIED | Single source or major conflicts |
 
-IF cbs.location == emr.location AND |cbs.timestamp - emr.timestamp| < 24h:
-    verification_score = 1.0  # CONFIRMED
-    status = "CONFIRMED"
-ELSE IF location_distance < 5km AND time_delta < 48h:
-    verification_score = 0.7  # PROBABLE
-    status = "PROBABLE"
-ELSE:
-    verification_score = 0.3  # UNVERIFIED
-    status = "UNVERIFIED"
-```
+## Offline-first mobile SDK
 
-## Authentication
-
-### API key authentication
-
-```bash
-curl -X POST http://localhost:8080/api/v1/cbs/report \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{...}'
-```
-
-### OAuth 2.0 (production)
-
-```python
-import requests
-from google.oauth2 import service_account
-
-# Load service account credentials
-credentials = service_account.Credentials.from_service_account_file(
-    'service-account.json',
-    scopes=['https://www.googleapis.com/auth/cloud-platform']
-)
-
-# Get access token
-auth_req = google.auth.transport.requests.Request()
-credentials.refresh(auth_req)
-access_token = credentials.token
-
-# Make authenticated request
-response = requests.post(
-    'https://api.iluminara.health/v1/cbs/report',
-    headers={'Authorization': f'Bearer {access_token}'},
-    json={...}
-)
-```
-
-## Consent management
-
-All API calls require valid consent tokens:
-
-```python
-from governance_kernel.vector_ledger import SovereignGuardrail
-
-guardrail = SovereignGuardrail()
-
-# Validate consent before processing
-guardrail.validate_action(
-    action_type='Consent_Validation',
-    payload={
-        'consent_token': 'CONSENT_12345',
-        'consent_scope': 'public_health_surveillance',
-        'data_type': 'PHI'
-    },
-    jurisdiction='KDPA_KE'
-)
-```
-
-## Mobile SDK
+iLuminara provides mobile SDKs for offline-first operation:
 
 ### Android SDK
 
 ```kotlin
-// Initialize iLuminara SDK
-val iluminara = ILuminaraClient(
-    apiKey = "YOUR_API_KEY",
-    baseUrl = "https://api.iluminara.health",
-    jurisdiction = Jurisdiction.KDPA_KE
-)
+import health.iluminara.sdk.BioInterface
 
-// Submit CBS report
+val bioInterface = BioInterface.Builder()
+    .setApiKey("your_api_key")
+    .setOfflineMode(true)
+    .setAutoSync(true)
+    .build()
+
+// Submit CBS report (queued if offline)
 val report = CBSReport(
-    chvId = "CHV_AMINA_HASSAN",
-    location = Location(0.0512, 40.3129, "Dadaab"),
-    symptoms = listOf("fever", "diarrhea", "vomiting"),
-    severity = 9,
-    consentToken = "CONSENT_12345"
+    reporterId = "CHV_AMINA_HASSAN",
+    location = Location(0.0512, 40.3129),
+    symptoms = listOf("diarrhea", "vomiting"),
+    severity = 9
 )
 
-iluminara.submitCBSReport(report) { result ->
+bioInterface.submitCBSReport(report) { result ->
     when (result) {
         is Success -> println("Report submitted: ${result.reportId}")
+        is Queued -> println("Report queued for sync")
         is Error -> println("Error: ${result.message}")
     }
+}
+
+// Check sync status
+bioInterface.getSyncStatus { status ->
+    println("Pending uploads: ${status.pendingUploads}")
 }
 ```
 
 ### iOS SDK
 
 ```swift
-// Initialize iLuminara SDK
-let iluminara = ILuminaraClient(
-    apiKey: "YOUR_API_KEY",
-    baseUrl: "https://api.iluminara.health",
-    jurisdiction: .KDPA_KE
+import iLuminaraSDK
+
+let bioInterface = BioInterface(
+    apiKey: "your_api_key",
+    offlineMode: true,
+    autoSync: true
 )
 
 // Submit CBS report
 let report = CBSReport(
-    chvId: "CHV_AMINA_HASSAN",
-    location: Location(lat: 0.0512, lng: 40.3129, name: "Dadaab"),
-    symptoms: ["fever", "diarrhea", "vomiting"],
-    severity: 9,
-    consentToken: "CONSENT_12345"
+    reporterId: "CHV_AMINA_HASSAN",
+    location: Location(lat: 0.0512, lng: 40.3129),
+    symptoms: ["diarrhea", "vomiting"],
+    severity: 9
 )
 
-iluminara.submitCBSReport(report) { result in
+bioInterface.submitCBSReport(report) { result in
     switch result {
     case .success(let reportId):
         print("Report submitted: \(reportId)")
-    case .failure(let error):
-        print("Error: \(error)")
+    case .queued:
+        print("Report queued for sync")
+    case .error(let message):
+        print("Error: \(message)")
     }
 }
 ```
 
-## Offline support
+## Sovereignty compliance
 
-The Bio-Interface supports offline operation with automatic sync:
+All Bio-Interface operations enforce sovereignty constraints:
 
 ```python
-from edge_node.ai_agents import OfflineAgent
+from governance_kernel.vector_ledger import SovereignGuardrail
 
-# Initialize offline agent
-agent = OfflineAgent(
-    name="Mobile Health Agent",
-    capabilities=[
-        AgentCapability.OFFLINE_OPERATION,
-        AgentCapability.LOCAL_STORAGE,
-        AgentCapability.EDGE_TO_CLOUD_SYNC
-    ]
+guardrail = SovereignGuardrail()
+
+# Validate CBS report submission
+guardrail.validate_action(
+    action_type='Data_Processing',
+    payload={
+        'data_type': 'PHI',
+        'processing_location': 'Edge_Node',
+        'consent_token': 'EMERGENCY_CHV_ALERT',
+        'jurisdiction': 'KDPA_KE'
+    },
+    jurisdiction='KDPA_KE'
 )
-
-# Queue report while offline
-agent.queue_operation("submit_cbs_report", {
-    "chv_id": "CHV_AMINA",
-    "symptoms": ["fever", "diarrhea"],
-    "location": {"lat": 0.0512, "lng": 40.3129}
-})
-
-# Automatically sync when connectivity returns
-agent.check_and_sync()
 ```
 
-## Rate limiting
-
-Production API implements rate limiting:
+## Rate limits
 
 | Endpoint | Rate Limit | Burst |
-|----------|------------|-------|
-| `/api/v1/cbs/report` | 100/hour | 10/minute |
-| `/api/v1/emr/record` | 100/hour | 10/minute |
-| `/api/v1/voice/process` | 10/hour | 2/minute |
-| `/api/v1/sync/status` | 1000/hour | 100/minute |
+|----------|-----------|-------|
+| `/cbs/report` | 100/hour | 10/minute |
+| `/emr/record` | 500/hour | 50/minute |
+| `/voice/process` | 50/hour | 5/minute |
+| `/sync/status` | 1000/hour | 100/minute |
 
-## Error handling
+## Error codes
 
-Standard error response format:
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `AUTH_REQUIRED` | 401 | Missing or invalid authentication token |
+| `CONSENT_MISSING` | 403 | Consent token required but not provided |
+| `SOVEREIGNTY_VIOLATION` | 403 | Action violates data sovereignty rules |
+| `INVALID_LOCATION` | 400 | Location coordinates invalid or missing |
+| `RATE_LIMIT_EXCEEDED` | 429 | Too many requests |
+| `OFFLINE_QUEUE_FULL` | 507 | Offline queue capacity exceeded |
+
+## Webhooks
+
+Subscribe to real-time events:
 
 ```json
 {
-  "status": "error",
-  "error_code": "CONSENT_INVALID",
-  "message": "Consent token expired or invalid",
-  "details": {
-    "consent_token": "CONSENT_12345",
-    "expiration": "2025-01-14T00:00:00Z"
-  },
-  "compliance": {
-    "framework": "GDPR",
-    "article": "Art. 6 (Lawfulness of Processing)",
-    "action_required": "Obtain new consent from patient"
-  }
+  "webhook_url": "https://your-app.com/webhooks/iluminara",
+  "events": [
+    "cbs.report.verified",
+    "emr.record.created",
+    "outbreak.alert.triggered"
+  ],
+  "secret": "webhook_secret_key"
 }
 ```
 
-## Testing
-
-Test the Bio-Interface locally:
-
-```bash
-# Start API service
-python api_service.py
-
-# Submit test CBS report
-curl -X POST http://localhost:8080/api/v1/cbs/report \
-  -H "Content-Type: application/json" \
-  -d '{
-    "chv_id": "CHV_TEST",
-    "location": {"lat": 0.0512, "lng": 40.3129},
-    "symptoms": ["fever", "diarrhea"],
-    "severity": 7,
-    "consent_token": "TEST_CONSENT"
-  }'
-
-# Submit test EMR record
-curl -X POST http://localhost:8080/api/v1/emr/record \
-  -H "Content-Type: application/json" \
-  -d '{
-    "facility_id": "TEST_CLINIC",
-    "patient_id": "PAT_TEST",
-    "location": {"lat": 0.0512, "lng": 40.3129},
-    "diagnosis": "malaria",
-    "symptoms": ["fever", "diarrhea"],
-    "severity": 7,
-    "consent_token": "TEST_CONSENT"
-  }'
+Webhook payload:
+```json
+{
+  "event": "cbs.report.verified",
+  "timestamp": "2025-12-23T10:50:00Z",
+  "data": {
+    "report_id": "CBS_20251223_001",
+    "verification_score": 1.0,
+    "verification_status": "CONFIRMED"
+  },
+  "signature": "sha256=..."
+}
 ```
 
 ## Next steps
@@ -492,24 +468,24 @@ curl -X POST http://localhost:8080/api/v1/emr/record \
     Understand data fusion logic
   </Card>
   <Card
-    title="API reference"
-    icon="terminal"
-    href="/api-reference/overview"
+    title="Voice processing"
+    icon="microphone"
+    href="/api-reference/voice-processing"
   >
-    Complete API documentation
+    Process voice alerts
+  </Card>
+  <Card
+    title="Governance"
+    icon="shield-check"
+    href="/governance/overview"
+  >
+    Sovereignty compliance
   </Card>
   <Card
     title="Mobile SDKs"
     icon="mobile"
     href="/integrations/mobile-sdks"
   >
-    Android and iOS SDK documentation
-  </Card>
-  <Card
-    title="Deployment"
-    icon="rocket"
-    href="/deployment/overview"
-  >
-    Deploy to production
+    Download mobile SDKs
   </Card>
 </CardGroup>
