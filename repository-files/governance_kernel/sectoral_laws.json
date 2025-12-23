@@ -1,0 +1,589 @@
+{
+  "version": "1.0.0",
+  "fortress_name": "iLuminara Omni-Law Matrix",
+  "total_frameworks": 29,
+  "last_updated": "2025-12-23T19:45:00Z",
+  
+  "primary_privacy_sovereignty": {
+    "category": "Data Privacy & Sovereignty",
+    "frameworks": [
+      {
+        "id": "GDPR",
+        "name": "General Data Protection Regulation",
+        "jurisdiction": "EU",
+        "year": 2016,
+        "status": "ENFORCED",
+        "key_articles": [
+          {
+            "article": "Art. 9",
+            "title": "Processing of special categories of personal data",
+            "trigger": "data_type == 'PHI' OR data_type == 'health_data'",
+            "action": "require_explicit_consent AND enforce_data_minimization"
+          },
+          {
+            "article": "Art. 22",
+            "title": "Automated individual decision-making",
+            "trigger": "action_type == 'High_Risk_Inference' AND confidence > 0.7",
+            "action": "require_human_oversight AND provide_explanation"
+          },
+          {
+            "article": "Art. 17",
+            "title": "Right to erasure",
+            "trigger": "data_age > retention_policy.max_days",
+            "action": "crypto_shred_key"
+          }
+        ]
+      },
+      {
+        "id": "KDPA",
+        "name": "Kenya Data Protection Act",
+        "jurisdiction": "Kenya",
+        "year": 2019,
+        "status": "ENFORCED",
+        "key_sections": [
+          {
+            "section": "§37",
+            "title": "Cross-border transfer restrictions",
+            "trigger": "destination_zone NOT IN allowed_zones AND jurisdiction == 'KDPA_KE'",
+            "action": "BLOCK_TRANSFER AND log_sovereignty_violation",
+            "example": "IF Region == 'Kenya' AND Data_Type == 'HIV_Status' AND Target_Server == 'USA' THEN Block_Transfer()"
+          },
+          {
+            "section": "§42",
+            "title": "Processing of sensitive health data",
+            "trigger": "data_type == 'sensitive_health' AND jurisdiction == 'KDPA_KE'",
+            "action": "require_dpc_authorization"
+          }
+        ]
+      },
+      {
+        "id": "HIPAA",
+        "name": "Health Insurance Portability and Accountability Act",
+        "jurisdiction": "USA",
+        "year": 1996,
+        "status": "ENFORCED",
+        "key_sections": [
+          {
+            "section": "§164.312",
+            "title": "Technical safeguards",
+            "trigger": "jurisdiction == 'HIPAA_US' AND data_type == 'PHI'",
+            "action": "enforce_encryption AND enable_audit_controls"
+          },
+          {
+            "section": "§164.530(j)",
+            "title": "Documentation",
+            "trigger": "jurisdiction == 'HIPAA_US'",
+            "action": "maintain_audit_trail_7_years"
+          }
+        ]
+      },
+      {
+        "id": "POPIA",
+        "name": "Protection of Personal Information Act",
+        "jurisdiction": "South Africa",
+        "year": 2013,
+        "status": "ENFORCED",
+        "key_sections": [
+          {
+            "section": "§11",
+            "title": "Consent",
+            "trigger": "jurisdiction == 'POPIA_ZA' AND data_type == 'personal_information'",
+            "action": "require_explicit_consent"
+          },
+          {
+            "section": "§14",
+            "title": "Retention restrictions",
+            "trigger": "jurisdiction == 'POPIA_ZA' AND data_age > retention_limit",
+            "action": "delete_or_anonymize"
+          }
+        ]
+      },
+      {
+        "id": "NDPR",
+        "name": "Nigeria Data Protection Regulation",
+        "jurisdiction": "Nigeria",
+        "year": 2019,
+        "status": "ENFORCED",
+        "key_articles": [
+          {
+            "article": "Art. 2.6",
+            "title": "Data Security",
+            "trigger": "jurisdiction == 'NDPR_NG'",
+            "action": "enforce_local_hosting AND implement_security_measures"
+          }
+        ]
+      },
+      {
+        "id": "PIPEDA",
+        "name": "Personal Information Protection and Electronic Documents Act",
+        "jurisdiction": "Canada",
+        "year": 2000,
+        "status": "ENFORCED",
+        "key_principles": [
+          {
+            "principle": "4.7",
+            "title": "Safeguards appropriate to sensitivity",
+            "trigger": "jurisdiction == 'PIPEDA_CA' AND data_sensitivity == 'high'",
+            "action": "apply_enhanced_safeguards"
+          }
+        ]
+      },
+      {
+        "id": "CCPA",
+        "name": "California Consumer Privacy Act",
+        "jurisdiction": "USA (California)",
+        "year": 2018,
+        "status": "ENFORCED",
+        "key_sections": [
+          {
+            "section": "§1798.100",
+            "title": "Right to Know",
+            "trigger": "jurisdiction == 'CCPA_US' AND request_type == 'data_access'",
+            "action": "provide_data_disclosure"
+          },
+          {
+            "section": "CPRA Amendment",
+            "title": "Right to Limit Use of Sensitive Personal Information",
+            "trigger": "jurisdiction == 'CCPA_US' AND data_type == 'sensitive'",
+            "action": "allow_opt_out"
+          }
+        ]
+      },
+      {
+        "id": "LGPD",
+        "name": "Lei Geral de Proteção de Dados",
+        "jurisdiction": "Brazil",
+        "year": 2018,
+        "status": "ENFORCED",
+        "key_articles": [
+          {
+            "article": "Art. 11",
+            "title": "Processing of sensitive personal data",
+            "trigger": "jurisdiction == 'LGPD_BR' AND data_type == 'public_health'",
+            "action": "require_explicit_consent AND enforce_strict_purpose_limitation"
+          }
+        ]
+      },
+      {
+        "id": "APPI",
+        "name": "Act on the Protection of Personal Information",
+        "jurisdiction": "Japan",
+        "year": 2003,
+        "status": "ENFORCED",
+        "key_articles": [
+          {
+            "article": "Art. 23",
+            "title": "Third-party provision",
+            "trigger": "jurisdiction == 'APPI_JP' AND action_type == 'third_party_transfer'",
+            "action": "require_consent_or_opt_out"
+          }
+        ]
+      }
+    ]
+  },
+  
+  "ai_governance": {
+    "category": "AI & Automated Decision-Making",
+    "frameworks": [
+      {
+        "id": "EU_AI_ACT",
+        "name": "EU Artificial Intelligence Act",
+        "jurisdiction": "EU",
+        "year": 2024,
+        "status": "ENFORCED",
+        "risk_classification": "HIGH_RISK",
+        "key_articles": [
+          {
+            "article": "Art. 6",
+            "title": "Classification as high-risk AI system",
+            "trigger": "use_case == 'healthcare' OR use_case == 'critical_infrastructure'",
+            "action": "enforce_high_risk_requirements"
+          },
+          {
+            "article": "Art. 10",
+            "title": "Data governance",
+            "trigger": "model_training == true",
+            "action": "mitigate_bias AND ensure_data_quality"
+          },
+          {
+            "article": "Art. 14",
+            "title": "Human oversight",
+            "trigger": "risk_level == 'HIGH'",
+            "action": "implement_kill_switch AND require_human_in_loop"
+          },
+          {
+            "article": "Art. 15",
+            "title": "Accuracy, robustness, and cybersecurity",
+            "trigger": "deployment == 'production'",
+            "action": "enable_crypto_shredder AND continuous_monitoring"
+          }
+        ]
+      }
+    ]
+  },
+  
+  "supply_chain_manufacturing": {
+    "category": "Supply Chain & Ethical Operations",
+    "frameworks": [
+      {
+        "id": "CSDDD",
+        "name": "EU Corporate Sustainability Due Diligence Directive",
+        "jurisdiction": "EU",
+        "year": 2024,
+        "status": "ENFORCED",
+        "trigger_conditions": "context == 'supply_chain' AND operation_type == 'procurement'",
+        "key_requirements": [
+          {
+            "requirement": "Human rights due diligence",
+            "trigger": "supplier_risk_score > threshold",
+            "action": "block_procurement_until_audit_proof_logged",
+            "logic": "IF Supplier_Risk_Score > Threshold THEN Block_Procurement() UNTIL Audit_Proof.logged == true"
+          },
+          {
+            "requirement": "Environmental due diligence",
+            "trigger": "environmental_impact_score > threshold",
+            "action": "require_environmental_assessment"
+          }
+        ]
+      },
+      {
+        "id": "LkSG",
+        "name": "German Supply Chain Due Diligence Act",
+        "jurisdiction": "Germany",
+        "year": 2023,
+        "status": "ENFORCED",
+        "trigger_conditions": "partner_country == 'Germany' OR funding_source == 'German_NGO'",
+        "key_requirements": [
+          {
+            "requirement": "Grievance mechanism",
+            "trigger": "supply_chain_node == true",
+            "action": "log_grievance_mechanism_access_for_every_node"
+          }
+        ]
+      },
+      {
+        "id": "UFLPA",
+        "name": "Uyghur Forced Labor Prevention Act",
+        "jurisdiction": "USA",
+        "year": 2021,
+        "status": "ENFORCED",
+        "trigger_conditions": "destination_market == 'USA' AND product_type == 'hardware'",
+        "key_requirements": [
+          {
+            "requirement": "Forced labor prevention",
+            "trigger": "component_origin == 'XUAR'",
+            "action": "flag_compliance_alert_severe AND block_import",
+            "logic": "IF Origin == 'XUAR' THEN Flag(Compliance_Alert: SEVERE) AND Block_Import()"
+          }
+        ]
+      },
+      {
+        "id": "DODD_FRANK_1502",
+        "name": "Dodd-Frank Section 1502 (Conflict Minerals)",
+        "jurisdiction": "USA",
+        "year": 2010,
+        "status": "ENFORCED",
+        "trigger_conditions": "product_contains_3TG == true",
+        "key_requirements": [
+          {
+            "requirement": "Conflict minerals disclosure",
+            "trigger": "hardware_component IN ['Tin', 'Tantalum', 'Tungsten', 'Gold']",
+            "action": "verify_smelter_sources_in_bom",
+            "logic": "Verify 3TG smelter sources in hardware BOM (Bill of Materials)"
+          }
+        ]
+      }
+    ]
+  },
+  
+  "esg_carbon": {
+    "category": "ESG & Carbon Credits",
+    "frameworks": [
+      {
+        "id": "CBAM",
+        "name": "EU Carbon Border Adjustment Mechanism",
+        "jurisdiction": "EU",
+        "year": 2023,
+        "status": "ENFORCED",
+        "trigger_conditions": "goods_destination == 'EU' AND carbon_intensive == true",
+        "key_requirements": [
+          {
+            "requirement": "Embedded emissions calculation",
+            "trigger": "logistics_movement == true",
+            "action": "calculate_embedded_emissions_per_hop AND automate_eu_import_reporting",
+            "logic": "Calculate Embedded_Emissions per logistics hop; automate reporting for EU import"
+          }
+        ]
+      },
+      {
+        "id": "PARIS_AGREEMENT_6_2",
+        "name": "Paris Agreement Article 6.2 (Sovereign Carbon Transfers)",
+        "jurisdiction": "Global",
+        "year": 2015,
+        "status": "ENFORCED",
+        "trigger_conditions": "transaction_type == 'carbon_credit_transfer'",
+        "key_requirements": [
+          {
+            "requirement": "Double counting prevention",
+            "trigger": "carbon_credit_trade == true",
+            "action": "ensure_double_counting_check_on_chrono_ledger",
+            "logic": "Ensure Double_Counting_Check == true on IP-09 Chrono-Ledger"
+          }
+        ]
+      },
+      {
+        "id": "ICVCM_CCP",
+        "name": "Integrity Council for Voluntary Carbon Market - Core Carbon Principles",
+        "jurisdiction": "Global",
+        "year": 2023,
+        "status": "ENFORCED",
+        "trigger_conditions": "carbon_credit_issuance == true",
+        "key_requirements": [
+          {
+            "requirement": "High-integrity carbon credits",
+            "trigger": "credit_minting == true",
+            "action": "enforce_permanence_and_additionality_checks",
+            "logic": "Enforce 'Permanence' and 'Additionality' checks in governance_kernel before minting"
+          }
+        ]
+      }
+    ]
+  },
+  
+  "humanitarian_finance": {
+    "category": "Humanitarian Finance & Clean Money",
+    "frameworks": [
+      {
+        "id": "FATF_R8",
+        "name": "FATF Recommendation 8 (Non-Profits & Terrorist Financing)",
+        "jurisdiction": "Global",
+        "year": 2016,
+        "status": "ENFORCED",
+        "trigger_conditions": "transaction_type == 'humanitarian_aid'",
+        "key_requirements": [
+          {
+            "requirement": "Know Your Beneficiary (KYB)",
+            "trigger": "aid_disbursement == true",
+            "action": "automated_kyb_using_acorn_protocol",
+            "logic": "Automated KYB checks using Acorn Protocol to prove aid reached real humans, not sanctioned entities"
+          }
+        ]
+      },
+      {
+        "id": "OFAC_SANCTIONS",
+        "name": "OFAC Sanctions Lists",
+        "jurisdiction": "USA",
+        "year": "Ongoing",
+        "status": "ENFORCED",
+        "trigger_conditions": "transaction_involves_us_entity == true",
+        "key_requirements": [
+          {
+            "requirement": "Sanctions screening",
+            "trigger": "payment_initiation == true",
+            "action": "realtime_fuzzy_matching_against_sanctions_db",
+            "logic": "Real-time fuzzy matching of all Payee_IDs against daily-updated sanctions databases"
+          }
+        ]
+      },
+      {
+        "id": "UN_SANCTIONS",
+        "name": "UN Security Council Consolidated List",
+        "jurisdiction": "Global",
+        "year": "Ongoing",
+        "status": "ENFORCED",
+        "trigger_conditions": "international_transaction == true",
+        "key_requirements": [
+          {
+            "requirement": "UN sanctions compliance",
+            "trigger": "payment_initiation == true",
+            "action": "check_un_consolidated_list"
+          }
+        ]
+      },
+      {
+        "id": "IASC_DATA_RESPONSIBILITY",
+        "name": "IASC Guidelines on Data Responsibility in Humanitarian Action",
+        "jurisdiction": "Global (UN OCHA, WFP)",
+        "year": 2021,
+        "status": "ENFORCED",
+        "trigger_conditions": "context == 'humanitarian_operations'",
+        "key_requirements": [
+          {
+            "requirement": "Data minimization for vulnerable populations",
+            "trigger": "population_type == 'refugees' OR population_type == 'vulnerable'",
+            "action": "redact_distinct_location_data",
+            "logic": "Implement 'Data Minimization' protocols for vulnerable populations (e.g., redact location data for refugees)"
+          }
+        ]
+      }
+    ]
+  },
+  
+  "healthcare_pharma": {
+    "category": "Healthcare & Pharmaceutical",
+    "frameworks": [
+      {
+        "id": "EU_MDR",
+        "name": "EU Medical Device Regulation",
+        "jurisdiction": "EU",
+        "year": 2017,
+        "status": "ENFORCED",
+        "trigger_conditions": "system_provides_diagnosis == true",
+        "device_classification": "Class IIa/IIb",
+        "key_requirements": [
+          {
+            "requirement": "Clinical evaluation",
+            "trigger": "frenasa_diagnosis == true",
+            "action": "log_clinical_evaluation_and_pms_events",
+            "logic": "If FRENASA Engine provides diagnosis, log Clinical Evaluation data and Post-Market Surveillance events"
+          }
+        ]
+      },
+      {
+        "id": "FDA_21_CFR_11",
+        "name": "FDA 21 CFR Part 11 (Electronic Records & Signatures)",
+        "jurisdiction": "USA",
+        "year": 1997,
+        "status": "ENFORCED",
+        "trigger_conditions": "pharma_data_integrity == true",
+        "key_requirements": [
+          {
+            "requirement": "Audit trail integrity",
+            "trigger": "data_entry == true",
+            "action": "ensure_timestamped_non_repudiable_audit_trail",
+            "logic": "Every entry in Golden Thread has timestamped, non-repudiable audit trail"
+          }
+        ]
+      },
+      {
+        "id": "EU_CTR",
+        "name": "Clinical Trials Regulation (EU) No 536/2014",
+        "jurisdiction": "EU",
+        "year": 2014,
+        "status": "ENFORCED",
+        "trigger_conditions": "clinical_trial_tracking == true",
+        "key_requirements": [
+          {
+            "requirement": "Data separation",
+            "trigger": "vaccine_efficacy_trial == true",
+            "action": "enforce_strict_separation_sponsor_subject_data",
+            "logic": "Enforce strict separation of 'Sponsor' data and 'Subject' clinical data"
+          }
+        ]
+      },
+      {
+        "id": "FHIR_R4_R5",
+        "name": "Fast Healthcare Interoperability Resources",
+        "jurisdiction": "Global",
+        "year": 2019,
+        "status": "ENFORCED",
+        "trigger_conditions": "data_exchange_with_moh == true",
+        "key_requirements": [
+          {
+            "requirement": "Interoperability compliance",
+            "trigger": "dhis2_integration == true",
+            "action": "ensure_fhir_compliance_for_legal_data_exchange",
+            "logic": "Compliance ensures iLuminara can legally 'speak' to Ministry of Health systems (DHIS2)"
+          }
+        ]
+      }
+    ]
+  },
+  
+  "cybersecurity_infrastructure": {
+    "category": "Cybersecurity & Critical Infrastructure",
+    "frameworks": [
+      {
+        "id": "NIS2",
+        "name": "NIS2 Directive",
+        "jurisdiction": "EU",
+        "year": 2023,
+        "status": "ENFORCED",
+        "trigger_conditions": "entity_type == 'essential' AND sector IN ['health', 'digital_infrastructure']",
+        "key_requirements": [
+          {
+            "requirement": "Incident reporting",
+            "trigger": "security_incident == true",
+            "action": "mandatory_24h_reporting_to_national_cert",
+            "logic": "Mandatory 24-hour incident reporting to national CERTs"
+          }
+        ]
+      },
+      {
+        "id": "CRA",
+        "name": "Cyber Resilience Act",
+        "jurisdiction": "EU",
+        "year": 2024,
+        "status": "ENFORCED",
+        "trigger_conditions": "product_has_digital_elements == true",
+        "key_requirements": [
+          {
+            "requirement": "Software Bill of Materials",
+            "trigger": "device_deployment == true",
+            "action": "automated_sbom_generation_and_vulnerability_handling",
+            "logic": "Automated SBOM generation and vulnerability handling for entire device lifecycle"
+          }
+        ]
+      }
+    ]
+  },
+  
+  "humanitarian_interoperability": {
+    "category": "Humanitarian & Interoperability Standards",
+    "frameworks": [
+      {
+        "id": "WHO_IHR",
+        "name": "WHO International Health Regulations",
+        "jurisdiction": "Global",
+        "year": 2005,
+        "status": "ENFORCED",
+        "trigger_conditions": "outbreak_detected == true",
+        "key_articles": [
+          {
+            "article": "Art. 6",
+            "title": "Notification",
+            "trigger": "outbreak_severity >= threshold",
+            "action": "notify_who_within_24h_without_violating_sovereignty"
+          },
+          {
+            "article": "Art. 44",
+            "title": "Collaboration and data sharing",
+            "trigger": "international_collaboration == true",
+            "action": "enable_data_sharing_with_sovereignty_constraints"
+          }
+        ]
+      },
+      {
+        "id": "GENEVA_CONVENTIONS",
+        "name": "Geneva Conventions (Additional Protocol I)",
+        "jurisdiction": "Global",
+        "year": 1977,
+        "status": "ENFORCED",
+        "trigger_conditions": "conflict_zone == true",
+        "key_principles": [
+          {
+            "principle": "Impartiality",
+            "trigger": "data_collection_in_conflict == true",
+            "action": "protect_medical_data_as_neutral_asset"
+          }
+        ]
+      },
+      {
+        "id": "AU_MALABO",
+        "name": "AU Malabo Convention on Cyber Security",
+        "jurisdiction": "African Union",
+        "year": 2014,
+        "status": "ENFORCED",
+        "trigger_conditions": "jurisdiction IN african_union_members",
+        "key_articles": [
+          {
+            "article": "Art. 13",
+            "title": "Protection of Personal Data",
+            "trigger": "data_processing_in_africa == true",
+            "action": "ensure_pan_african_legitimacy"
+          }
+        ]
+      }
+    ]
+  }
+}
