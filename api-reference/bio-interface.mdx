@@ -1,0 +1,535 @@
+---
+title: Bio-Interface REST API
+description: Mobile health app integration with Golden Thread data fusion
+---
+
+## Overview
+
+The Bio-Interface REST API enables mobile health applications to integrate with iLuminara-Core using the Golden Thread protocol for data fusion from CBS (Community-Based Surveillance) and EMR (Electronic Medical Records).
+
+<Card
+  title="Philosophy"
+  icon="mobile"
+>
+  "Zero-friction data collection with sovereign dignity preservation"
+</Card>
+
+## Architecture
+
+```
+┌─────────────────────────────────────┐
+│      MOBILE HEALTH APP              │
+│  - CHV Data Collection              │
+│  - Patient Registration             │
+│  - Symptom Reporting                │
+└─────────────────────────────────────┘
+              │
+              │ HTTPS/TLS 1.3
+              ▼
+┌─────────────────────────────────────┐
+│      BIO-INTERFACE API              │
+│  - Authentication                   │
+│  - Data Validation                  │
+│  - Sovereignty Enforcement          │
+└─────────────────────────────────────┘
+              │
+              │ Golden Thread
+              ▼
+┌─────────────────────────────────────┐
+│      DATA FUSION ENGINE             │
+│  - CBS Signal Processing            │
+│  - EMR Integration                  │
+│  - Verification Scoring             │
+└─────────────────────────────────────┘
+```
+
+## Base URL
+
+```
+https://api.iluminara.health/v1
+```
+
+For local development:
+```
+http://localhost:8080/v1
+```
+
+## Authentication
+
+All API requests require authentication using JWT tokens:
+
+```bash
+curl -X POST https://api.iluminara.health/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "chv_amina_hassan",
+    "password": "secure_password",
+    "jurisdiction": "KDPA_KE"
+  }'
+```
+
+**Response:**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "jurisdiction": "KDPA_KE",
+  "sovereignty_zone": "africa-south1"
+}
+```
+
+## Core endpoints
+
+<CardGroup cols={2}>
+  <Card
+    title="Submit CBS report"
+    icon="users"
+    href="#submit-cbs-report"
+  >
+    Community-based surveillance data
+  </Card>
+  <Card
+    title="Register patient"
+    icon="user-plus"
+    href="#register-patient"
+  >
+    Patient registration with consent
+  </Card>
+  <Card
+    title="Submit symptoms"
+    icon="stethoscope"
+    href="#submit-symptoms"
+  >
+    Symptom reporting from field
+  </Card>
+  <Card
+    title="Get verification status"
+    icon="check-circle"
+    href="#verification-status"
+  >
+    Check Golden Thread verification
+  </Card>
+</CardGroup>
+
+## Submit CBS report
+
+Submit community-based surveillance data from CHVs.
+
+### Endpoint
+
+```
+POST /v1/cbs/report
+```
+
+### Headers
+
+| Header | Value | Required |
+|--------|-------|----------|
+| `Authorization` | `Bearer {token}` | Yes |
+| `Content-Type` | `application/json` | Yes |
+
+### Request body
+
+```json
+{
+  "chv_id": "CHV_AMINA_HASSAN",
+  "location": {
+    "lat": 0.0512,
+    "lng": 40.3129,
+    "name": "Dadaab Refugee Camp"
+  },
+  "timestamp": "2025-12-23T10:30:00Z",
+  "symptoms": ["fever", "diarrhea", "vomiting"],
+  "severity": 8,
+  "patient_count": 1,
+  "notes": "Patient reports severe dehydration",
+  "consent_token": "CONSENT_12345"
+}
+```
+
+### Response
+
+```json
+{
+  "status": "success",
+  "report_id": "CBS_20251223_001",
+  "timestamp": "2025-12-23T10:30:15Z",
+  "verification_score": 0.5,
+  "verification_status": "PENDING_EMR",
+  "alert_level": "HIGH",
+  "recommendations": [
+    "Monitor for additional cases in area",
+    "Ensure ORS availability",
+    "Notify district health officer"
+  ],
+  "golden_thread": {
+    "cbs_signal_id": "CBS_SIG_001",
+    "awaiting_emr_confirmation": true,
+    "estimated_verification_time": "24h"
+  }
+}
+```
+
+## Register patient
+
+Register a new patient with informed consent.
+
+### Endpoint
+
+```
+POST /v1/patients/register
+```
+
+### Request body
+
+```json
+{
+  "patient_id": "PAT_12345",
+  "demographics": {
+    "age": 35,
+    "gender": "F",
+    "location": "Dadaab"
+  },
+  "consent": {
+    "scope": ["diagnosis", "treatment", "public_health_surveillance"],
+    "granted_at": "2025-12-23T10:00:00Z",
+    "expires_at": "2026-12-23T10:00:00Z",
+    "signature": "digital_signature_hash"
+  },
+  "jurisdiction": "KDPA_KE"
+}
+```
+
+### Response
+
+```json
+{
+  "status": "success",
+  "patient_id": "PAT_12345",
+  "consent_token": "CONSENT_12345",
+  "sovereignty_zone": "africa-south1",
+  "data_residency": "KENYA",
+  "retention_policy": "HOT",
+  "retention_expires": "2026-06-23T10:00:00Z"
+}
+```
+
+## Submit symptoms
+
+Submit symptom data for a registered patient.
+
+### Endpoint
+
+```
+POST /v1/patients/{patient_id}/symptoms
+```
+
+### Request body
+
+```json
+{
+  "symptoms": [
+    {
+      "name": "fever",
+      "severity": 8,
+      "onset": "2025-12-22T18:00:00Z"
+    },
+    {
+      "name": "diarrhea",
+      "severity": 9,
+      "onset": "2025-12-22T20:00:00Z"
+    }
+  ],
+  "vital_signs": {
+    "temperature": 38.5,
+    "heart_rate": 95,
+    "blood_pressure": "110/70"
+  },
+  "location": {
+    "lat": 0.0512,
+    "lng": 40.3129
+  },
+  "consent_token": "CONSENT_12345"
+}
+```
+
+### Response
+
+```json
+{
+  "status": "success",
+  "submission_id": "SYMP_001",
+  "risk_score": 0.85,
+  "alert_level": "CRITICAL",
+  "suspected_conditions": [
+    {
+      "condition": "cholera",
+      "confidence": 0.92,
+      "explanation": {
+        "method": "SHAP",
+        "top_features": ["diarrhea", "dehydration", "location_risk"]
+      }
+    }
+  ],
+  "recommendations": [
+    "IMMEDIATE: Start ORS",
+    "Isolate patient",
+    "Notify health facility"
+  ],
+  "golden_thread": {
+    "cbs_signal_created": true,
+    "awaiting_emr_confirmation": true
+  }
+}
+```
+
+## Verification status
+
+Check Golden Thread verification status for a patient.
+
+### Endpoint
+
+```
+GET /v1/patients/{patient_id}/verification
+```
+
+### Response
+
+```json
+{
+  "status": "success",
+  "patient_id": "PAT_12345",
+  "verification": {
+    "score": 1.0,
+    "status": "CONFIRMED",
+    "sources": ["CBS", "EMR"],
+    "cbs_signal": {
+      "id": "CBS_SIG_001",
+      "timestamp": "2025-12-23T10:30:00Z",
+      "location": "Dadaab",
+      "symptoms": ["fever", "diarrhea"]
+    },
+    "emr_record": {
+      "id": "EMR_REC_001",
+      "timestamp": "2025-12-23T11:00:00Z",
+      "location": "Dadaab Clinic",
+      "diagnosis": "cholera"
+    },
+    "verification_logic": {
+      "location_match": true,
+      "time_delta_hours": 0.5,
+      "symptom_match": true
+    }
+  }
+}
+```
+
+## Golden Thread integration
+
+All Bio-Interface submissions automatically integrate with the Golden Thread:
+
+```python
+from edge_node.sync_protocol.golden_thread import GoldenThread
+
+gt = GoldenThread()
+
+# CBS signal from mobile app
+cbs_signal = {
+    'location': 'Dadaab',
+    'symptom': 'fever',
+    'timestamp': '2025-12-23T10:30:00Z',
+    'source': 'MOBILE_APP_CHV'
+}
+
+# Later: EMR record from clinic
+emr_record = {
+    'location': 'Dadaab Clinic',
+    'diagnosis': 'cholera',
+    'timestamp': '2025-12-23T11:00:00Z',
+    'source': 'CLINIC_EMR'
+}
+
+# Fuse data streams
+fused = gt.fuse_data_streams(
+    cbs_signal=cbs_signal,
+    emr_record=emr_record,
+    patient_id='PAT_12345'
+)
+
+# Verification score: 1.0 (CONFIRMED)
+print(f"Verification: {fused.verification_score}")
+```
+
+## Sovereignty enforcement
+
+All API requests enforce data sovereignty:
+
+```python
+from governance_kernel.vector_ledger import SovereignGuardrail
+
+guardrail = SovereignGuardrail()
+
+# Validate API request
+guardrail.validate_action(
+    action_type='Data_Transfer',
+    payload={
+        'data_type': 'PHI',
+        'source': 'Mobile_App',
+        'destination': 'Edge_Node',
+        'jurisdiction': 'KDPA_KE',
+        'consent_token': 'CONSENT_12345'
+    },
+    jurisdiction='KDPA_KE'
+)
+```
+
+## Mobile SDK
+
+### Android (Kotlin)
+
+```kotlin
+import com.iluminara.sdk.BiointerfaceClient
+
+val client = BiointerfaceClient(
+    baseUrl = "https://api.iluminara.health/v1",
+    jurisdiction = "KDPA_KE"
+)
+
+// Authenticate
+val token = client.authenticate(
+    username = "chv_amina_hassan",
+    password = "secure_password"
+)
+
+// Submit CBS report
+val report = CBSReport(
+    chvId = "CHV_AMINA_HASSAN",
+    location = Location(0.0512, 40.3129, "Dadaab"),
+    symptoms = listOf("fever", "diarrhea"),
+    severity = 8,
+    consentToken = "CONSENT_12345"
+)
+
+val response = client.submitCBSReport(report)
+println("Report ID: ${response.reportId}")
+println("Alert Level: ${response.alertLevel}")
+```
+
+### iOS (Swift)
+
+```swift
+import ILuminaraSDK
+
+let client = BioInterfaceClient(
+    baseURL: "https://api.iluminara.health/v1",
+    jurisdiction: "KDPA_KE"
+)
+
+// Authenticate
+client.authenticate(
+    username: "chv_amina_hassan",
+    password: "secure_password"
+) { result in
+    switch result {
+    case .success(let token):
+        print("Authenticated: \(token)")
+    case .failure(let error):
+        print("Error: \(error)")
+    }
+}
+
+// Submit CBS report
+let report = CBSReport(
+    chvId: "CHV_AMINA_HASSAN",
+    location: Location(lat: 0.0512, lng: 40.3129, name: "Dadaab"),
+    symptoms: ["fever", "diarrhea"],
+    severity: 8,
+    consentToken: "CONSENT_12345"
+)
+
+client.submitCBSReport(report) { result in
+    switch result {
+    case .success(let response):
+        print("Report ID: \(response.reportId)")
+        print("Alert Level: \(response.alertLevel)")
+    case .failure(let error):
+        print("Error: \(error)")
+    }
+}
+```
+
+## Offline support
+
+The Bio-Interface API supports offline operation with queue-and-sync:
+
+```python
+from edge_node.ai_agents import OfflineAgent
+
+agent = OfflineAgent(
+    name="Mobile App Agent",
+    capabilities=["OFFLINE_OPERATION", "DATA_SYNC"]
+)
+
+# Queue operation while offline
+agent.queue_operation("submit_cbs_report", {
+    "chv_id": "CHV_AMINA_HASSAN",
+    "location": {"lat": 0.0512, "lng": 40.3129},
+    "symptoms": ["fever", "diarrhea"]
+})
+
+# Sync when connectivity returns
+agent.check_and_sync()
+```
+
+## Rate limits
+
+| Endpoint | Rate Limit | Burst |
+|----------|------------|-------|
+| `/auth/login` | 10/minute | 20 |
+| `/cbs/report` | 100/minute | 200 |
+| `/patients/register` | 50/minute | 100 |
+| `/patients/{id}/symptoms` | 100/minute | 200 |
+
+## Error codes
+
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `AUTH_REQUIRED` | 401 | Missing or invalid authentication |
+| `CONSENT_REQUIRED` | 403 | Missing consent token |
+| `SOVEREIGNTY_VIOLATION` | 403 | Data sovereignty violation |
+| `INVALID_JURISDICTION` | 400 | Invalid jurisdiction specified |
+| `RATE_LIMIT_EXCEEDED` | 429 | Too many requests |
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Golden Thread"
+    icon="link"
+    href="/architecture/golden-thread"
+  >
+    Understand data fusion logic
+  </Card>
+  <Card
+    title="SovereignGuardrail"
+    icon="shield-check"
+    href="/governance/overview"
+  >
+    Configure compliance enforcement
+  </Card>
+  <Card
+    title="Offline agents"
+    icon="wifi-slash"
+    href="/ai-agents/offline"
+  >
+    Enable offline operation
+  </Card>
+  <Card
+    title="Deployment"
+    icon="rocket"
+    href="/deployment/overview"
+  >
+    Deploy to production
+  </Card>
+</CardGroup>
