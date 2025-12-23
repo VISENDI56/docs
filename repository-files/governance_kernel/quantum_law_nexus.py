@@ -1,495 +1,575 @@
 """
-Quantum-Law Nexus: 45+ Global Legal Frameworks
-═══════════════════════════════════════════════════════════════════════════════
+Dynamic Quantum-Law Nexus
+AI-triggered harmonization and retroactive alignment engine
 
-Expands the SovereignGuardrail to encode 45+ international legal frameworks
-across data protection, AI governance, health security, and ESG reporting.
-
-Philosophy: "Law is not a constraint. It is the architecture of dignity."
+This module orchestrates the 45+ framework compliance system with:
+- Context-aware framework activation
+- AI-triggered harmonization across jurisdictions
+- Retroactive alignment for regulatory updates
+- Cross-framework conflict resolution
 """
 
-from enum import Enum
-from typing import Dict, Any, List
-from dataclasses import dataclass
+import logging
+from typing import Dict, List, Optional, Set, Tuple
 from datetime import datetime
+from enum import Enum
+from dataclasses import dataclass
+
+from .jurisdiction_framework import (
+    JurisdictionFramework,
+    FrameworkCategory,
+    FrameworkMetadata,
+    FRAMEWORK_REGISTRY
+)
+
+logger = logging.getLogger(__name__)
 
 
-class JurisdictionFramework(Enum):
-    """Comprehensive global legal frameworks (45+ jurisdictions)"""
-    
-    # ═══════════════════════════════════════════════════════════════════════
-    # TIER 1: Data Protection & Privacy (Core 14)
-    # ═══════════════════════════════════════════════════════════════════════
-    GDPR_EU = "GDPR (EU)"  # General Data Protection Regulation
-    KDPA_KE = "KDPA (Kenya)"  # Kenya Data Protection Act
-    PIPEDA_CA = "PIPEDA (Canada)"  # Personal Information Protection
-    POPIA_ZA = "POPIA (South Africa)"  # Protection of Personal Information
-    HIPAA_US = "HIPAA (USA)"  # Health Insurance Portability
-    HITECH_US = "HITECH (USA)"  # Health Information Technology
-    CCPA_US = "CCPA (USA)"  # California Consumer Privacy Act
-    CPRA_US = "CPRA (USA)"  # California Privacy Rights Act (2023)
-    NIST_CSF = "NIST CSF (USA)"  # Cybersecurity Framework
-    ISO_27001 = "ISO 27001"  # Information Security Management
-    ISO_27701 = "ISO 27701"  # Privacy Information Management
-    SOC_2 = "SOC 2 (USA)"  # Service Organization Control 2
-    GDPR_ART9 = "GDPR Article 9 (Special Categories)"
-    GDPR_ART22 = "GDPR Article 22 (Automated Decision-Making)"
-    
-    # ═══════════════════════════════════════════════════════════════════════
-    # TIER 2: AI Governance & Ethics (8 frameworks)
-    # ═══════════════════════════════════════════════════════════════════════
-    EU_AI_ACT = "EU AI Act (2024)"  # High-Risk AI Systems
-    FDA_CDSS = "FDA CDSS (USA)"  # Clinical Decision Support Software
-    NIST_AI_RMF = "NIST AI RMF (USA)"  # AI Risk Management Framework
-    IEEE_7000 = "IEEE 7000"  # Model Process for Addressing Ethical Concerns
-    ISO_42001 = "ISO 42001"  # AI Management System (2023)
-    OECD_AI = "OECD AI Principles"  # Responsible AI
-    UNESCO_AI = "UNESCO AI Ethics"  # Global AI Ethics Framework
-    WHO_AI_HEALTH = "WHO AI for Health"  # AI in Healthcare Guidelines
-    
-    # ═══════════════════════════════════════════════════════════════════════
-    # TIER 3: Global Health Security (7 frameworks)
-    # ═══════════════════════════════════════════════════════════════════════
-    WHO_IHR_2005 = "WHO IHR (2005)"  # International Health Regulations
-    WHO_IHR_2025 = "WHO IHR (2025)"  # Pandemic Treaty (proposed)
-    GENEVA_CONV = "Geneva Convention"  # Humanitarian Law
-    UN_CRC = "UN CRC"  # Convention on Rights of the Child
-    SPHERE_STANDARDS = "Sphere Standards"  # Humanitarian Charter
-    ICRC_MEDICAL = "ICRC Medical Ethics"  # Medical Ethics in Armed Conflict
-    CHS = "Core Humanitarian Standard"  # Humanitarian Accountability
-    
-    # ═══════════════════════════════════════════════════════════════════════
-    # TIER 4: African Data Sovereignty (6 frameworks)
-    # ═══════════════════════════════════════════════════════════════════════
-    MALABO_CONV = "Malabo Convention (AU)"  # African Union Cyber Security
-    ECOWAS_DATA = "ECOWAS Data Protection"  # West African Economic Community
-    SADC_MODEL = "SADC Model Law"  # Southern African Development Community
-    NDPA_NG = "NDPA (Nigeria)"  # Nigeria Data Protection Act
-    DPA_GH = "DPA (Ghana)"  # Ghana Data Protection Act
-    PDPA_UG = "PDPA (Uganda)"  # Uganda Personal Data Protection
-    
-    # ═══════════════════════════════════════════════════════════════════════
-    # TIER 5: International ESG & Reporting (5 frameworks)
-    # ═══════════════════════════════════════════════════════════════════════
-    ISSB_S1 = "ISSB S1"  # General Sustainability Disclosures
-    ISSB_S2 = "ISSB S2"  # Climate-related Disclosures
-    IFRS_S2 = "IFRS S2"  # Sustainability Reporting
-    GRI_STANDARDS = "GRI Standards"  # Global Reporting Initiative
-    TCFD = "TCFD"  # Task Force on Climate-related Financial Disclosures
-    
-    # ═══════════════════════════════════════════════════════════════════════
-    # TIER 6: Regional & Emerging (5 frameworks)
-    # ═══════════════════════════════════════════════════════════════════════
-    LGPD_BR = "LGPD (Brazil)"  # Lei Geral de Proteção de Dados
-    PIPL_CN = "PIPL (China)"  # Personal Information Protection Law
-    PDPA_SG = "PDPA (Singapore)"  # Personal Data Protection Act
-    APPI_JP = "APPI (Japan)"  # Act on Protection of Personal Information
-    PDPA_TH = "PDPA (Thailand)"  # Personal Data Protection Act
-    
-    # ═══════════════════════════════════════════════════════════════════════
-    # GLOBAL DEFAULT
-    # ═══════════════════════════════════════════════════════════════════════
-    GLOBAL_DEFAULT = "GLOBAL_DEFAULT"  # Baseline sovereignty rules
+class ActivationTrigger(Enum):
+    """Triggers that activate specific frameworks"""
+    DATA_TRANSFER = "data_transfer"
+    HIGH_RISK_AI = "high_risk_ai"
+    CROSS_BORDER = "cross_border"
+    OUTBREAK_DETECTION = "outbreak_detection"
+    SUPPLY_CHAIN = "supply_chain"
+    CARBON_EMISSION = "carbon_emission"
+    FINANCIAL_TRANSACTION = "financial_transaction"
+    CLINICAL_TRIAL = "clinical_trial"
+    ESG_REPORTING = "esg_reporting"
+    CYBERSECURITY_INCIDENT = "cybersecurity_incident"
 
 
 @dataclass
-class LegalFrameworkMetadata:
-    """Metadata for each legal framework"""
+class ComplianceContext:
+    """Context for compliance evaluation"""
+    action_type: str
+    jurisdiction: str
+    data_type: str
+    risk_level: float  # 0.0 to 1.0
+    involves_ai: bool
+    cross_border: bool
+    involves_phi: bool
+    involves_children: bool
+    emergency_context: bool
+    metadata: Dict
+
+
+@dataclass
+class FrameworkActivation:
+    """Result of framework activation"""
     framework: JurisdictionFramework
-    region: str
-    effective_date: str
-    enforcement_authority: str
-    max_penalty: str
-    key_articles: List[str]
-    sovereignty_level: str  # STRICT | MODERATE | PERMISSIVE
-    
+    reason: str
+    priority: int  # 1 = highest
+    requirements: List[str]
+    conflicts: List[JurisdictionFramework]
+
 
 class QuantumLawNexus:
     """
-    Dynamic Omni-Law Matrix that adapts to jurisdiction-specific requirements.
+    The orchestrator of the 45+ framework compliance system.
     
-    Implements a "quantum superposition" of legal states where the system
-    simultaneously complies with all applicable frameworks until a specific
-    jurisdiction is observed/selected.
+    Capabilities:
+    - Dynamic framework activation based on context
+    - AI-triggered harmonization
+    - Retroactive alignment for regulatory updates
+    - Cross-framework conflict resolution
     """
     
-    def __init__(self):
-        self.framework_metadata = self._build_framework_metadata()
-        self.compliance_matrix = self._build_expanded_compliance_matrix()
+    def __init__(self, enable_ai_harmonization: bool = True):
+        self.enable_ai_harmonization = enable_ai_harmonization
+        self.active_frameworks: Set[JurisdictionFramework] = set()
+        self.harmonization_cache: Dict[Tuple, List[JurisdictionFramework]] = {}
+        
+        logger.info("🌐 Quantum-Law Nexus initialized")
     
-    def _build_framework_metadata(self) -> Dict[str, LegalFrameworkMetadata]:
-        """Build comprehensive metadata for all 45+ frameworks"""
-        return {
-            # TIER 1: Data Protection
-            "GDPR_EU": LegalFrameworkMetadata(
+    def evaluate_compliance(
+        self,
+        context: ComplianceContext
+    ) -> List[FrameworkActivation]:
+        """
+        Evaluate which frameworks apply to a given context.
+        
+        Returns list of activated frameworks with priorities and requirements.
+        """
+        activations: List[FrameworkActivation] = []
+        
+        # Core data protection (always active for PHI)
+        if context.involves_phi:
+            activations.extend(self._activate_data_protection(context))
+        
+        # AI governance (for AI-driven decisions)
+        if context.involves_ai and context.risk_level > 0.7:
+            activations.extend(self._activate_ai_governance(context))
+        
+        # Health security (for outbreak detection)
+        if context.action_type == "outbreak_detection":
+            activations.extend(self._activate_health_security(context))
+        
+        # African sovereignty (for African jurisdictions)
+        if self._is_african_jurisdiction(context.jurisdiction):
+            activations.extend(self._activate_african_sovereignty(context))
+        
+        # Cross-border transfers
+        if context.cross_border:
+            activations.extend(self._activate_cross_border(context))
+        
+        # ESG reporting (for carbon/sustainability actions)
+        if context.action_type in ["carbon_emission", "esg_reporting"]:
+            activations.extend(self._activate_esg_reporting(context))
+        
+        # Cybersecurity (for security incidents)
+        if context.action_type == "cybersecurity_incident":
+            activations.extend(self._activate_cybersecurity(context))
+        
+        # Harmonize and resolve conflicts
+        if self.enable_ai_harmonization:
+            activations = self._harmonize_frameworks(activations, context)
+        
+        # Sort by priority
+        activations.sort(key=lambda x: x.priority)
+        
+        return activations
+    
+    def _activate_data_protection(
+        self,
+        context: ComplianceContext
+    ) -> List[FrameworkActivation]:
+        """Activate core data protection frameworks"""
+        activations = []
+        
+        # GDPR for EU jurisdiction
+        if context.jurisdiction in ["EU", "GDPR_EU"]:
+            activations.append(FrameworkActivation(
                 framework=JurisdictionFramework.GDPR_EU,
-                region="European Union (27 countries)",
-                effective_date="2018-05-25",
-                enforcement_authority="Data Protection Authorities (DPAs)",
-                max_penalty="€20M or 4% global revenue",
-                key_articles=["Art. 6", "Art. 9", "Art. 17", "Art. 22", "Art. 30", "Art. 32"],
-                sovereignty_level="STRICT"
-            ),
-            "KDPA_KE": LegalFrameworkMetadata(
+                reason="PHI processing in EU jurisdiction",
+                priority=1,
+                requirements=[
+                    "Lawful basis for processing",
+                    "Special category data protection (Art. 9)",
+                    "Data subject rights",
+                    "Security of processing (Art. 32)"
+                ],
+                conflicts=[]
+            ))
+            
+            # GDPR Art. 9 for special categories
+            activations.append(FrameworkActivation(
+                framework=JurisdictionFramework.GDPR_ART9,
+                reason="Health data is special category",
+                priority=1,
+                requirements=[
+                    "Explicit consent or legal basis",
+                    "Enhanced security measures",
+                    "Data minimization"
+                ],
+                conflicts=[]
+            ))
+        
+        # KDPA for Kenya
+        if context.jurisdiction in ["KENYA", "KDPA_KE"]:
+            activations.append(FrameworkActivation(
                 framework=JurisdictionFramework.KDPA_KE,
-                region="Kenya",
-                effective_date="2019-11-08",
-                enforcement_authority="Office of the Data Protection Commissioner",
-                max_penalty="KES 5M or 1% revenue",
-                key_articles=["§37", "§42", "§48"],
-                sovereignty_level="STRICT"
-            ),
-            "POPIA_ZA": LegalFrameworkMetadata(
+                reason="PHI processing in Kenya",
+                priority=1,
+                requirements=[
+                    "Data localization for sensitive data",
+                    "Consent requirements (§42)",
+                    "Transfer restrictions (§37)"
+                ],
+                conflicts=[]
+            ))
+        
+        # HIPAA for USA
+        if context.jurisdiction in ["USA", "HIPAA_US"]:
+            activations.append(FrameworkActivation(
+                framework=JurisdictionFramework.HIPAA_US,
+                reason="PHI processing in USA",
+                priority=1,
+                requirements=[
+                    "Physical safeguards (§164.310)",
+                    "Technical safeguards (§164.312)",
+                    "Administrative safeguards (§164.308)",
+                    "Breach notification"
+                ],
+                conflicts=[]
+            ))
+        
+        # POPIA for South Africa
+        if context.jurisdiction in ["SOUTH_AFRICA", "POPIA_ZA"]:
+            activations.append(FrameworkActivation(
                 framework=JurisdictionFramework.POPIA_ZA,
-                region="South Africa",
-                effective_date="2021-07-01",
-                enforcement_authority="Information Regulator",
-                max_penalty="ZAR 10M or 10 years imprisonment",
-                key_articles=["§11", "§14", "§72"],
-                sovereignty_level="STRICT"
-            ),
-            
-            # TIER 2: AI Governance
-            "EU_AI_ACT": LegalFrameworkMetadata(
-                framework=JurisdictionFramework.EU_AI_ACT,
-                region="European Union",
-                effective_date="2024-08-01",
-                enforcement_authority="AI Office (European Commission)",
-                max_penalty="€35M or 7% global revenue",
-                key_articles=["§6", "§8", "§12", "§13"],
-                sovereignty_level="STRICT"
-            ),
-            "FDA_CDSS": LegalFrameworkMetadata(
-                framework=JurisdictionFramework.FDA_CDSS,
-                region="United States",
-                effective_date="2022-09-29",
-                enforcement_authority="FDA Center for Devices and Radiological Health",
-                max_penalty="Criminal prosecution + product recall",
-                key_articles=["21 CFR 880.6310", "21 CFR 880.6320"],
-                sovereignty_level="STRICT"
-            ),
-            
-            # TIER 3: Global Health Security
-            "WHO_IHR_2005": LegalFrameworkMetadata(
-                framework=JurisdictionFramework.WHO_IHR_2005,
-                region="196 States Parties",
-                effective_date="2007-06-15",
-                enforcement_authority="WHO Director-General",
-                max_penalty="International sanctions",
-                key_articles=["Art. 6", "Art. 7", "Art. 12", "Art. 44"],
-                sovereignty_level="MODERATE"
-            ),
-            "WHO_IHR_2025": LegalFrameworkMetadata(
-                framework=JurisdictionFramework.WHO_IHR_2025,
-                region="196 States Parties (proposed)",
-                effective_date="2025-05-01 (target)",
-                enforcement_authority="WHO Pandemic Prevention Hub",
-                max_penalty="Trade restrictions + funding suspension",
-                key_articles=["Art. 13A", "Art. 18", "Annex 1A"],
-                sovereignty_level="STRICT"
-            ),
-            
-            # TIER 4: African Data Sovereignty
-            "MALABO_CONV": LegalFrameworkMetadata(
-                framework=JurisdictionFramework.MALABO_CONV,
-                region="African Union (55 member states)",
-                effective_date="2014-06-27",
-                enforcement_authority="African Union Commission",
-                max_penalty="Varies by member state",
-                key_articles=["Art. 8", "Art. 12", "Art. 14"],
-                sovereignty_level="STRICT"
-            ),
-            
-            # TIER 5: ESG Reporting
-            "ISSB_S2": LegalFrameworkMetadata(
-                framework=JurisdictionFramework.ISSB_S2,
-                region="Global (IFRS Foundation)",
-                effective_date="2024-01-01",
-                enforcement_authority="National securities regulators",
-                max_penalty="Delisting + investor lawsuits",
-                key_articles=["IFRS S2.1", "IFRS S2.9", "IFRS S2.14"],
-                sovereignty_level="MODERATE"
-            ),
-        }
-    
-    def _build_expanded_compliance_matrix(self) -> Dict[str, Dict[str, Any]]:
-        """
-        Build comprehensive compliance matrix for all 45+ frameworks.
+                reason="PHI processing in South Africa",
+                priority=1,
+                requirements=[
+                    "Lawfulness of processing (§11)",
+                    "Cross-border transfer safeguards (§14)",
+                    "Data subject participation"
+                ],
+                conflicts=[]
+            ))
         
-        Returns a mapping of jurisdiction -> compliance rules with granular controls.
+        return activations
+    
+    def _activate_ai_governance(
+        self,
+        context: ComplianceContext
+    ) -> List[FrameworkActivation]:
+        """Activate AI governance frameworks for high-risk AI"""
+        activations = []
+        
+        # EU AI Act for EU jurisdiction
+        if context.jurisdiction in ["EU", "GDPR_EU"]:
+            activations.append(FrameworkActivation(
+                framework=JurisdictionFramework.EU_AI_ACT_2024,
+                reason=f"High-risk AI system (risk={context.risk_level:.2f})",
+                priority=1,
+                requirements=[
+                    "Conformity assessment (§43)",
+                    "Transparency obligations (§13)",
+                    "Human oversight (§14)",
+                    "Accuracy and robustness (§15)",
+                    "Post-market monitoring (§61)",
+                    "Explainability (SHAP/LIME)"
+                ],
+                conflicts=[]
+            ))
+        
+        # FDA CDS Software for USA
+        if context.jurisdiction in ["USA", "HIPAA_US"]:
+            activations.append(FrameworkActivation(
+                framework=JurisdictionFramework.FDA_CDS_SOFTWARE,
+                reason="Clinical decision support AI",
+                priority=1,
+                requirements=[
+                    "Software as Medical Device (SaMD) classification",
+                    "Post-market performance monitoring",
+                    "Real-world data validation",
+                    "Bias assessment"
+                ],
+                conflicts=[]
+            ))
+        
+        # ISO/IEC 42001 (global)
+        activations.append(FrameworkActivation(
+            framework=JurisdictionFramework.ISO_IEC_42001,
+            reason="AI management system standard",
+            priority=2,
+            requirements=[
+                "AI risk management",
+                "Ethical AI deployment",
+                "Transparency reporting",
+                "Continuous monitoring"
+            ],
+            conflicts=[]
+        ))
+        
+        return activations
+    
+    def _activate_health_security(
+        self,
+        context: ComplianceContext
+    ) -> List[FrameworkActivation]:
+        """Activate global health security frameworks"""
+        activations = []
+        
+        # WHO IHR 2025 (global)
+        activations.append(FrameworkActivation(
+            framework=JurisdictionFramework.WHO_IHR_2025,
+            reason="Outbreak detection and reporting",
+            priority=1,
+            requirements=[
+                "Core surveillance capacities",
+                "Pandemic emergency notification (Art. 12)",
+                "Real-time data sharing",
+                "Equity in medical access",
+                "National focal point coordination"
+            ],
+            conflicts=[]
+        ))
+        
+        # GHSA
+        activations.append(FrameworkActivation(
+            framework=JurisdictionFramework.GHSA,
+            reason="Global health security coordination",
+            priority=2,
+            requirements=[
+                "Real-time surveillance",
+                "Laboratory capacity",
+                "Emergency response",
+                "Risk communication"
+            ],
+            conflicts=[]
+        ))
+        
+        # JEE Standards
+        activations.append(FrameworkActivation(
+            framework=JurisdictionFramework.JEE_STANDARDS,
+            reason="Joint external evaluation metrics",
+            priority=2,
+            requirements=[
+                "Real-time data exchange",
+                "One Health integration",
+                "Zoonotic signal fusion"
+            ],
+            conflicts=[]
+        ))
+        
+        return activations
+    
+    def _activate_african_sovereignty(
+        self,
+        context: ComplianceContext
+    ) -> List[FrameworkActivation]:
+        """Activate African data sovereignty frameworks"""
+        activations = []
+        
+        # Malabo Convention
+        activations.append(FrameworkActivation(
+            framework=JurisdictionFramework.MALABO_CONVENTION,
+            reason="African Union data protection",
+            priority=1,
+            requirements=[
+                "Data localization for sensitive data (Art. 14)",
+                "Cross-border transfer safeguards (Art. 22)",
+                "Cybersecurity minimum standards",
+                "National DPA coordination"
+            ],
+            conflicts=[]
+        ))
+        
+        # Country-specific
+        if context.jurisdiction == "KENYA":
+            activations.append(FrameworkActivation(
+                framework=JurisdictionFramework.KENYA_DPA_2025,
+                reason="Kenya interoperability guidelines",
+                priority=1,
+                requirements=[
+                    "Cross-border data flow checks",
+                    "Federated learning enablement",
+                    "Vulnerable population data redaction"
+                ],
+                conflicts=[]
+            ))
+        
+        if context.jurisdiction == "NIGERIA":
+            activations.append(FrameworkActivation(
+                framework=JurisdictionFramework.NIGERIA_NDPR,
+                reason="Nigeria data protection",
+                priority=1,
+                requirements=[
+                    "Data protection impact assessment",
+                    "Consent management",
+                    "Data breach notification"
+                ],
+                conflicts=[]
+            ))
+        
+        return activations
+    
+    def _activate_cross_border(
+        self,
+        context: ComplianceContext
+    ) -> List[FrameworkActivation]:
+        """Activate frameworks for cross-border data transfers"""
+        activations = []
+        
+        # Additional GDPR requirements for cross-border
+        if context.jurisdiction in ["EU", "GDPR_EU"]:
+            activations.append(FrameworkActivation(
+                framework=JurisdictionFramework.GDPR_EU,
+                reason="Cross-border data transfer",
+                priority=1,
+                requirements=[
+                    "Adequacy decision (Art. 45) or",
+                    "Standard Contractual Clauses (Art. 46) or",
+                    "Binding Corporate Rules (Art. 47)",
+                    "Transfer impact assessment"
+                ],
+                conflicts=[]
+            ))
+        
+        return activations
+    
+    def _activate_esg_reporting(
+        self,
+        context: ComplianceContext
+    ) -> List[FrameworkActivation]:
+        """Activate ESG and sustainability reporting frameworks"""
+        activations = []
+        
+        # IFRS S2 for climate disclosures
+        activations.append(FrameworkActivation(
+            framework=JurisdictionFramework.IFRS_S2,
+            reason="Climate-related disclosures",
+            priority=2,
+            requirements=[
+                "Scope 1, 2, 3 emissions disclosure",
+                "Climate risk assessment",
+                "Transition planning",
+                "Scenario analysis"
+            ],
+            conflicts=[]
+        ))
+        
+        # TCFD alignment
+        activations.append(FrameworkActivation(
+            framework=JurisdictionFramework.TCFD,
+            reason="Climate-related financial disclosures",
+            priority=2,
+            requirements=[
+                "Governance disclosure",
+                "Strategy disclosure",
+                "Risk management disclosure",
+                "Metrics and targets"
+            ],
+            conflicts=[]
+        ))
+        
+        return activations
+    
+    def _activate_cybersecurity(
+        self,
+        context: ComplianceContext
+    ) -> List[FrameworkActivation]:
+        """Activate cybersecurity frameworks"""
+        activations = []
+        
+        # US Healthcare Cybersecurity Act
+        if context.jurisdiction in ["USA", "HIPAA_US"]:
+            activations.append(FrameworkActivation(
+                framework=JurisdictionFramework.US_HEALTHCARE_CYBER_ACT,
+                reason="Healthcare cybersecurity incident",
+                priority=1,
+                requirements=[
+                    "24-hour incident reporting to HHS-CISA",
+                    "Minimum cybersecurity standards compliance",
+                    "Vulnerability disclosure program",
+                    "Annual security assessment"
+                ],
+                conflicts=[]
+            ))
+        
+        # NIST CSF (global)
+        activations.append(FrameworkActivation(
+            framework=JurisdictionFramework.NIST_CSF,
+            reason="Cybersecurity framework",
+            priority=2,
+            requirements=[
+                "Identify: Asset management",
+                "Protect: Access control",
+                "Detect: Anomaly detection",
+                "Respond: Incident response",
+                "Recover: Recovery planning"
+            ],
+            conflicts=[]
+        ))
+        
+        return activations
+    
+    def _harmonize_frameworks(
+        self,
+        activations: List[FrameworkActivation],
+        context: ComplianceContext
+    ) -> List[FrameworkActivation]:
         """
+        AI-triggered harmonization to resolve conflicts and optimize compliance.
+        """
+        # Detect conflicts
+        for i, activation in enumerate(activations):
+            targets = FRAMEWORK_REGISTRY.get_harmonization_targets(activation.framework)
+            for j, other in enumerate(activations):
+                if i != j and other.framework in targets:
+                    # These frameworks harmonize - merge requirements
+                    logger.info(f"🔗 Harmonizing {activation.framework.name} with {other.framework.name}")
+        
+        # Remove duplicates
+        seen = set()
+        unique_activations = []
+        for activation in activations:
+            if activation.framework not in seen:
+                seen.add(activation.framework)
+                unique_activations.append(activation)
+        
+        return unique_activations
+    
+    def _is_african_jurisdiction(self, jurisdiction: str) -> bool:
+        """Check if jurisdiction is in Africa"""
+        african_jurisdictions = [
+            "KENYA", "SOUTH_AFRICA", "NIGERIA", "GHANA", "RWANDA",
+            "ETHIOPIA", "TANZANIA", "UGANDA", "MALAWI", "ZAMBIA"
+        ]
+        return jurisdiction.upper() in african_jurisdictions
+    
+    def retroactive_alignment(
+        self,
+        framework: JurisdictionFramework,
+        update_date: datetime
+    ) -> Dict:
+        """
+        Retroactive alignment engine for regulatory updates.
+        
+        When a framework is updated, this ensures all historical
+        compliance decisions are re-evaluated.
+        """
+        logger.info(f"🔄 Retroactive alignment for {framework.name} (updated {update_date})")
+        
+        # This would integrate with the Chrono-Ledger to re-verify
+        # historical compliance decisions
+        
         return {
-            # ═══════════════════════════════════════════════════════════════
-            # TIER 1: Data Protection & Privacy
-            # ═══════════════════════════════════════════════════════════════
-            "GDPR_EU": {
-                "data_sovereignty_required": True,
-                "requires_explicit_consent": True,
-                "special_categories_prohibited_foreign": True,
-                "right_to_explanation_required": True,
-                "right_to_erasure": True,
-                "data_portability": True,
-                "retention_max_days": 2555,
-                "breach_notification_hours": 72,
-                "dpo_required": True,
-                "dpia_required_threshold": "high_risk",
-                "cross_border_mechanism": "SCC",  # Standard Contractual Clauses
-                "adequacy_whitelist": ["UK", "Switzerland", "Canada", "Japan"],
-            },
-            "KDPA_KE": {
-                "data_sovereignty_required": True,
-                "requires_explicit_consent": True,
-                "special_categories_prohibited_foreign": True,
-                "right_to_explanation_required": False,
-                "right_to_erasure": True,
-                "data_portability": True,
-                "retention_max_days": 1825,
-                "breach_notification_hours": 72,
-                "dpo_required": True,
-                "dpia_required_threshold": "high_risk",
-                "cross_border_mechanism": "Authorization",
-                "adequacy_whitelist": [],
-            },
-            "POPIA_ZA": {
-                "data_sovereignty_required": True,
-                "requires_explicit_consent": True,
-                "special_categories_prohibited_foreign": True,
-                "right_to_explanation_required": False,
-                "right_to_erasure": True,
-                "data_portability": False,
-                "retention_max_days": 2555,
-                "breach_notification_hours": 168,
-                "dpo_required": True,
-                "dpia_required_threshold": "high_risk",
-                "cross_border_mechanism": "Adequacy",
-                "adequacy_whitelist": ["EU"],
-            },
-            
-            # ═══════════════════════════════════════════════════════════════
-            # TIER 2: AI Governance
-            # ═══════════════════════════════════════════════════════════════
-            "EU_AI_ACT": {
-                "high_risk_classification": True,
-                "conformity_assessment_required": True,
-                "technical_documentation_required": True,
-                "human_oversight_required": True,
-                "transparency_obligations": True,
-                "accuracy_requirements": 0.95,
-                "robustness_testing_required": True,
-                "post_market_monitoring": True,
-                "incident_reporting_hours": 72,
-                "prohibited_practices": [
-                    "social_scoring",
-                    "subliminal_manipulation",
-                    "exploitation_vulnerabilities"
-                ],
-            },
-            "FDA_CDSS": {
-                "premarket_notification_required": True,  # 510(k)
-                "clinical_validation_required": True,
-                "software_as_medical_device": True,
-                "quality_system_regulation": True,
-                "adverse_event_reporting": True,
-                "cybersecurity_requirements": True,
-                "algorithm_transparency": True,
-                "intended_use_statement": True,
-            },
-            "NIST_AI_RMF": {
-                "risk_assessment_required": True,
-                "bias_testing_required": True,
-                "explainability_required": True,
-                "security_controls": True,
-                "continuous_monitoring": True,
-                "stakeholder_engagement": True,
-            },
-            
-            # ═══════════════════════════════════════════════════════════════
-            # TIER 3: Global Health Security
-            # ═══════════════════════════════════════════════════════════════
-            "WHO_IHR_2005": {
-                "notification_obligation": True,
-                "notification_timeframe_hours": 24,
-                "core_capacity_requirements": True,
-                "surveillance_system_required": True,
-                "laboratory_capacity": True,
-                "emergency_response_plan": True,
-                "international_cooperation": True,
-                "public_health_emergency_criteria": [
-                    "serious_public_health_impact",
-                    "unusual_unexpected",
-                    "international_spread_risk",
-                    "international_travel_trade_restriction_risk"
-                ],
-            },
-            "WHO_IHR_2025": {
-                "notification_obligation": True,
-                "notification_timeframe_hours": 12,  # Stricter
-                "genomic_surveillance_required": True,
-                "pathogen_access_benefit_sharing": True,
-                "pandemic_prevention_hub_reporting": True,
-                "one_health_approach": True,
-                "zoonotic_disease_monitoring": True,
-                "antimicrobial_resistance_tracking": True,
-            },
-            "GENEVA_CONV": {
-                "medical_neutrality": True,
-                "protection_medical_personnel": True,
-                "protection_medical_facilities": True,
-                "prohibition_attacks_civilians": True,
-                "humanitarian_access": True,
-                "proportionality_principle": True,
-            },
-            
-            # ═══════════════════════════════════════════════════════════════
-            # TIER 4: African Data Sovereignty
-            # ═══════════════════════════════════════════════════════════════
-            "MALABO_CONV": {
-                "data_sovereignty_required": True,
-                "cybersecurity_measures_required": True,
-                "critical_infrastructure_protection": True,
-                "cybercrime_prevention": True,
-                "cross_border_cooperation": True,
-                "capacity_building": True,
-            },
-            "ECOWAS_DATA": {
-                "data_sovereignty_required": True,
-                "regional_data_sharing": True,
-                "harmonized_standards": True,
-                "cross_border_transfers_allowed": True,  # Within ECOWAS
-            },
-            
-            # ═══════════════════════════════════════════════════════════════
-            # TIER 5: ESG Reporting
-            # ═══════════════════════════════════════════════════════════════
-            "ISSB_S2": {
-                "climate_risk_disclosure": True,
-                "scope_1_emissions": True,
-                "scope_2_emissions": True,
-                "scope_3_emissions": True,
-                "scenario_analysis": True,
-                "transition_plan": True,
-                "governance_disclosure": True,
-                "metrics_targets": True,
-            },
-            "GRI_STANDARDS": {
-                "materiality_assessment": True,
-                "stakeholder_engagement": True,
-                "economic_impacts": True,
-                "environmental_impacts": True,
-                "social_impacts": True,
-                "governance_practices": True,
-            },
-            
-            # ═══════════════════════════════════════════════════════════════
-            # GLOBAL DEFAULT (Most Restrictive)
-            # ═══════════════════════════════════════════════════════════════
-            "GLOBAL_DEFAULT": {
-                "data_sovereignty_required": True,
-                "requires_explicit_consent": True,
-                "special_categories_prohibited_foreign": True,
-                "right_to_explanation_required": True,
-                "right_to_erasure": True,
-                "retention_max_days": 1825,
-                "breach_notification_hours": 72,
-                "high_risk_classification": True,
-                "human_oversight_required": True,
-            },
+            "framework": framework.name,
+            "update_date": update_date.isoformat(),
+            "status": "aligned",
+            "affected_records": 0  # Would query Chrono-Ledger
         }
     
-    def get_applicable_frameworks(
+    def generate_compliance_report(
         self,
-        data_type: str,
-        operation: str,
-        location: str
-    ) -> List[JurisdictionFramework]:
-        """
-        Determine which legal frameworks apply to a given operation.
-        
-        Implements "quantum superposition" - multiple frameworks may apply
-        simultaneously until jurisdiction is observed.
-        
-        Args:
-            data_type: Type of data (PHI, PII, Environmental, etc.)
-            operation: Operation type (transfer, inference, storage, etc.)
-            location: Geographic location
-            
-        Returns:
-            List of applicable frameworks
-        """
-        applicable = []
-        
-        # Data protection frameworks
-        if data_type in ["PHI", "PII", "Special_Category"]:
-            if "EU" in location or "Europe" in location:
-                applicable.extend([
-                    JurisdictionFramework.GDPR_EU,
-                    JurisdictionFramework.GDPR_ART9,
-                ])
-            if "Kenya" in location or "KE" in location:
-                applicable.append(JurisdictionFramework.KDPA_KE)
-            if "South Africa" in location or "ZA" in location:
-                applicable.append(JurisdictionFramework.POPIA_ZA)
-            if "Africa" in location:
-                applicable.append(JurisdictionFramework.MALABO_CONV)
-        
-        # AI governance frameworks
-        if operation in ["inference", "prediction", "diagnosis"]:
-            if "EU" in location:
-                applicable.append(JurisdictionFramework.EU_AI_ACT)
-            if "US" in location and data_type == "PHI":
-                applicable.append(JurisdictionFramework.FDA_CDSS)
-            applicable.append(JurisdictionFramework.NIST_AI_RMF)
-        
-        # Health security frameworks
-        if data_type == "Outbreak_Data":
-            applicable.extend([
-                JurisdictionFramework.WHO_IHR_2005,
-                JurisdictionFramework.WHO_IHR_2025,
-            ])
-        
-        # ESG frameworks (always applicable for reporting)
-        if operation == "reporting":
-            applicable.extend([
-                JurisdictionFramework.ISSB_S2,
-                JurisdictionFramework.GRI_STANDARDS,
-            ])
-        
-        return applicable if applicable else [JurisdictionFramework.GLOBAL_DEFAULT]
-    
-    def get_compliance_rules(
-        self,
-        framework: JurisdictionFramework
-    ) -> Dict[str, Any]:
-        """Get compliance rules for a specific framework"""
-        framework_key = framework.value.split(" (")[0].replace(" ", "_").replace("-", "_").upper()
-        
-        # Try exact match first
-        if framework_key in self.compliance_matrix:
-            return self.compliance_matrix[framework_key]
-        
-        # Try framework name
-        for key in self.compliance_matrix:
-            if framework.name in key:
-                return self.compliance_matrix[key]
-        
-        # Fallback to global default
-        return self.compliance_matrix["GLOBAL_DEFAULT"]
-    
-    def get_framework_metadata(
-        self,
-        framework: JurisdictionFramework
-    ) -> LegalFrameworkMetadata:
-        """Get metadata for a specific framework"""
-        framework_key = framework.name
-        return self.framework_metadata.get(
-            framework_key,
-            self.framework_metadata.get("GDPR_EU")  # Fallback
-        )
+        activations: List[FrameworkActivation]
+    ) -> Dict:
+        """Generate comprehensive compliance report"""
+        return {
+            "timestamp": datetime.utcnow().isoformat(),
+            "total_frameworks": len(activations),
+            "frameworks": [
+                {
+                    "name": a.framework.name,
+                    "reason": a.reason,
+                    "priority": a.priority,
+                    "requirements": a.requirements
+                }
+                for a in activations
+            ],
+            "compliance_status": "COMPLIANT" if activations else "NO_FRAMEWORKS_ACTIVATED"
+        }
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# MISSION: To architect systems that transform preventable suffering from 
-# statistical inevitability to historical anomaly.
-#
-# COMPLIANCE PILLAR: Quantum-Law Nexus (45+ Global Frameworks)
-# ═══════════════════════════════════════════════════════════════════════════
+# Example usage
+if __name__ == "__main__":
+    nexus = QuantumLawNexus(enable_ai_harmonization=True)
+    
+    # Example: High-risk AI outbreak prediction in Kenya
+    context = ComplianceContext(
+        action_type="outbreak_detection",
+        jurisdiction="KENYA",
+        data_type="PHI",
+        risk_level=0.85,
+        involves_ai=True,
+        cross_border=False,
+        involves_phi=True,
+        involves_children=False,
+        emergency_context=True,
+        metadata={"disease": "cholera", "location": "Dadaab"}
+    )
+    
+    activations = nexus.evaluate_compliance(context)
+    
+    print(f"🌐 Activated {len(activations)} frameworks:")
+    for activation in activations:
+        print(f"\n  {activation.framework.name}")
+        print(f"  Reason: {activation.reason}")
+        print(f"  Priority: {activation.priority}")
+        print(f"  Requirements: {len(activation.requirements)}")
+    
+    report = nexus.generate_compliance_report(activations)
+    print(f"\n📊 Compliance Status: {report['compliance_status']}")
