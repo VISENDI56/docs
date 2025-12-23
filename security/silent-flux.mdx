@@ -1,0 +1,567 @@
+---
+title: Silent Flux (IP-04)
+description: Anxiety-regulated AI output that prevents information overload through adaptive serenity flow
+---
+
+## Overview
+
+Silent Flux (IP-04) is iLuminara's **Adaptive Serenity Flow** system that transforms AI from a "data firehose" to a "cognitive dampener," actively managing information entropy to match the user's emotional bandwidth.
+
+<Card
+  title="Philosophy"
+  icon="brain"
+>
+  "The AI reads the room before it speaks."
+</Card>
+
+## The empathy loop
+
+Instead of just processing what you say, Silent Flux processes **how you interact**:
+
+<CardGroup cols={3}>
+  <Card title="Interaction velocity" icon="gauge-high">
+    Typing speed as anxiety proxy
+  </Card>
+  <Card title="Input jitter" icon="wave-pulse">
+    Backspaces and erratic scrolling
+  </Card>
+  <Card title="Biometric fusion" icon="heart-pulse">
+    Heart rate integration (optional)
+  </Card>
+</CardGroup>
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│              SOMATIC INFERENCE ENGINE                   │
+│  ┌──────────────────────────────────────────────────┐  │
+│  │  Interaction Metrics                             │  │
+│  │  • Typing Speed (CPM)                            │  │
+│  │  • Error Rate (Backspaces/Keystrokes)           │  │
+│  │  • Scroll Velocity (Pixels/Second)              │  │
+│  │  • Biometric HR (Optional)                      │  │
+│  └──────────────────────────────────────────────────┘  │
+│                        ▼                                │
+│  ┌──────────────────────────────────────────────────┐  │
+│  │  Bayesian Anxiety Inference (GaussianNB)        │  │
+│  │  Features: [Speed, ErrorRate, ScrollVelocity]   │  │
+│  │  Output: Anxiety Score (0.0 - 1.0)              │  │
+│  └──────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────┘
+                        ▼
+┌─────────────────────────────────────────────────────────┐
+│           COGNITIVE LOAD BALANCING                      │
+│  ┌──────────────────────────────────────────────────┐  │
+│  │  Text Entropy Calculation                        │  │
+│  │  • Average Word Length                           │  │
+│  │  • Sentence Length Variance                      │  │
+│  │  • Jargon Density                                │  │
+│  └──────────────────────────────────────────────────┘  │
+│                        ▼                                │
+│  ┌──────────────────────────────────────────────────┐  │
+│  │  Three-Mode Regulation                           │  │
+│  │  • ZEN Mode (>0.7): Executive Summary            │  │
+│  │  • FLOW Mode (0.4-0.7): Semantic Chunking       │  │
+│  │  • RAW Mode (<0.4): Full Bandwidth              │  │
+│  └──────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────┘
+                        ▼
+┌─────────────────────────────────────────────────────────┐
+│          ANTI-PATERNALISM PROTOCOL                      │
+│  • User sees regulation: [Flux: High]                   │
+│  • Override available: override=True                    │
+│  • Transparency report: get_transparency_report()       │
+└─────────────────────────────────────────────────────────┘
+```
+
+## Basic usage
+
+```python
+from edge_node.frenasa_engine.silent_flux import AdaptiveSerenityFlow, InteractionMetrics
+
+# Initialize Silent Flux
+asf = AdaptiveSerenityFlow()
+
+# Configure user preferences (Anti-Paternalism)
+asf.configure({
+    "baseline_anxiety": 0.2,
+    "sensitivity": 1.0,
+    "allow_simplification": True,
+    "show_transparency": True
+})
+
+# Collect interaction metrics
+metrics = InteractionMetrics(
+    timestamp=time.time(),
+    typing_speed_cpm=550,   # Fast typing
+    error_rate=0.18,        # High error rate (jitter)
+    scroll_velocity=150.0,  # Frantic scrolling
+    session_duration=1200,
+    biometric_hr=110        # Elevated heart rate
+)
+
+# Infer anxiety level
+anxiety_score = asf.infer_anxiety(metrics)
+print(f"Anxiety Score: {anxiety_score:.2f}")  # 0.85 (HIGH)
+
+# Regulate output based on anxiety
+dense_report = """
+The epidemiological vector analysis indicates a stochastic surge 
+in R0 values correlated with spatiotemporal clustering...
+"""
+
+output = asf.regulate_output(dense_report)
+
+print(f"Mode: {output['mode']}")  # ZEN
+print(f"Content:\n{output['text']}")
+```
+
+## Three regulation modes
+
+### ZEN Mode (High Anxiety >0.7)
+
+**Goal:** Reduce cognitive load immediately. Summarize & pause.
+
+```python
+# Input: Dense technical report (500 words)
+# Output: Executive summary + expandable details
+
+"""
+**Insight Summary:** The epidemiological vector analysis indicates 
+a stochastic surge in R0 values...
+
+*[System: Taking a beat. Complex details available below.]*
+
+---> **Expand for Full Details (500 words)**
+"""
+```
+
+**Features:**
+- First sentence extraction
+- Complexity warning
+- Expandable full content
+- No information loss
+
+### FLOW Mode (Medium Anxiety 0.4-0.7)
+
+**Goal:** Chunking. Don't remove info, but structure it for rhythm.
+
+```python
+# Input: Wall of text
+# Output: Semantic bullet points
+
+"""
+• The epidemiological vector analysis indicates a stochastic 
+  surge in R0 values correlated with spatiotemporal clustering.
+
+• We advise immediate quarantine protocols involving negative 
+  pressure isolation.
+
+• Contact tracing heuristic applying Bayesian updates to 
+  2nd degree nodes.
+"""
+```
+
+**Features:**
+- Semantic chunking (not arbitrary)
+- Breathing units based on punctuation
+- Maintains information density
+- Improves scanability
+
+### RAW Mode (Low Anxiety <0.4)
+
+**Goal:** High bandwidth efficiency. User is calm and focused.
+
+```python
+# Input: Technical report
+# Output: Unchanged
+
+"""
+The epidemiological vector analysis indicates a stochastic surge 
+in R0 values correlated with the spatiotemporal clustering of 
+sub-variants in Sector 7. We advise immediate quarantine protocols...
+"""
+```
+
+## Anxiety inference
+
+### Bayesian model
+
+Silent Flux uses a lightweight **GaussianNB** classifier:
+
+```python
+# Features: [TypingSpeed, ErrorRate, ScrollVelocity]
+# Labels: [0=Calm, 1=Anxious]
+
+# Pre-seeded with synthetic priors:
+X_seed = np.array([
+    [150, 0.02, 10],   # Calm: Slow typing, low errors
+    [500, 0.15, 100],  # Anxious: Fast/erratic, high errors
+    [200, 0.05, 20]    # Calm: Normal pace
+])
+y_seed = np.array([0, 1, 0])
+
+inference_engine.fit(X_seed, y_seed)
+```
+
+### Biometric fusion
+
+Optional heart rate integration for enhanced detection:
+
+```python
+# Simple heuristic: >100bpm boosts anxiety score
+bio_stress = max(0, (metrics.biometric_hr - 80) / 40)
+prob_anxious = (prob_anxious + bio_stress) / 2
+```
+
+### Exponential smoothing
+
+Prevents jittery mode switching:
+
+```python
+# Exponential Moving Average
+alpha = 0.3
+current_anxiety = (alpha * new_score) + ((1-alpha) * previous_score)
+```
+
+## Text entropy calculation
+
+Approximates cognitive load of text:
+
+```python
+def calculate_text_entropy(text: str) -> float:
+    """
+    High score = Dense, jargon-heavy
+    Low score = Simple, airy
+    """
+    words = re.findall(r'\w+', text)
+    
+    # Metrics
+    avg_word_len = sum(len(w) for w in words) / len(words)
+    sentences = re.split(r'[.!?]+', text)
+    avg_sent_len = len(words) / max(1, len(sentences))
+    
+    # Heuristic formula
+    return (avg_word_len * 0.5) + (avg_sent_len * 0.1)
+```
+
+## Semantic chunking
+
+Breaks text into "breathing units":
+
+```python
+def chunk_text_semantically(text: str, max_chunk_size: int = 50) -> List[str]:
+    """
+    Based on punctuation and semantic completeness,
+    not just character count.
+    """
+    sentences = re.split(r'(?<=[.!?]) +', text)
+    chunks = []
+    current_chunk = ""
+    
+    for sent in sentences:
+        if len(current_chunk) + len(sent) < max_chunk_size * 5:
+            current_chunk += sent + " "
+        else:
+            chunks.append(current_chunk.strip())
+            current_chunk = sent + " "
+    
+    if current_chunk:
+        chunks.append(current_chunk.strip())
+    
+    return chunks
+```
+
+## Anti-paternalism protocol
+
+### User agency
+
+Silent Flux **never deletes information**, only folds it:
+
+```python
+# User can always override
+output = asf.regulate_output(dense_report, override=True)
+# Returns full content regardless of anxiety score
+```
+
+### Transparency reporting
+
+User sees the AI's internal state:
+
+```python
+report = asf.get_transparency_report()
+
+"""
+[ASF SYSTEM]
+Current Anxiety Index: 0.85
+Regulation Strategy: Overload Risk Detected
+Agency: Overrides are Enabled
+"""
+```
+
+### Visual indicators
+
+Dashboard shows flux status:
+
+```
+[Flux: High] 🔴 - ZEN Mode Active
+[Flux: Medium] 🟡 - FLOW Mode Active
+[Flux: Low] 🟢 - RAW Mode Active
+```
+
+## Edge-native design
+
+### Lightweight model
+
+- **GaussianNB**: Kilobytes in size
+- **No cloud latency**: Runs locally
+- **Low compute**: Works on refugee camp laptops
+- **Offline capable**: No internet required
+
+### Performance
+
+```python
+# Model size: ~5KB
+# Inference time: <1ms
+# Memory footprint: <10MB
+# CPU usage: <5%
+```
+
+## Integration with iLuminara
+
+### FRENASA Engine
+
+Voice processing with anxiety-aware output:
+
+```python
+from edge_node.frenasa_engine.voice_processor import VoiceProcessor
+from edge_node.frenasa_engine.silent_flux import AdaptiveSerenityFlow
+
+processor = VoiceProcessor()
+asf = AdaptiveSerenityFlow()
+
+# Process voice alert
+voice_result = processor.process_voice(audio_data)
+
+# Regulate output based on operator anxiety
+regulated = asf.regulate_output(voice_result['transcription'])
+```
+
+### AI Agents
+
+Autonomous surveillance with cognitive load management:
+
+```python
+from edge_node.ai_agents import EarlyWarningSystemAgent
+from edge_node.frenasa_engine.silent_flux import AdaptiveSerenityFlow
+
+agent = EarlyWarningSystemAgent(location="Dadaab")
+asf = AdaptiveSerenityFlow()
+
+# Generate alerts
+alerts = agent.generate_alerts()
+
+# Regulate alert verbosity
+for alert in alerts:
+    regulated = asf.regulate_output(alert.message)
+    print(regulated['text'])
+```
+
+### Dashboard
+
+Real-time flux status indicators:
+
+```python
+import streamlit as st
+from edge_node.frenasa_engine.silent_flux import AdaptiveSerenityFlow
+
+asf = AdaptiveSerenityFlow()
+
+# Display flux status
+st.sidebar.metric(
+    "Cognitive Flux",
+    f"{asf.current_anxiety_score:.2f}",
+    delta="High" if asf.current_anxiety_score > 0.7 else "Normal"
+)
+
+# Transparency report
+with st.expander("Silent Flux Status"):
+    st.code(asf.get_transparency_report())
+```
+
+## Configuration
+
+### User preferences
+
+```python
+asf.configure({
+    "baseline_anxiety": 0.2,      # Default calmness (0.0-1.0)
+    "sensitivity": 1.0,           # Signal detection multiplier
+    "allow_simplification": True, # Enable ZEN/FLOW modes
+    "show_transparency": True     # Display flux status
+})
+```
+
+### Thresholds
+
+```python
+# Anxiety thresholds
+ZEN_THRESHOLD = 0.7   # High anxiety
+FLOW_THRESHOLD = 0.4  # Medium anxiety
+RAW_THRESHOLD = 0.0   # Low anxiety
+
+# Entropy thresholds
+HIGH_ENTROPY = 8.0    # Dense, jargon-heavy
+MEDIUM_ENTROPY = 5.0  # Moderate complexity
+LOW_ENTROPY = 3.0     # Simple, clear
+```
+
+## Use cases
+
+### Crisis response
+
+During outbreak emergencies, operators are under extreme stress:
+
+```python
+# Operator is frantic (high anxiety)
+metrics = InteractionMetrics(
+    typing_speed_cpm=600,
+    error_rate=0.22,
+    scroll_velocity=200.0,
+    biometric_hr=120
+)
+
+anxiety = asf.infer_anxiety(metrics)  # 0.92 (CRITICAL)
+
+# Silent Flux delivers executive summary only
+output = asf.regulate_output(complex_outbreak_report)
+# Mode: ZEN - First sentence + expandable details
+```
+
+### Routine surveillance
+
+During normal operations, operators are calm:
+
+```python
+# Operator is focused (low anxiety)
+metrics = InteractionMetrics(
+    typing_speed_cpm=180,
+    error_rate=0.03,
+    scroll_velocity=15.0,
+    biometric_hr=75
+)
+
+anxiety = asf.infer_anxiety(metrics)  # 0.15 (CALM)
+
+# Silent Flux delivers full bandwidth
+output = asf.regulate_output(detailed_analysis)
+# Mode: RAW - Full content unchanged
+```
+
+## Compliance
+
+Silent Flux respects sovereignty and dignity:
+
+```python
+from governance_kernel.vector_ledger import SovereignGuardrail
+
+guardrail = SovereignGuardrail()
+
+# Validate flux regulation
+guardrail.validate_action(
+    action_type='Information_Regulation',
+    payload={
+        'anxiety_score': asf.current_anxiety_score,
+        'mode': output['mode'],
+        'user_override_available': True
+    },
+    jurisdiction='GLOBAL_DEFAULT'
+)
+```
+
+## Testing
+
+Run the demonstration:
+
+```bash
+python edge_node/frenasa_engine/silent_flux.py
+```
+
+**Output:**
+```
+--- Session Start: Adaptive Serenity Flow ---
+
+User State: CALM (Score: 0.18)
+Output Mode: RAW
+Delivered Content:
+The epidemiological vector analysis indicates a stochastic 
+surge in R0 values...
+----------------------------------------
+
+User State: HIGH LOAD (Score: 0.87)
+Output Mode: ZEN
+Delivered Content:
+**Insight Summary:** The epidemiological vector analysis 
+indicates a stochastic surge...
+
+*[System: Taking a beat. Complex details available below.]*
+
+---> **Expand for Full Details (87 words)**
+
+Anti-Paternalism Check: [ASF SYSTEM]
+Current Anxiety Index: 0.87
+Regulation Strategy: Overload Risk Detected
+Agency: Overrides are Enabled
+```
+
+## Visualization
+
+Silent Flux includes real-time visualization:
+
+```python
+import matplotlib.pyplot as plt
+
+# Plot anxiety vs output complexity
+plt.figure(figsize=(10, 4))
+plt.plot(x, y_anxiety, label='Inferred Anxiety', color='red', linestyle='--')
+plt.plot(x, y_complexity, label='Output Complexity (ASF)', color='blue', linewidth=2)
+plt.title("Silent Flux: Dynamic Output Regulation")
+plt.xlabel("Interaction Timeline")
+plt.ylabel("Intensity (0-1)")
+plt.legend()
+plt.show()
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="FRENASA Engine"
+    icon="microphone"
+    href="/api-reference/voice-processing"
+  >
+    Integrate with voice processing
+  </Card>
+  <Card
+    title="AI Agents"
+    icon="brain-circuit"
+    href="/ai-agents/overview"
+  >
+    Deploy anxiety-aware agents
+  </Card>
+  <Card
+    title="Dashboard"
+    icon="gauge"
+    href="/deployment/overview"
+  >
+    Add flux status indicators
+  </Card>
+  <Card
+    title="Governance"
+    icon="shield-check"
+    href="/governance/overview"
+  >
+    Ensure compliance integration
+  </Card>
+</CardGroup>
