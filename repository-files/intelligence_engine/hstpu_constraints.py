@@ -1,16 +1,12 @@
 """
 HSTPU-Bounded Decision Windows
-Health Spatiotemporal Processing Unit - Constraint Protocol
-
-Enforces spatiotemporal validity bounds for humanitarian decisions:
-- 50km radius constraint (geospatial outbreak boundaries)
-- 72-hour validity period (lagged humanitarian environments)
-- 100% rejection rate for decisions exceeding bounds
+Spatiotemporal constraint protocols for humanitarian decision validity
 
 Compliance:
 - WHO IHR (2005) Article 6 (Notification)
 - Sphere Standards (Humanitarian Charter)
-- UN OCHA Cluster Coordination
+- UN OCHA Humanitarian Principles
+- ISO 22320 (Emergency Management)
 """
 
 import math
@@ -24,39 +20,20 @@ logger = logging.getLogger(__name__)
 
 
 class DecisionStatus(Enum):
-    """Decision validation status"""
+    """Decision validity status"""
     VALID = "valid"
     EXPIRED = "expired"
     OUT_OF_BOUNDS = "out_of_bounds"
     REJECTED = "rejected"
 
 
-class OutbreakPhase(Enum):
-    """Outbreak phases with different constraint profiles"""
-    ALERT = "alert"              # Initial detection
-    RESPONSE = "response"        # Active intervention
-    CONTAINMENT = "containment"  # Spread control
-    RECOVERY = "recovery"        # Post-outbreak
-
-
-@dataclass
-class SpatiotemporalBounds:
-    """Spatiotemporal constraint configuration"""
-    radius_km: float = 50.0      # Default: 50km radius
-    validity_hours: int = 72     # Default: 72-hour validity
-    strict_enforcement: bool = True
-    
-    # Phase-specific overrides
-    phase_overrides: Dict[OutbreakPhase, Tuple[float, int]] = None
-    
-    def __post_init__(self):
-        if self.phase_overrides is None:
-            self.phase_overrides = {
-                OutbreakPhase.ALERT: (100.0, 48),      # Wider radius, shorter validity
-                OutbreakPhase.RESPONSE: (50.0, 72),    # Standard bounds
-                OutbreakPhase.CONTAINMENT: (25.0, 96), # Tighter radius, longer validity
-                OutbreakPhase.RECOVERY: (75.0, 168),   # Wider radius, week-long validity
-            }
+class SpatialBoundaryType(Enum):
+    """Types of spatial boundaries"""
+    OUTBREAK_ZONE = "outbreak_zone"
+    REFUGEE_CAMP = "refugee_camp"
+    DISTRICT = "district"
+    REGION = "region"
+    NATIONAL = "national"
 
 
 @dataclass
@@ -64,64 +41,263 @@ class GeospatialPoint:
     """Geographic coordinate"""
     latitude: float
     longitude: float
-    timestamp: datetime
     
     def __post_init__(self):
-        # Validate coordinates
-        if not (-90 <= self.latitude <= 90):
+        if not -90 <= self.latitude <= 90:
             raise ValueError(f"Invalid latitude: {self.latitude}")
-        if not (-180 <= self.longitude <= 180):
+        if not -180 <= self.longitude <= 180:
             raise ValueError(f"Invalid longitude: {self.longitude}")
 
 
 @dataclass
+class SpatiotemporalBounds:
+    """Spatiotemporal constraints for decision validity"""
+    center: GeospatialPoint
+    radius_km: float
+    validity_hours: int
+    boundary_type: SpatialBoundaryType
+    created_at: datetime
+    
+    def __post_init__(self):
+        if self.radius_km <= 0:
+            raise ValueError(f"Radius must be positive: {self.radius_km}")
+        if self.validity_hours <= 0:
+            raise ValueError(f"Validity hours must be positive: {self.validity_hours}")
+
+
+@dataclass
 class HumanitarianDecision:
-    """Humanitarian decision with spatiotemporal context"""
+    """A humanitarian decision with spatiotemporal context"""
     decision_id: str
     decision_type: str
     location: GeospatialPoint
-    created_at: datetime
-    expires_at: datetime
-    outbreak_phase: OutbreakPhase
+    timestamp: datetime
+    bounds: SpatiotemporalBounds
     metadata: Dict
-    
-    # Validation results
-    is_valid: bool = True
-    validation_status: DecisionStatus = DecisionStatus.VALID
-    rejection_reason: Optional[str] = None
+    status: DecisionStatus = DecisionStatus.VALID
 
 
 class HSTPUConstraintEngine:
     """
-    Health Spatiotemporal Processing Unit - Constraint Engine
+    HSTPU-Bounded Decision Windows Engine
     
-    Enforces spatiotemporal validity bounds for humanitarian decisions
-    to ensure contextual relevance in lagged environments.
+    Enforces spatiotemporal constraints to ensure decisions remain
+    contextually valid in lagged humanitarian environments.
+    
+    Default constraints:
+    - Spatial: 50km radius (outbreak zone boundary)
+    - Temporal: 72 hours (humanitarian response window)
     """
+    
+    # Default HSTPU constraints
+    DEFAULT_RADIUS_KM = 50.0  # 50km outbreak zone boundary
+    DEFAULT_VALIDITY_HOURS = 72  # 72-hour humanitarian response window
+    
+    # Earth radius for Haversine calculation
+    EARTH_RADIUS_KM = 6371.0
     
     def __init__(
         self,
-        bounds: Optional[SpatiotemporalBounds] = None,
-        enable_audit: bool = True
+        default_radius_km: float = DEFAULT_RADIUS_KM,
+        default_validity_hours: int = DEFAULT_VALIDITY_HOURS,
+        strict_enforcement: bool = True
     ):
-        self.bounds = bounds or SpatiotemporalBounds()
-        self.enable_audit = enable_audit
+        self.default_radius_km = default_radius_km
+        self.default_validity_hours = default_validity_hours
+        self.strict_enforcement = strict_enforcement
         
-        # Audit trail
-        self.audit_log: List[Dict] = []
+        # Decision registry
+        self.decisions: Dict[str, HumanitarianDecision] = {}
         
-        # Statistics
-        self.stats = {
+        # Rejection statistics
+        self.rejection_stats = {
             "total_decisions": 0,
-            "valid_decisions": 0,
-            "expired_decisions": 0,
-            "out_of_bounds_decisions": 0,
-            "rejected_decisions": 0,
+            "spatial_rejections": 0,
+            "temporal_rejections": 0,
+            "total_rejections": 0
         }
         
-        logger.info(f"🌍 HSTPU Constraint Engine initialized - Radius: {self.bounds.radius_km}km, Validity: {self.bounds.validity_hours}h")
+        logger.info(
+            f"🌍 HSTPU Constraint Engine initialized - "
+            f"Radius: {default_radius_km}km, Validity: {default_validity_hours}h"
+        )
     
-    def haversine_distance(
+    def create_decision(
+        self,
+        decision_id: str,
+        decision_type: str,
+        location: GeospatialPoint,
+        radius_km: Optional[float] = None,
+        validity_hours: Optional[int] = None,
+        boundary_type: SpatialBoundaryType = SpatialBoundaryType.OUTBREAK_ZONE,
+        metadata: Optional[Dict] = None
+    ) -> HumanitarianDecision:
+        """
+        Create a new humanitarian decision with spatiotemporal bounds.
+        
+        Args:
+            decision_id: Unique decision identifier
+            decision_type: Type of decision (e.g., "resource_allocation", "evacuation")
+            location: Geographic location of decision
+            radius_km: Spatial validity radius (default: 50km)
+            validity_hours: Temporal validity window (default: 72h)
+            boundary_type: Type of spatial boundary
+            metadata: Additional decision metadata
+        
+        Returns:
+            HumanitarianDecision with spatiotemporal bounds
+        """
+        radius_km = radius_km or self.default_radius_km
+        validity_hours = validity_hours or self.default_validity_hours
+        
+        bounds = SpatiotemporalBounds(
+            center=location,
+            radius_km=radius_km,
+            validity_hours=validity_hours,
+            boundary_type=boundary_type,
+            created_at=datetime.utcnow()
+        )
+        
+        decision = HumanitarianDecision(
+            decision_id=decision_id,
+            decision_type=decision_type,
+            location=location,
+            timestamp=datetime.utcnow(),
+            bounds=bounds,
+            metadata=metadata or {},
+            status=DecisionStatus.VALID
+        )
+        
+        self.decisions[decision_id] = decision
+        self.rejection_stats["total_decisions"] += 1
+        
+        logger.info(
+            f"✅ Decision created - ID: {decision_id}, "
+            f"Type: {decision_type}, Bounds: {radius_km}km/{validity_hours}h"
+        )
+        
+        return decision
+    
+    def validate_decision(
+        self,
+        decision_id: str,
+        query_location: GeospatialPoint,
+        query_time: Optional[datetime] = None
+    ) -> Tuple[DecisionStatus, Optional[str]]:
+        """
+        Validate if a decision is still valid at a given location and time.
+        
+        Args:
+            decision_id: Decision to validate
+            query_location: Location to check validity
+            query_time: Time to check validity (default: now)
+        
+        Returns:
+            (status, reason) tuple
+        """
+        if decision_id not in self.decisions:
+            return DecisionStatus.REJECTED, f"Decision not found: {decision_id}"
+        
+        decision = self.decisions[decision_id]
+        query_time = query_time or datetime.utcnow()
+        
+        # Check temporal validity
+        time_delta = query_time - decision.timestamp
+        if time_delta.total_seconds() / 3600 > decision.bounds.validity_hours:
+            decision.status = DecisionStatus.EXPIRED
+            self.rejection_stats["temporal_rejections"] += 1
+            self.rejection_stats["total_rejections"] += 1
+            
+            reason = (
+                f"Decision expired - Age: {time_delta.total_seconds() / 3600:.1f}h, "
+                f"Limit: {decision.bounds.validity_hours}h"
+            )
+            
+            logger.warning(f"⏰ {reason}")
+            
+            if self.strict_enforcement:
+                return DecisionStatus.REJECTED, reason
+            return DecisionStatus.EXPIRED, reason
+        
+        # Check spatial validity
+        distance_km = self._haversine_distance(
+            decision.bounds.center,
+            query_location
+        )
+        
+        if distance_km > decision.bounds.radius_km:
+            decision.status = DecisionStatus.OUT_OF_BOUNDS
+            self.rejection_stats["spatial_rejections"] += 1
+            self.rejection_stats["total_rejections"] += 1
+            
+            reason = (
+                f"Decision out of bounds - Distance: {distance_km:.1f}km, "
+                f"Limit: {decision.bounds.radius_km}km"
+            )
+            
+            logger.warning(f"🌍 {reason}")
+            
+            if self.strict_enforcement:
+                return DecisionStatus.REJECTED, reason
+            return DecisionStatus.OUT_OF_BOUNDS, reason
+        
+        # Decision is valid
+        logger.info(
+            f"✅ Decision valid - ID: {decision_id}, "
+            f"Distance: {distance_km:.1f}km, Age: {time_delta.total_seconds() / 3600:.1f}h"
+        )
+        
+        return DecisionStatus.VALID, None
+    
+    def get_rejection_rate(self) -> float:
+        """
+        Calculate the rejection rate for decisions.
+        
+        Returns:
+            Rejection rate (0.0 to 1.0)
+        """
+        if self.rejection_stats["total_decisions"] == 0:
+            return 0.0
+        
+        return (
+            self.rejection_stats["total_rejections"] /
+            self.rejection_stats["total_decisions"]
+        )
+    
+    def get_active_decisions(
+        self,
+        location: Optional[GeospatialPoint] = None,
+        radius_km: Optional[float] = None
+    ) -> List[HumanitarianDecision]:
+        """
+        Get all active decisions, optionally filtered by location.
+        
+        Args:
+            location: Center point for spatial filter
+            radius_km: Radius for spatial filter
+        
+        Returns:
+            List of active decisions
+        """
+        active = []
+        
+        for decision in self.decisions.values():
+            # Check temporal validity
+            age_hours = (datetime.utcnow() - decision.timestamp).total_seconds() / 3600
+            if age_hours > decision.bounds.validity_hours:
+                continue
+            
+            # Check spatial filter
+            if location and radius_km:
+                distance = self._haversine_distance(location, decision.location)
+                if distance > radius_km:
+                    continue
+            
+            active.append(decision)
+        
+        return active
+    
+    def _haversine_distance(
         self,
         point1: GeospatialPoint,
         point2: GeospatialPoint
@@ -129,12 +305,13 @@ class HSTPUConstraintEngine:
         """
         Calculate great-circle distance between two points using Haversine formula.
         
+        Args:
+            point1: First geographic point
+            point2: Second geographic point
+        
         Returns:
             Distance in kilometers
         """
-        # Earth radius in kilometers
-        R = 6371.0
-        
         # Convert to radians
         lat1 = math.radians(point1.latitude)
         lon1 = math.radians(point1.longitude)
@@ -145,281 +322,73 @@ class HSTPUConstraintEngine:
         dlat = lat2 - lat1
         dlon = lon2 - lon1
         
-        a = math.sin(dlat / 2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2
+        a = (
+            math.sin(dlat / 2) ** 2 +
+            math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+        )
         c = 2 * math.asin(math.sqrt(a))
         
-        distance = R * c
-        return distance
-    
-    def validate_temporal_bounds(
-        self,
-        decision: HumanitarianDecision,
-        current_time: Optional[datetime] = None
-    ) -> Tuple[bool, Optional[str]]:
-        """
-        Validate temporal bounds (72-hour validity period).
-        
-        Returns:
-            (is_valid, rejection_reason)
-        """
-        current_time = current_time or datetime.utcnow()
-        
-        # Check if decision has expired
-        if current_time > decision.expires_at:
-            time_delta = current_time - decision.expires_at
-            return False, f"Decision expired {time_delta.total_seconds() / 3600:.1f} hours ago"
-        
-        # Check if decision is too far in the future (sanity check)
-        max_future = current_time + timedelta(days=30)
-        if decision.expires_at > max_future:
-            return False, f"Decision expiration too far in future: {decision.expires_at}"
-        
-        return True, None
-    
-    def validate_spatial_bounds(
-        self,
-        decision: HumanitarianDecision,
-        reference_point: GeospatialPoint
-    ) -> Tuple[bool, Optional[str]]:
-        """
-        Validate spatial bounds (50km radius constraint).
-        
-        Returns:
-            (is_valid, rejection_reason)
-        """
-        # Get phase-specific bounds
-        radius_km, _ = self.bounds.phase_overrides.get(
-            decision.outbreak_phase,
-            (self.bounds.radius_km, self.bounds.validity_hours)
-        )
-        
-        # Calculate distance
-        distance = self.haversine_distance(decision.location, reference_point)
-        
-        # Check if within bounds
-        if distance > radius_km:
-            return False, f"Decision location {distance:.1f}km from reference (max: {radius_km}km)"
-        
-        return True, None
-    
-    def validate_decision(
-        self,
-        decision: HumanitarianDecision,
-        reference_point: GeospatialPoint,
-        current_time: Optional[datetime] = None
-    ) -> HumanitarianDecision:
-        """
-        Validate a humanitarian decision against spatiotemporal constraints.
-        
-        Enforces:
-        - 50km radius constraint (geospatial outbreak boundaries)
-        - 72-hour validity period (lagged humanitarian environments)
-        - 100% rejection rate for decisions exceeding bounds
-        
-        Args:
-            decision: Decision to validate
-            reference_point: Reference location (e.g., outbreak epicenter)
-            current_time: Current timestamp (default: now)
-        
-        Returns:
-            Updated decision with validation results
-        """
-        current_time = current_time or datetime.utcnow()
-        
-        self.stats["total_decisions"] += 1
-        
-        # Validate temporal bounds
-        temporal_valid, temporal_reason = self.validate_temporal_bounds(decision, current_time)
-        
-        if not temporal_valid:
-            decision.is_valid = False
-            decision.validation_status = DecisionStatus.EXPIRED
-            decision.rejection_reason = temporal_reason
-            self.stats["expired_decisions"] += 1
-            
-            if self.enable_audit:
-                self._log_audit("TEMPORAL_REJECTION", decision, temporal_reason)
-            
-            logger.warning(f"⏰ Decision {decision.decision_id} EXPIRED: {temporal_reason}")
-            return decision
-        
-        # Validate spatial bounds
-        spatial_valid, spatial_reason = self.validate_spatial_bounds(decision, reference_point)
-        
-        if not spatial_valid:
-            decision.is_valid = False
-            decision.validation_status = DecisionStatus.OUT_OF_BOUNDS
-            decision.rejection_reason = spatial_reason
-            self.stats["out_of_bounds_decisions"] += 1
-            
-            if self.enable_audit:
-                self._log_audit("SPATIAL_REJECTION", decision, spatial_reason)
-            
-            logger.warning(f"🌍 Decision {decision.decision_id} OUT OF BOUNDS: {spatial_reason}")
-            return decision
-        
-        # Decision is valid
-        decision.is_valid = True
-        decision.validation_status = DecisionStatus.VALID
-        self.stats["valid_decisions"] += 1
-        
-        if self.enable_audit:
-            self._log_audit("VALIDATED", decision, "Decision within spatiotemporal bounds")
-        
-        logger.info(f"✅ Decision {decision.decision_id} VALID")
-        return decision
-    
-    def create_decision(
-        self,
-        decision_id: str,
-        decision_type: str,
-        location: GeospatialPoint,
-        outbreak_phase: OutbreakPhase = OutbreakPhase.RESPONSE,
-        metadata: Optional[Dict] = None
-    ) -> HumanitarianDecision:
-        """
-        Create a new humanitarian decision with automatic expiration.
-        
-        Args:
-            decision_id: Unique decision identifier
-            decision_type: Type of decision (e.g., "resource_allocation", "evacuation")
-            location: Decision location
-            outbreak_phase: Current outbreak phase
-            metadata: Additional metadata
-        
-        Returns:
-            New humanitarian decision
-        """
-        # Get phase-specific bounds
-        _, validity_hours = self.bounds.phase_overrides.get(
-            outbreak_phase,
-            (self.bounds.radius_km, self.bounds.validity_hours)
-        )
-        
-        created_at = datetime.utcnow()
-        expires_at = created_at + timedelta(hours=validity_hours)
-        
-        decision = HumanitarianDecision(
-            decision_id=decision_id,
-            decision_type=decision_type,
-            location=location,
-            created_at=created_at,
-            expires_at=expires_at,
-            outbreak_phase=outbreak_phase,
-            metadata=metadata or {}
-        )
-        
-        logger.info(f"📋 Created decision {decision_id} - Expires: {expires_at} ({validity_hours}h)")
-        return decision
-    
-    def batch_validate(
-        self,
-        decisions: List[HumanitarianDecision],
-        reference_point: GeospatialPoint,
-        current_time: Optional[datetime] = None
-    ) -> List[HumanitarianDecision]:
-        """
-        Validate multiple decisions in batch.
-        
-        Returns:
-            List of validated decisions
-        """
-        validated = []
-        
-        for decision in decisions:
-            validated_decision = self.validate_decision(decision, reference_point, current_time)
-            validated.append(validated_decision)
-        
-        # Log batch statistics
-        valid_count = sum(1 for d in validated if d.is_valid)
-        invalid_count = len(validated) - valid_count
-        
-        logger.info(f"📊 Batch validation complete - Valid: {valid_count}, Invalid: {invalid_count}")
-        
-        return validated
+        return self.EARTH_RADIUS_KM * c
     
     def get_statistics(self) -> Dict:
-        """Get validation statistics"""
-        total = self.stats["total_decisions"]
-        
-        if total == 0:
-            return self.stats
-        
+        """Get constraint engine statistics"""
         return {
-            **self.stats,
-            "valid_rate": self.stats["valid_decisions"] / total,
-            "expired_rate": self.stats["expired_decisions"] / total,
-            "out_of_bounds_rate": self.stats["out_of_bounds_decisions"] / total,
-            "rejection_rate": (self.stats["expired_decisions"] + self.stats["out_of_bounds_decisions"]) / total,
+            "total_decisions": self.rejection_stats["total_decisions"],
+            "spatial_rejections": self.rejection_stats["spatial_rejections"],
+            "temporal_rejections": self.rejection_stats["temporal_rejections"],
+            "total_rejections": self.rejection_stats["total_rejections"],
+            "rejection_rate": self.get_rejection_rate(),
+            "active_decisions": len(self.get_active_decisions()),
+            "default_radius_km": self.default_radius_km,
+            "default_validity_hours": self.default_validity_hours
         }
-    
-    def _log_audit(self, action: str, decision: HumanitarianDecision, reason: str):
-        """Internal audit logging"""
-        audit_entry = {
-            "timestamp": datetime.utcnow().isoformat(),
-            "action": action,
-            "decision_id": decision.decision_id,
-            "decision_type": decision.decision_type,
-            "location": {
-                "lat": decision.location.latitude,
-                "lng": decision.location.longitude
-            },
-            "outbreak_phase": decision.outbreak_phase.value,
-            "validation_status": decision.validation_status.value,
-            "reason": reason
-        }
-        self.audit_log.append(audit_entry)
 
 
 # Example usage
 if __name__ == "__main__":
-    # Initialize HSTPU Constraint Engine
-    engine = HSTPUConstraintEngine()
-    
-    # Define outbreak epicenter (Dadaab, Kenya)
-    epicenter = GeospatialPoint(
-        latitude=0.0512,
-        longitude=40.3129,
-        timestamp=datetime.utcnow()
+    # Initialize HSTPU engine
+    engine = HSTPUConstraintEngine(
+        default_radius_km=50.0,
+        default_validity_hours=72,
+        strict_enforcement=True
     )
     
-    # Create decision within bounds
-    decision_valid = engine.create_decision(
+    # Create decision for Dadaab refugee camp
+    dadaab_location = GeospatialPoint(latitude=0.0512, longitude=40.3129)
+    
+    decision = engine.create_decision(
         decision_id="DEC_001",
         decision_type="resource_allocation",
-        location=GeospatialPoint(
-            latitude=0.0600,  # ~10km from epicenter
-            longitude=40.3200,
-            timestamp=datetime.utcnow()
-        ),
-        outbreak_phase=OutbreakPhase.RESPONSE,
-        metadata={"resource": "ORS", "quantity": 1000}
+        location=dadaab_location,
+        boundary_type=SpatialBoundaryType.REFUGEE_CAMP,
+        metadata={
+            "resource": "ORS_supplies",
+            "quantity": 10000,
+            "priority": "CRITICAL"
+        }
     )
     
-    # Validate decision
-    validated = engine.validate_decision(decision_valid, epicenter)
-    print(f"✅ Decision {validated.decision_id}: {validated.validation_status.value}")
+    print(f"✅ Decision created: {decision.decision_id}")
     
-    # Create decision out of bounds
-    decision_invalid = engine.create_decision(
-        decision_id="DEC_002",
-        decision_type="evacuation",
-        location=GeospatialPoint(
-            latitude=1.0000,  # ~100km from epicenter
-            longitude=41.0000,
-            timestamp=datetime.utcnow()
-        ),
-        outbreak_phase=OutbreakPhase.RESPONSE
+    # Validate at same location (should be valid)
+    status, reason = engine.validate_decision(
+        "DEC_001",
+        dadaab_location
     )
+    print(f"Status: {status.value}, Reason: {reason}")
     
-    # Validate decision (should be rejected)
-    validated_invalid = engine.validate_decision(decision_invalid, epicenter)
-    print(f"❌ Decision {validated_invalid.decision_id}: {validated_invalid.validation_status.value}")
-    print(f"   Reason: {validated_invalid.rejection_reason}")
+    # Validate at distant location (should be rejected)
+    nairobi_location = GeospatialPoint(latitude=-1.2921, longitude=36.8219)
+    status, reason = engine.validate_decision(
+        "DEC_001",
+        nairobi_location
+    )
+    print(f"Status: {status.value}, Reason: {reason}")
     
     # Get statistics
     stats = engine.get_statistics()
     print(f"\n📊 Statistics:")
-    print(f"   Total: {stats['total_decisions']}")
-    print(f"   Valid: {stats['valid_decisions']}")
+    print(f"   Total Decisions: {stats['total_decisions']}")
     print(f"   Rejection Rate: {stats['rejection_rate']:.1%}")
+    print(f"   Spatial Rejections: {stats['spatial_rejections']}")
+    print(f"   Temporal Rejections: {stats['temporal_rejections']}")
