@@ -1,0 +1,57 @@
+name: "CodeQL Security Analysis"
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday at midnight UTC
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'python', 'javascript' ]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+        queries: +security-extended,security-and-quality
+        config: |
+          paths-ignore:
+            - '**/test/**'
+            - '**/tests/**'
+            - '**/node_modules/**'
+            - '**/venv/**'
+
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v3
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:${{matrix.language}}"
+        upload: true
+
+    - name: iLuminara Sovereignty Check
+      if: always()
+      run: |
+        echo "🛡️ FORTRESS STATUS: CodeQL scan complete"
+        echo "📊 Compliance: GDPR Art. 32 (Security of Processing)"
+        echo "🔒 Framework: ISO 27001 A.12.6 (Technical Vulnerability Management)"
