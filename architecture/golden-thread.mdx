@@ -46,24 +46,68 @@ The Golden Thread merges three independent sources:
   </Card>
 </CardGroup>
 
-## Verification logic
+## How ECF works: The quantum-inspired architecture
 
-The Golden Thread uses cross-source verification to establish confidence:
+### 1. Quantum-like representation
 
+Signals are not scalars; they are **complex vectors** (qubits mapped to classical Hilbert space):
+
+- **Magnitude (r)**: Confidence/Evidence strength
+- **Phase (θ)**: Contextual "flavor" (Symptom Type, Spatiotemporal Sector)
+- **Interference**: When signals fuse, phases align (constructive interference/amplification) or oppose (destructive interference/noise cancellation)
+
+```python
+# Signal encoding: V = Confidence * (Features * e^(i * Phase))
+complex_vec = features * np.exp(1j * phase)
+state_vector = complex_vec * confidence
 ```
-IF cbs.location == emr.location AND |cbs.timestamp - emr.timestamp| < 24h
-    THEN verification_score = 1.0 (CONFIRMED)
-    ELSE score degrades based on conflict severity
+
+### 2. Entanglement topology
+
+We use a **Matrix Product State (MPS)** inspired structure to chain temporal events:
+
+- **Gram Matrix**: G = S · S† where S is the matrix of all state vectors
+- **Non-local correlations**: Updating one node instantaneously rotates the manifold
+- **Wavefunction collapse**: Schur Complement provides classical analogue
+
+```python
+# Entanglement matrix (Density Matrix)
+entanglement_matrix = S @ S.conj().T  # Shape (N, N)
+```
+
+### 3. The Golden Thread extraction
+
+**Eigendecomposition** of the density matrix reveals the dominant pattern:
+
+```python
+# Extract dominant eigenvector (The Golden Thread)
+evals, evecs = np.linalg.eigh(entanglement_matrix)
+dominant_mode = evecs[:, 0]  # The strongest narrative
+coherence_strength = evals[0]  # How strong this pattern is
+```
+
+### 4. Verification via entropy
+
+**Von Neumann Entropy** S = -tr(ρ · ln(ρ)) measures timeline coherence:
+
+- **Low entropy** → Coherent, verified timeline (signals agree)
+- **High entropy** → Noisy, unverified signals (random data)
+- **Entropy spike** → Fork or tampering event detected
+
+```python
+# Calculate Von Neumann entropy
+evals = np.linalg.eigvalsh(density_matrix)
+entropy = -np.sum(evals * np.log(evals))
 ```
 
 ### Verification scores
 
-| Score | Status | Description |
-|-------|--------|-------------|
-| 1.0 | CONFIRMED | Multiple sources agree on location and time |
-| 0.7-0.9 | PROBABLE | Partial agreement with minor conflicts |
-| 0.4-0.6 | POSSIBLE | Significant conflicts but plausible |
-| 0.0-0.3 | UNVERIFIED | Major conflicts or single source only |
+| Coherence Strength (λ₁) | Status | Description |
+|-------------------------|--------|-------------|
+| > 0.8 | CONFIRMED | Strong constructive interference |
+| 0.6-0.8 | PROBABLE | Moderate correlation detected |
+| 0.4-0.6 | POSSIBLE | Weak correlation, high noise |
+| < 0.4 | UNVERIFIED | Destructive interference dominates |
 
 ## Basic usage
 
