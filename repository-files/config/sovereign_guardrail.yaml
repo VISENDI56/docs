@@ -1,0 +1,321 @@
+# iLuminara-Core SovereignGuardrail Configuration
+# Enforces 14 global legal frameworks for health data sovereignty
+
+version: "1.0.0"
+fortress_name: "iLuminara Sovereign Health Fortress"
+
+# Jurisdiction Configuration
+jurisdiction:
+  primary: "KDPA_KE"  # Kenya Data Protection Act
+  secondary:
+    - "GDPR_EU"      # European Union
+    - "POPIA_ZA"     # South Africa
+    - "HIPAA_US"     # United States
+    - "PIPEDA_CA"    # Canada
+
+# Data Sovereignty Rules
+sovereignty:
+  # Rule 1: PHI cannot leave sovereign territory
+  data_residency:
+    enabled: true
+    allowed_zones:
+      - "africa-south1"      # Kenya, South Africa
+      - "europe-west1"       # EU (GDPR)
+      - "northamerica-northeast1"  # Canada (PIPEDA)
+      - "us-central1"        # USA (HIPAA) - requires explicit consent
+    
+    blocked_zones:
+      - "asia-*"             # Sovereignty violation
+      - "australia-*"        # Sovereignty violation
+      - "southamerica-*"     # Sovereignty violation
+    
+    enforcement_level: "STRICT"  # STRICT | MODERATE | PERMISSIVE
+    
+  # Rule 2: Cross-border transfers require explicit authorization
+  cross_border_transfers:
+    enabled: true
+    require_authorization: true
+    authorization_authority: "Data Protection Commissioner"
+    
+    # Standard Contractual Clauses (GDPR Art. 46)
+    scc_required: true
+    
+    # Adequacy decisions (GDPR Art. 45)
+    adequacy_whitelist:
+      - "EU"
+      - "UK"
+      - "Switzerland"
+      - "Canada"
+
+# Right to Explanation (EU AI Act §6, GDPR Art. 22)
+explainability:
+  enabled: true
+  
+  # High-risk AI systems require explanation
+  high_risk_threshold: 0.7  # Confidence score
+  
+  # Explanation methods
+  methods:
+    - "SHAP"           # SHapley Additive exPlanations
+    - "LIME"           # Local Interpretable Model-agnostic Explanations
+    - "Feature_Importance"
+  
+  # Minimum explanation requirements
+  requirements:
+    - "confidence_score"
+    - "evidence_chain"
+    - "feature_contributions"
+    - "decision_rationale"
+
+# Consent Management (GDPR Art. 6, POPIA §11, CCPA §1798.100)
+consent:
+  enabled: true
+  
+  # Consent must be explicit for PHI
+  require_explicit_consent: true
+  
+  # Consent scope
+  valid_scopes:
+    - "diagnosis"
+    - "treatment"
+    - "research"
+    - "public_health_surveillance"
+    - "emergency_response"
+  
+  # Consent expiration
+  expiration_days: 365
+  
+  # Emergency override (WHO IHR Article 6)
+  emergency_override:
+    enabled: true
+    conditions:
+      - "public_health_emergency"
+      - "outbreak_response"
+      - "life_threatening_situation"
+
+# Data Retention (GDPR Art. 17, HIPAA §164.530(j))
+retention:
+  enabled: true
+  
+  # Retention policies
+  policies:
+    HOT:
+      days: 180
+      description: "Active operational data"
+      storage_class: "STANDARD"
+    
+    WARM:
+      days: 365
+      description: "Compliance minimum (HIPAA)"
+      storage_class: "NEARLINE"
+    
+    COLD:
+      days: 1825
+      description: "Legal hold maximum (GDPR Art. 17)"
+      storage_class: "COLDLINE"
+    
+    ETERNAL:
+      days: -1
+      description: "Never expires (requires explicit justification)"
+      storage_class: "ARCHIVE"
+  
+  # Auto-shred expired keys (IP-02)
+  auto_shred_enabled: true
+  auto_shred_schedule: "0 2 * * *"  # Daily at 2 AM UTC
+
+# Audit Trail (GDPR Art. 30, HIPAA §164.312(b), SOC 2)
+audit:
+  enabled: true
+  
+  # Tamper-proof audit
+  tamper_proof: true
+  
+  # Audit storage
+  storage:
+    backend: "Cloud_Spanner"  # or "Bigtable", "Local"
+    region: "africa-south1"
+    retention_days: 2555  # 7 years (HIPAA requirement)
+  
+  # Cryptographic signing
+  signing:
+    enabled: true
+    algorithm: "SHA256_RSA"
+    key_management: "Cloud_KMS"
+  
+  # Audit events
+  events:
+    - "Data_Transfer"
+    - "High_Risk_Inference"
+    - "Consent_Validation"
+    - "Data_Retention"
+    - "Key_Shred"
+    - "Sovereignty_Violation"
+    - "Emergency_Override"
+
+# Humanitarian Constraints (Geneva Convention, WHO IHR)
+humanitarian:
+  enabled: true
+  
+  # Constraints
+  constraints:
+    - "Medical_Ethics"
+    - "Resource_Allocation"
+    - "Data_Protection"
+    - "Population_Protection"
+    - "Emergency_Response"
+  
+  # Margin calculation
+  margin_threshold: 0.15  # 15% humanitarian margin
+  
+  # Emergency protocols
+  emergency_protocols:
+    - "WHO_IHR_Article_6"
+    - "Geneva_Convention_Article_3"
+    - "UN_Humanitarian_Principles"
+
+# Compliance Frameworks
+frameworks:
+  GDPR:
+    enabled: true
+    articles:
+      - "Art. 6 (Lawfulness of Processing)"
+      - "Art. 9 (Special Categories)"
+      - "Art. 17 (Right to Erasure)"
+      - "Art. 22 (Right to Explanation)"
+      - "Art. 30 (Records of Processing)"
+      - "Art. 32 (Security of Processing)"
+  
+  KDPA:
+    enabled: true
+    sections:
+      - "§37 (Transfer Restrictions)"
+      - "§42 (Data Subject Rights)"
+  
+  HIPAA:
+    enabled: true
+    sections:
+      - "§164.312 (Physical/Technical Safeguards)"
+      - "§164.530(j) (Documentation)"
+  
+  POPIA:
+    enabled: true
+    sections:
+      - "§11 (Lawfulness)"
+      - "§14 (Cross-border Transfers)"
+  
+  EU_AI_ACT:
+    enabled: true
+    articles:
+      - "§6 (High-Risk AI)"
+      - "§8 (Transparency)"
+      - "§12 (Record Keeping)"
+  
+  ISO_27001:
+    enabled: true
+    controls:
+      - "A.8.3.2 (Disposal of Media)"
+      - "A.12.4 (Logging)"
+      - "A.12.6 (Technical Vulnerability Management)"
+  
+  SOC_2:
+    enabled: true
+    criteria:
+      - "Security"
+      - "Availability"
+      - "Processing Integrity"
+  
+  NIST_CSF:
+    enabled: true
+    functions:
+      - "Identify"
+      - "Protect"
+      - "Detect"
+      - "Respond"
+      - "Recover"
+
+# Enforcement Actions
+enforcement:
+  # Violation handling
+  on_violation:
+    action: "BLOCK"  # BLOCK | WARN | LOG
+    notify: true
+    escalate: true
+  
+  # Notification channels
+  notifications:
+    - type: "Email"
+      recipients:
+        - "compliance@iluminara.health"
+        - "dpo@iluminara.health"
+    
+    - type: "PubSub"
+      topic: "projects/iluminara/topics/sovereignty-violations"
+    
+    - type: "Slack"
+      webhook: "${SLACK_WEBHOOK_URL}"
+  
+  # Escalation
+  escalation:
+    enabled: true
+    threshold: 3  # violations
+    window_minutes: 60
+    escalate_to:
+      - "Chief Compliance Officer"
+      - "Data Protection Officer"
+
+# Integration with Nuclear IP Stack
+nuclear_ip:
+  IP_02_CRYPTO_SHREDDER:
+    enabled: true
+    auto_shred: true
+  
+  IP_03_ACORN_PROTOCOL:
+    enabled: false  # Requires hardware attestation
+  
+  IP_04_SILENT_FLUX:
+    enabled: false  # Requires anxiety monitoring
+  
+  IP_05_GOLDEN_THREAD:
+    enabled: true
+    verification_threshold: 0.8
+  
+  IP_06_5DM_BRIDGE:
+    enabled: false  # Requires mobile network integration
+
+# Monitoring & Alerting
+monitoring:
+  enabled: true
+  
+  # Metrics
+  metrics:
+    - "sovereignty_violations_total"
+    - "cross_border_transfers_total"
+    - "high_risk_inferences_total"
+    - "consent_validations_total"
+    - "keys_shredded_total"
+  
+  # Prometheus integration
+  prometheus:
+    enabled: true
+    port: 9090
+    path: "/metrics"
+  
+  # Grafana dashboards
+  grafana:
+    enabled: true
+    dashboards:
+      - "Sovereignty Compliance"
+      - "Audit Trail"
+      - "Data Retention"
+
+# Development & Testing
+development:
+  # Relaxed mode for testing
+  relaxed_mode: false
+  
+  # Mock services
+  mock_services:
+    enabled: false
+  
+  # Test jurisdiction
+  test_jurisdiction: "GLOBAL_DEFAULT"
