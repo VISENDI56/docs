@@ -1,0 +1,407 @@
+---
+title: IP-04 Silent Flux
+description: Anxiety-regulated AI output that prevents information overload
+---
+
+## Overview
+
+Silent Flux (IP-04) implements **anxiety-regulated AI output** - the system monitors operator stress levels and automatically reduces information verbosity to prevent cognitive overload during emergencies.
+
+<Card
+  title="Philosophy"
+  icon="brain"
+>
+  "When anxiety rises, the signal must quiet. Clarity emerges from silence."
+</Card>
+
+## The problem
+
+During health emergencies, AI systems generate overwhelming amounts of information:
+- **Alert fatigue** - Too many notifications cause operators to ignore critical alerts
+- **Cognitive overload** - Information flood prevents effective decision-making
+- **Panic amplification** - Excessive data increases operator anxiety
+- **Decision paralysis** - Too many options prevent action
+
+Traditional AI systems have no awareness of operator state and continue generating output regardless of stress levels.
+
+## The solution
+
+Silent Flux monitors operator anxiety through multiple signals and dynamically adjusts AI output:
+
+<Steps>
+  <Step title="Anxiety detection">
+    Monitor heart rate variability, typing speed, mouse movement patterns
+  </Step>
+  <Step title="Output regulation">
+    Reduce verbosity, filter non-critical alerts, simplify recommendations
+  </Step>
+  <Step title="Adaptive interface">
+    Simplify UI, increase font size, reduce color complexity
+  </Step>
+  <Step title="Cognitive support">
+    Provide decision trees, highlight critical actions, suppress details
+  </Step>
+</Steps>
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    SILENT FLUX ENGINE                        │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │           ANXIETY DETECTION LAYER                     │  │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐           │  │
+│  │  │   HRV    │  │  Typing  │  │  Mouse   │           │  │
+│  │  │ Monitor  │  │  Speed   │  │ Movement │           │  │
+│  │  └────┬─────┘  └────┬─────┘  └────┬─────┘           │  │
+│  │       └─────────────┼─────────────┘                  │  │
+│  │                     ▼                                 │  │
+│  │           ┌──────────────────┐                        │  │
+│  │           │ ANXIETY SCORE    │                        │  │
+│  │           │   (0.0 - 1.0)    │                        │  │
+│  │           └────────┬─────────┘                        │  │
+│  └────────────────────┼──────────────────────────────────┘  │
+│                       │                                     │
+│  ┌────────────────────▼──────────────────────────────────┐  │
+│  │           OUTPUT REGULATION LAYER                     │  │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐           │  │
+│  │  │ Verbosity│  │  Alert   │  │    UI    │           │  │
+│  │  │ Control  │  │ Filtering│  │Adaptation│           │  │
+│  │  └────┬─────┘  └────┬─────┘  └────┬─────┘           │  │
+│  │       └─────────────┼─────────────┘                  │  │
+│  │                     ▼                                 │  │
+│  │           ┌──────────────────┐                        │  │
+│  │           │  REGULATED       │                        │  │
+│  │           │  OUTPUT          │                        │  │
+│  │           └──────────────────┘                        │  │
+│  └───────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Anxiety detection
+
+### Heart rate variability (HRV)
+
+```python
+from nuclear_ip.silent_flux import AnxietyMonitor
+
+monitor = AnxietyMonitor()
+
+# Monitor HRV from wearable device
+hrv_data = monitor.get_hrv_from_device()
+
+# Calculate anxiety score
+anxiety_score = monitor.calculate_anxiety_from_hrv(hrv_data)
+
+print(f"Anxiety Score: {anxiety_score:.2f}")  # 0.0 = calm, 1.0 = high anxiety
+```
+
+### Behavioral signals
+
+```python
+class BehavioralAnxietyDetector:
+    """Detect anxiety from typing and mouse behavior"""
+    
+    def __init__(self):
+        self.typing_buffer = []
+        self.mouse_buffer = []
+    
+    def analyze_typing_speed(self, keystroke_events):
+        """Rapid, erratic typing indicates anxiety"""
+        intervals = [
+            events[i+1].timestamp - events[i].timestamp
+            for i in range(len(events)-1)
+        ]
+        
+        # High variance = anxiety
+        variance = np.var(intervals)
+        anxiety_score = min(1.0, variance / 100)
+        
+        return anxiety_score
+    
+    def analyze_mouse_movement(self, mouse_events):
+        """Erratic mouse movement indicates anxiety"""
+        # Calculate path length
+        path_length = sum([
+            np.linalg.norm([
+                events[i+1].x - events[i].x,
+                events[i+1].y - events[i].y
+            ])
+            for i in range(len(events)-1)
+        ])
+        
+        # Calculate straightness (direct distance / path length)
+        direct_distance = np.linalg.norm([
+            events[-1].x - events[0].x,
+            events[-1].y - events[0].y
+        ])
+        
+        straightness = direct_distance / path_length if path_length > 0 else 1.0
+        
+        # Low straightness = anxiety
+        anxiety_score = 1.0 - straightness
+        
+        return anxiety_score
+```
+
+## Output regulation
+
+### Verbosity control
+
+```python
+class VerbosityController:
+    """Adjust AI output verbosity based on anxiety"""
+    
+    def regulate_output(self, ai_response, anxiety_score):
+        """
+        Reduce verbosity when anxiety is high.
+        
+        anxiety_score:
+          0.0-0.3: Full detail
+          0.3-0.6: Moderate detail
+          0.6-0.8: Minimal detail
+          0.8-1.0: Critical only
+        """
+        if anxiety_score < 0.3:
+            # Low anxiety - full detail
+            return ai_response
+        
+        elif anxiety_score < 0.6:
+            # Moderate anxiety - summarize
+            return self._summarize(ai_response, max_sentences=5)
+        
+        elif anxiety_score < 0.8:
+            # High anxiety - bullet points only
+            return self._extract_key_points(ai_response, max_points=3)
+        
+        else:
+            # Critical anxiety - single action only
+            return self._extract_critical_action(ai_response)
+    
+    def _summarize(self, text, max_sentences):
+        """Extract most important sentences"""
+        sentences = text.split('.')
+        # TODO: Use extractive summarization
+        return '. '.join(sentences[:max_sentences])
+    
+    def _extract_key_points(self, text, max_points):
+        """Extract key bullet points"""
+        # TODO: Use NLP to extract key actions
+        return "• " + "\n• ".join(text.split('.')[:max_points])
+    
+    def _extract_critical_action(self, text):
+        """Extract single most critical action"""
+        # TODO: Use NLP to identify most urgent action
+        return f"🚨 CRITICAL: {text.split('.')[0]}"
+```
+
+### Alert filtering
+
+```python
+class AlertFilter:
+    """Filter non-critical alerts when anxiety is high"""
+    
+    def filter_alerts(self, alerts, anxiety_score):
+        """
+        Filter alerts based on anxiety level.
+        
+        anxiety_score:
+          0.0-0.3: Show all alerts
+          0.3-0.6: Show HIGH and CRITICAL only
+          0.6-0.8: Show CRITICAL only
+          0.8-1.0: Suppress all alerts (operator overloaded)
+        """
+        if anxiety_score < 0.3:
+            return alerts
+        
+        elif anxiety_score < 0.6:
+            return [a for a in alerts if a.level in ['HIGH', 'CRITICAL']]
+        
+        elif anxiety_score < 0.8:
+            return [a for a in alerts if a.level == 'CRITICAL']
+        
+        else:
+            # Operator is overloaded - suppress all alerts
+            # Log for later review
+            self._log_suppressed_alerts(alerts)
+            return []
+```
+
+### UI adaptation
+
+```python
+class UIAdapter:
+    """Adapt UI based on anxiety level"""
+    
+    def adapt_interface(self, anxiety_score):
+        """
+        Simplify UI when anxiety is high.
+        
+        Adaptations:
+          - Increase font size
+          - Reduce color complexity
+          - Hide non-essential elements
+          - Highlight critical actions
+        """
+        config = {
+            "font_size": self._calculate_font_size(anxiety_score),
+            "color_scheme": self._select_color_scheme(anxiety_score),
+            "show_details": anxiety_score < 0.6,
+            "show_sidebar": anxiety_score < 0.4,
+            "highlight_critical": anxiety_score > 0.6
+        }
+        
+        return config
+    
+    def _calculate_font_size(self, anxiety_score):
+        """Increase font size with anxiety"""
+        base_size = 14
+        max_increase = 6
+        return base_size + int(anxiety_score * max_increase)
+    
+    def _select_color_scheme(self, anxiety_score):
+        """Simplify colors with anxiety"""
+        if anxiety_score < 0.3:
+            return "full_color"
+        elif anxiety_score < 0.6:
+            return "reduced_color"
+        else:
+            return "high_contrast"  # Black and white with red highlights
+```
+
+## Integration example
+
+```python
+from nuclear_ip.silent_flux import SilentFluxEngine
+from edge_node.ai_agents import EarlyWarningSystemAgent
+
+# Initialize Silent Flux
+silent_flux = SilentFluxEngine()
+
+# Initialize AI agent
+agent = EarlyWarningSystemAgent(location="Dadaab")
+
+# Monitor operator anxiety
+anxiety_score = silent_flux.get_current_anxiety_score()
+
+# Generate alerts
+raw_alerts = agent.generate_alerts()
+
+# Regulate output based on anxiety
+regulated_alerts = silent_flux.regulate_alerts(raw_alerts, anxiety_score)
+
+# Adapt UI
+ui_config = silent_flux.adapt_ui(anxiety_score)
+
+# Display regulated output
+for alert in regulated_alerts:
+    print(f"{alert.level}: {alert.message}")
+
+print(f"\nUI Config: Font size={ui_config['font_size']}, "
+      f"Color scheme={ui_config['color_scheme']}")
+```
+
+## Real-world scenario
+
+### Cholera outbreak response
+
+**Without Silent Flux:**
+```
+Operator anxiety: 0.85 (HIGH)
+
+AI Output:
+- 47 new cases reported in Sector 3
+- Water contamination detected at 12 locations
+- 23 patients require immediate hospitalization
+- Supply chain disruption affecting 8 health facilities
+- Weather forecast shows continued rainfall
+- Historical data suggests peak in 5-7 days
+- Recommended actions: [15 detailed steps]
+- Risk factors: [8 paragraphs of analysis]
+...
+
+Result: Operator overwhelmed, decision paralysis
+```
+
+**With Silent Flux:**
+```
+Operator anxiety: 0.85 (HIGH)
+
+AI Output (regulated):
+🚨 CRITICAL: 23 patients need immediate hospitalization
+
+Next action: Contact district ambulance coordinator
+
+Result: Clear, actionable, operator can execute
+```
+
+## Anxiety thresholds
+
+```python
+class AnxietyThresholds:
+    CALM = 0.0 - 0.3        # Full detail, all alerts
+    MODERATE = 0.3 - 0.6    # Summarized, high-priority alerts
+    HIGH = 0.6 - 0.8        # Bullet points, critical alerts only
+    CRITICAL = 0.8 - 1.0    # Single action, suppress alerts
+```
+
+## Compliance
+
+Silent Flux supports operator well-being and decision quality:
+
+| Framework | Requirement | How Silent Flux Satisfies |
+|-----------|-------------|---------------------------|
+| **ISO 27001 A.7.2** | Human resource security | Prevents operator burnout |
+| **OSHA** | Workplace safety | Reduces cognitive stress |
+| **WHO IHR** | Emergency response | Improves decision quality under pressure |
+
+## Hardware requirements
+
+<CardGroup cols={2}>
+  <Card title="Heart rate monitor" icon="heart-pulse">
+    Wearable device with HRV tracking (Apple Watch, Fitbit, Polar)
+  </Card>
+  <Card title="Keyboard/mouse" icon="keyboard">
+    Standard input devices for behavioral monitoring
+  </Card>
+  <Card title="Optional: EEG" icon="brain">
+    Advanced: Brain activity monitoring for direct anxiety measurement
+  </Card>
+  <Card title="Optional: Camera" icon="camera">
+    Facial expression analysis for emotion detection
+  </Card>
+</CardGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Setup guide"
+    icon="gear"
+    href="/nuclear-ip/silent-flux-setup"
+  >
+    Configure anxiety monitoring
+  </Card>
+  <Card
+    title="Integration"
+    icon="plug"
+    href="/nuclear-ip/silent-flux-integration"
+  >
+    Integrate with your AI agents
+  </Card>
+  <Card
+    title="Calibration"
+    icon="sliders"
+    href="/nuclear-ip/silent-flux-calibration"
+  >
+    Calibrate anxiety thresholds
+  </Card>
+  <Card
+    title="Testing"
+    icon="flask"
+    href="/nuclear-ip/silent-flux-testing"
+  >
+    Test anxiety regulation
+  </Card>
+</CardGroup>
