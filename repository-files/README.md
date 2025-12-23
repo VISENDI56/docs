@@ -1,189 +1,275 @@
-# iLuminara-Core: Sovereign Health Fortress Implementation Files
+# iLuminara-Core: Hyper-Law Singularity Implementation Files
 
-This directory contains all the implementation files for deploying the complete iLuminara-Core security and integration stack.
+## Overview
 
-## 📁 Directory Structure
+This directory contains all implementation files for the **Hyper-Law Singularity** - iLuminara-Core's 45+ framework compliance orchestration system.
+
+## Directory Structure
 
 ```
 repository-files/
 ├── .github/
 │   ├── workflows/
-│   │   ├── codeql.yml              # SAST security scanning
+│   │   ├── codeql.yml              # CodeQL SAST scanning
 │   │   └── gitleaks.yml            # Secret detection
 │   └── dependabot.yml              # Daily security updates
 ├── .gitleaks.toml                  # Gitleaks configuration
 ├── governance_kernel/
 │   ├── crypto_shredder.py          # IP-02: Data dissolution
-│   └── quantum_law_nexus.py        # 45+ global legal frameworks
-├── cloud_oracle/
-│   └── vertex_ai_shap.py           # Vertex AI + SHAP integration
-├── api/
-│   └── bio_interface.py            # Bio-Interface REST API
+│   ├── omni_law_matrix.py          # 45+ framework orchestration
+│   ├── ai_governance.py            # EU AI Act + FDA compliance
+│   └── global_health_harmonizer.py # IHR 2005 + WHO integration
 ├── config/
-│   └── sovereign_guardrail.yaml    # Sovereignty configuration
+│   └── sovereign_guardrail.yaml    # Compliance configuration
 ├── scripts/
-│   ├── validate_fortress.sh        # Fortress validation
-│   └── setup_branch_protection.sh  # GitHub branch protection
-├── requirements.txt                # Python dependencies
+│   └── validate_fortress.sh        # Fortress validation
+├── IMPLEMENTATION_GUIDE_HYPER_LAW.md  # Step-by-step guide
+├── DEPLOYMENT_SUMMARY.md           # Complete deployment summary
 └── README.md                       # This file
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
-### Step 1: Copy Files to Repository
+### 1. Copy Files to Your Repository
 
 ```bash
-# Navigate to your iLuminara-Core repository
+# From this directory
+cp -r .github/ /path/to/iLuminara-Core/
+cp .gitleaks.toml /path/to/iLuminara-Core/
+cp -r governance_kernel/ /path/to/iLuminara-Core/
+cp -r config/ /path/to/iLuminara-Core/
+cp -r scripts/ /path/to/iLuminara-Core/
+```
+
+### 2. Install Dependencies
+
+```bash
 cd /path/to/iLuminara-Core
-
-# Copy all files from repository-files/
-cp -r /path/to/docs/repository-files/* .
-
-# Make scripts executable
-chmod +x scripts/*.sh
-```
-
-### Step 2: Install Dependencies
-
-```bash
-# Install Python dependencies
-pip install -r requirements.txt
-
-# Or use virtual environment (recommended)
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### Step 3: Configure Environment
+**Required packages:**
+- `cryptography>=41.0.0`
+- `shap>=0.42.0`
+- `google-cloud-bigquery>=3.11.0`
+- `google-cloud-spanner>=3.40.0`
+
+### 3. Run Validation
 
 ```bash
-# Set required environment variables
-export NODE_ID=JOR-47
-export JURISDICTION=KDPA_KE
-export GOOGLE_CLOUD_PROJECT=your-project-id
-export GCP_REGION=us-central1
-
-# Optional: Enable tamper-proof audit
-export ENABLE_TAMPER_PROOF_AUDIT=true
-```
-
-### Step 4: Validate Installation
-
-```bash
-# Run fortress validation
+chmod +x scripts/validate_fortress.sh
 ./scripts/validate_fortress.sh
 ```
 
-### Step 5: Setup GitHub Security
+### 4. Test Components
 
 ```bash
-# Authenticate with GitHub CLI
-gh auth refresh -s workflow,repo,write:packages,admin:repo_hook
+# Test Omni-Law Matrix
+python -m governance_kernel.omni_law_matrix
 
-# Setup branch protection
-./scripts/setup_branch_protection.sh
+# Test AI Governance
+python -m governance_kernel.ai_governance
+
+# Test Global Health Harmonizer
+python -m governance_kernel.global_health_harmonizer
+
+# Test Crypto Shredder
+python -m governance_kernel.crypto_shredder
 ```
 
-## 📦 Component Overview
+## File Descriptions
 
-### Security Audit Layer
+### Security Workflows
 
-**CodeQL Workflow** (`.github/workflows/codeql.yml`)
-- SAST security scanning
-- Runs on push, PR, and weekly schedule
-- Compliance: GDPR Art. 32, ISO 27001 A.12.6
+#### `.github/workflows/codeql.yml`
+- **Purpose**: Continuous SAST security scanning
+- **Triggers**: Push to main/develop, PRs, weekly schedule
+- **Languages**: Python, JavaScript
+- **Compliance**: GDPR Art. 32, ISO 27001 A.12.6
 
-**Gitleaks Workflow** (`.github/workflows/gitleaks.yml`)
-- Secret detection and scanning
-- Runs daily at 2 AM UTC
-- Compliance: NIST SP 800-53 IA-5, HIPAA §164.312
+#### `.github/workflows/gitleaks.yml`
+- **Purpose**: Secret detection and credential scanning
+- **Triggers**: Push to main/develop, daily schedule
+- **Features**: SARIF upload, sovereignty violation detection
+- **Compliance**: NIST SP 800-53 IA-5, HIPAA §164.312(a)(2)(i)
 
-**Dependabot** (`.github/dependabot.yml`)
-- Daily security updates for Python, npm, Docker, GitHub Actions
-- Automatic vulnerability patching
+#### `.github/dependabot.yml`
+- **Purpose**: Automated dependency updates
+- **Frequency**: Daily for security updates
+- **Ecosystems**: pip, GitHub Actions, Docker, npm
+- **Features**: Grouped updates, security-only mode
+
+#### `.gitleaks.toml`
+- **Purpose**: Secret detection rules
+- **Features**: Sovereignty-aware (blocks AWS keys), custom rules for GCP/GitHub
+- **Allowlist**: Test files, documentation, examples
 
 ### Governance Kernel
 
-**Crypto Shredder** (`governance_kernel/crypto_shredder.py`)
-- IP-02: Data is dissolved, not deleted
-- Ephemeral key encryption with auto-shred
-- Compliance: GDPR Art. 17, HIPAA §164.530(j), NIST SP 800-88
+#### `governance_kernel/crypto_shredder.py`
+- **Purpose**: IP-02 implementation - cryptographic data dissolution
+- **Features**:
+  - Ephemeral key encryption
+  - Auto-shred after retention period
+  - Retention policies: HOT (180d), WARM (365d), COLD (1825d)
+  - Tamper-proof audit trail
+- **Compliance**: GDPR Art. 17, HIPAA §164.530(j), NIST SP 800-88
 
-**Quantum-Law Nexus** (`governance_kernel/quantum_law_nexus.py`)
-- 45+ global legal frameworks
-- Dynamic jurisdiction selection
-- Quantum superposition of legal states
+#### `governance_kernel/omni_law_matrix.py`
+- **Purpose**: Dynamic 45+ framework orchestration
+- **Features**:
+  - Context-aware framework activation
+  - AI-actuated compliance triggers
+  - Retroactive harmonization
+  - Multi-jurisdictional conflict resolution
+- **Frameworks**: 45+ across 11 categories
 
-### Cloud Oracle
+#### `governance_kernel/ai_governance.py`
+- **Purpose**: AI compliance for EU AI Act and FDA guidance
+- **Features**:
+  - High-risk AI conformity assessment
+  - SHAP explainability
+  - Bias detection and mitigation
+  - Post-market performance monitoring
+  - Transparency reporting
+- **Compliance**: EU AI Act, FDA CDS Software, ISO 42001, IMDRF
 
-**Vertex AI + SHAP** (`cloud_oracle/vertex_ai_shap.py`)
-- Right to Explanation for high-risk AI
-- SHAP explainability integration
-- Compliance: EU AI Act §6, GDPR Art. 22, FDA CDSS
-
-### Bio-Interface
-
-**REST API** (`api/bio_interface.py`)
-- Golden Thread protocol integration
-- CBS + EMR data fusion
-- Verification scoring (CONFIRMED | PROBABLE | POSSIBLE | UNVERIFIED)
+#### `governance_kernel/global_health_harmonizer.py`
+- **Purpose**: WHO integration and outbreak reporting
+- **Features**:
+  - IHR 2005 automatic notification (24-hour requirement)
+  - PHEIC event detection
+  - JEE indicator mapping
+  - One Health signal fusion
+- **Compliance**: IHR 2005, GHSA, JEE Standards
 
 ### Configuration
 
-**SovereignGuardrail Config** (`config/sovereign_guardrail.yaml`)
-- Jurisdiction configuration
-- Data sovereignty rules
-- Retention policies
-- Audit settings
+#### `config/sovereign_guardrail.yaml`
+- **Purpose**: Central compliance configuration
+- **Sections**:
+  - Jurisdiction settings
+  - Data sovereignty rules
+  - Explainability requirements
+  - Consent management
+  - Data retention policies
+  - Audit trail configuration
+  - Humanitarian constraints
+  - Framework activation
+  - Enforcement actions
 
-## 🛡️ The Nuclear IP Stack
+### Scripts
 
-| Component | Protocol | Status |
-|-----------|----------|--------|
-| **IP-02** | Crypto Shredder | ✅ Active |
-| **IP-03** | Acorn Protocol | ⚠️ Requires Hardware |
-| **IP-04** | Silent Flux | ⚠️ Requires Integration |
-| **IP-05** | Golden Thread | ✅ Active |
-| **IP-06** | 5DM Bridge | ⚠️ Requires Mobile Network |
+#### `scripts/validate_fortress.sh`
+- **Purpose**: Complete fortress validation
+- **Phases**:
+  1. Security Audit Layer
+  2. Governance Kernel
+  3. Edge Node & AI Agents
+  4. Cloud Oracle
+  5. Python Dependencies
+  6. Environment Configuration
+  7. Nuclear IP Stack Status
+- **Output**: Detailed validation report with pass/fail status
 
-## 📊 Compliance Coverage
+## Integration Examples
 
-### TIER 1: Data Protection (14 frameworks)
-- GDPR, KDPA, POPIA, HIPAA, HITECH, PIPEDA, CCPA, CPRA
-- NIST CSF, ISO 27001, ISO 27701, SOC 2, LGPD, NDPA
+### Example 1: Validate AI Prediction
 
-### TIER 2: AI Governance (8 frameworks)
-- EU AI Act, FDA CDSS, NIST AI RMF, IEEE 7000
-- ISO 42001, OECD AI, UNESCO AI, WHO AI for Health
+```python
+from governance_kernel.omni_law_matrix import OmniLawMatrix, ComplianceContext
+from governance_kernel.ai_governance import AIGovernance
 
-### TIER 3: Global Health Security (7 frameworks)
-- WHO IHR (2005), WHO IHR (2025), Geneva Convention
-- UN CRC, Sphere Standards, ICRC Medical, CHS
+# Initialize
+matrix = OmniLawMatrix(enable_ai_triggers=True)
+governance = AIGovernance(enable_shap=True)
 
-### TIER 4: African Data Sovereignty (6 frameworks)
-- Malabo Convention, ECOWAS Data, SADC Model
-- NDPA (Nigeria), DPA (Ghana), PDPA (Uganda)
+# Define context
+context = ComplianceContext(
+    action_type="prediction",
+    data_type="PHI",
+    jurisdiction="Kenya",
+    ai_involved=True,
+    high_risk=True,
+    outbreak_context=True
+)
 
-### TIER 5: ESG & Reporting (5 frameworks)
-- ISSB S1, ISSB S2/IFRS S2, GRI Standards, TCFD, Paris Agreement
+# Validate
+result = matrix.validate_action(context)
 
-### TIER 6: Regional & Emerging (5 frameworks)
-- LGPD (Brazil), PIPL (China), PDPA (Singapore)
-- APPI (Japan), PDPA (Thailand)
+if not result['compliant']:
+    print(f"Violations: {result['violations']}")
+    print(f"Recommendations: {result['recommendations']}")
+```
 
-## 🔧 Configuration
+### Example 2: Process Outbreak Event
 
-### Environment Variables
+```python
+from governance_kernel.global_health_harmonizer import GlobalHealthHarmonizer, OutbreakEvent
+from datetime import datetime
+
+# Initialize
+harmonizer = GlobalHealthHarmonizer(
+    national_focal_point="kenya.nfp@health.go.ke",
+    country_code="KE",
+    enable_auto_notification=True
+)
+
+# Create event
+event = OutbreakEvent(
+    event_id="KE-CHOLERA-2025-001",
+    disease="cholera",
+    location={"name": "Dadaab", "border_proximity": True},
+    case_count=156,
+    death_count=12,
+    r_effective=2.8,
+    severity_score=0.75,
+    detection_timestamp=datetime.utcnow().isoformat()
+)
+
+# Process (auto-notifies WHO if required)
+result = harmonizer.process_outbreak_event(event)
+```
+
+### Example 3: Encrypt with Crypto Shredder
+
+```python
+from governance_kernel.crypto_shredder import CryptoShredder, RetentionPolicy, SovereigntyZone
+
+# Initialize
+shredder = CryptoShredder(
+    sovereignty_zone=SovereigntyZone.KENYA,
+    enable_audit=True
+)
+
+# Encrypt patient data
+patient_data = b"Patient ID: 12345, Diagnosis: Malaria"
+encrypted_data, key_id = shredder.encrypt_with_ephemeral_key(
+    data=patient_data,
+    retention_policy=RetentionPolicy.HOT,
+    metadata={"patient_id": "12345", "jurisdiction": "KDPA_KE"}
+)
+
+# After retention period, shred key
+shredder.shred_key(key_id)
+
+# Data is now cryptographically irrecoverable
+```
+
+## Environment Variables
+
+Required environment variables:
 
 ```bash
-# Core Configuration
+# Node Configuration
 export NODE_ID=JOR-47
 export JURISDICTION=KDPA_KE
+
+# API Configuration
 export API_HOST=0.0.0.0
 export API_PORT=8080
 
-# GCP Configuration
+# GCP Configuration (if using cloud)
 export GOOGLE_CLOUD_PROJECT=your-project-id
 export GCP_REGION=us-central1
 
@@ -192,186 +278,75 @@ export ENABLE_TAMPER_PROOF_AUDIT=true
 export RETENTION_MAX_DAYS=1825
 export AUDIT_LOG_LEVEL=INFO
 
-# Sovereignty Settings
-export DATA_SOVEREIGNTY_REQUIRED=true
-export REQUIRES_EXPLICIT_CONSENT=true
+# AI Governance
+export ENABLE_SHAP_EXPLAINABILITY=true
+export ENABLE_BIAS_DETECTION=true
 
-# AI Agents Configuration
-export ENABLE_OFFLINE_MODE=true
-export SYNC_INTERVAL_SECONDS=300
-export FEDERATED_LEARNING_EPSILON=1.0
+# Global Health Security
+export NATIONAL_FOCAL_POINT=your.nfp@health.gov
+export ENABLE_WHO_NOTIFICATION=true
 ```
 
-### Jurisdiction Configuration
+## Testing
 
-Edit `config/sovereign_guardrail.yaml`:
-
-```yaml
-jurisdiction:
-  primary: "KDPA_KE"  # Your primary jurisdiction
-  secondary:
-    - "GDPR_EU"
-    - "POPIA_ZA"
-    - "HIPAA_US"
-```
-
-## 🧪 Testing
+### Unit Tests
 
 ```bash
-# Run all tests
-pytest tests/
+# Test Omni-Law Matrix
+python -m pytest tests/test_omni_law_matrix.py
 
-# Run specific test suite
-pytest tests/test_crypto_shredder.py
-pytest tests/test_quantum_law_nexus.py
-pytest tests/test_vertex_ai_shap.py
+# Test AI Governance
+python -m pytest tests/test_ai_governance.py
 
-# Run with coverage
-pytest --cov=governance_kernel --cov=cloud_oracle --cov=api
+# Test Global Health Harmonizer
+python -m pytest tests/test_global_health_harmonizer.py
+
+# Test Crypto Shredder
+python -m pytest tests/test_crypto_shredder.py
 ```
 
-## 📝 Usage Examples
-
-### Crypto Shredder
-
-```python
-from governance_kernel.crypto_shredder import CryptoShredder, RetentionPolicy
-
-shredder = CryptoShredder(sovereignty_zone=SovereigntyZone.KENYA)
-
-# Encrypt with ephemeral key
-encrypted_data, key_id = shredder.encrypt_with_ephemeral_key(
-    data=patient_record,
-    retention_policy=RetentionPolicy.HOT,
-    metadata={"patient_id": "12345", "jurisdiction": "KDPA_KE"}
-)
-
-# After retention period, shred the key
-shredder.shred_key(key_id)
-```
-
-### Quantum-Law Nexus
-
-```python
-from governance_kernel.quantum_law_nexus import QuantumLawNexus
-
-nexus = QuantumLawNexus()
-
-# Get applicable frameworks
-applicable = nexus.get_applicable_frameworks(
-    data_type="PHI",
-    operation="inference",
-    location="Kenya"
-)
-
-# Get compliance rules
-rules = nexus.get_compliance_rules(JurisdictionFramework.EU_AI_ACT)
-```
-
-### Vertex AI + SHAP
-
-```python
-from cloud_oracle.vertex_ai_shap import VertexAIExplainer
-
-explainer = VertexAIExplainer(
-    project_id="iluminara-core",
-    jurisdiction="EU_AI_ACT"
-)
-
-# Generate explanation
-result = explainer.explain_prediction(
-    model_endpoint="projects/123/locations/us-central1/endpoints/456",
-    input_data={"fever": 1.0, "diarrhea": 1.0},
-    feature_names=["fever", "diarrhea"]
-)
-```
-
-### Bio-Interface API
+### Integration Tests
 
 ```bash
-# Submit CBS report
-curl -X POST http://localhost:8080/api/v1/cbs/report \
-  -H "Content-Type: application/json" \
-  -d '{
-    "location": {"lat": 0.0512, "lng": 40.3129},
-    "symptoms": ["fever", "diarrhea"],
-    "severity": 8,
-    "chv_id": "CHV_AMINA_HASSAN"
-  }'
+# Run full validation
+./scripts/validate_fortress.sh
 
-# Submit EMR record
-curl -X POST http://localhost:8080/api/v1/emr/record \
-  -H "Content-Type: application/json" \
-  -d '{
-    "patient_id": "PAT_12345",
-    "location": {"lat": 0.0512, "lng": 40.3129},
-    "diagnosis": "cholera",
-    "facility_id": "DADAAB_CLINIC"
-  }'
+# Test with demo data
+python examples/hyper_law_demo.py
 ```
 
-## 🚨 Troubleshooting
+## Compliance Matrix
 
-### CodeQL Workflow Fails
+| Framework | Module | Status |
+|-----------|--------|--------|
+| EU AI Act | `ai_governance.py` | ✅ Active |
+| IHR 2005 | `global_health_harmonizer.py` | ✅ Active |
+| GDPR | `omni_law_matrix.py` | ✅ Active |
+| KDPA | `omni_law_matrix.py` | ✅ Active |
+| Malabo Convention | `omni_law_matrix.py` | ✅ Active |
+| IFRS S1/S2 | `omni_law_matrix.py` | ✅ Active |
+| All 45+ Frameworks | `omni_law_matrix.py` | ✅ Active |
 
-```bash
-# Check workflow logs
-gh run list --workflow=codeql.yml
-gh run view <run-id> --log
+## Documentation
 
-# Re-run failed workflow
-gh run rerun <run-id>
-```
+- **Implementation Guide**: `IMPLEMENTATION_GUIDE_HYPER_LAW.md`
+- **Deployment Summary**: `DEPLOYMENT_SUMMARY.md`
+- **Online Docs**: https://docs.iluminara.health
 
-### Gitleaks Detects Secrets
+## Support
 
-```bash
-# View detected secrets
-gh run view <run-id> --log
+For issues or questions:
 
-# Add to .gitleaks.toml allowlist if false positive
-```
+- **GitHub Issues**: https://github.com/VISENDI56/iLuminara-Core/issues
+- **Documentation**: https://docs.iluminara.health
+- **Email**: support@iluminara.health
 
-### Branch Protection Issues
+## License
 
-```bash
-# Check current protection status
-gh api repos/:owner/:repo/branches/main/protection
+iLuminara-Core is licensed under the MIT License.
 
-# Re-run setup script
-./scripts/setup_branch_protection.sh
-```
+---
 
-## 📚 Documentation
+**The Sovereign Health Fortress is ready for deployment.**
 
-Full documentation available at: https://docs.iluminara.health
-
-- [Architecture Overview](https://docs.iluminara.health/architecture/overview)
-- [Governance Kernel](https://docs.iluminara.health/governance/overview)
-- [Security Stack](https://docs.iluminara.health/security/overview)
-- [API Reference](https://docs.iluminara.health/api-reference/overview)
-- [Deployment Guide](https://docs.iluminara.health/deployment/overview)
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests and validation
-5. Submit a pull request
-
-All contributions must pass:
-- CodeQL security scanning
-- Gitleaks secret detection
-- Fortress validation
-- Unit tests
-
-## 📄 License
-
-Copyright © 2025 VISENDI56. All rights reserved.
-
-## 🛡️ Mission
-
-> Transform preventable suffering from statistical inevitability to historical anomaly.
-
-The Sovereign Health Fortress is now built. Deploy with dignity.
+Transform preventable suffering from statistical inevitability to historical anomaly.
