@@ -1,11 +1,11 @@
 ---
 title: Bio-Interface REST API
-description: Mobile health app integration with Golden Thread data fusion
+description: Mobile health app integration with Golden Thread protocol
 ---
 
 ## Overview
 
-The Bio-Interface REST API enables mobile health applications to integrate with iLuminara-Core's Golden Thread protocol, fusing Community-Based Surveillance (CBS) and Electronic Medical Records (EMR) into verified timelines.
+The Bio-Interface REST API enables mobile health applications to integrate with iLuminara-Core using the Golden Thread protocol for data fusion from Community-Based Surveillance (CBS) and Electronic Medical Records (EMR).
 
 <Card
   title="Philosophy"
@@ -17,312 +17,341 @@ The Bio-Interface REST API enables mobile health applications to integrate with 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│           MOBILE HEALTH APPS                            │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
-│  │   CHV App    │  │  Clinic EMR  │  │  IDSR App    │ │
-│  │  (Android)   │  │   (Web)      │  │  (iOS)       │ │
-│  └──────────────┘  └──────────────┘  └──────────────┘ │
-└─────────────────────────────────────────────────────────┘
-                         │
-                         │ HTTPS / TLS 1.3
-                         ▼
-┌─────────────────────────────────────────────────────────┐
-│           BIO-INTERFACE REST API                        │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │  /api/v1/cbs/submit     - CBS signal ingestion  │  │
-│  │  /api/v1/emr/submit     - EMR record ingestion  │  │
-│  │  /api/v1/fuse/verify    - Golden Thread fusion  │  │
-│  │  /api/v1/sync/status    - Sync status check     │  │
-│  └──────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────┘
-                         │
-                         │ Data Fusion
-                         ▼
-┌─────────────────────────────────────────────────────────┐
-│           GOLDEN THREAD ENGINE (IP-05)                  │
-│  - Cross-source verification                            │
-│  - Verification score calculation                       │
-│  - Conflict resolution                                  │
-│  - Verified timeline generation                         │
-└─────────────────────────────────────────────────────────┘
-                         │
-                         │ Validated Data
-                         ▼
-┌─────────────────────────────────────────────────────────┐
-│           SOVEREIGNGUARDRAIL                            │
-│  - Data sovereignty enforcement                         │
-│  - Consent validation                                   │
-│  - Audit trail logging                                  │
-│  - Compliance attestation                               │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────┐
+│    MOBILE HEALTH APPS               │
+│  - CHV data collection              │
+│  - Patient symptom reporting        │
+│  - IoT sensor integration           │
+└─────────────────────────────────────┘
+              │
+              │ HTTPS/TLS 1.3
+              ▼
+┌─────────────────────────────────────┐
+│    BIO-INTERFACE REST API           │
+│  - /health (health check)           │
+│  - /process-voice (voice alerts)    │
+│  - /submit-cbs (CBS signals)        │
+│  - /submit-emr (EMR records)        │
+│  - /predict (outbreak prediction)   │
+└─────────────────────────────────────┘
+              │
+              │ Validation
+              ▼
+┌─────────────────────────────────────┐
+│    SOVEREIGN GUARDRAIL              │
+│  - Consent validation               │
+│  - Data sovereignty check           │
+│  - Audit trail logging              │
+└─────────────────────────────────────┘
+              │
+              │ Fusion
+              ▼
+┌─────────────────────────────────────┐
+│    GOLDEN THREAD                    │
+│  - Merge CBS + EMR + IDSR           │
+│  - Cross-source verification        │
+│  - Verified timeline creation       │
+└─────────────────────────────────────┘
+```
+
+## Base URL
+
+**Local development:**
+```
+http://localhost:8080
+```
+
+**Production (Cloud Run):**
+```
+https://iluminara-api-<hash>-uc.a.run.app
 ```
 
 ## Authentication
 
-### OAuth 2.0 flow
+### Development
+No authentication required for local testing.
 
-```python
-import requests
+### Production
+Use Google Cloud IAM or API keys:
 
-# Step 1: Get authorization code
-auth_url = "https://api.iluminara.health/oauth/authorize"
-params = {
-    'client_id': 'your_client_id',
-    'redirect_uri': 'https://yourapp.com/callback',
-    'response_type': 'code',
-    'scope': 'cbs:write emr:write fuse:read',
-    'state': 'random_state_string'
-}
+```bash
+# Generate API key
+gcloud alpha services api-keys create \
+  --display-name="iLuminara Mobile App" \
+  --api-target=service=iluminara-api-uc.a.run.app
 
-# User authorizes in browser
-# Redirect back with code
-
-# Step 2: Exchange code for token
-token_url = "https://api.iluminara.health/oauth/token"
-token_data = {
-    'grant_type': 'authorization_code',
-    'code': 'authorization_code_from_redirect',
-    'redirect_uri': 'https://yourapp.com/callback',
-    'client_id': 'your_client_id',
-    'client_secret': 'your_client_secret'
-}
-
-response = requests.post(token_url, data=token_data)
-access_token = response.json()['access_token']
-
-print(f"✅ Access token: {access_token}")
-```
-
-### API key authentication (development)
-
-```python
-import requests
-
-headers = {
-    'Authorization': 'Bearer YOUR_API_KEY',
-    'Content-Type': 'application/json'
-}
-
-response = requests.get(
-    'https://api.iluminara.health/api/v1/health',
-    headers=headers
-)
-
-print(response.json())
+# Use in requests
+curl -H "X-API-Key: YOUR_API_KEY" \
+  https://iluminara-api-uc.a.run.app/health
 ```
 
 ## Core endpoints
 
-### Submit CBS signal
+### Health check
 
-Community Health Volunteers submit field observations:
-
-```python
-import requests
-
-url = "https://api.iluminara.health/api/v1/cbs/submit"
-
-headers = {
-    'Authorization': 'Bearer YOUR_ACCESS_TOKEN',
-    'Content-Type': 'application/json'
-}
-
-payload = {
-    'chv_id': 'CHV_AMINA_HASSAN',
-    'location': {
-        'lat': 0.0512,
-        'lng': 40.3129,
-        'name': 'Dadaab Refugee Camp'
-    },
-    'timestamp': '2025-12-23T10:30:00Z',
-    'symptoms': ['diarrhea', 'vomiting', 'dehydration'],
-    'severity': 9,
-    'patient_count': 1,
-    'notes': 'Severe watery diarrhea, suspected cholera',
-    'consent_token': 'EMERGENCY_CHV_ALERT'
-}
-
-response = requests.post(url, json=payload, headers=headers)
-
-print(response.json())
+```http
+GET /health
 ```
 
 **Response:**
+```json
+{
+  "status": "healthy",
+  "service": "iLuminara Bio-Interface API",
+  "version": "1.0.0",
+  "timestamp": "2025-12-23T18:00:00Z",
+  "node_id": "JOR-47",
+  "jurisdiction": "KDPA_KE"
+}
+```
 
+### Submit CBS signal
+
+Community Health Volunteer submits symptom observation.
+
+```http
+POST /submit-cbs
+Content-Type: application/json
+```
+
+**Request:**
+```json
+{
+  "chv_id": "CHV_AMINA_HASSAN",
+  "location": {
+    "lat": 0.0512,
+    "lng": 40.3129,
+    "name": "Dadaab Refugee Camp"
+  },
+  "symptoms": ["fever", "diarrhea", "vomiting"],
+  "severity": 8,
+  "timestamp": "2025-12-23T10:30:00Z",
+  "patient_consent": "verbal_emergency",
+  "notes": "Patient reports 3 days of symptoms"
+}
+```
+
+**Response:**
 ```json
 {
   "status": "success",
-  "signal_id": "CBS_20251223_103000_001",
+  "cbs_signal_id": "CBS_20251223_001",
   "verification_status": "PENDING",
-  "message": "CBS signal received and queued for fusion",
-  "golden_thread_id": "GT_DADAAB_20251223_001"
+  "message": "CBS signal recorded. Awaiting EMR correlation.",
+  "golden_thread_id": "GT_PAT_12345"
 }
 ```
 
 ### Submit EMR record
 
-Clinics submit electronic medical records:
+Clinic submits electronic medical record.
 
-```python
-url = "https://api.iluminara.health/api/v1/emr/submit"
+```http
+POST /submit-emr
+Content-Type: application/json
+```
 
-payload = {
-    'facility_id': 'DADAAB_CLINIC_001',
-    'patient_id': 'PAT_12345',
-    'location': {
-        'lat': 0.0512,
-        'lng': 40.3129,
-        'name': 'Dadaab Refugee Camp'
-    },
-    'timestamp': '2025-12-23T10:45:00Z',
-    'diagnosis': 'cholera',
-    'symptoms': ['diarrhea', 'vomiting', 'dehydration'],
-    'lab_results': {
-        'rapid_test': 'positive',
-        'culture': 'pending'
-    },
-    'treatment': 'ORS, IV fluids, isolation',
-    'consent_token': 'PATIENT_CONSENT_12345'
+**Request:**
+```json
+{
+  "facility_id": "DADAAB_CLINIC_01",
+  "patient_id": "PAT_12345",
+  "location": {
+    "lat": 0.0512,
+    "lng": 40.3129,
+    "name": "Dadaab Refugee Camp"
+  },
+  "diagnosis": "cholera",
+  "symptoms": ["diarrhea", "vomiting", "dehydration"],
+  "lab_results": {
+    "rapid_test": "positive",
+    "culture": "pending"
+  },
+  "timestamp": "2025-12-23T11:00:00Z",
+  "consent_token": "CONSENT_PAT_12345_20251223"
 }
-
-response = requests.post(url, json=payload, headers=headers)
-
-print(response.json())
 ```
 
 **Response:**
-
 ```json
 {
   "status": "success",
-  "record_id": "EMR_20251223_104500_001",
+  "emr_record_id": "EMR_20251223_001",
   "verification_status": "CONFIRMED",
-  "message": "EMR record received and fused with CBS signal",
-  "golden_thread_id": "GT_DADAAB_20251223_001",
   "verification_score": 1.0,
-  "matched_signals": ["CBS_20251223_103000_001"]
+  "message": "EMR record fused with CBS signal. Verification: CONFIRMED",
+  "golden_thread_id": "GT_PAT_12345",
+  "matched_cbs_signals": ["CBS_20251223_001"]
 }
 ```
 
-### Verify fusion status
+### Process voice alert
 
-Check Golden Thread verification:
+Convert voice recording to structured health data.
 
-```python
-url = "https://api.iluminara.health/api/v1/fuse/verify"
+```http
+POST /process-voice
+Content-Type: audio/wav
+```
 
-params = {
-    'golden_thread_id': 'GT_DADAAB_20251223_001'
-}
-
-response = requests.get(url, params=params, headers=headers)
-
-print(response.json())
+**Request:**
+```bash
+curl -X POST http://localhost:8080/process-voice \
+  -H "Content-Type: audio/wav" \
+  --data-binary @swahili-symptom.wav
 ```
 
 **Response:**
-
 ```json
 {
   "status": "success",
-  "golden_thread_id": "GT_DADAAB_20251223_001",
-  "verification_score": 1.0,
-  "verification_status": "CONFIRMED",
-  "sources": {
-    "cbs": {
-      "signal_id": "CBS_20251223_103000_001",
-      "timestamp": "2025-12-23T10:30:00Z",
-      "location": {"lat": 0.0512, "lng": 40.3129}
+  "timestamp": "2025-12-23T18:00:00Z",
+  "processing_time_ms": 4200,
+  "transcription": "Patient reporting severe watery diarrhea and vomiting",
+  "language_detected": "swahili",
+  "symptoms": ["diarrhea", "vomiting", "dehydration"],
+  "severity": 9,
+  "alert_level": "CRITICAL",
+  "cbs_signal_id": "CBS_VOICE_20251223_001",
+  "recommendations": [
+    "IMMEDIATE: Suspected cholera. Start ORS immediately.",
+    "Isolate patient to prevent spread",
+    "Notify district health officer"
+  ]
+}
+```
+
+### Outbreak prediction
+
+Predict outbreak risk based on symptoms and location.
+
+```http
+POST /predict
+Content-Type: application/json
+```
+
+**Request:**
+```json
+{
+  "location": {
+    "lat": 0.0512,
+    "lng": 40.3129
+  },
+  "symptoms": ["diarrhea", "vomiting"],
+  "time_window_days": 7
+}
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "prediction": {
+    "disease": "cholera",
+    "risk_score": 0.87,
+    "z_score": 8.5,
+    "alert_level": "HIGH",
+    "forecasted_cases": {
+      "24h": 15,
+      "48h": 28,
+      "72h": 45
     },
-    "emr": {
-      "record_id": "EMR_20251223_104500_001",
-      "timestamp": "2025-12-23T10:45:00Z",
-      "location": {"lat": 0.0512, "lng": 40.3129}
+    "confidence_interval": {
+      "lower": 12,
+      "upper": 52
     }
   },
-  "conflicts": [],
-  "time_delta_minutes": 15,
-  "location_match": true
+  "recommendations": [
+    "Activate emergency response protocol",
+    "Deploy rapid response team",
+    "Initiate contact tracing"
+  ]
 }
 ```
 
-### Sync status
+## Golden Thread integration
 
-Check offline sync status:
+The Bio-Interface automatically fuses CBS and EMR signals using the Golden Thread protocol.
+
+### Verification logic
 
 ```python
-url = "https://api.iluminara.health/api/v1/sync/status"
+from edge_node.sync_protocol.golden_thread import GoldenThread
 
-params = {
-    'device_id': 'DEVICE_CHV_AMINA_001'
-}
+gt = GoldenThread()
 
-response = requests.get(url, params=params, headers=headers)
+# Submit CBS signal
+cbs_response = requests.post('http://localhost:8080/submit-cbs', json={
+    'chv_id': 'CHV_AMINA',
+    'location': {'lat': 0.0512, 'lng': 40.3129},
+    'symptoms': ['fever', 'diarrhea'],
+    'timestamp': '2025-12-23T10:30:00Z'
+})
 
-print(response.json())
+cbs_signal_id = cbs_response.json()['cbs_signal_id']
+
+# Submit EMR record (30 minutes later)
+emr_response = requests.post('http://localhost:8080/submit-emr', json={
+    'facility_id': 'DADAAB_CLINIC',
+    'patient_id': 'PAT_12345',
+    'location': {'lat': 0.0512, 'lng': 40.3129},
+    'diagnosis': 'malaria',
+    'timestamp': '2025-12-23T11:00:00Z'
+})
+
+# Golden Thread automatically fuses signals
+# Verification score: 1.0 (CONFIRMED)
+# - Same location ✓
+# - Time delta < 24h ✓
 ```
 
-**Response:**
-
-```json
-{
-  "status": "success",
-  "device_id": "DEVICE_CHV_AMINA_001",
-  "last_sync": "2025-12-23T09:00:00Z",
-  "pending_uploads": 3,
-  "pending_downloads": 0,
-  "sync_queue": [
-    {
-      "signal_id": "CBS_OFFLINE_001",
-      "timestamp": "2025-12-23T09:15:00Z",
-      "priority": "HIGH"
-    },
-    {
-      "signal_id": "CBS_OFFLINE_002",
-      "timestamp": "2025-12-23T09:30:00Z",
-      "priority": "MEDIUM"
-    }
-  ],
-  "connectivity_status": "ONLINE"
-}
-```
-
-## Mobile SDK integration
+## Mobile SDK examples
 
 ### Android (Kotlin)
 
 ```kotlin
-import com.iluminara.sdk.BiointerfaceClient
-import com.iluminara.sdk.models.CBSSignal
+import okhttp3.*
+import org.json.JSONObject
 
-class HealthDataCollector {
-    private val client = BiointerfaceClient(
-        apiKey = "YOUR_API_KEY",
-        baseUrl = "https://api.iluminara.health"
-    )
+class ILuminaraClient(private val baseUrl: String) {
+    private val client = OkHttpClient()
     
-    suspend fun submitCBSSignal(
+    fun submitCBSSignal(
+        chvId: String,
         location: Location,
         symptoms: List<String>,
         severity: Int
-    ) {
-        val signal = CBSSignal(
-            chvId = "CHV_AMINA_HASSAN",
-            location = location,
-            symptoms = symptoms,
-            severity = severity,
-            timestamp = System.currentTimeMillis()
-        )
-        
-        try {
-            val response = client.cbs.submit(signal)
-            Log.d("iLuminara", "Signal submitted: ${response.signalId}")
-        } catch (e: Exception) {
-            // Queue for offline sync
-            client.offlineQueue.add(signal)
-            Log.w("iLuminara", "Queued for offline sync")
+    ): CBSResponse {
+        val json = JSONObject().apply {
+            put("chv_id", chvId)
+            put("location", JSONObject().apply {
+                put("lat", location.latitude)
+                put("lng", location.longitude)
+            })
+            put("symptoms", JSONArray(symptoms))
+            put("severity", severity)
+            put("timestamp", System.currentTimeMillis())
         }
+        
+        val request = Request.Builder()
+            .url("$baseUrl/submit-cbs")
+            .post(json.toString().toRequestBody("application/json".toMediaType()))
+            .build()
+        
+        val response = client.newCall(request).execute()
+        return CBSResponse.fromJson(response.body?.string())
+    }
+    
+    fun processVoiceAlert(audioFile: File): VoiceResponse {
+        val requestBody = audioFile.asRequestBody("audio/wav".toMediaType())
+        
+        val request = Request.Builder()
+            .url("$baseUrl/process-voice")
+            .post(requestBody)
+            .build()
+        
+        val response = client.newCall(request).execute()
+        return VoiceResponse.fromJson(response.body?.string())
     }
 }
 ```
@@ -330,35 +359,54 @@ class HealthDataCollector {
 ### iOS (Swift)
 
 ```swift
-import iLuminaraSDK
+import Foundation
 
-class HealthDataCollector {
-    let client = BiointerfaceClient(
-        apiKey: "YOUR_API_KEY",
-        baseURL: "https://api.iluminara.health"
-    )
+class ILuminaraClient {
+    let baseURL: String
+    
+    init(baseURL: String) {
+        self.baseURL = baseURL
+    }
     
     func submitCBSSignal(
+        chvId: String,
         location: CLLocation,
         symptoms: [String],
-        severity: Int
-    ) async throws {
-        let signal = CBSSignal(
-            chvId: "CHV_AMINA_HASSAN",
-            location: location,
-            symptoms: symptoms,
-            severity: severity,
-            timestamp: Date()
-        )
+        severity: Int,
+        completion: @escaping (Result<CBSResponse, Error>) -> Void
+    ) {
+        let url = URL(string: "\(baseURL)/submit-cbs")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        do {
-            let response = try await client.cbs.submit(signal)
-            print("Signal submitted: \(response.signalId)")
-        } catch {
-            // Queue for offline sync
-            client.offlineQueue.add(signal)
-            print("Queued for offline sync")
-        }
+        let body: [String: Any] = [
+            "chv_id": chvId,
+            "location": [
+                "lat": location.coordinate.latitude,
+                "lng": location.coordinate.longitude
+            ],
+            "symptoms": symptoms,
+            "severity": severity,
+            "timestamp": ISO8601DateFormatter().string(from: Date())
+        ]
+        
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+            
+            guard let data = data else {
+                completion(.failure(NSError(domain: "NoData", code: -1)))
+                return
+            }
+            
+            let cbsResponse = try? JSONDecoder().decode(CBSResponse.self, from: data)
+            completion(.success(cbsResponse!))
+        }.resume()
     }
 }
 ```
@@ -366,90 +414,101 @@ class HealthDataCollector {
 ### React Native (JavaScript)
 
 ```javascript
-import { BiointerfaceClient } from '@iluminara/sdk';
-
-const client = new BiointerfaceClient({
-  apiKey: 'YOUR_API_KEY',
-  baseURL: 'https://api.iluminara.health'
-});
-
-async function submitCBSSignal(location, symptoms, severity) {
-  const signal = {
-    chv_id: 'CHV_AMINA_HASSAN',
-    location: location,
-    symptoms: symptoms,
-    severity: severity,
-    timestamp: new Date().toISOString()
-  };
+class ILuminaraClient {
+  constructor(baseURL) {
+    this.baseURL = baseURL;
+  }
   
-  try {
-    const response = await client.cbs.submit(signal);
-    console.log('Signal submitted:', response.signal_id);
-  } catch (error) {
-    // Queue for offline sync
-    await client.offlineQueue.add(signal);
-    console.log('Queued for offline sync');
+  async submitCBSSignal({ chvId, location, symptoms, severity }) {
+    const response = await fetch(`${this.baseURL}/submit-cbs`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        chv_id: chvId,
+        location: {
+          lat: location.latitude,
+          lng: location.longitude,
+        },
+        symptoms,
+        severity,
+        timestamp: new Date().toISOString(),
+      }),
+    });
+    
+    return await response.json();
+  }
+  
+  async processVoiceAlert(audioUri) {
+    const formData = new FormData();
+    formData.append('audio', {
+      uri: audioUri,
+      type: 'audio/wav',
+      name: 'voice-alert.wav',
+    });
+    
+    const response = await fetch(`${this.baseURL}/process-voice`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'audio/wav',
+      },
+      body: formData,
+    });
+    
+    return await response.json();
   }
 }
 ```
 
-## Offline sync protocol
+## Offline support
 
-### Priority queue
+The Bio-Interface supports offline operation with queue-and-sync:
 
-```python
-from enum import Enum
-
-class SyncPriority(Enum):
-    CRITICAL = 1  # Life-threatening, sync immediately
-    HIGH = 2      # Outbreak-related, sync within 1 hour
-    MEDIUM = 3    # Routine surveillance, sync within 6 hours
-    LOW = 4       # Administrative, sync within 24 hours
-
-# Priority queue implementation
-sync_queue = [
-    {
-        'signal_id': 'CBS_OFFLINE_001',
-        'priority': SyncPriority.CRITICAL,
-        'timestamp': '2025-12-23T09:15:00Z',
-        'retry_count': 0
-    },
-    {
-        'signal_id': 'CBS_OFFLINE_002',
-        'priority': SyncPriority.HIGH,
-        'timestamp': '2025-12-23T09:30:00Z',
-        'retry_count': 0
+```javascript
+class OfflineQueue {
+  constructor(client) {
+    this.client = client;
+    this.queue = [];
+  }
+  
+  async submitCBSSignal(data) {
+    if (navigator.onLine) {
+      return await this.client.submitCBSSignal(data);
+    } else {
+      // Queue for later
+      this.queue.push({ type: 'cbs', data });
+      await this.saveQueue();
+      return { status: 'queued', message: 'Will sync when online' };
     }
-]
-
-# Sort by priority, then timestamp
-sync_queue.sort(key=lambda x: (x['priority'].value, x['timestamp']))
+  }
+  
+  async syncQueue() {
+    if (!navigator.onLine || this.queue.length === 0) return;
+    
+    const results = [];
+    for (const item of this.queue) {
+      try {
+        const result = await this.client.submitCBSSignal(item.data);
+        results.push(result);
+      } catch (error) {
+        console.error('Sync failed:', error);
+        break; // Stop on first failure
+      }
+    }
+    
+    // Remove synced items
+    this.queue = this.queue.slice(results.length);
+    await this.saveQueue();
+    
+    return results;
+  }
+}
 ```
 
-### Exponential backoff
+## Sovereignty compliance
 
-```python
-import time
-import random
-
-def sync_with_backoff(signal, max_retries=5):
-    for attempt in range(max_retries):
-        try:
-            response = client.cbs.submit(signal)
-            return response
-        except Exception as e:
-            if attempt == max_retries - 1:
-                raise
-            
-            # Exponential backoff with jitter
-            wait_time = (2 ** attempt) + random.uniform(0, 1)
-            print(f"Retry {attempt + 1}/{max_retries} in {wait_time:.2f}s")
-            time.sleep(wait_time)
-```
-
-## Data sovereignty
-
-All Bio-Interface API calls enforce sovereignty constraints:
+All Bio-Interface endpoints enforce sovereignty constraints:
 
 ```python
 from governance_kernel.vector_ledger import SovereignGuardrail
@@ -462,39 +521,46 @@ guardrail.validate_action(
     payload={
         'data_type': 'PHI',
         'destination': 'Edge_Node',
-        'processing_location': 'africa-south1',
-        'consent_token': 'EMERGENCY_CHV_ALERT'
+        'processing_location': 'Local',
+        'consent_token': request.json.get('consent_token')
     },
     jurisdiction='KDPA_KE'
 )
-
-# ✅ Approved - Data stays in sovereign territory
 ```
 
-## Rate limits
+## Rate limiting
 
-| Endpoint | Rate Limit | Burst |
-|----------|-----------|-------|
-| `/api/v1/cbs/submit` | 100/min | 200 |
-| `/api/v1/emr/submit` | 50/min | 100 |
-| `/api/v1/fuse/verify` | 200/min | 400 |
-| `/api/v1/sync/status` | 500/min | 1000 |
+**Development:** No limits
 
-## Error codes
+**Production:**
+- Voice processing: 10 requests/minute per IP
+- CBS/EMR submission: 100 requests/minute per IP
+- Outbreak prediction: 100 requests/minute per IP
 
-| Code | HTTP Status | Description |
-|------|-------------|-------------|
-| `INVALID_TOKEN` | 401 | Invalid or expired access token |
-| `INSUFFICIENT_SCOPE` | 403 | Token lacks required scope |
-| `SOVEREIGNTY_VIOLATION` | 403 | Action violates data sovereignty |
-| `INVALID_LOCATION` | 400 | Location coordinates invalid |
-| `MISSING_CONSENT` | 400 | Consent token required |
-| `RATE_LIMIT_EXCEEDED` | 429 | Too many requests |
-| `FUSION_CONFLICT` | 409 | Data sources conflict |
+## Error handling
+
+All endpoints return consistent error format:
+
+```json
+{
+  "status": "error",
+  "error": "missing_consent_token",
+  "message": "Consent token required for PHI processing",
+  "code": 400,
+  "timestamp": "2025-12-23T18:00:00Z"
+}
+```
 
 ## Next steps
 
 <CardGroup cols={2}>
+  <Card
+    title="Voice processing"
+    icon="microphone"
+    href="/api-reference/voice-processing"
+  >
+    Detailed voice API documentation
+  </Card>
   <Card
     title="Golden Thread"
     icon="link"
@@ -507,20 +573,13 @@ guardrail.validate_action(
     icon="mobile"
     href="/integrations/mobile-sdks"
   >
-    Download Android/iOS SDKs
+    Download official mobile SDKs
   </Card>
   <Card
-    title="Governance"
-    icon="shield-check"
-    href="/governance/overview"
+    title="Deployment"
+    icon="rocket"
+    href="/deployment/gcp"
   >
-    Configure sovereignty rules
-  </Card>
-  <Card
-    title="API reference"
-    icon="terminal"
-    href="/api-reference/overview"
-  >
-    Complete API documentation
+    Deploy API to production
   </Card>
 </CardGroup>
