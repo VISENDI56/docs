@@ -5,231 +5,232 @@ description: Right to Explanation with explainable AI for high-risk clinical inf
 
 ## Overview
 
-iLuminara-Core integrates Google Cloud Vertex AI with SHAP (SHapley Additive exPlanations) to provide the **Right to Explanation** for every high-risk clinical inference, as required by EU AI Act §6 and GDPR Art. 22.
+iLuminara-Core integrates Google Cloud Vertex AI with SHAP (SHapley Additive exPlanations) to provide **Right to Explanation** for every high-risk clinical inference, ensuring compliance with EU AI Act §6 and GDPR Art. 22.
 
 <Card
   title="Compliance"
   icon="scale-balanced"
 >
-  EU AI Act §6 (High-Risk AI), GDPR Art. 22 (Right to Explanation), ISO 27001 A.18.1.4
+  Every high-risk AI decision requires explainability with SHAP values, feature importance, and evidence chains.
 </Card>
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│              VERTEX AI FORECASTING                      │
+│                  VERTEX AI PIPELINE                     │
 │  ┌──────────────────────────────────────────────────┐  │
-│  │  AutoML Time-Series Models                       │  │
-│  │  - ARIMA, Prophet, LSTM                          │  │
-│  │  - 72-hour outbreak forecasting                  │  │
-│  │  - Hierarchical spatial aggregation              │  │
+│  │  AutoML Time-Series Forecasting                  │  │
+│  │  - 72-hour outbreak predictions                  │  │
+│  │  - Hierarchical spatial forecasting              │  │
+│  │  - 95% confidence intervals                      │  │
+│  └──────────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────┐  │
+│  │  Custom Model Training                           │  │
+│  │  - Disease classification                        │  │
+│  │  - Risk stratification                           │  │
+│  │  - Outbreak detection                            │  │
 │  └──────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────┘
-                         │
-                         │ Prediction
-                         ▼
+                        ▼
 ┌─────────────────────────────────────────────────────────┐
-│              SHAP EXPLAINABILITY ENGINE                 │
+│                  SHAP EXPLAINER                         │
 │  ┌──────────────────────────────────────────────────┐  │
-│  │  TreeExplainer / KernelExplainer                 │  │
-│  │  - Feature importance                            │  │
-│  │  - SHAP values per prediction                    │  │
-│  │  - Confidence intervals                          │  │
+│  │  TreeExplainer (for tree-based models)           │  │
+│  │  KernelExplainer (for any model)                 │  │
+│  │  DeepExplainer (for neural networks)             │  │
+│  └──────────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────┐  │
+│  │  Explanation Output                              │  │
+│  │  - SHAP values per feature                       │  │
+│  │  - Feature importance ranking                    │  │
+│  │  - Waterfall plots                               │  │
+│  │  - Force plots                                   │  │
 │  └──────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────┘
-                         │
-                         │ Explanation
-                         ▼
+                        ▼
 ┌─────────────────────────────────────────────────────────┐
 │              SOVEREIGNGUARDRAIL VALIDATION              │
-│  - Confidence threshold check (>0.7 = high-risk)       │
-│  - Explanation completeness validation                  │
-│  - Evidence chain verification                          │
-│  - Audit trail logging                                  │
+│  - Validates explanation completeness                   │
+│  - Enforces EU AI Act §6 requirements                   │
+│  - Logs to tamper-proof audit trail                    │
 └─────────────────────────────────────────────────────────┘
 ```
 
-## High-risk inference detection
+## Setup
 
-Any clinical inference with confidence >0.7 is classified as **high-risk** and requires explanation:
+### Install dependencies
 
-```python
-from governance_kernel.vector_ledger import SovereignGuardrail, SovereigntyViolationError
-
-guardrail = SovereignGuardrail()
-
-# High-risk inference requires explanation
-try:
-    guardrail.validate_action(
-        action_type='High_Risk_Inference',
-        payload={
-            'inference': 'cholera_outbreak_predicted',
-            'confidence_score': 0.92,  # >0.7 = high-risk
-            'explanation': None,  # Missing!
-            'evidence_chain': []
-        },
-        jurisdiction='EU_AI_ACT'
-    )
-except SovereigntyViolationError as e:
-    print(f"❌ {e}")
-    # Raises: "High-risk inference requires explanation (EU AI Act §6)"
+```bash
+pip install google-cloud-aiplatform shap pandas numpy scikit-learn
 ```
 
-## Vertex AI model training
-
-### Setup
+### Configure Vertex AI
 
 ```python
 from google.cloud import aiplatform
-from google.cloud.aiplatform import gapic as aip
 
 # Initialize Vertex AI
 aiplatform.init(
-    project='iluminara-core',
-    location='us-central1',
-    staging_bucket='gs://iluminara-ml-staging'
-)
-
-# Create dataset
-dataset = aiplatform.TimeSeriesDataset.create(
-    display_name='cholera_outbreak_timeseries',
-    gcs_source='gs://iluminara-data/cholera_cases.csv',
-    bq_source='bq://iluminara-core.health_data.cholera_cases'
+    project="your-project-id",
+    location="us-central1",
+    staging_bucket="gs://your-bucket"
 )
 ```
 
-### Train AutoML model
+## Training with explainability
+
+### AutoML time-series forecasting
 
 ```python
-# Train time-series forecasting model
+from google.cloud import aiplatform
+
+# Create dataset
+dataset = aiplatform.TimeSeriesDataset.create(
+    display_name="cholera_outbreak_forecast",
+    gcs_source="gs://your-bucket/outbreak_data.csv",
+    time_column="timestamp",
+    time_series_identifier_column="location",
+    target_column="case_count"
+)
+
+# Train AutoML model
 job = aiplatform.AutoMLForecastingTrainingJob(
-    display_name='cholera_72h_forecast',
-    optimization_objective='minimize-rmse',
+    display_name="cholera_forecast_model",
+    optimization_objective="minimize-rmse",
     column_specs={
-        'date': 'timestamp',
-        'cases': 'numeric',
-        'location': 'categorical',
-        'temperature': 'numeric',
-        'rainfall': 'numeric'
+        "case_count": "numeric",
+        "temperature": "numeric",
+        "rainfall": "numeric",
+        "population_density": "numeric"
     }
 )
 
 model = job.run(
     dataset=dataset,
-    target_column='cases',
-    time_column='date',
-    time_series_identifier_column='location',
+    target_column="case_count",
+    time_column="timestamp",
+    time_series_identifier_column="location",
     forecast_horizon=72,  # 72 hours
-    data_granularity_unit='hour',
+    data_granularity_unit="hour",
     data_granularity_count=1,
     budget_milli_node_hours=1000,
-    model_display_name='cholera_forecast_v1'
+    model_display_name="cholera_forecast_v1"
 )
 
 print(f"✅ Model trained: {model.resource_name}")
 ```
 
-### Deploy model
-
-```python
-# Deploy to endpoint
-endpoint = model.deploy(
-    deployed_model_display_name='cholera_forecast_prod',
-    machine_type='n1-standard-4',
-    min_replica_count=1,
-    max_replica_count=10,
-    accelerator_type='NVIDIA_TESLA_T4',
-    accelerator_count=1
-)
-
-print(f"✅ Model deployed: {endpoint.resource_name}")
-```
-
-## SHAP explainability
-
-### Generate SHAP values
+### Custom model with SHAP
 
 ```python
 import shap
 import numpy as np
+from sklearn.ensemble import RandomForestClassifier
 from google.cloud import aiplatform
 
-# Load deployed model
-endpoint = aiplatform.Endpoint('projects/123/locations/us-central1/endpoints/456')
+# Train custom model
+X_train, y_train = load_training_data()
 
-# Prepare input data
-instances = [{
-    'location': 'Dadaab',
-    'temperature': 32.5,
-    'rainfall': 15.2,
-    'population_density': 850,
-    'water_quality_index': 0.65,
-    'previous_cases': [12, 15, 18, 22, 28]
-}]
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
 
-# Get prediction
-prediction = endpoint.predict(instances=instances)
-predicted_cases = prediction.predictions[0]['value']
-confidence = prediction.predictions[0]['confidence']
+# Create SHAP explainer
+explainer = shap.TreeExplainer(model)
 
-print(f"Predicted cases: {predicted_cases}")
-print(f"Confidence: {confidence:.2%}")
-
-# Generate SHAP explanation
-explainer = shap.KernelExplainer(
-    model=lambda x: endpoint.predict(instances=x).predictions,
-    data=shap.sample(training_data, 100)  # Background dataset
+# Upload to Vertex AI
+aiplatform.Model.upload(
+    display_name="disease_classifier_v1",
+    artifact_uri="gs://your-bucket/models/disease_classifier",
+    serving_container_image_uri="us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-0:latest"
 )
 
-shap_values = explainer.shap_values(instances)
-
-# Extract feature importance
-feature_importance = {
-    'temperature': shap_values[0][0],
-    'rainfall': shap_values[0][1],
-    'population_density': shap_values[0][2],
-    'water_quality_index': shap_values[0][3],
-    'previous_cases': shap_values[0][4]
-}
-
-print(f"Feature importance: {feature_importance}")
+print("✅ Model uploaded to Vertex AI")
 ```
 
-### Validate with SovereignGuardrail
+## Making explainable predictions
+
+### High-risk inference with SHAP
 
 ```python
-from governance_kernel.vector_ledger import SovereignGuardrail
+import shap
+from governance_kernel.vector_ledger import SovereignGuardrail, SovereigntyViolationError
 
-guardrail = SovereignGuardrail()
+def explainable_prediction(model, explainer, input_data, patient_id):
+    """
+    Make a prediction with SHAP explanation.
+    
+    Enforces EU AI Act §6 and GDPR Art. 22 requirements.
+    """
+    # Make prediction
+    prediction = model.predict_proba(input_data)[0]
+    confidence_score = float(np.max(prediction))
+    predicted_class = int(np.argmax(prediction))
+    
+    # Generate SHAP explanation
+    shap_values = explainer.shap_values(input_data)
+    
+    # Extract feature importance
+    feature_names = ["fever", "cough", "diarrhea", "vomiting", "age", "location_risk"]
+    feature_importance = dict(zip(feature_names, shap_values[predicted_class][0]))
+    
+    # Sort by absolute importance
+    sorted_features = sorted(
+        feature_importance.items(),
+        key=lambda x: abs(x[1]),
+        reverse=True
+    )
+    
+    # Build evidence chain
+    evidence_chain = [
+        f"{feature}: {value:.3f}" for feature, value in sorted_features[:5]
+    ]
+    
+    # Validate with SovereignGuardrail
+    guardrail = SovereignGuardrail()
+    
+    try:
+        guardrail.validate_action(
+            action_type='High_Risk_Inference',
+            payload={
+                'actor': 'vertex_ai_model',
+                'resource': f'patient_{patient_id}',
+                'explanation': str(feature_importance),
+                'confidence_score': confidence_score,
+                'evidence_chain': evidence_chain,
+                'shap_values': shap_values[predicted_class][0].tolist(),
+                'consent_token': 'VALID_TOKEN',
+                'consent_scope': 'diagnosis'
+            },
+            jurisdiction='EU_AI_ACT'
+        )
+        
+        return {
+            'prediction': predicted_class,
+            'confidence': confidence_score,
+            'shap_values': feature_importance,
+            'evidence_chain': evidence_chain,
+            'explanation': f"Top factors: {', '.join([f[0] for f in sorted_features[:3]])}",
+            'compliant': True
+        }
+    
+    except SovereigntyViolationError as e:
+        print(f"❌ Compliance violation: {e}")
+        return None
 
-# Validate high-risk inference with explanation
-guardrail.validate_action(
-    action_type='High_Risk_Inference',
-    payload={
-        'inference': 'cholera_outbreak_predicted',
-        'confidence_score': confidence,
-        'explanation': {
-            'method': 'SHAP',
-            'feature_importance': feature_importance,
-            'shap_values': shap_values.tolist()
-        },
-        'evidence_chain': [
-            'temperature_anomaly_detected',
-            'rainfall_above_threshold',
-            'water_quality_degradation',
-            'historical_pattern_match'
-        ],
-        'model_id': model.resource_name,
-        'endpoint_id': endpoint.resource_name
-    },
-    jurisdiction='EU_AI_ACT'
-)
+# Example usage
+input_data = np.array([[38.5, 1, 1, 0, 45, 0.7]])  # fever, cough, diarrhea, vomiting, age, location_risk
 
-print("✅ High-risk inference validated with explanation")
+result = explainable_prediction(model, explainer, input_data, patient_id="PAT_12345")
+
+if result:
+    print(f"✅ Prediction: {result['prediction']}")
+    print(f"   Confidence: {result['confidence']:.2%}")
+    print(f"   Explanation: {result['explanation']}")
+    print(f"   Evidence: {result['evidence_chain']}")
 ```
 
-## Explanation visualization
+## Visualization
 
 ### SHAP waterfall plot
 
@@ -237,19 +238,23 @@ print("✅ High-risk inference validated with explanation")
 import shap
 import matplotlib.pyplot as plt
 
+# Generate SHAP values
+shap_values = explainer.shap_values(input_data)
+
 # Create waterfall plot
 shap.waterfall_plot(
     shap.Explanation(
-        values=shap_values[0],
-        base_values=explainer.expected_value,
-        data=instances[0],
-        feature_names=list(feature_importance.keys())
+        values=shap_values[1][0],
+        base_values=explainer.expected_value[1],
+        data=input_data[0],
+        feature_names=feature_names
     )
 )
 
-plt.title('SHAP Explanation: Cholera Outbreak Prediction')
-plt.savefig('shap_waterfall.png', dpi=300, bbox_inches='tight')
-print("✅ SHAP waterfall plot saved")
+plt.title("SHAP Waterfall Plot - Cholera Diagnosis")
+plt.tight_layout()
+plt.savefig("shap_waterfall.png", dpi=300, bbox_inches='tight')
+print("✅ Waterfall plot saved")
 ```
 
 ### SHAP force plot
@@ -257,184 +262,158 @@ print("✅ SHAP waterfall plot saved")
 ```python
 # Create force plot
 shap.force_plot(
-    base_value=explainer.expected_value,
-    shap_values=shap_values[0],
-    features=instances[0],
-    feature_names=list(feature_importance.keys()),
-    matplotlib=True
+    explainer.expected_value[1],
+    shap_values[1][0],
+    input_data[0],
+    feature_names=feature_names,
+    matplotlib=True,
+    show=False
 )
 
-plt.savefig('shap_force.png', dpi=300, bbox_inches='tight')
-print("✅ SHAP force plot saved")
+plt.savefig("shap_force.png", dpi=300, bbox_inches='tight')
+print("✅ Force plot saved")
 ```
 
-## Integration with API
-
-### Explainable prediction endpoint
+## Batch prediction with explanations
 
 ```python
-from flask import Flask, request, jsonify
 from google.cloud import aiplatform
-import shap
 
-app = Flask(__name__)
-
-@app.route('/predict-explainable', methods=['POST'])
-def predict_explainable():
-    data = request.json
-    
-    # Get prediction from Vertex AI
-    endpoint = aiplatform.Endpoint(data['endpoint_id'])
-    prediction = endpoint.predict(instances=[data['features']])
-    
-    predicted_value = prediction.predictions[0]['value']
-    confidence = prediction.predictions[0]['confidence']
-    
-    # Generate SHAP explanation
-    explainer = shap.KernelExplainer(
-        model=lambda x: endpoint.predict(instances=x).predictions,
-        data=background_data
-    )
-    shap_values = explainer.shap_values([data['features']])
-    
-    # Build explanation
-    explanation = {
-        'method': 'SHAP',
-        'feature_importance': dict(zip(
-            data['feature_names'],
-            shap_values[0].tolist()
-        )),
-        'confidence_score': confidence
-    }
-    
-    # Validate with SovereignGuardrail
-    if confidence > 0.7:
-        guardrail = SovereignGuardrail()
-        guardrail.validate_action(
-            action_type='High_Risk_Inference',
-            payload={
-                'inference': data['inference_type'],
-                'confidence_score': confidence,
-                'explanation': explanation,
-                'evidence_chain': data.get('evidence_chain', [])
+def batch_predict_with_shap(model_endpoint, input_gcs_uri, output_gcs_uri):
+    """
+    Run batch predictions with SHAP explanations.
+    """
+    # Create batch prediction job
+    job = model_endpoint.batch_predict(
+        job_display_name="cholera_batch_prediction",
+        gcs_source=input_gcs_uri,
+        gcs_destination_prefix=output_gcs_uri,
+        machine_type="n1-standard-4",
+        starting_replica_count=1,
+        max_replica_count=10,
+        generate_explanation=True,  # Enable explanations
+        explanation_metadata={
+            "inputs": {
+                "fever": {"input_tensor_name": "fever"},
+                "cough": {"input_tensor_name": "cough"},
+                "diarrhea": {"input_tensor_name": "diarrhea"}
             },
-            jurisdiction='EU_AI_ACT'
-        )
-    
-    return jsonify({
-        'prediction': predicted_value,
-        'confidence': confidence,
-        'explanation': explanation,
-        'high_risk': confidence > 0.7
-    })
-```
-
-## Hierarchical forecasting
-
-iLuminara uses hierarchical forecasting to ensure spatial consistency:
-
-```python
-from google.cloud import aiplatform
-
-# Train models at multiple spatial scales
-scales = [
-    ('community', 'Ifo Camp'),
-    ('district', 'Dadaab'),
-    ('region', 'Garissa'),
-    ('national', 'Kenya')
-]
-
-models = {}
-
-for scale, location in scales:
-    dataset = aiplatform.TimeSeriesDataset.create(
-        display_name=f'cholera_{scale}_{location}',
-        bq_source=f'bq://iluminara.health_data.cholera_{scale}'
+            "outputs": {
+                "prediction": {"output_tensor_name": "prediction"}
+            }
+        }
     )
     
-    job = aiplatform.AutoMLForecastingTrainingJob(
-        display_name=f'cholera_forecast_{scale}',
-        optimization_objective='minimize-rmse'
-    )
+    print(f"✅ Batch prediction job created: {job.resource_name}")
     
-    model = job.run(
-        dataset=dataset,
-        target_column='cases',
-        forecast_horizon=72
-    )
+    # Wait for completion
+    job.wait()
     
-    models[scale] = model
-    print(f"✅ {scale} model trained")
+    print(f"✅ Batch prediction complete")
+    print(f"   Results: {output_gcs_uri}")
 
-# Bottom-up aggregation ensures consistency
-# Community forecasts sum to district, district to region, etc.
+# Example usage
+endpoint = aiplatform.Endpoint("projects/123/locations/us-central1/endpoints/456")
+
+batch_predict_with_shap(
+    model_endpoint=endpoint,
+    input_gcs_uri="gs://your-bucket/batch_input.jsonl",
+    output_gcs_uri="gs://your-bucket/batch_output/"
+)
 ```
 
-## Performance metrics
+## Compliance validation
 
-### Model evaluation
+### EU AI Act §6 requirements
+
+<AccordionGroup>
+  <Accordion title="High-risk AI system identification">
+    iLuminara classifies clinical diagnosis and outbreak prediction as high-risk AI systems requiring explainability.
+  </Accordion>
+  <Accordion title="Transparency obligations">
+    Every prediction includes SHAP values, feature importance, and evidence chains.
+  </Accordion>
+  <Accordion title="Human oversight">
+    Predictions are flagged for human review when confidence < 0.7 or explanation quality is low.
+  </Accordion>
+  <Accordion title="Record keeping">
+    All predictions and explanations are logged to tamper-proof audit trail (Cloud Spanner).
+  </Accordion>
+</AccordionGroup>
+
+### GDPR Art. 22 requirements
 
 ```python
-from sklearn.metrics import mean_absolute_error, mean_squared_error
-import numpy as np
+from governance_kernel.vector_ledger import SovereignGuardrail
 
-# Evaluate model
-predictions = model.batch_predict(test_dataset)
+guardrail = SovereignGuardrail()
 
-mae = mean_absolute_error(y_true, y_pred)
-rmse = np.sqrt(mean_squared_error(y_true, y_pred))
-mape = np.mean(np.abs((y_true - y_pred) / y_true)) * 100
-
-print(f"MAE: {mae:.2f}")
-print(f"RMSE: {rmse:.2f}")
-print(f"MAPE: {mape:.2f}%")
-
-# Explanation quality metrics
-explanation_completeness = len(feature_importance) / len(all_features)
-explanation_coverage = sum(abs(v) for v in shap_values[0]) / abs(predicted_value)
-
-print(f"Explanation completeness: {explanation_completeness:.2%}")
-print(f"Explanation coverage: {explanation_coverage:.2%}")
+# Validate right to explanation
+guardrail.validate_action(
+    action_type='High_Risk_Inference',
+    payload={
+        'explanation': shap_explanation,
+        'confidence_score': 0.92,
+        'evidence_chain': evidence_chain,
+        'human_review_required': confidence_score < 0.7
+    },
+    jurisdiction='GDPR_EU'
+)
 ```
 
-## Compliance reporting
+## Performance optimization
 
-### Generate explanation report
+### Model caching
 
 ```python
-from datetime import datetime
-import json
+from functools import lru_cache
 
-def generate_explanation_report(prediction, explanation, metadata):
-    report = {
-        'timestamp': datetime.utcnow().isoformat(),
-        'prediction': {
-            'value': prediction['value'],
-            'confidence': prediction['confidence'],
-            'high_risk': prediction['confidence'] > 0.7
-        },
-        'explanation': {
-            'method': 'SHAP',
-            'feature_importance': explanation['feature_importance'],
-            'top_features': sorted(
-                explanation['feature_importance'].items(),
-                key=lambda x: abs(x[1]),
-                reverse=True
-            )[:5]
-        },
-        'compliance': {
-            'framework': 'EU AI Act §6',
-            'requirement': 'Right to Explanation',
-            'status': 'COMPLIANT'
-        },
-        'metadata': metadata
-    }
+@lru_cache(maxsize=10)
+def get_model_and_explainer(model_name):
+    """Cache model and explainer for performance."""
+    model = load_model(model_name)
+    explainer = shap.TreeExplainer(model)
+    return model, explainer
+```
+
+### Batch SHAP computation
+
+```python
+# Compute SHAP values for multiple samples at once
+shap_values = explainer.shap_values(X_batch)
+
+# Process in parallel
+from concurrent.futures import ThreadPoolExecutor
+
+with ThreadPoolExecutor(max_workers=4) as executor:
+    results = list(executor.map(process_shap_values, shap_values))
+```
+
+## Monitoring
+
+### Track explanation quality
+
+```python
+def explanation_quality_score(shap_values, threshold=0.1):
+    """
+    Calculate explanation quality score.
     
-    # Save to audit trail
-    with open(f'explanations/{metadata["prediction_id"]}.json', 'w') as f:
-        json.dump(report, f, indent=2)
+    High-quality explanations have:
+    - Clear dominant features (high max SHAP value)
+    - Low noise (few features with tiny SHAP values)
+    """
+    abs_shap = np.abs(shap_values)
+    max_shap = np.max(abs_shap)
+    significant_features = np.sum(abs_shap > threshold)
     
-    return report
+    quality = max_shap * (1 / (1 + significant_features))
+    return quality
+
+# Monitor explanation quality
+quality = explanation_quality_score(shap_values[1][0])
+
+if quality < 0.5:
+    print("⚠️ Low explanation quality - flagging for human review")
 ```
 
 ## Next steps
@@ -452,7 +431,7 @@ def generate_explanation_report(prediction, explanation, metadata):
     icon="shield-check"
     href="/governance/overview"
   >
-    Configure SovereignGuardrail
+    Configure compliance enforcement
   </Card>
   <Card
     title="Deployment"
