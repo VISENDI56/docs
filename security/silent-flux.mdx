@@ -1,0 +1,369 @@
+---
+title: Silent Flux (IP-04)
+description: Adaptive Serenity Flow - Anxiety-regulated AI output that prevents information overload
+---
+
+## Overview
+
+Silent Flux (IP-04) is iLuminara's **Adaptive Serenity Flow (ASF)** engine that transforms AI from a "data firehose" to a "cognitive dampener." It actively manages information entropy to match the user's emotional bandwidth.
+
+<Card
+  title="Philosophy"
+  icon="brain"
+>
+  "The AI that knows when to whisper."
+</Card>
+
+## The three pillars
+
+<CardGroup cols={3}>
+  <Card title="Empathy loop" icon="heart-pulse">
+    Processes HOW you interact, not just WHAT you say
+  </Card>
+  <Card title="Cognitive load balancing" icon="scale-balanced">
+    Adjusts information entropy to match emotional bandwidth
+  </Card>
+  <Card title="Anti-paternalism protocol" icon="hand">
+    User sees regulation and can override instantly
+  </Card>
+</CardGroup>
+
+## How it works
+
+### Somatic inference
+
+Silent Flux detects "tremors" in digital behavior as proxies for anxiety:
+
+| Signal | Calm State | Anxious State |
+|--------|-----------|---------------|
+| **Typing speed** | 150-200 CPM | 400+ CPM |
+| **Error rate** | <5% | >15% |
+| **Scroll velocity** | 10-20 px/s | 100+ px/s |
+| **Heart rate** | 60-80 bpm | 100+ bpm |
+| **Pause duration** | 5+ seconds | <1 second |
+
+### Entropy regulation
+
+The system calculates cognitive load of outgoing text and adjusts based on anxiety:
+
+```python
+from edge_node.silent_flux.adaptive_serenity_flow import AdaptiveSerenityFlow, InteractionMetrics
+
+asf = AdaptiveSerenityFlow()
+
+# User interaction metrics
+metrics = InteractionMetrics(
+    timestamp=time.time(),
+    typing_speed_cpm=550,   # Fast typing
+    error_rate=0.18,        # High errors
+    scroll_velocity=150.0,  # Frantic scrolling
+    session_duration=1200,
+    biometric_hr=110        # Elevated heart rate
+)
+
+# Infer anxiety
+anxiety_score = asf.infer_anxiety(metrics)  # Returns 0.0-1.0
+
+# Regulate output
+dense_report = "The epidemiological vector analysis indicates..."
+regulated = asf.regulate_output(dense_report)
+
+print(f"Mode: {regulated['mode']}")  # ZEN, FLOW, or RAW
+print(f"Text: {regulated['text']}")
+```
+
+## The three modes
+
+### ZEN mode (High anxiety > 0.7)
+
+**Goal:** Reduce cognitive load immediately. Summarize & pause.
+
+**Output:**
+```
+**Key Insight:** The epidemiological vector analysis indicates 
+a stochastic surge in R0 values...
+
+*[System: Taking a beat. You seem busy. Complex details folded below.]*
+
+📋 **Expand for Full Details** (87 words)
+🌊 *Flux Level: HIGH* (Anxiety: 0.82)
+```
+
+**Features:**
+- Extracts key insight (first sentence + urgency markers)
+- Folds full details (never deletes)
+- Shows transparency indicator
+- User can expand at any time
+
+### FLOW mode (Medium anxiety 0.4-0.7)
+
+**Goal:** Chunking. Don't remove info, but structure it for rhythm.
+
+**Output:**
+```
+• The epidemiological vector analysis indicates a stochastic 
+  surge in R0 values correlated with spatiotemporal clustering.
+
+• We advise immediate quarantine protocols involving negative 
+  pressure isolation.
+
+• Rigorous contact tracing heuristic applying Bayesian updates 
+  to 2nd degree nodes.
+
+🌊 *Flux Level: MEDIUM* (Anxiety: 0.55)
+```
+
+**Features:**
+- Semantic chunking (not arbitrary character limits)
+- Bullet points for visual rhythm
+- Preserves all information
+- Easier to scan and digest
+
+### RAW mode (Low anxiety < 0.4)
+
+**Goal:** High bandwidth efficiency.
+
+**Output:**
+```
+The epidemiological vector analysis indicates a stochastic surge 
+in R0 values correlated with the spatiotemporal clustering of 
+sub-variants in Sector 7. We advise immediate quarantine protocols 
+involving negative pressure isolation and a rigorous contact 
+tracing heuristic applying Bayesian updates to 2nd degree nodes.
+```
+
+**Features:**
+- Full density output
+- No simplification
+- Maximum information throughput
+
+## Anti-paternalism protocol
+
+Silent Flux **never** deletes information. It only folds it. Users retain the right to be overwhelmed if they choose.
+
+### User override
+
+```python
+# User can always request full density
+regulated = asf.regulate_output(dense_report, override=True)
+
+print(regulated['mode'])  # "OVERRIDE"
+print(regulated['meta'])  # "User requested full density."
+```
+
+### Transparency report
+
+```python
+report = asf.get_transparency_report()
+print(report)
+```
+
+**Output:**
+```
+[SILENT FLUX SYSTEM]
+Current Anxiety Index: 0.82
+Regulation Strategy: Overload Risk Detected
+Agency: Overrides are Enabled
+Transparency: Visible
+```
+
+## Configuration
+
+Users can customize their experience:
+
+```python
+from edge_node.silent_flux.adaptive_serenity_flow import SerenityConfig
+
+config = SerenityConfig(
+    baseline_anxiety=0.2,        # Default calmness
+    sensitivity=1.0,             # Signal detection multiplier
+    allow_simplification=True,   # Enable regulation
+    show_transparency=True,      # Show flux indicators
+    zen_threshold=0.7,           # High anxiety threshold
+    flow_threshold=0.4           # Medium anxiety threshold
+)
+
+asf = AdaptiveSerenityFlow(config=config)
+```
+
+## Integration with iLuminara
+
+### API middleware
+
+```python
+from edge_node.silent_flux.adaptive_serenity_flow import SilentFluxMiddleware
+
+middleware = SilentFluxMiddleware()
+
+# Process API response
+regulated = middleware.process_response(
+    user_id="CHV_AMINA_HASSAN",
+    raw_response=api_response,
+    metrics=interaction_metrics,
+    override=False
+)
+
+# Return regulated response
+return regulated['text']
+```
+
+### Dashboard integration
+
+Silent Flux integrates with the iLuminara dashboard to show real-time anxiety monitoring:
+
+```python
+# Get anxiety history for visualization
+history = asf.get_anxiety_history(limit=50)
+
+# Plot anxiety trajectory
+timestamps = [h['timestamp'] for h in history]
+scores = [h['anxiety_score'] for h in history]
+
+plt.plot(timestamps, scores)
+plt.title("User Anxiety Trajectory")
+plt.xlabel("Time")
+plt.ylabel("Anxiety Score")
+```
+
+## Calibration
+
+Silent Flux learns from user behavior over time:
+
+```python
+# Collect session metrics
+session_metrics = [
+    InteractionMetrics(...),
+    InteractionMetrics(...),
+    # ... more interactions
+]
+
+# Calibrate inference engine
+asf.calibrate_from_session(session_metrics)
+```
+
+**Calibration improves:**
+- Personalized anxiety detection
+- Reduced false positives
+- Better mode selection
+
+## Use cases
+
+### Emergency response
+
+During outbreak emergencies, CHWs are under extreme stress. Silent Flux automatically simplifies complex epidemiological reports:
+
+**Before Silent Flux:**
+```
+The epidemiological vector analysis indicates a stochastic surge 
+in R0 values correlated with the spatiotemporal clustering of 
+sub-variants in Sector 7. We advise immediate quarantine protocols 
+involving negative pressure isolation and a rigorous contact 
+tracing heuristic applying Bayesian updates to 2nd degree nodes.
+```
+
+**After Silent Flux (ZEN mode):**
+```
+**Key Insight:** Outbreak detected in Sector 7. Immediate 
+quarantine required.
+
+*[System: Taking a beat. Complex details available below.]*
+
+📋 **Expand for Full Details**
+```
+
+### Training mode
+
+New users learning the system benefit from FLOW mode's structured output:
+
+```python
+# Configure for training
+config = SerenityConfig(
+    flow_threshold=0.2,  # Lower threshold = more chunking
+    show_transparency=True
+)
+```
+
+### Expert mode
+
+Experienced epidemiologists can disable regulation:
+
+```python
+config = SerenityConfig(
+    allow_simplification=False,  # Always RAW mode
+    show_transparency=False
+)
+```
+
+## Performance
+
+- **Inference latency:** <10ms per interaction
+- **Memory footprint:** ~2MB (GaussianNB model)
+- **Edge-native:** Runs on refugee camp laptops
+- **Offline-capable:** No cloud dependency
+
+## Compliance
+
+Silent Flux enforces humanitarian constraints:
+
+| Framework | Compliance |
+|-----------|-----------|
+| **WHO IHR Article 6** | Emergency response without cognitive overload |
+| **Geneva Convention Article 3** | Humanitarian treatment (do no harm) |
+| **UN Humanitarian Principles** | Dignity-preserving information delivery |
+
+## Visualization
+
+Silent Flux provides real-time visualization of anxiety regulation:
+
+```python
+# Run demo
+python edge_node/silent_flux/adaptive_serenity_flow.py
+```
+
+**Output:**
+- Anxiety trajectory plot
+- Complexity dampening visualization
+- Mode transition timeline
+
+## Testing
+
+```bash
+# Run Silent Flux tests
+python tests/test_silent_flux.py
+
+# Run demo scenarios
+python examples/silent_flux_demo.py
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Acorn Protocol (IP-03)"
+    icon="fingerprint"
+    href="/security/acorn-protocol"
+  >
+    Somatic authentication integration
+  </Card>
+  <Card
+    title="Golden Thread (IP-05)"
+    icon="link"
+    href="/architecture/golden-thread"
+  >
+    Data fusion with anxiety context
+  </Card>
+  <Card
+    title="AI agents"
+    icon="brain-circuit"
+    href="/ai-agents/overview"
+  >
+    Integrate Silent Flux with agents
+  </Card>
+  <Card
+    title="API integration"
+    icon="plug"
+    href="/api-reference/overview"
+  >
+    Add Silent Flux to API responses
+  </Card>
+</CardGroup>
