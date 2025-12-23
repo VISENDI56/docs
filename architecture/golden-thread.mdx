@@ -109,33 +109,61 @@ entropy = -np.sum(evals * np.log(evals))
 | 0.4-0.6 | POSSIBLE | Weak correlation, high noise |
 | < 0.4 | UNVERIFIED | Destructive interference dominates |
 
-## Basic usage
+## Basic usage with ECF
 
 ```python
-from edge_node.sync_protocol.golden_thread import GoldenThread
+from edge_node.sync_protocol.golden_thread_ecf import GoldenThreadECF
 
-gt = GoldenThread()
+# Initialize with ECF enabled
+gt = GoldenThreadECF(feature_dimension=8, enable_ecf=True)
 
-# Merge EMR and CBS signals
-fused = gt.fuse_data_streams(
-    cbs_signal={
-        'location': 'Nairobi',
-        'symptom': 'fever',
-        'timestamp': '2025-01-10T10:00Z'
-    },
-    emr_record={
-        'location': 'Nairobi',
-        'diagnosis': 'malaria',
-        'timestamp': '2025-01-10T09:45Z'
-    },
-    patient_id='PATIENT_12345'
+# Ingest CBS signal (Community Health Volunteer)
+gt.ingest_cbs_signal(
+    patient_id="PAT_001",
+    timestamp=10.0,
+    location=(-1.2, 36.8),
+    symptoms=["fever", "cough", "fatigue"],
+    confidence=0.5,
+    metadata={"chv_name": "Amina Hassan"}
 )
 
-# Check verification score
-print(f"Verification Score: {fused.verification_score}")  # 1.0 (CONFIRMED)
+# Ingest EMR record (Clinic diagnosis)
+gt.ingest_emr_record(
+    patient_id="PAT_001",
+    timestamp=10.5,
+    location=(-1.21, 36.81),
+    diagnosis="malaria",
+    symptoms=["fever", "headache", "fatigue"],
+    confidence=0.8,
+    metadata={"clinic": "Dadaab Primary Health Center"}
+)
 
-# View fused record
-print(fused.to_dict())
+# Perform ECF fusion
+record = gt.fuse_and_verify()
+
+# View results
+print(f"Verification Score: {record.verification_score:.3f}")
+print(f"Coherence Strength: {record.coherence_strength:.3f}")
+print(f"System Entropy: {record.system_entropy:.3f} nats")
+print(f"Timeline Valid: {record.timeline_valid}")
+print(f"Symptoms: {', '.join(record.symptoms)}")
+```
+
+### Output
+
+```
+[ECF] 🌌 Initiating Entanglement Fusion...
+      System Entropy (Von Neumann): 0.6931 nats
+      Coherence Strength (λ₁): 0.8542
+      Signal abc123: 0.500 → 0.927 (Δ=+0.427)
+      Signal def456: 0.800 → 0.985 (Δ=+0.185)
+[ECF] Timeline Status: CONVERGING ✓ (ΔS: -0.1234)
+
+Verification Score: 0.854
+Coherence Strength: 0.854
+System Entropy: 0.693 nats
+Timeline Valid: True
+Symptoms: fever, cough, fatigue, headache
 ```
 
 ## The 6-month rule
