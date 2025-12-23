@@ -1,0 +1,594 @@
+---
+title: Deployment checklist
+description: Complete checklist for deploying the Sovereign Health Fortress
+---
+
+## Overview
+
+This comprehensive checklist ensures all components of the iLuminara-Core Sovereign Health Fortress are properly deployed and validated.
+
+<Card
+  title="Deployment Philosophy"
+  icon="list-check"
+>
+  "The Fortress is not built in a day. It is assembled with precision, validated continuously, and attested cryptographically."
+</Card>
+
+## Pre-deployment checklist
+
+### Infrastructure requirements
+
+<Steps>
+  <Step title="Hardware">
+    - [ ] Edge devices: NVIDIA Jetson Orin or equivalent (for edge deployment)
+    - [ ] Minimum 8GB RAM, 4 CPU cores
+    - [ ] 100GB storage (SSD recommended)
+    - [ ] Network connectivity (intermittent acceptable)
+  </Step>
+  <Step title="Cloud resources">
+    - [ ] Google Cloud Platform project created
+    - [ ] Billing enabled
+    - [ ] APIs enabled: Cloud Run, Vertex AI, BigQuery, Spanner, KMS
+    - [ ] Service accounts configured with appropriate IAM roles
+  </Step>
+  <Step title="Development environment">
+    - [ ] Python 3.8+ installed
+    - [ ] Git installed and configured
+    - [ ] GitHub CLI (`gh`) installed
+    - [ ] Docker installed (optional, for containerized deployment)
+  </Step>
+</Steps>
+
+### Access and permissions
+
+- [ ] GitHub repository access (write permissions)
+- [ ] GCP project owner or editor role
+- [ ] API keys generated for external services
+- [ ] SSL/TLS certificates obtained (for production)
+
+---
+
+## Phase 1: Security audit layer
+
+### GitHub security configuration
+
+- [ ] **Elevate permissions**
+  ```bash
+  gh auth refresh -s workflow,repo,write:packages,admin:repo_hook
+  ```
+
+- [ ] **Enable branch protection**
+  - [ ] Require pull request reviews (minimum 1 approval)
+  - [ ] Require status checks: CodeQL, Gitleaks
+  - [ ] Require branches to be up to date
+  - [ ] Include administrators in restrictions
+
+- [ ] **Enable security features**
+  - [ ] Dependabot alerts enabled
+  - [ ] Dependabot security updates enabled
+  - [ ] Secret scanning enabled
+  - [ ] Secret scanning push protection enabled
+
+### Deploy security workflows
+
+- [ ] **Copy workflow files**
+  - [ ] `.github/workflows/codeql.yml`
+  - [ ] `.github/workflows/gitleaks.yml`
+  - [ ] `.github/dependabot.yml`
+  - [ ] `.gitleaks.toml`
+
+- [ ] **Commit and push**
+  ```bash
+  git add .github/
+  git commit -m "feat: integrate security workflows"
+  git push origin main
+  ```
+
+- [ ] **Verify workflows**
+  - [ ] CodeQL workflow runs successfully
+  - [ ] Gitleaks workflow runs successfully
+  - [ ] No critical vulnerabilities detected
+
+---
+
+## Phase 2: Governance kernel
+
+### Deploy Crypto Shredder (IP-02)
+
+- [ ] **Copy Crypto Shredder**
+  ```bash
+  cp crypto_shredder.py governance_kernel/
+  ```
+
+- [ ] **Install dependencies**
+  ```bash
+  pip install cryptography>=41.0.0
+  ```
+
+- [ ] **Test Crypto Shredder**
+  ```bash
+  python governance_kernel/crypto_shredder.py
+  ```
+  - [ ] Encryption works
+  - [ ] Decryption works
+  - [ ] Key shredding works
+  - [ ] Decryption after shred fails (expected)
+
+### Configure SovereignGuardrail
+
+- [ ] **Copy configuration**
+  ```bash
+  cp sovereign_guardrail.yaml config/
+  ```
+
+- [ ] **Edit configuration**
+  - [ ] Set primary jurisdiction
+  - [ ] Configure allowed sovereignty zones
+  - [ ] Set retention policies
+  - [ ] Enable tamper-proof audit
+  - [ ] Configure notification channels
+
+- [ ] **Test SovereignGuardrail**
+  ```python
+  from governance_kernel.vector_ledger import SovereignGuardrail
+  guardrail = SovereignGuardrail()
+  # Test validation logic
+  ```
+
+### Deploy Ethical Engine
+
+- [ ] **Verify Ethical Engine exists**
+  ```bash
+  ls governance_kernel/ethical_engine.py
+  ```
+
+- [ ] **Test humanitarian constraints**
+  ```python
+  from governance_kernel.ethical_engine import EthicalEngine
+  engine = EthicalEngine()
+  # Test constraint validation
+  ```
+
+---
+
+## Phase 3: Edge node deployment
+
+### FRENASA Engine
+
+- [ ] **Verify FRENASA Engine**
+  ```bash
+  ls edge_node/frenasa_engine/
+  ```
+
+- [ ] **Test voice processing**
+  ```bash
+  python generate_test_audio.py
+  python edge_node/frenasa_engine/voice_processor.py
+  ```
+
+### AI Agents
+
+- [ ] **Deploy AI agents**
+  - [ ] Epidemiological forecasting agent
+  - [ ] Spatiotemporal analysis agent
+  - [ ] Early warning system agent
+  - [ ] Agent orchestrator
+
+- [ ] **Test offline operation**
+  ```python
+  from edge_node.ai_agents import OfflineAgent
+  agent = OfflineAgent(name="Test Agent")
+  # Test queue and sync
+  ```
+
+- [ ] **Test federated learning**
+  ```python
+  from edge_node.ai_agents import FederatedLearningClient
+  client = FederatedLearningClient(name="Test Client")
+  # Test privacy-preserving training
+  ```
+
+### Golden Thread (IP-05)
+
+- [ ] **Verify Golden Thread**
+  ```bash
+  ls edge_node/sync_protocol/
+  ```
+
+- [ ] **Test data fusion**
+  ```python
+  from edge_node.sync_protocol.golden_thread import GoldenThread
+  gt = GoldenThread()
+  # Test CBS + EMR fusion
+  ```
+
+---
+
+## Phase 4: Cloud oracle deployment
+
+### Google Cloud Platform setup
+
+- [ ] **Enable required APIs**
+  ```bash
+  gcloud services enable run.googleapis.com
+  gcloud services enable aiplatform.googleapis.com
+  gcloud services enable bigquery.googleapis.com
+  gcloud services enable spanner.googleapis.com
+  gcloud services enable cloudkms.googleapis.com
+  ```
+
+- [ ] **Create service accounts**
+  ```bash
+  gcloud iam service-accounts create iluminara-sa \
+    --display-name="iLuminara Service Account"
+  ```
+
+- [ ] **Grant IAM roles**
+  - [ ] Cloud Run Admin
+  - [ ] Vertex AI User
+  - [ ] BigQuery Admin
+  - [ ] Spanner Admin
+  - [ ] Cloud KMS Admin
+
+### Deploy services
+
+- [ ] **Deploy FRENASA Engine to Cloud Run**
+  ```bash
+  gcloud run deploy frenasa-engine \
+    --source . \
+    --region africa-south1 \
+    --allow-unauthenticated
+  ```
+
+- [ ] **Deploy Dashboard to Cloud Run**
+  ```bash
+  gcloud run deploy dashboard \
+    --source . \
+    --region africa-south1 \
+    --allow-unauthenticated
+  ```
+
+- [ ] **Set up Vertex AI models**
+  - [ ] Upload outbreak prediction model
+  - [ ] Configure explainability (SHAP)
+  - [ ] Test predictions
+
+- [ ] **Create BigQuery datasets**
+  ```bash
+  bq mk --dataset iluminara_data
+  bq mk --table iluminara_data.health_reports schema.json
+  ```
+
+- [ ] **Create Spanner instance**
+  ```bash
+  gcloud spanner instances create iluminara-audit \
+    --config=regional-africa-south1 \
+    --nodes=1
+  ```
+
+---
+
+## Phase 5: Environment configuration
+
+### Set environment variables
+
+- [ ] **Create `.env` file**
+  ```bash
+  # Node identification
+  NODE_ID=JOR-47
+  JURISDICTION=KDPA_KE
+  
+  # API configuration
+  API_HOST=0.0.0.0
+  API_PORT=8080
+  
+  # GCP configuration
+  GOOGLE_CLOUD_PROJECT=your-project-id
+  GCP_REGION=africa-south1
+  
+  # Governance settings
+  ENABLE_TAMPER_PROOF_AUDIT=true
+  RETENTION_MAX_DAYS=1825
+  DATA_SOVEREIGNTY_REQUIRED=true
+  ```
+
+- [ ] **Load environment**
+  ```bash
+  source .env
+  ```
+
+- [ ] **Verify environment**
+  ```bash
+  echo $NODE_ID
+  echo $JURISDICTION
+  echo $GOOGLE_CLOUD_PROJECT
+  ```
+
+---
+
+## Phase 6: Validation
+
+### Run fortress validation
+
+- [ ] **Copy validation script**
+  ```bash
+  cp validate_fortress.sh scripts/
+  chmod +x scripts/validate_fortress.sh
+  ```
+
+- [ ] **Run validation**
+  ```bash
+  ./scripts/validate_fortress.sh
+  ```
+
+- [ ] **Verify all phases pass**
+  - [ ] Phase 1: Security Audit Layer
+  - [ ] Phase 2: Governance Kernel
+  - [ ] Phase 3: Edge Node & AI Agents
+  - [ ] Phase 4: Cloud Oracle
+  - [ ] Phase 5: Python Dependencies
+  - [ ] Phase 6: Environment Configuration
+  - [ ] Phase 7: Nuclear IP Stack Status
+
+### Test core functionality
+
+- [ ] **Test API endpoints**
+  ```bash
+  curl http://localhost:8080/health
+  curl -X POST http://localhost:8080/process-voice --data-binary @test.wav
+  curl -X POST http://localhost:8080/predict -d '{"location": {...}}'
+  ```
+
+- [ ] **Test dashboards**
+  - [ ] Command Console: http://localhost:8501
+  - [ ] Transparency Audit: http://localhost:8502
+  - [ ] Field Validation: http://localhost:8503
+
+- [ ] **Test offline operation**
+  - [ ] Disconnect network
+  - [ ] Queue operations
+  - [ ] Reconnect network
+  - [ ] Verify sync
+
+---
+
+## Phase 7: Monitoring and observability
+
+### Set up monitoring
+
+- [ ] **Deploy Prometheus**
+  ```bash
+  docker run -d -p 9090:9090 prom/prometheus
+  ```
+
+- [ ] **Deploy Grafana**
+  ```bash
+  docker run -d -p 3000:3000 grafana/grafana
+  ```
+
+- [ ] **Configure dashboards**
+  - [ ] Sovereignty Compliance dashboard
+  - [ ] Audit Trail dashboard
+  - [ ] Data Retention dashboard
+
+### Configure alerts
+
+- [ ] **Set up PubSub topics**
+  ```bash
+  gcloud pubsub topics create sovereignty-violations
+  gcloud pubsub topics create high-risk-inferences
+  ```
+
+- [ ] **Configure notification channels**
+  - [ ] Email notifications
+  - [ ] Slack webhooks
+  - [ ] PagerDuty integration
+
+---
+
+## Phase 8: Production readiness
+
+### Security hardening
+
+- [ ] **Enable TLS/SSL**
+  - [ ] Obtain SSL certificates
+  - [ ] Configure HTTPS endpoints
+  - [ ] Redirect HTTP to HTTPS
+
+- [ ] **Configure firewalls**
+  - [ ] Restrict API access to known IPs
+  - [ ] Enable DDoS protection
+  - [ ] Configure rate limiting
+
+- [ ] **Rotate secrets**
+  - [ ] Generate new API keys
+  - [ ] Rotate service account keys
+  - [ ] Update environment variables
+
+### Compliance validation
+
+- [ ] **Run compliance audit**
+  - [ ] GDPR compliance check
+  - [ ] HIPAA compliance check
+  - [ ] KDPA compliance check
+  - [ ] ISO 27001 compliance check
+
+- [ ] **Generate compliance reports**
+  ```bash
+  python scripts/generate_compliance_report.py
+  ```
+
+### Documentation
+
+- [ ] **Update README.md**
+  - [ ] Deployment instructions
+  - [ ] Configuration guide
+  - [ ] Troubleshooting section
+
+- [ ] **Create runbooks**
+  - [ ] Incident response procedures
+  - [ ] Disaster recovery plan
+  - [ ] Backup and restore procedures
+
+---
+
+## Phase 9: Training and handoff
+
+### Operator training
+
+- [ ] **Conduct war room demo**
+  ```bash
+  ./launch_war_room.sh
+  ```
+  - [ ] Show online status
+  - [ ] Disconnect WiFi (offline operation)
+  - [ ] Generate outbreak simulation
+  - [ ] Observe real-time response
+
+- [ ] **Train on dashboards**
+  - [ ] Command Console navigation
+  - [ ] Transparency Audit interpretation
+  - [ ] Field Validation workflows
+
+- [ ] **Train on API usage**
+  - [ ] Submit health reports
+  - [ ] Process voice alerts
+  - [ ] Query outbreak predictions
+
+### Handoff documentation
+
+- [ ] **Create operator manual**
+  - [ ] Daily operations checklist
+  - [ ] Common troubleshooting scenarios
+  - [ ] Emergency contact information
+
+- [ ] **Create technical documentation**
+  - [ ] Architecture diagrams
+  - [ ] API reference
+  - [ ] Database schemas
+
+---
+
+## Post-deployment checklist
+
+### Week 1
+
+- [ ] Monitor system health daily
+- [ ] Review security alerts
+- [ ] Validate data sovereignty compliance
+- [ ] Check audit trail integrity
+
+### Week 2-4
+
+- [ ] Conduct disaster recovery drill
+- [ ] Review and optimize performance
+- [ ] Gather operator feedback
+- [ ] Update documentation based on learnings
+
+### Monthly
+
+- [ ] Review compliance reports
+- [ ] Rotate credentials
+- [ ] Update dependencies (Dependabot PRs)
+- [ ] Conduct security audit
+
+---
+
+## Success criteria
+
+<AccordionGroup>
+  <Accordion title="Security">
+    - ✅ All security workflows passing
+    - ✅ No critical vulnerabilities detected
+    - ✅ Branch protection enforced
+    - ✅ Secret scanning active
+  </Accordion>
+  <Accordion title="Governance">
+    - ✅ SovereignGuardrail operational
+    - ✅ Crypto Shredder functional
+    - ✅ Tamper-proof audit enabled
+    - ✅ Compliance validated
+  </Accordion>
+  <Accordion title="Functionality">
+    - ✅ All API endpoints responding
+    - ✅ Dashboards accessible
+    - ✅ Offline operation working
+    - ✅ Data fusion verified
+  </Accordion>
+  <Accordion title="Performance">
+    - ✅ API latency <500ms
+    - ✅ Dashboard load time <2s
+    - ✅ Sync latency <5s
+    - ✅ 99.9% uptime
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Troubleshooting
+
+### Common issues
+
+<AccordionGroup>
+  <Accordion title="CodeQL workflow fails">
+    **Solution:** Ensure Python files exist and workflow configuration is correct
+    ```bash
+    ls -la *.py
+    cat .github/workflows/codeql.yml
+    ```
+  </Accordion>
+  <Accordion title="Gitleaks detects secrets">
+    **Solution:** Remove secrets from code and use environment variables
+    ```bash
+    git filter-branch --force --index-filter "git rm --cached --ignore-unmatch path/to/secret"
+    ```
+  </Accordion>
+  <Accordion title="Crypto Shredder import error">
+    **Solution:** Install cryptography library
+    ```bash
+    pip install cryptography
+    ```
+  </Accordion>
+  <Accordion title="GCP deployment fails">
+    **Solution:** Verify APIs are enabled and service account has correct permissions
+    ```bash
+    gcloud services list --enabled
+    gcloud projects get-iam-policy $GOOGLE_CLOUD_PROJECT
+    ```
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Setup guide"
+    icon="book"
+    href="/deployment/setup-guide"
+  >
+    Detailed setup instructions
+  </Card>
+  <Card
+    title="Monitoring"
+    icon="chart-line"
+    href="/deployment/monitoring"
+  >
+    Configure monitoring and alerts
+  </Card>
+  <Card
+    title="Security"
+    icon="shield-halved"
+    href="/security/overview"
+  >
+    Security stack documentation
+  </Card>
+  <Card
+    title="Support"
+    icon="life-ring"
+    href="/support"
+  >
+    Get help and support
+  </Card>
+</CardGroup>
