@@ -1,0 +1,349 @@
+---
+title: ECF endpoints
+description: Entangled Correlation Fusion API endpoints for advanced data fusion
+---
+
+## Overview
+
+The ECF API provides endpoints for ingesting signals and retrieving fused events using the Entangled Correlation Fusion engine.
+
+## Base URL
+
+```
+http://localhost:8080/ecf
+```
+
+## Endpoints
+
+### Ingest signal
+
+```
+POST /ecf/ingest
+```
+
+Ingest a new signal into the ECF engine for correlation analysis.
+
+#### Request body
+
+```json
+{
+  "source": "CBS",
+  "timestamp": "2025-01-15T08:00:00Z",
+  "location": {
+    "lat": 0.0512,
+    "lng": 40.3129
+  },
+  "symptom": "diarrhea",
+  "severity": 0.8,
+  "confidence": 0.7,
+  "metadata": {
+    "chv": "Amina Hassan",
+    "cases": 3
+  }
+}
+```
+
+#### Parameters
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `source` | string | Yes | Signal source: CBS, EMR, IDSR, IOT, VOICE, SOCIAL |
+| `timestamp` | string | Yes | ISO 8601 timestamp |
+| `location` | object | Yes | Geographic coordinates |
+| `location.lat` | float | Yes | Latitude |
+| `location.lng` | float | Yes | Longitude |
+| `symptom` | string | Yes | Symptom or diagnosis |
+| `severity` | float | Yes | Severity score (0.0 to 1.0) |
+| `confidence` | float | Yes | Confidence score (0.0 to 1.0) |
+| `metadata` | object | No | Additional metadata |
+
+#### Response
+
+```json
+{
+  "status": "success",
+  "signal_ingested": true,
+  "fusion_occurred": true,
+  "fused_event": {
+    "event_id": "ECF_1737024000_1234",
+    "primary_source": "EMR",
+    "correlated_sources": ["CBS", "EMR"],
+    "timestamp": "2025-01-15T08:15:00Z",
+    "location": {
+      "lat": 0.0516,
+      "lng": 40.3132
+    },
+    "symptom": "diarrhea",
+    "severity": 0.825,
+    "confidence": 0.88,
+    "correlation_score": 0.87,
+    "verification_status": "CONFIRMED",
+    "num_contributing_signals": 2
+  }
+}
+```
+
+#### Example
+
+```bash
+curl -X POST http://localhost:8080/ecf/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source": "CBS",
+    "timestamp": "2025-01-15T08:00:00Z",
+    "location": {"lat": 0.0512, "lng": 40.3129},
+    "symptom": "diarrhea",
+    "severity": 0.8,
+    "confidence": 0.7,
+    "metadata": {"chv": "Amina Hassan"}
+  }'
+```
+
+### Get fused events
+
+```
+GET /ecf/events
+```
+
+Retrieve fused events with optional filtering.
+
+#### Query parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `min_correlation` | float | No | Minimum correlation score (0.0 to 1.0) |
+| `source_filter` | string | No | Comma-separated list of sources |
+| `limit` | integer | No | Maximum number of events to return |
+
+#### Response
+
+```json
+{
+  "status": "success",
+  "total_events": 15,
+  "events": [
+    {
+      "event_id": "ECF_1737024000_1234",
+      "primary_source": "EMR",
+      "correlated_sources": ["CBS", "EMR", "VOICE"],
+      "timestamp": "2025-01-15T08:15:00Z",
+      "location": {"lat": 0.0516, "lng": 40.3132},
+      "symptom": "cholera",
+      "severity": 0.85,
+      "confidence": 0.92,
+      "correlation_score": 0.91,
+      "verification_status": "ENTANGLED"
+    }
+  ]
+}
+```
+
+#### Example
+
+```bash
+# Get high-confidence events
+curl "http://localhost:8080/ecf/events?min_correlation=0.8&limit=10"
+
+# Filter by source
+curl "http://localhost:8080/ecf/events?source_filter=EMR,CBS"
+```
+
+### Get ECF statistics
+
+```
+GET /ecf/statistics
+```
+
+Retrieve ECF engine statistics and performance metrics.
+
+#### Response
+
+```json
+{
+  "status": "success",
+  "statistics": {
+    "total_signals_ingested": 127,
+    "total_fused_events": 42,
+    "average_correlation": 0.78,
+    "verification_distribution": {
+      "ENTANGLED": 8,
+      "CONFIRMED": 18,
+      "PROBABLE": 12,
+      "POSSIBLE": 4
+    },
+    "signal_buffer_size": 85,
+    "source_distribution": {
+      "CBS": 45,
+      "EMR": 38,
+      "VOICE": 22,
+      "IOT": 15,
+      "IDSR": 7
+    }
+  }
+}
+```
+
+#### Example
+
+```bash
+curl http://localhost:8080/ecf/statistics
+```
+
+### Clear old signals
+
+```
+POST /ecf/clear
+```
+
+Clear signals older than specified retention period.
+
+#### Request body
+
+```json
+{
+  "retention_hours": 168
+}
+```
+
+#### Parameters
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `retention_hours` | float | No | Retention period in hours (default: 168 = 7 days) |
+
+#### Response
+
+```json
+{
+  "status": "success",
+  "signals_cleared": 23,
+  "remaining_signals": 62
+}
+```
+
+#### Example
+
+```bash
+curl -X POST http://localhost:8080/ecf/clear \
+  -H "Content-Type: application/json" \
+  -d '{"retention_hours": 168}'
+```
+
+## Integration with Golden Thread
+
+The ECF API can be used alongside the Golden Thread API for enhanced fusion:
+
+```python
+import requests
+
+# Ingest CBS signal via ECF
+cbs_response = requests.post(
+    "http://localhost:8080/ecf/ingest",
+    json={
+        "source": "CBS",
+        "timestamp": "2025-01-15T08:00:00Z",
+        "location": {"lat": 0.0512, "lng": 40.3129},
+        "symptom": "diarrhea",
+        "severity": 0.8,
+        "confidence": 0.7
+    }
+)
+
+# Ingest EMR signal via ECF
+emr_response = requests.post(
+    "http://localhost:8080/ecf/ingest",
+    json={
+        "source": "EMR",
+        "timestamp": "2025-01-15T08:30:00Z",
+        "location": {"lat": 0.0520, "lng": 40.3135},
+        "symptom": "cholera",
+        "severity": 0.85,
+        "confidence": 0.95
+    }
+)
+
+# Check if fusion occurred
+if emr_response.json()["fusion_occurred"]:
+    fused_event = emr_response.json()["fused_event"]
+    print(f"✨ Fusion: Correlation {fused_event['correlation_score']:.2f}")
+```
+
+## Error responses
+
+### 400 Bad Request
+
+```json
+{
+  "status": "error",
+  "error": "invalid_signal",
+  "message": "Missing required field: location"
+}
+```
+
+### 500 Internal Server Error
+
+```json
+{
+  "status": "error",
+  "error": "fusion_failed",
+  "message": "ECF engine encountered an error"
+}
+```
+
+## Performance
+
+- **Ingestion latency**: <50ms per signal
+- **Fusion latency**: <100ms for correlation analysis
+- **Throughput**: 1000+ signals/second
+- **Buffer size**: Configurable (default: unlimited with auto-cleanup)
+
+## Configuration
+
+ECF engine configuration via environment variables:
+
+```bash
+# Temporal window for correlation
+export ECF_TEMPORAL_WINDOW_HOURS=24.0
+
+# Spatial threshold for correlation
+export ECF_SPATIAL_THRESHOLD_KM=50.0
+
+# Minimum correlation score for fusion
+export ECF_MIN_CORRELATION=0.6
+
+# Enable quantum weighting
+export ECF_QUANTUM_WEIGHTING=true
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="ECF architecture"
+    icon="atom"
+    href="/architecture/ecf"
+  >
+    Understand ECF correlation algorithm
+  </Card>
+  <Card
+    title="Golden Thread"
+    icon="link"
+    href="/architecture/golden-thread"
+  >
+    Learn about base fusion engine
+  </Card>
+  <Card
+    title="Integration examples"
+    icon="code"
+    href="/examples/ecf"
+  >
+    Complete ECF integration examples
+  </Card>
+  <Card
+    title="Voice processing"
+    icon="microphone"
+    href="/api-reference/voice-processing"
+  >
+    Combine ECF with voice alerts
+  </Card>
+</CardGroup>

@@ -1,6 +1,34 @@
-# iLuminara-Core: Sovereign Health Fortress - Implementation Files
+# iLuminara-Core Security Stack Implementation Files
 
-This directory contains all the implementation files ready to be copied to your iLuminara-Core repository.
+This directory contains the complete implementation of the **Sovereign Health Fortress** security architecture and **Nuclear IP Stack** for iLuminara-Core.
+
+## 🛡️ The Fortress
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                 SOVEREIGN HEALTH FORTRESS                     │
+│                                                               │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │  Security Audit Layer                               │    │
+│  │  • CodeQL SAST Scanning                             │    │
+│  │  • Gitleaks Secret Detection                        │    │
+│  │  • Dependabot Daily Updates                         │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                          ▼                                    │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │  Governance Kernel (Nuclear IP Stack)               │    │
+│  │  • IP-02: Crypto Shredder                           │    │
+│  │  • IP-03: Acorn Protocol                            │    │
+│  │  • SovereignGuardrail (14 frameworks)               │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                          ▼                                    │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │  Hardware Attestation                                │    │
+│  │  • TPM-based Trust                                   │    │
+│  │  • Bill-of-Materials Ledger                          │    │
+│  └─────────────────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────────────────┘
+```
 
 ## 📁 Directory Structure
 
@@ -11,23 +39,25 @@ repository-files/
 │   │   ├── codeql.yml              # SAST security scanning
 │   │   └── gitleaks.yml            # Secret detection
 │   └── dependabot.yml              # Daily security updates
-├── .gitleaks.toml                  # Gitleaks configuration
-├── config/
-│   └── sovereign_guardrail.yaml    # SovereignGuardrail configuration
+│
 ├── governance_kernel/
-│   └── crypto_shredder.py          # IP-02: Crypto Shredder implementation
-├── edge_node/
-│   └── sync_protocol/
-│       └── entangled_correlation_fusion.py  # IP-05: ECF implementation
+│   ├── crypto_shredder.py          # IP-02: Data dissolution
+│   └── acorn_protocol.py           # IP-03: Somatic authentication
+│
+├── config/
+│   └── sovereign_guardrail.yaml    # 14 global legal frameworks
+│
 ├── scripts/
 │   └── validate_fortress.sh        # Fortress validation script
-└── examples/
-    └── ecf_demo.py                 # ECF demonstration
+│
+├── .gitleaks.toml                  # Secret scanning rules
+├── requirements-security.txt       # Security dependencies
+└── README.md                       # This file
 ```
 
-## 🚀 Installation Instructions
+## 🚀 Quick Start
 
-### Step 1: Copy Files to Repository
+### 1. Copy Files to Your Repository
 
 ```bash
 # Navigate to your iLuminara-Core repository
@@ -35,45 +65,196 @@ cd /path/to/iLuminara-Core
 
 # Copy all files (preserving directory structure)
 cp -r /path/to/repository-files/.github .
+cp -r /path/to/repository-files/governance_kernel .
 cp -r /path/to/repository-files/config .
-cp -r /path/to/repository-files/governance_kernel/* governance_kernel/
-cp -r /path/to/repository-files/edge_node/* edge_node/
 cp -r /path/to/repository-files/scripts .
-cp -r /path/to/repository-files/examples .
 cp /path/to/repository-files/.gitleaks.toml .
+cp /path/to/repository-files/requirements-security.txt .
 ```
 
-### Step 2: Make Scripts Executable
+### 2. Install Dependencies
+
+```bash
+pip install -r requirements-security.txt
+```
+
+### 3. Validate the Fortress
 
 ```bash
 chmod +x scripts/validate_fortress.sh
-chmod +x launch_all_services.sh
+./scripts/validate_fortress.sh
 ```
 
-### Step 3: Install Dependencies
+### 4. Enable GitHub Security Features
 
 ```bash
-# Install Python dependencies
-pip install -r requirements.txt
+# Authenticate with GitHub CLI
+gh auth refresh -s workflow,repo,write:packages,admin:repo_hook
 
-# Additional dependencies for ECF
-pip install scipy numpy
+# Enable branch protection
+gh api repos/:owner/:repo/branches/main/protection \
+  -X PUT \
+  -f required_status_checks[strict]=true \
+  -f required_status_checks[contexts][]=CodeQL \
+  -f required_status_checks[contexts][]=Gitleaks \
+  -f required_pull_request_reviews[required_approving_review_count]=1 \
+  -f enforce_admins=true
 ```
 
-### Step 4: Configure Environment
+## ⚡ Nuclear IP Stack
 
-```bash
-# Set environment variables
-export NODE_ID=JOR-47
-export JURISDICTION=KDPA_KE
-export GOOGLE_CLOUD_PROJECT=your-project-id
-export ENABLE_TAMPER_PROOF_AUDIT=true
+### IP-02: Crypto Shredder
+
+Data is not deleted; it is cryptographically dissolved.
+
+```python
+from governance_kernel.crypto_shredder import CryptoShredder, RetentionPolicy
+
+shredder = CryptoShredder(sovereignty_zone=SovereigntyZone.KENYA)
+
+# Encrypt with ephemeral key
+encrypted_data, key_id = shredder.encrypt_with_ephemeral_key(
+    data=patient_record,
+    retention_policy=RetentionPolicy.HOT,
+    metadata={"patient_id": "12345", "jurisdiction": "KDPA_KE"}
+)
+
+# After retention period, shred the key
+shredder.shred_key(key_id)
+
+# Data is now cryptographically irrecoverable
 ```
 
-### Step 5: Validate Installation
+**Compliance:**
+- GDPR Art. 17 (Right to Erasure)
+- HIPAA §164.530(j) (Documentation)
+- NIST SP 800-88 (Media Sanitization)
+
+### IP-03: Acorn Protocol
+
+Somatic Triad Authentication: Posture + Location + Stillness
+
+```python
+from governance_kernel.acorn_protocol import (
+    SomaticTriadAuthentication,
+    AuthenticationRisk
+)
+
+sta = SomaticTriadAuthentication(posture_tolerance=15.0)
+
+# Enroll user with "Secret Pose"
+sta.enroll(
+    user_id="coordinator_001",
+    posture_keypoints=pose_keypoints,
+    gps_coords=(-1.2921, 36.8219),  # Nairobi
+    imu_readings=imu_data,
+    risk_level=AuthenticationRisk.CRITICAL
+)
+
+# Authenticate for high-risk operation
+result = sta.authenticate(
+    user_id="coordinator_001",
+    posture_keypoints=current_pose,
+    gps_coords=current_location,
+    imu_readings=current_imu,
+    operation_risk=AuthenticationRisk.CRITICAL
+)
+
+if result.success:
+    print(f"✅ Session Token: {result.session_token}")
+```
+
+**Compliance:**
+- NIST SP 800-63B (Biometric Authentication)
+- ISO/IEC 30107 (Presentation Attack Detection)
+- GDPR Art. 9 (Biometric Data Processing)
+
+## 🔒 Security Workflows
+
+### CodeQL (SAST)
+
+Runs on:
+- Every push to `main` and `develop`
+- Every pull request
+- Weekly schedule (Sunday midnight UTC)
+
+**Coverage:**
+- Python security vulnerabilities
+- JavaScript security issues
+- Security-extended queries
+
+### Gitleaks (Secret Scanning)
+
+Runs on:
+- Every push to `main` and `develop`
+- Every pull request
+- Daily schedule (2 AM UTC)
+
+**Detects:**
+- API keys (GCP, AWS, GitHub)
+- Private keys
+- JWT tokens
+- Service account credentials
+
+### Dependabot (Dependency Updates)
+
+Runs daily at 2 AM UTC for:
+- Python dependencies (pip)
+- GitHub Actions
+- Docker images
+- npm packages
+
+## 🌍 SovereignGuardrail Configuration
+
+The Fortress enforces 14 global legal frameworks:
+
+| Framework | Region | Status |
+|-----------|--------|--------|
+| GDPR | 🇪🇺 EU | ✅ Enforced |
+| KDPA | 🇰🇪 Kenya | ✅ Enforced |
+| HIPAA | 🇺🇸 USA | ✅ Enforced |
+| POPIA | 🇿🇦 South Africa | ✅ Enforced |
+| PIPEDA | 🇨🇦 Canada | ✅ Enforced |
+| EU AI Act | 🇪🇺 EU | ✅ Enforced |
+| ISO 27001 | 🌐 Global | ✅ Enforced |
+| SOC 2 | 🇺🇸 USA | ✅ Enforced |
+
+Configure in `config/sovereign_guardrail.yaml`:
+
+```yaml
+jurisdiction:
+  primary: "KDPA_KE"
+  secondary:
+    - "GDPR_EU"
+    - "POPIA_ZA"
+    - "HIPAA_US"
+
+sovereignty:
+  data_residency:
+    enabled: true
+    allowed_zones:
+      - "africa-south1"
+      - "europe-west1"
+    enforcement_level: "STRICT"
+```
+
+## 🧪 Testing
+
+### Run Crypto Shredder Demo
 
 ```bash
-# Run fortress validation
+python governance_kernel/crypto_shredder.py
+```
+
+### Run Acorn Protocol Demo
+
+```bash
+python governance_kernel/acorn_protocol.py
+```
+
+### Validate Fortress
+
+```bash
 ./scripts/validate_fortress.sh
 ```
 
@@ -102,335 +283,82 @@ PHASE 1: Security Audit Layer
 The Sovereign Health Fortress is ready for deployment.
 ```
 
-## 🔐 Security Stack Components
-
-### 1. CodeQL SAST Scanning
-
-**File:** `.github/workflows/codeql.yml`
-
-- Runs on: Push to main/develop, PRs, weekly schedule
-- Languages: Python, JavaScript
-- Queries: Security-extended + quality
-- Compliance: GDPR Art. 32, ISO 27001 A.12.6
-
-**Enable in GitHub:**
-```bash
-# Push workflow to repository
-git add .github/workflows/codeql.yml
-git commit -m "feat: add CodeQL SAST scanning"
-git push
-
-# Enable in GitHub Settings > Security > Code scanning
-```
-
-### 2. Gitleaks Secret Scanning
-
-**File:** `.github/workflows/gitleaks.yml`
-
-- Runs on: Push to main/develop, daily schedule
-- Detects: API keys, credentials, private keys
-- Compliance: NIST SP 800-53 IA-5, HIPAA §164.312(a)(2)(i)
-
-**Configuration:** `.gitleaks.toml`
-
-Custom rules for:
-- GCP API keys (sovereignty-critical)
-- AWS keys (sovereignty-violation - blocked)
-- Private keys (crypto-shredder)
-- JWT tokens, GitHub tokens, Slack tokens
-
-### 3. Dependabot Security Updates
-
-**File:** `.github/dependabot.yml`
-
-- Frequency: Daily for pip/npm, weekly for Docker/Actions
-- Groups: Security, Google Cloud, AI/ML
-- Auto-creates PRs for security updates
-
-### 4. Crypto Shredder (IP-02)
-
-**File:** `governance_kernel/crypto_shredder.py`
-
-Data dissolution (not deletion):
-
-```python
-from governance_kernel.crypto_shredder import CryptoShredder, RetentionPolicy
-
-shredder = CryptoShredder(sovereignty_zone=SovereigntyZone.KENYA)
-
-# Encrypt with ephemeral key
-encrypted_data, key_id = shredder.encrypt_with_ephemeral_key(
-    data=patient_record,
-    retention_policy=RetentionPolicy.HOT,
-    metadata={"patient_id": "12345", "jurisdiction": "KDPA_KE"}
-)
-
-# After retention period, shred the key
-shredder.shred_key(key_id)
-
-# Data is now cryptographically irrecoverable
-```
-
-**Features:**
-- AES-256-GCM encryption
-- Ephemeral key management
-- Retention policies (HOT/WARM/COLD/ETERNAL)
-- Auto-shred expired keys
-- Tamper-proof audit trail
-
-### 5. Entangled Correlation Fusion (IP-05)
-
-**File:** `edge_node/sync_protocol/entangled_correlation_fusion.py`
-
-Quantum-inspired weak signal fusion:
-
-```python
-from edge_node.sync_protocol.entangled_correlation_fusion import EntangledCorrelationFusion
-
-ecf = EntangledCorrelationFusion(
-    correlation_threshold=0.3,
-    time_window=7.0,
-    spatial_resolution=10.0
-)
-
-# Add signals
-ecf.add_signal({
-    'time': 100,
-    'location': (0.0512, 40.3129),
-    'symptom_type': 'diarrhea',
-    'confidence': 0.5,
-    'is_event': True
-})
-
-# Fuse signals
-result = ecf.fuse()
-print(f"Outbreak probability: {result['outbreak_probability']:.3f}")
-```
-
-**Features:**
-- Quantum-inspired correlation
-- Belief propagation
-- Timeline verification
-- Pattern emergence detection
-- Von Neumann entropy metrics
-
-### 6. SovereignGuardrail Configuration
-
-**File:** `config/sovereign_guardrail.yaml`
-
-Enforces 14 global legal frameworks:
-
-```yaml
-jurisdiction:
-  primary: "KDPA_KE"
-  secondary:
-    - "GDPR_EU"
-    - "POPIA_ZA"
-    - "HIPAA_US"
-
-sovereignty:
-  data_residency:
-    enabled: true
-    allowed_zones:
-      - "africa-south1"
-      - "europe-west1"
-    enforcement_level: "STRICT"
-```
-
-## 🧪 Testing
-
-### Run ECF Demo
-
-```bash
-python examples/ecf_demo.py
-```
-
-Expected output:
-```
-╔════════════════════════════════════════════════════════════════════╗
-║     Entangled Correlation Fusion (ECF) - Comprehensive Demo       ║
-║                    iLuminara-Core IP-05                            ║
-╚════════════════════════════════════════════════════════════════════╝
-
-DEMO 1: Basic Entangled Correlation Fusion
-Creating 100 synthetic outbreak signals...
-Adding signals to ECF...
-  Added 25 signals...
-  Added 50 signals...
-  Added 75 signals...
-  Added 100 signals...
-
-Performing entangled correlation fusion...
-
-Fusion Results:
-  Status: success
-  Outbreak probability: 0.847
-  Entanglement entropy: 2.134
-  Signals fused: 100
-  Entangled clusters: 3
-  Coherence factor: 0.590
-```
-
-### Run Fortress Validation
-
-```bash
-./scripts/validate_fortress.sh
-```
-
-### Run Unit Tests
-
-```bash
-# Test Crypto Shredder
-python -m pytest tests/test_crypto_shredder.py
-
-# Test ECF
-python -m pytest tests/test_ecf.py
-
-# Test SovereignGuardrail
-python -m pytest tests/test_sovereign_guardrail.py
-```
-
 ## 📊 Monitoring
 
 ### Prometheus Metrics
 
-ECF exposes metrics at `/metrics`:
+The security stack exposes metrics at `:9090/metrics`:
 
 ```
-ecf_signals_total
-ecf_outbreak_probability
-ecf_entanglement_entropy
-ecf_correlation_density
-ecf_fusion_duration_seconds
+sovereignty_violations_total
+cross_border_transfers_total
+high_risk_inferences_total
+keys_shredded_total
+authentication_attempts_total
+authentication_failures_total
 ```
 
 ### Grafana Dashboards
 
-Import dashboards from `dashboards/`:
-- `ecf_monitoring.json` - ECF metrics
-- `sovereignty_compliance.json` - Compliance monitoring
-- `crypto_shredder.json` - Key lifecycle
+Import dashboards for:
+- Sovereignty Compliance
+- Audit Trail
+- Data Retention
+- Authentication Analytics
 
-## 🔧 Configuration
+## 🔐 Compliance Attestation
 
-### Adjust ECF Parameters
+The Fortress provides continuous compliance attestation:
 
-```python
-ecf = EntangledCorrelationFusion(
-    max_signals=1000,              # Maximum signals to track
-    correlation_threshold=0.3,     # Minimum correlation (0.2-0.5)
-    time_window=7.0,               # Temporal window (days)
-    spatial_resolution=10.0,       # Spatial grid (km)
-    entanglement_dim=4             # Tensor dimension (4-8)
-)
-```
+| Framework | Attestation Method | Frequency |
+|-----------|-------------------|-----------|
+| GDPR | SovereignGuardrail + Audit Trail | Real-time |
+| HIPAA | Crypto Shredder + Retention Policies | Daily |
+| ISO 27001 | CodeQL + Gitleaks | Weekly |
+| SOC 2 | Tamper-proof Audit | Continuous |
+| NIST CSF | Security Workflows | Daily |
 
-**Tuning guidelines:**
-- **correlation_threshold**: Lower = more connections, higher = stricter
-- **time_window**: Shorter = recent focus, longer = historical context
-- **spatial_resolution**: Smaller = finer grid, larger = broader regions
-- **entanglement_dim**: Higher = more features, more memory
+## 🚨 Incident Response
 
-### Adjust Retention Policies
-
-```python
-from governance_kernel.crypto_shredder import RetentionPolicy
-
-# HOT: 180 days (active operational data)
-# WARM: 365 days (compliance minimum - HIPAA)
-# COLD: 1825 days (legal hold maximum - GDPR)
-# ETERNAL: Never expires (requires justification)
-```
-
-## 🚨 Troubleshooting
-
-### Issue: CodeQL workflow fails
-
-**Solution:**
-```bash
-# Check Python version (requires 3.8+)
-python3 --version
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### Issue: Gitleaks detects false positives
-
-**Solution:**
-Edit `.gitleaks.toml` to add allowlist:
-
-```toml
-[allowlist]
-paths = [
-  '''.*_test\.py''',
-  '''.*\.example''',
-]
-```
-
-### Issue: ECF runs out of memory
-
-**Solution:**
-Reduce `max_signals` or increase system memory:
-
-```python
-ecf = EntangledCorrelationFusion(
-    max_signals=500,  # Reduce from 1000
-)
-```
-
-### Issue: Fortress validation fails
-
-**Solution:**
-```bash
-# Check missing dependencies
-pip install -r requirements.txt
-
-# Check environment variables
-echo $NODE_ID
-echo $JURISDICTION
-
-# Re-run validation
-./scripts/validate_fortress.sh
-```
+1. **Detection**: Security workflows trigger alerts
+2. **Containment**: SovereignGuardrail blocks violating actions
+3. **Investigation**: Tamper-proof audit trail provides forensics
+4. **Remediation**: Crypto Shredder dissolves compromised data
+5. **Recovery**: Golden Thread reconstructs verified timeline
 
 ## 📚 Documentation
 
-Full documentation available at: [iLuminara-Core Docs](https://docs.iluminara.health)
+Full documentation available at: [docs.iluminara.health](https://docs.iluminara.health)
 
-Key pages:
-- [Architecture Overview](/architecture/overview)
-- [Entangled Correlation Fusion](/architecture/entangled-correlation-fusion)
-- [Security Stack](/security/overview)
+- [Security Overview](/security/overview)
+- [Crypto Shredder (IP-02)](/security/crypto-shredder)
+- [Acorn Protocol (IP-03)](/security/acorn-protocol)
 - [Governance Kernel](/governance/overview)
 - [Deployment Guide](/deployment/overview)
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature/amazing-feature`
-3. Commit changes: `git commit -m 'feat: add amazing feature'`
-4. Push to branch: `git push origin feature/amazing-feature`
-5. Open Pull Request
+When contributing security-related code:
 
-**All PRs must pass:**
-- CodeQL SAST scanning
-- Gitleaks secret detection
-- Unit tests
-- Fortress validation
+1. All PRs must pass CodeQL and Gitleaks scans
+2. Security changes require 2 approvals
+3. Update `config/sovereign_guardrail.yaml` for new jurisdictions
+4. Add tests for new security features
+5. Update documentation
 
 ## 📄 License
 
-Proprietary - Nuclear IP Stack
-
-Copyright © 2025 iLuminara-Core Team
+This security stack is part of iLuminara-Core and follows the same license.
 
 ## 🆘 Support
 
-- GitHub Issues: https://github.com/VISENDI56/iLuminara-Core/issues
-- Email: support@iluminara.health
-- Slack: #iluminara-core
+For security issues:
+- **Email**: security@iluminara.health
+- **GitHub**: Open a security advisory
+- **Slack**: #security channel
 
 ---
 
-**The Fortress is now built. Your Agent AI has transitioned iLuminara from a repository to a Sovereign Architecture.**
+**The Fortress is not built. It is continuously attested.**
+
+🛡️ iLuminara-Core Sovereign Health Fortress
