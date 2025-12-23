@@ -1,78 +1,27 @@
-# iLuminara-Core Sovereign Health Fortress Setup Guide
+# iLuminara-Core Setup Guide
+## Sovereign Health Fortress Deployment
 
-This guide walks you through setting up the complete Nuclear IP Stack with maximum automation.
+This guide walks you through setting up the complete iLuminara-Core security and integration stack.
 
-## 🛡️ The Fortress Architecture
+---
 
-You are not just installing tools; you are initializing a **Sovereign Health Fortress**.
+## Phase 1: GitHub Security Configuration
 
-## Step 1: Elevate Agent Permissions
+### Step 1: Elevate Agent Permissions
 
-Before starting, ensure your Codespace has the required permissions:
+Ensure your GitHub Codespace has the required permissions:
 
 ```bash
 gh auth refresh -s workflow,repo,write:packages,admin:repo_hook
 ```
 
-This grants:
-- `workflow` - Modify GitHub Actions workflows
-- `repo` - Full repository access
-- `write:packages` - Publish packages
-- `admin:repo_hook` - Configure webhooks and branch protection
+### Step 2: Enable Branch Protection
 
-## Step 2: Copy Files to Repository
-
-All necessary files have been generated in the `repository-files/` directory. Copy them to your iLuminara-Core repository:
+Protect the `main` branch with required status checks:
 
 ```bash
-# Navigate to your iLuminara-Core repository
-cd /path/to/iLuminara-Core
-
-# Copy GitHub workflows
-mkdir -p .github/workflows
-cp /path/to/docs/repository-files/.github/workflows/codeql.yml .github/workflows/
-cp /path/to/docs/repository-files/.github/workflows/gitleaks.yml .github/workflows/
-cp /path/to/docs/repository-files/.github/dependabot.yml .github/
-
-# Copy Gitleaks configuration
-cp /path/to/docs/repository-files/.gitleaks.toml .
-
-# Copy Crypto Shredder implementation
-cp /path/to/docs/repository-files/governance_kernel/crypto_shredder.py governance_kernel/
-
-# Copy SovereignGuardrail configuration
-mkdir -p config
-cp /path/to/docs/repository-files/config/sovereign_guardrail.yaml config/
-
-# Copy validation script
-mkdir -p scripts
-cp /path/to/docs/repository-files/scripts/validate_fortress.sh scripts/
-chmod +x scripts/validate_fortress.sh
-```
-
-## Step 3: Commit and Push
-
-```bash
-git add .
-git commit -m "feat: integrate SovereignGuardrail and Nuclear IP security stack
-
-- Add CodeQL SAST scanning (GDPR Art. 32, ISO 27001 A.12.6)
-- Add Gitleaks secret detection (NIST SP 800-53 IA-5)
-- Implement IP-02 Crypto Shredder (data dissolution)
-- Configure SovereignGuardrail (14 global legal frameworks)
-- Add Dependabot daily security updates
-- Add fortress validation script"
-
-git push origin main
-```
-
-## Step 4: Enable Branch Protection
-
-Use GitHub CLI to enable branch protection on `main`:
-
-```bash
-# Require pull requests
-gh api repos/:owner/:repo/branches/main/protection \
+# Enable branch protection
+gh api repos/VISENDI56/iLuminara-Core/branches/main/protection \
   --method PUT \
   --field required_status_checks='{"strict":true,"contexts":["CodeQL","Gitleaks"]}' \
   --field enforce_admins=true \
@@ -84,32 +33,156 @@ Or configure via GitHub UI:
 1. Go to **Settings** → **Branches**
 2. Add rule for `main` branch
 3. Enable:
-   - ✅ Require pull request reviews (1 approval)
+   - ✅ Require pull request before merging
    - ✅ Require status checks to pass (CodeQL, Gitleaks)
    - ✅ Require branches to be up to date
    - ✅ Include administrators
 
-## Step 5: Configure Secrets
-
-Add required secrets to your repository:
+### Step 3: Enable Security Features
 
 ```bash
-# GitHub token (for workflows)
-gh secret set GITHUB_TOKEN --body "$GITHUB_TOKEN"
+# Enable Dependabot alerts
+gh api repos/VISENDI56/iLuminara-Core/vulnerability-alerts \
+  --method PUT
 
-# GCP credentials (if using cloud)
-gh secret set GCP_PROJECT_ID --body "your-project-id"
-gh secret set GCP_SA_KEY --body "$(cat service-account-key.json)"
+# Enable Dependabot security updates
+gh api repos/VISENDI56/iLuminara-Core/automated-security-fixes \
+  --method PUT
 
-# Slack webhook (for alerts)
-gh secret set SLACK_WEBHOOK_URL --body "https://hooks.slack.com/services/..."
+# Enable secret scanning
+gh api repos/VISENDI56/iLuminara-Core \
+  --method PATCH \
+  --field security_and_analysis='{"secret_scanning":{"status":"enabled"},"secret_scanning_push_protection":{"status":"enabled"}}'
 ```
 
-## Step 6: Validate the Fortress
+---
 
-Run the validation script to ensure all components are operational:
+## Phase 2: Deploy Security Workflows
+
+### Copy Workflow Files
+
+Copy the following files from `repository-files/` to your iLuminara-Core repository:
 
 ```bash
+# From your docs repository
+cd /path/to/docs/repository-files
+
+# Copy to iLuminara-Core
+cp -r .github /path/to/iLuminara-Core/
+cp .gitleaks.toml /path/to/iLuminara-Core/
+```
+
+**Files to copy:**
+- `.github/workflows/codeql.yml` - SAST security scanning
+- `.github/workflows/gitleaks.yml` - Secret detection
+- `.github/dependabot.yml` - Daily security updates
+- `.gitleaks.toml` - Secret scanning configuration
+
+### Commit and Push
+
+```bash
+cd /path/to/iLuminara-Core
+
+git add .github/workflows/codeql.yml
+git add .github/workflows/gitleaks.yml
+git add .github/dependabot.yml
+git add .gitleaks.toml
+
+git commit -m "feat: integrate SovereignGuardrail and Nuclear IP security stack"
+git push origin main
+```
+
+---
+
+## Phase 3: Deploy Governance Kernel
+
+### Copy Governance Files
+
+```bash
+# Copy Crypto Shredder (IP-02)
+cp repository-files/governance_kernel/crypto_shredder.py /path/to/iLuminara-Core/governance_kernel/
+
+# Copy SovereignGuardrail configuration
+mkdir -p /path/to/iLuminara-Core/config
+cp repository-files/config/sovereign_guardrail.yaml /path/to/iLuminara-Core/config/
+```
+
+### Install Dependencies
+
+```bash
+cd /path/to/iLuminara-Core
+
+# Install cryptography library
+pip install cryptography
+
+# Or add to requirements.txt
+echo "cryptography>=41.0.0" >> requirements.txt
+pip install -r requirements.txt
+```
+
+### Test Crypto Shredder
+
+```bash
+python governance_kernel/crypto_shredder.py
+```
+
+Expected output:
+```
+🔐 Crypto Shredder initialized - Zone: africa-south1
+✅ Encrypted - Key ID: abc123def456
+✅ Decrypted: Patient ID: 12345, Diagnosis: Malaria, Location: Dadaab
+🔥 Key shredded - Data irrecoverable: abc123def456
+❌ Decryption after shred: None
+```
+
+---
+
+## Phase 4: Configure Environment
+
+### Set Environment Variables
+
+Create `.env` file:
+
+```bash
+# Node identification
+export NODE_ID=JOR-47
+export JURISDICTION=KDPA_KE
+
+# API configuration
+export API_HOST=0.0.0.0
+export API_PORT=8080
+
+# GCP configuration
+export GOOGLE_CLOUD_PROJECT=your-project-id
+export GCP_REGION=africa-south1
+
+# Governance settings
+export ENABLE_TAMPER_PROOF_AUDIT=true
+export RETENTION_MAX_DAYS=1825
+export DATA_SOVEREIGNTY_REQUIRED=true
+```
+
+Load environment:
+
+```bash
+source .env
+```
+
+---
+
+## Phase 5: Validate Fortress
+
+### Copy Validation Script
+
+```bash
+cp repository-files/scripts/validate_fortress.sh /path/to/iLuminara-Core/scripts/
+chmod +x /path/to/iLuminara-Core/scripts/validate_fortress.sh
+```
+
+### Run Validation
+
+```bash
+cd /path/to/iLuminara-Core
 ./scripts/validate_fortress.sh
 ```
 
@@ -123,23 +196,10 @@ Expected output:
 PHASE 1: Security Audit Layer
 ═══════════════════════════════════════════════════════════
 
-📄 Checking .github/workflows/codeql.yml... ✓ EXISTS
-   └─ SAST security scanning (GDPR Art. 32, ISO 27001 A.12.6)
-📄 Checking .github/workflows/gitleaks.yml... ✓ EXISTS
-   └─ Secret scanning (NIST SP 800-53 IA-5)
+🔍 Checking .github/workflows/codeql.yml... ✓ OPERATIONAL
+🔍 Checking .github/workflows/gitleaks.yml... ✓ OPERATIONAL
 📄 Checking .gitleaks.toml... ✓ EXISTS
-   └─ Secret detection rules
 📄 Checking .github/dependabot.yml... ✓ EXISTS
-   └─ Daily security updates
-
-═══════════════════════════════════════════════════════════
-PHASE 2: Governance Kernel (Nuclear IP Stack)
-═══════════════════════════════════════════════════════════
-
-📁 Checking governance_kernel... ✓ EXISTS
-   └─ Law-as-code enforcement engine
-📄 Checking governance_kernel/crypto_shredder.py... ✓ EXISTS
-   └─ IP-02: Data dissolution (not deletion)
 
 ...
 
@@ -156,188 +216,191 @@ PHASE 2: Governance Kernel (Nuclear IP Stack)
 The Sovereign Health Fortress is ready for deployment.
 ```
 
-## Step 7: Integrated Architecture Implementation
+---
 
-### A. Model Integration (Vertex AI + SHAP)
+## Phase 6: Deploy to GCP (Optional)
 
-Configure Vertex AI models to provide "Right to Explanation":
+### Prerequisites
 
-```python
-from google.cloud import aiplatform
-import shap
+```bash
+# Install gcloud CLI
+curl https://sdk.cloud.google.com | bash
+exec -l $SHELL
 
-# Initialize Vertex AI
-aiplatform.init(project='your-project-id', location='us-central1')
-
-# Every high-risk inference triggers SHAP analysis
-endpoint = aiplatform.Endpoint('projects/.../endpoints/...')
-prediction = endpoint.predict(instances=[patient_features])
-
-# Generate SHAP explanation
-explainer = shap.TreeExplainer(model)
-shap_values = explainer.shap_values(patient_features)
-
-# Validate with SovereignGuardrail
-from governance_kernel.vector_ledger import SovereignGuardrail
-
-guardrail = SovereignGuardrail()
-guardrail.validate_action(
-    action_type='High_Risk_Inference',
-    payload={
-        'inference': 'cholera_diagnosis',
-        'confidence_score': 0.92,
-        'explanation': shap_values,
-        'evidence_chain': ['fever', 'diarrhea', 'dehydration']
-    },
-    jurisdiction='EU_AI_ACT'
-)
+# Authenticate
+gcloud auth login
+gcloud config set project YOUR_PROJECT_ID
 ```
 
-### B. App Integration (Bio-Interface)
+### Deploy Services
 
-Set up the REST API for Mobile Health Apps:
-
-```python
-from flask import Flask, request, jsonify
-from edge_node.sync_protocol.golden_thread import GoldenThread
-from governance_kernel.vector_ledger import SovereignGuardrail
-
-app = Flask(__name__)
-gt = GoldenThread()
-guardrail = SovereignGuardrail()
-
-@app.route('/v1/cbs/report', methods=['POST'])
-def submit_cbs_report():
-    data = request.json
-    
-    # Validate sovereignty
-    guardrail.validate_action(
-        action_type='Data_Transfer',
-        payload={
-            'data_type': 'PHI',
-            'source': 'Mobile_App',
-            'destination': 'Edge_Node',
-            'consent_token': data['consent_token']
-        },
-        jurisdiction=data['jurisdiction']
-    )
-    
-    # Create CBS signal
-    fused = gt.fuse_data_streams(
-        cbs_signal={
-            'location': data['location'],
-            'symptom': data['symptoms'][0],
-            'timestamp': data['timestamp']
-        },
-        patient_id=data['patient_id']
-    )
-    
-    return jsonify({
-        'status': 'success',
-        'verification_score': fused.verification_score,
-        'alert_level': 'HIGH' if fused.verification_score > 0.8 else 'MEDIUM'
-    })
+```bash
+chmod +x deploy_gcp_prototype.sh
+./deploy_gcp_prototype.sh
 ```
 
-### C. Compliance & Protection (The Shield)
+This deploys:
+- FRENASA AI Engine (Cloud Run)
+- HSTPU Forecaster (Vertex AI)
+- HSML Ledger (Cloud Spanner)
+- Dashboard (Cloud Run)
 
-The SovereignGuardrail automatically blocks any PII/PHI from leaving sovereign territory:
+---
+
+## Phase 7: Launch Services
+
+### Local Development
+
+```bash
+chmod +x launch_all_services.sh
+./launch_all_services.sh
+```
+
+This launches:
+- **Command Console**: http://localhost:8501
+- **Transparency Audit**: http://localhost:8502
+- **Field Validation**: http://localhost:8503
+- **API Service**: http://localhost:8080
+
+### Validate Services
+
+```bash
+# Check API health
+curl http://localhost:8080/health
+
+# Check dashboard
+curl http://localhost:8501/_stcore/health
+```
+
+---
+
+## Phase 8: Test the Stack
+
+### Test Voice Processing
+
+```bash
+# Generate test audio
+python generate_test_audio.py
+
+# Process voice alert
+curl -X POST http://localhost:8080/process-voice \
+  -H "Content-Type: audio/wav" \
+  --data-binary @swahili-symptom.wav
+```
+
+### Test Outbreak Prediction
+
+```bash
+curl -X POST http://localhost:8080/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "location": {"lat": 0.4221, "lng": 40.2255},
+    "symptoms": ["diarrhea", "vomiting"]
+  }'
+```
+
+### Test Governance Kernel
 
 ```python
 from governance_kernel.vector_ledger import SovereignGuardrail, SovereigntyViolationError
 
 guardrail = SovereignGuardrail()
 
-# This will BLOCK - Kenyan health data cannot move to foreign cloud
+# Try to export health data (should fail)
 try:
     guardrail.validate_action(
         action_type='Data_Transfer',
-        payload={
-            'data_type': 'PHI',
-            'destination': 'AWS_US'
-        },
-        jurisdiction='KDPA_KE'
+        payload={'data_type': 'PHI', 'destination': 'AWS_US'},
+        jurisdiction='GDPR_EU'
     )
 except SovereigntyViolationError as e:
-    print(f"❌ BLOCKED: {e}")
-    # Output: "Violates Kenya DPA §37 (Transfer Restrictions)"
+    print(f"✅ Sovereignty protection working: {e}")
 ```
 
-## Summary of the Automated "10/10" Stack
-
-| Component | iLuminara Protocol | Benefit |
-|---|---|---|
-| **Security Audit** | Gitleaks + CodeQL | Continuous attestation of the "Fortress" |
-| **Data Lifecycle** | IP-02 Crypto Shredder | Data is dissolved, not just deleted |
-| **Intelligence** | IP-04 Silent Flux | AI output is regulated by operator anxiety metrics |
-| **Connectivity** | IP-06 5DM Bridge | Direct injection into 14M+ African mobile nodes |
-
-## Verification Command
-
-Validate the entire iLuminara stack:
-
-```bash
-./scripts/validate_fortress.sh
-```
-
-Or with the launch script:
-
-```bash
-./launch_all_services.sh --validate-only
-```
-
-## Next Steps
-
-1. **Deploy to GCP**: Run `./deploy_gcp_prototype.sh`
-2. **Launch Services**: Run `./launch_all_services.sh`
-3. **Monitor Compliance**: Access Grafana dashboards
-4. **Test API**: Use the Bio-Interface REST API
-5. **Train Models**: Deploy to Vertex AI with SHAP explainability
+---
 
 ## Troubleshooting
 
-### CodeQL workflow fails
+### CodeQL Workflow Fails
 
-**Issue**: CodeQL analysis times out or fails
+**Issue:** CodeQL analysis fails with "No code to analyze"
 
-**Solution**:
+**Solution:**
 ```bash
-# Reduce analysis scope
-echo "paths-ignore:
-  - '**/test/**'
-  - '**/node_modules/**'" >> .github/workflows/codeql.yml
+# Ensure Python files exist
+ls -la *.py
+
+# Check workflow configuration
+cat .github/workflows/codeql.yml
 ```
 
-### Gitleaks detects false positives
+### Gitleaks Finds Secrets
 
-**Issue**: Test files trigger secret detection
+**Issue:** Gitleaks detects hardcoded secrets
 
-**Solution**: Add to `.gitleaks.toml`:
-```toml
-[allowlist]
-paths = [
-  '''.*_test\.py''',
-  '''.*\.example''',
-]
-```
-
-### Branch protection blocks pushes
-
-**Issue**: Cannot push directly to main
-
-**Solution**: This is intentional. Create a feature branch:
+**Solution:**
 ```bash
-git checkout -b feature/my-changes
-git push origin feature/my-changes
-# Create PR via GitHub UI
+# Review detected secrets
+cat results.sarif
+
+# Remove secrets from code
+git filter-branch --force --index-filter \
+  "git rm --cached --ignore-unmatch path/to/secret/file" \
+  --prune-empty --tag-name-filter cat -- --all
+
+# Use environment variables instead
+export API_KEY="your-key"
 ```
+
+### Crypto Shredder Import Error
+
+**Issue:** `ModuleNotFoundError: No module named 'cryptography'`
+
+**Solution:**
+```bash
+pip install cryptography
+```
+
+### Validation Script Fails
+
+**Issue:** Permission denied when running validation script
+
+**Solution:**
+```bash
+chmod +x scripts/validate_fortress.sh
+```
+
+---
+
+## Next Steps
+
+1. **Configure Compliance**: Edit `config/sovereign_guardrail.yaml` for your jurisdiction
+2. **Deploy AI Agents**: Set up autonomous surveillance agents
+3. **Integrate Mobile Apps**: Use Bio-Interface REST API
+4. **Set Up Monitoring**: Configure Prometheus and Grafana
+5. **Train Operators**: Conduct war room demo training
+
+---
 
 ## Support
 
 - **Documentation**: https://docs.iluminara.health
 - **GitHub Issues**: https://github.com/VISENDI56/iLuminara-Core/issues
-- **Security**: security@iluminara.health
+- **Email**: support@iluminara.health
 
 ---
 
-**The Fortress is now built.** Your Agent AI has transitioned iLuminara from a repository to a Sovereign Architecture.
+## Compliance Checklist
+
+- [ ] CodeQL workflow enabled
+- [ ] Gitleaks secret scanning enabled
+- [ ] Dependabot security updates enabled
+- [ ] Branch protection configured
+- [ ] Crypto Shredder deployed
+- [ ] SovereignGuardrail configured
+- [ ] Environment variables set
+- [ ] Fortress validation passed
+- [ ] Services launched successfully
+- [ ] Test suite passed
+
+**Status:** 🛡️ Sovereign Health Fortress is OPERATIONAL

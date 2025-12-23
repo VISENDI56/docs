@@ -1,0 +1,401 @@
+---
+title: Deployment checklist
+description: Complete checklist for deploying the Sovereign Health Fortress
+---
+
+## Overview
+
+This checklist ensures all components of the iLuminara-Core Sovereign Health Fortress are properly configured and validated before production deployment.
+
+<Card
+  title="Deployment philosophy"
+  icon="list-check"
+>
+  "The Fortress is not deployed. It is continuously validated and attested."
+</Card>
+
+## Pre-deployment checklist
+
+### Phase 1: Security audit layer
+
+<Steps>
+  <Step title="CodeQL workflow">
+    - [ ] Create `.github/workflows/codeql.yml`
+    - [ ] Configure security-extended queries
+    - [ ] Test workflow runs successfully
+    - [ ] Verify SARIF upload to Security tab
+  </Step>
+  <Step title="Gitleaks workflow">
+    - [ ] Create `.github/workflows/gitleaks.yml`
+    - [ ] Create `.gitleaks.toml` configuration
+    - [ ] Test secret detection
+    - [ ] Verify no secrets in repository
+  </Step>
+  <Step title="Dependabot">
+    - [ ] Create `.github/dependabot.yml`
+    - [ ] Configure daily security updates
+    - [ ] Enable auto-merge for security patches
+    - [ ] Test dependency update PR creation
+  </Step>
+  <Step title="Branch protection">
+    - [ ] Enable branch protection on `main`
+    - [ ] Require CodeQL and Gitleaks checks
+    - [ ] Require 1 approving review
+    - [ ] Create `.github/CODEOWNERS`
+  </Step>
+</Steps>
+
+### Phase 2: Governance kernel
+
+<Steps>
+  <Step title="Crypto Shredder (IP-02)">
+    - [ ] Create `governance_kernel/crypto_shredder.py`
+    - [ ] Configure retention policies
+    - [ ] Test key generation and shredding
+    - [ ] Verify auto-shred cron job
+  </Step>
+  <Step title="SovereignGuardrail">
+    - [ ] Verify `governance_kernel/vector_ledger.py` exists
+    - [ ] Create `config/sovereign_guardrail.yaml`
+    - [ ] Configure jurisdiction (KDPA_KE, GDPR_EU, etc.)
+    - [ ] Test sovereignty violation detection
+  </Step>
+  <Step title="Ethical Engine">
+    - [ ] Verify `governance_kernel/ethical_engine.py` exists
+    - [ ] Configure humanitarian constraints
+    - [ ] Test margin calculations
+    - [ ] Validate Geneva Convention compliance
+  </Step>
+  <Step title="Tamper-proof audit">
+    - [ ] Enable audit trail in config
+    - [ ] Configure Cloud Spanner or Bigtable
+    - [ ] Test cryptographic signing
+    - [ ] Verify chain integrity
+  </Step>
+</Steps>
+
+### Phase 3: Edge node & AI agents
+
+<Steps>
+  <Step title="FRENASA Engine">
+    - [ ] Verify `edge_node/frenasa_engine/` exists
+    - [ ] Test voice processing
+    - [ ] Configure Swahili language support
+    - [ ] Test offline operation
+  </Step>
+  <Step title="AI Agents">
+    - [ ] Verify `edge_node/ai_agents/` exists
+    - [ ] Test epidemiological forecasting
+    - [ ] Test spatiotemporal analysis
+    - [ ] Configure federated learning
+  </Step>
+  <Step title="Golden Thread (IP-05)">
+    - [ ] Verify `edge_node/sync_protocol/` exists
+    - [ ] Test CBS + EMR fusion
+    - [ ] Configure verification thresholds
+    - [ ] Test IDSR report generation
+  </Step>
+  <Step title="Offline operation">
+    - [ ] Test queue management
+    - [ ] Test sync protocol
+    - [ ] Configure retry logic
+    - [ ] Test connectivity detection
+  </Step>
+</Steps>
+
+### Phase 4: Cloud oracle
+
+<Steps>
+  <Step title="API service">
+    - [ ] Verify `api_service.py` exists
+    - [ ] Test `/process-voice` endpoint
+    - [ ] Test `/predict` endpoint
+    - [ ] Configure rate limiting
+  </Step>
+  <Step title="Dashboard">
+    - [ ] Verify `dashboard.py` exists
+    - [ ] Test Streamlit launch
+    - [ ] Configure authentication
+    - [ ] Test real-time updates
+  </Step>
+  <Step title="GCP deployment">
+    - [ ] Configure `GOOGLE_CLOUD_PROJECT`
+    - [ ] Enable required GCP services
+    - [ ] Test `deploy_gcp_prototype.sh`
+    - [ ] Verify Cloud Run deployment
+  </Step>
+  <Step title="Database setup">
+    - [ ] Configure BigQuery datasets
+    - [ ] Configure Cloud Spanner instance
+    - [ ] Test data ingestion
+    - [ ] Verify backup strategy
+  </Step>
+</Steps>
+
+### Phase 5: Environment configuration
+
+<Steps>
+  <Step title="Required variables">
+    - [ ] Set `NODE_ID` (e.g., JOR-47)
+    - [ ] Set `JURISDICTION` (e.g., KDPA_KE)
+    - [ ] Set `GOOGLE_CLOUD_PROJECT`
+    - [ ] Set `GCP_REGION`
+  </Step>
+  <Step title="Optional variables">
+    - [ ] Set `ENABLE_TAMPER_PROOF_AUDIT=true`
+    - [ ] Set `RETENTION_MAX_DAYS=1825`
+    - [ ] Set `ENABLE_OFFLINE_MODE=true`
+    - [ ] Set `FEDERATED_LEARNING_EPSILON=1.0`
+  </Step>
+  <Step title="Secrets management">
+    - [ ] Store API keys in Secret Manager
+    - [ ] Configure service account keys
+    - [ ] Test secret rotation
+    - [ ] Verify no secrets in code
+  </Step>
+</Steps>
+
+### Phase 6: Dependencies
+
+<Steps>
+  <Step title="Python packages">
+    - [ ] Install from `requirements.txt`
+    - [ ] Verify cryptography library
+    - [ ] Verify google-cloud packages
+    - [ ] Test import statements
+  </Step>
+  <Step title="System dependencies">
+    - [ ] Install Python 3.8+
+    - [ ] Install Docker (if using containers)
+    - [ ] Install gcloud CLI
+    - [ ] Install gh CLI
+  </Step>
+</Steps>
+
+## Deployment execution
+
+### Step 1: Validate fortress
+
+```bash
+chmod +x scripts/validate_fortress.sh
+./scripts/validate_fortress.sh
+```
+
+**Expected output:**
+```
+🛡️  FORTRESS STATUS: OPERATIONAL
+✓  All critical components validated
+✓  Security audit layer active
+✓  Governance kernel operational
+✓  Nuclear IP stack initialized
+```
+
+### Step 2: Run security scans
+
+```bash
+# Run CodeQL
+gh workflow run codeql.yml
+
+# Run Gitleaks
+gh workflow run gitleaks.yml
+
+# Check results
+gh run list --workflow=codeql.yml
+gh run list --workflow=gitleaks.yml
+```
+
+### Step 3: Deploy to GCP
+
+```bash
+chmod +x deploy_gcp_prototype.sh
+./deploy_gcp_prototype.sh
+```
+
+### Step 4: Launch services
+
+```bash
+chmod +x launch_all_services.sh
+./launch_all_services.sh
+```
+
+**Services launched:**
+- Command Console: http://0.0.0.0:8501
+- Transparency Audit: http://0.0.0.0:8502
+- Field Validation: http://0.0.0.0:8503
+- API Service: http://0.0.0.0:8080
+
+### Step 5: Verify deployment
+
+```bash
+# Health checks
+curl http://localhost:8080/health
+curl http://localhost:8501/_stcore/health
+
+# Test API
+curl -X POST http://localhost:8080/predict \
+  -H "Content-Type: application/json" \
+  -d '{"location": {"lat": 0.4221, "lng": 40.2255}, "symptoms": ["fever"]}'
+
+# Check logs
+tail -f logs/api.log
+tail -f logs/dashboard.log
+```
+
+## Post-deployment checklist
+
+### Monitoring
+
+<Steps>
+  <Step title="Prometheus metrics">
+    - [ ] Verify metrics endpoint: http://localhost:9090/metrics
+    - [ ] Check `sovereignty_violations_total`
+    - [ ] Check `keys_shredded_total`
+    - [ ] Configure alerting rules
+  </Step>
+  <Step title="Grafana dashboards">
+    - [ ] Import Sovereignty Compliance dashboard
+    - [ ] Import Audit Trail dashboard
+    - [ ] Import Data Retention dashboard
+    - [ ] Configure alert notifications
+  </Step>
+  <Step title="Log aggregation">
+    - [ ] Configure Cloud Logging
+    - [ ] Set up log-based metrics
+    - [ ] Create log sinks
+    - [ ] Test log queries
+  </Step>
+</Steps>
+
+### Security validation
+
+<Steps>
+  <Step title="Penetration testing">
+    - [ ] Test API authentication
+    - [ ] Test rate limiting
+    - [ ] Test input validation
+    - [ ] Test CORS configuration
+  </Step>
+  <Step title="Compliance validation">
+    - [ ] Test sovereignty violations
+    - [ ] Test consent validation
+    - [ ] Test data retention
+    - [ ] Test audit trail integrity
+  </Step>
+  <Step title="Disaster recovery">
+    - [ ] Test backup restoration
+    - [ ] Test failover procedures
+    - [ ] Test data recovery
+    - [ ] Document recovery time objectives
+  </Step>
+</Steps>
+
+### Documentation
+
+<Steps>
+  <Step title="Operational docs">
+    - [ ] Document deployment procedures
+    - [ ] Document incident response
+    - [ ] Document escalation paths
+    - [ ] Create runbooks
+  </Step>
+  <Step title="Training">
+    - [ ] Train operators on dashboard
+    - [ ] Train CHVs on mobile app
+    - [ ] Train compliance team on audit trail
+    - [ ] Conduct tabletop exercises
+  </Step>
+</Steps>
+
+## Nuclear IP Stack status
+
+Verify all proprietary protocols are active:
+
+| Protocol | Status | Validation |
+|----------|--------|------------|
+| **IP-02: Crypto Shredder** | ✅ Active | Test key shredding |
+| **IP-03: Acorn Protocol** | ⚠️ Requires Hardware | TPM attestation needed |
+| **IP-04: Silent Flux** | ⚠️ Requires Integration | Anxiety monitoring needed |
+| **IP-05: Golden Thread** | ✅ Active | Test data fusion |
+| **IP-06: 5DM Bridge** | ⚠️ Requires Mobile Network | API injection needed |
+
+## Compliance attestation
+
+Generate compliance report:
+
+```bash
+python scripts/generate_compliance_report.py \
+  --jurisdiction KDPA_KE \
+  --output compliance_report.pdf
+```
+
+**Report includes:**
+- Security scan results
+- Audit trail summary
+- Data retention status
+- Sovereignty violations (should be 0)
+- Framework compliance matrix
+
+## Rollback procedures
+
+If deployment fails:
+
+```bash
+# Rollback GCP deployment
+gcloud run services update iluminara-api \
+  --image gcr.io/PROJECT_ID/iluminara-api:previous-version
+
+# Restore database backup
+gcloud spanner databases restore \
+  --source-backup=backup-name \
+  --destination-database=iluminara-db
+
+# Revert code
+git revert HEAD
+git push origin main
+```
+
+## Success criteria
+
+Deployment is successful when:
+
+- [ ] All security workflows pass
+- [ ] Fortress validation returns OPERATIONAL
+- [ ] All services respond to health checks
+- [ ] API endpoints return valid responses
+- [ ] Dashboard loads without errors
+- [ ] Audit trail is logging events
+- [ ] No sovereignty violations detected
+- [ ] Compliance report shows 100% coverage
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Monitoring"
+    icon="chart-line"
+    href="/deployment/monitoring"
+  >
+    Set up monitoring and alerts
+  </Card>
+  <Card
+    title="Incident response"
+    icon="siren"
+    href="/security/incident-response"
+  >
+    Configure incident response
+  </Card>
+  <Card
+    title="Operations"
+    icon="gears"
+    href="/operations/overview"
+  >
+    Operational procedures
+  </Card>
+  <Card
+    title="Training"
+    icon="graduation-cap"
+    href="/training/overview"
+  >
+    Operator training materials
+  </Card>
+</CardGroup>
