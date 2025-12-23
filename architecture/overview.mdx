@@ -1,0 +1,218 @@
+---
+title: Architecture overview
+description: Understanding iLuminara's four foundational pillars
+---
+
+## The fortress
+
+iLuminara-Core is built on four foundational pillars that enable globally sovereign, compliance-first health intelligence:
+
+<CardGroup cols={2}>
+  <Card title="Governance kernel" icon="shield-check">
+    Law-as-code enforcement of 14 global legal frameworks
+  </Card>
+  <Card title="Edge node" icon="microchip">
+    Offline-first data collection and processing
+  </Card>
+  <Card title="Cloud oracle" icon="cloud">
+    Multi-scale outbreak forecasting and analytics
+  </Card>
+  <Card title="Hardware attestation" icon="server">
+    TPM-based trust and bill-of-materials ledger
+  </Card>
+</CardGroup>
+
+## System architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    GOVERNANCE KERNEL                          │
+│        (Legal Vector Ledger, Dignity Guardrails, Audit)      │
+└──────────────────────────────────────────────────────────────┘
+                            ▲
+        ┌───────────────────┼───────────────────┐
+        │                   │                   │
+   ┌────▼────┐      ┌──────▼──────┐    ┌──────▼──────┐
+   │ EDGE    │      │   CLOUD     │    │  HARDWARE   │
+   │ NODE    │      │   ORACLE    │    │  ATTESTATION│
+   │ (EMR    │      │  (Parametric│    │  (TPM,      │
+   │  CBS    │      │   Bonds,    │    │  BOM        │
+   │  IDSR)  │      │  Z-Score)   │    │  Ledger)    │
+   └────┬────┘      └──────┬──────┘    └──────┬──────┘
+        │                  │                  │
+        └──────────────────┼──────────────────┘
+                    ▼
+         ┌────────────────────────┐
+         │   GOLDEN THREAD        │
+         │  Data Fusion Engine    │
+         │ (Verified Timeline)    │
+         └────────────────────────┘
+                    ▲
+                    │
+         ┌──────────┴──────────┐
+         │  FLUTTER WEB UI     │
+         │  (Cloud Run)        │
+         │  Compassionate CHW  │
+         │  Interface          │
+         └─────────────────────┘
+```
+
+## Governance kernel
+
+The ethical engine of iLuminara that enforces sovereign dignity across 14 global legal frameworks.
+
+### Key components
+
+- **SovereignGuardrail** - Encodes GDPR, HIPAA, KDPA, POPIA, and 10 other frameworks
+- **Crypto Shredder (IP-02)** - Data is not deleted; it is cryptographically dissolved
+- **Ethical Engine** - Applies Geneva Convention and WHO IHR constraints
+- **Audit Trail** - Tamper-proof logging with Bigtable, Spanner, and KMS
+
+### Enforcement rules
+
+<AccordionGroup>
+  <Accordion title="Rule 1: Data sovereignty">
+    Health data (PHI) cannot leave sovereign territory. Enforces GDPR Art. 9, Kenya DPA §37, HIPAA §164.312.
+  </Accordion>
+  <Accordion title="Rule 2: Right to explanation">
+    Every high-risk clinical inference requires explainability (SHAP values, feature importance). Enforces EU AI Act §6, GDPR Art. 22.
+  </Accordion>
+  <Accordion title="Rule 3: Consent & dignity">
+    No processing without informed consent. Enforces POPIA §11, CCPA §1798.100, GDPR Art. 6.
+  </Accordion>
+  <Accordion title="Rule 4: Retention windows">
+    Data expires. Eternal surveillance violates dignity. Records >180 days transition to cold storage.
+  </Accordion>
+</AccordionGroup>
+
+## Edge node
+
+Offline-first data collection and processing for resource-constrained environments.
+
+### Modules
+
+- **FRENASA Engine** - Voice-to-JSON transformation with Swahili support
+- **AI Agents** - Autonomous disease surveillance with offline operation
+- **Sync Protocol** - Golden Thread data fusion engine
+- **Vector Store** - Semantic health information retrieval
+- **LoRa Mesh** - Low-bandwidth mesh networking
+
+### Golden Thread
+
+Merges three data streams into one verified timeline:
+
+- **EMR** - Hospital/clinic records (ground truth)
+- **CBS** - Community-based surveillance (population signals)
+- **IDSR** - Integrated Disease Surveillance Response (government standard)
+
+**Verification logic:**
+```
+IF cbs.location == emr.location AND |cbs.timestamp - emr.timestamp| < 24h
+    THEN verification_score = 1.0 (CONFIRMED)
+    ELSE score degrades based on conflict severity
+```
+
+## Cloud oracle
+
+Multi-scale outbreak forecasting system with Google Cloud Platform integration.
+
+### Capabilities
+
+- **BigQuery** - Historical outbreak data storage + real-time streaming
+- **Vertex AI** - AutoML time-series forecasting across spatial hierarchies
+- **Dataflow** - Real-time data fusion combining CBS, EMR, and environmental streams
+- **72-hour forecasting** - Predict outbreak trajectories with 95% confidence intervals
+- **Hierarchical forecasting** - Bottom-up aggregation ensures spatial consistency
+
+### Spatial hierarchy
+
+```
+Community (Ifo Camp)      → Event count: 15  → Forecast: [18, 22, 27]
+    ↓
+District (Dadaab)         → Event count: 45  → Forecast: [55, 68, 82]
+    ↓
+Region (Garissa)          → Event count: 120 → Forecast: [145, 175, 210]
+    ↓
+National (Kenya)          → Event count: 450 → Forecast: [550, 680, 820]
+```
+
+## Hardware attestation
+
+TPM-based trust and bill-of-materials ledger for hardware-rooted security.
+
+### Acorn Protocol (IP-03)
+
+Somatic security using posture + location + stillness as cryptographic authentication. Prevents "panic access" during crises.
+
+## Data flow
+
+<Steps>
+  <Step title="Collection">
+    Community Health Volunteers record voice notes on mobile devices
+  </Step>
+  <Step title="Processing">
+    FRENASA Engine converts Swahili voice to structured JSON at the edge
+  </Step>
+  <Step title="Validation">
+    Governance Kernel validates all actions against sovereign constraints
+  </Step>
+  <Step title="Fusion">
+    Golden Thread merges CBS, EMR, and IDSR data streams
+  </Step>
+  <Step title="Forecasting">
+    Cloud Oracle generates 72-hour outbreak predictions
+  </Step>
+  <Step title="Response">
+    AI Agents trigger alerts and coordinate autonomous response
+  </Step>
+</Steps>
+
+## Design principles
+
+<CardGroup cols={2}>
+  <Card title="Offline-first" icon="wifi-slash">
+    All critical functions work without internet connectivity
+  </Card>
+  <Card title="Sovereignty-native" icon="flag">
+    Data never leaves sovereign territory without explicit authorization
+  </Card>
+  <Card title="Dignity-preserving" icon="heart">
+    Every decision enhances human dignity and respects consent
+  </Card>
+  <Card title="Audit-ready" icon="file-contract">
+    Complete tamper-proof audit trail for regulatory compliance
+  </Card>
+</CardGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Governance kernel"
+    icon="shield-check"
+    href="/governance/overview"
+  >
+    Deep dive into compliance enforcement
+  </Card>
+  <Card
+    title="AI agents"
+    icon="brain-circuit"
+    href="/ai-agents/overview"
+  >
+    Explore autonomous surveillance capabilities
+  </Card>
+  <Card
+    title="Golden Thread"
+    icon="link"
+    href="/architecture/golden-thread"
+  >
+    Understand data fusion logic
+  </Card>
+  <Card
+    title="Deployment"
+    icon="rocket"
+    href="/deployment/overview"
+  >
+    Deploy to production environments
+  </Card>
+</CardGroup>
