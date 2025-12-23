@@ -1,497 +1,706 @@
 """
-Sectoral Compliance Modules
-CBAM Carbon Emissions, MDR Pharma Compliance, and other sector-specific checks
+Sectoral Compliance Module for iLuminara Governance Kernel
+Implements 15 additional global frameworks across 5 sectors
 
-Compliance:
-- EU Carbon Border Adjustment Mechanism (CBAM)
-- EU Medical Device Regulation (MDR) 2017/745
-- FDA 21 CFR Part 11
-- Paris Agreement Article 6.2
+Sectors:
+1. Supply Chain & Manufacturing (Ethical Operations Stack)
+2. ESG & Carbon Credits (Green Sovereign Stack)
+3. Humanitarian Finance & Non-Profit (Clean Money Stack)
+4. Healthcare & Pharma (Clinical Grade Stack)
+5. Cybersecurity & Critical Infrastructure (Digital Fortress Stack)
+
+Total Frameworks: 29 (14 base + 15 sectoral)
 """
 
 import json
-from typing import Dict, List, Optional
+import os
+import hashlib
 from datetime import datetime
+from typing import Dict, List, Optional, Tuple
 from enum import Enum
 import logging
+from fuzzywuzzy import fuzz
+import requests
 
 logger = logging.getLogger(__name__)
 
 
-class TransportMode(Enum):
-    """Transport modes for emissions calculation"""
-    AIR_FREIGHT = "air_freight"
-    SEA_FREIGHT = "sea_freight"
-    ROAD_TRUCK = "road_truck"
-    RAIL = "rail"
+class SectoralContext(Enum):
+    """Sectoral contexts for compliance checking"""
+    SUPPLY_CHAIN = "supply_chain"
+    PROCUREMENT = "procurement"
+    ESG_CARBON = "esg_carbon"
+    HUMANITARIAN_FINANCE = "humanitarian_finance"
+    HEALTHCARE_PHARMA = "healthcare_pharma"
+    CYBERSECURITY = "cybersecurity"
+    CLINICAL_TRIALS = "clinical_trials"
+    CARBON_TRADING = "carbon_trading"
 
 
-class DeviceClass(Enum):
-    """EU MDR device classification"""
-    CLASS_I = "Class I"
-    CLASS_IIA = "Class IIa"
-    CLASS_IIB = "Class IIb"
-    CLASS_III = "Class III"
+class ComplianceViolation(Exception):
+    """Raised when sectoral compliance check fails"""
+    pass
 
 
-class CBAMCalculator:
+class SectoralCompliance:
     """
-    EU Carbon Border Adjustment Mechanism (CBAM) Calculator
-    
-    Calculates embedded emissions per logistics hop for EU import reporting
+    Sectoral Abstraction Layer for the Governance Kernel
+    Implements 15 additional global frameworks
     """
     
-    # Emission factors (kg CO2e per tonne-km)
-    EMISSION_FACTORS = {
-        TransportMode.AIR_FREIGHT: 0.602,      # High emissions
-        TransportMode.SEA_FREIGHT: 0.016,      # Low emissions
-        TransportMode.ROAD_TRUCK: 0.096,       # Medium emissions
-        TransportMode.RAIL: 0.028              # Low-medium emissions
-    }
+    def __init__(self, config_path: str = "governance_kernel/sectoral_laws.json"):
+        self.config_path = config_path
+        self.frameworks = self._load_frameworks()
+        self.sanctions_cache = {}
+        self.sanctions_cache_ttl = 86400  # 24 hours
+        
+        logger.info(f"🌐 Sectoral Compliance initialized - {len(self.frameworks)} frameworks loaded")
     
-    def __init__(self):
-        logger.info("🌍 CBAM Calculator initialized")
+    def _load_frameworks(self) -> Dict:
+        """Load sectoral frameworks from JSON"""
+        if not os.path.exists(self.config_path):
+            logger.warning(f"⚠️ Sectoral laws config not found: {self.config_path}")
+            return {}
+        
+        with open(self.config_path, 'r') as f:
+            return json.load(f)
     
-    def calculate_embedded_emissions(
+    def check_sectoral_compliance(
         self,
-        logistics_chain: List[Dict[str, any]]
-    ) -> Dict[str, any]:
+        context: SectoralContext,
+        payload: Dict,
+        jurisdiction: Optional[str] = None
+    ) -> Dict:
         """
-        Calculate embedded emissions for entire logistics chain
+        Main entry point for sectoral compliance checking
         
         Args:
-            logistics_chain: List of logistics hops with:
-                - transport_mode: TransportMode
-                - distance_km: float
-                - weight_tonnes: float
-                - origin: str
-                - destination: str
+            context: Sectoral context (supply_chain, esg_carbon, etc.)
+            payload: Action payload with relevant data
+            jurisdiction: Optional jurisdiction override
         
         Returns:
-            Emissions report with per-hop and total emissions
+            Compliance result with applicable frameworks and violations
         """
         result = {
-            "timestamp": datetime.utcnow().isoformat(),
-            "total_emissions_kg_co2e": 0.0,
-            "hops": [],
-            "cbam_compliant": False,
-            "eu_import_ready": False
+            "compliant": True,
+            "context": context.value,
+            "applicable_frameworks": [],
+            "violations": [],
+            "warnings": [],
+            "timestamp": datetime.utcnow().isoformat()
         }
         
-        for hop in logistics_chain:
-            transport_mode = TransportMode(hop["transport_mode"])
-            distance_km = hop["distance_km"]
-            weight_tonnes = hop["weight_tonnes"]
-            
-            # Calculate emissions for this hop
-            emission_factor = self.EMISSION_FACTORS[transport_mode]
-            hop_emissions = emission_factor * distance_km * weight_tonnes
-            
-            hop_result = {
-                "origin": hop["origin"],
-                "destination": hop["destination"],
-                "transport_mode": transport_mode.value,
-                "distance_km": distance_km,
-                "weight_tonnes": weight_tonnes,
-                "emission_factor": emission_factor,
-                "emissions_kg_co2e": hop_emissions
-            }
-            
-            result["hops"].append(hop_result)
-            result["total_emissions_kg_co2e"] += hop_emissions
+        # Find applicable frameworks for this context
+        applicable = self._find_applicable_frameworks(context, payload)
         
-        # Check CBAM compliance
-        result["cbam_compliant"] = True
-        result["eu_import_ready"] = True
-        result["compliance_framework"] = "EU Carbon Border Adjustment Mechanism"
-        
-        logger.info(f"✅ CBAM calculation complete - Total: {result['total_emissions_kg_co2e']:.2f} kg CO2e")
+        for framework in applicable:
+            framework_result = self._check_framework(framework, payload, jurisdiction)
+            result["applicable_frameworks"].append(framework["id"])
+            
+            if not framework_result["compliant"]:
+                result["compliant"] = False
+                result["violations"].extend(framework_result["violations"])
+            
+            if framework_result.get("warnings"):
+                result["warnings"].extend(framework_result["warnings"])
         
         return result
     
-    def generate_cbam_report(self, emissions_data: Dict) -> str:
-        """Generate CBAM import report for EU customs"""
-        report = f"""
-╔════════════════════════════════════════════════════════════╗
-║           EU CBAM IMPORT DECLARATION                       ║
-╚════════════════════════════════════════════════════════════╝
-
-Timestamp: {emissions_data['timestamp']}
-Total Embedded Emissions: {emissions_data['total_emissions_kg_co2e']:.2f} kg CO2e
-
-Logistics Chain:
-"""
-        for i, hop in enumerate(emissions_data['hops'], 1):
-            report += f"""
-Hop {i}:
-  Origin: {hop['origin']}
-  Destination: {hop['destination']}
-  Mode: {hop['transport_mode']}
-  Distance: {hop['distance_km']} km
-  Weight: {hop['weight_tonnes']} tonnes
-  Emissions: {hop['emissions_kg_co2e']:.2f} kg CO2e
-"""
+    def _find_applicable_frameworks(
+        self,
+        context: SectoralContext,
+        payload: Dict
+    ) -> List[Dict]:
+        """Find frameworks applicable to this context and payload"""
+        applicable = []
         
-        report += f"""
-CBAM Compliance: {'✅ COMPLIANT' if emissions_data['cbam_compliant'] else '❌ NON-COMPLIANT'}
-EU Import Ready: {'✅ YES' if emissions_data['eu_import_ready'] else '❌ NO'}
-
-Framework: {emissions_data['compliance_framework']}
-"""
-        return report
-
-
-class MDRComplianceChecker:
-    """
-    EU Medical Device Regulation (MDR) 2017/745 Compliance Checker
-    
-    Validates clinical evaluation and post-market surveillance requirements
-    """
-    
-    def __init__(self):
-        logger.info("🏥 MDR Compliance Checker initialized")
-    
-    def classify_device(self, device_info: Dict) -> DeviceClass:
-        """
-        Classify medical device according to MDR rules
+        for sector_name, sector_data in self.frameworks.get("sectors", {}).items():
+            for framework in sector_data.get("frameworks", []):
+                trigger_conditions = framework.get("trigger_conditions", {})
+                
+                # Check if context matches
+                if context.value in trigger_conditions.get("context", []):
+                    # Additional payload-based filtering
+                    if self._matches_trigger_conditions(trigger_conditions, payload):
+                        applicable.append(framework)
         
-        Simplified classification logic:
-        - Diagnostic AI with high risk: Class IIb
-        - Diagnostic AI with medium risk: Class IIa
-        - Non-invasive monitoring: Class I
+        return applicable
+    
+    def _matches_trigger_conditions(
+        self,
+        trigger_conditions: Dict,
+        payload: Dict
+    ) -> bool:
+        """Check if payload matches framework trigger conditions"""
+        # Check data types
+        if "data_types" in trigger_conditions:
+            payload_data_type = payload.get("data_type")
+            if payload_data_type and payload_data_type not in trigger_conditions["data_types"]:
+                return False
+        
+        # Check product types
+        if "product_types" in trigger_conditions:
+            payload_product = payload.get("product_type")
+            if payload_product and payload_product not in trigger_conditions["product_types"]:
+                return False
+        
+        # Check destination
+        if "destination" in trigger_conditions:
+            payload_dest = payload.get("destination")
+            if payload_dest and payload_dest not in trigger_conditions["destination"]:
+                return False
+        
+        return True
+    
+    def _check_framework(
+        self,
+        framework: Dict,
+        payload: Dict,
+        jurisdiction: Optional[str]
+    ) -> Dict:
+        """Check compliance for a specific framework"""
+        result = {
+            "framework_id": framework["id"],
+            "framework_name": framework["name"],
+            "compliant": True,
+            "violations": [],
+            "warnings": []
+        }
+        
+        # Route to specific checker based on framework ID
+        framework_id = framework["id"]
+        
+        if framework_id == "CSDDD":
+            return self._check_csddd(framework, payload)
+        elif framework_id == "LkSG":
+            return self._check_lksg(framework, payload)
+        elif framework_id == "UFLPA":
+            return self._check_uflpa(framework, payload)
+        elif framework_id == "DODD_FRANK_1502":
+            return self._check_conflict_minerals(framework, payload)
+        elif framework_id == "CBAM":
+            return self._check_cbam(framework, payload)
+        elif framework_id == "PARIS_ARTICLE_6_2":
+            return self._check_paris_article_6(framework, payload)
+        elif framework_id == "ICVCM_CCP":
+            return self._check_icvcm(framework, payload)
+        elif framework_id == "FATF_R8":
+            return self._check_fatf_r8(framework, payload)
+        elif framework_id in ["OFAC_SANCTIONS", "UN_SANCTIONS"]:
+            return self._check_sanctions(framework, payload)
+        elif framework_id == "IASC_DATA_RESPONSIBILITY":
+            return self._check_iasc(framework, payload)
+        elif framework_id == "EU_MDR":
+            return self._check_eu_mdr(framework, payload)
+        elif framework_id == "FDA_21_CFR_11":
+            return self._check_fda_21_cfr_11(framework, payload)
+        elif framework_id == "EU_CTR":
+            return self._check_eu_ctr(framework, payload)
+        elif framework_id == "NIS2":
+            return self._check_nis2(framework, payload)
+        elif framework_id == "CRA":
+            return self._check_cra(framework, payload)
+        
+        return result
+    
+    # ========== SUPPLY CHAIN CHECKERS ==========
+    
+    def _check_csddd(self, framework: Dict, payload: Dict) -> Dict:
+        """EU Corporate Sustainability Due Diligence Directive"""
+        result = {"framework_id": "CSDDD", "compliant": True, "violations": [], "warnings": []}
+        
+        supplier_risk_score = payload.get("supplier_risk_score", 0)
+        threshold = framework["enforcement_logic"]["threshold"]
+        
+        if supplier_risk_score > threshold:
+            audit_proof = payload.get("audit_proof_logged", False)
+            if not audit_proof:
+                result["compliant"] = False
+                result["violations"].append({
+                    "rule": "CSDDD: Supplier risk exceeds threshold without audit proof",
+                    "supplier_risk_score": supplier_risk_score,
+                    "threshold": threshold,
+                    "action_required": "Block procurement until audit proof logged"
+                })
+        
+        return result
+    
+    def _check_lksg(self, framework: Dict, payload: Dict) -> Dict:
+        """German Supply Chain Due Diligence Act"""
+        result = {"framework_id": "LkSG", "compliant": True, "violations": [], "warnings": []}
+        
+        grievance_mechanism_logged = payload.get("grievance_mechanism_logged", False)
+        
+        if not grievance_mechanism_logged:
+            result["compliant"] = False
+            result["violations"].append({
+                "rule": "LkSG: Grievance mechanism access must be logged for every supply chain node",
+                "action_required": "Log grievance mechanism access"
+            })
+        
+        return result
+    
+    def _check_uflpa(self, framework: Dict, payload: Dict) -> Dict:
+        """Uyghur Forced Labor Prevention Act"""
+        result = {"framework_id": "UFLPA", "compliant": True, "violations": [], "warnings": []}
+        
+        component_origin = payload.get("component_origin", "")
+        blocked_regions = framework["enforcement_logic"]["blocked_regions"]
+        
+        if component_origin in blocked_regions:
+            result["compliant"] = False
+            result["violations"].append({
+                "rule": "UFLPA: Component origin from blocked region",
+                "component_origin": component_origin,
+                "severity": "SEVERE",
+                "action_required": "Block import and notify CBP"
+            })
+        
+        return result
+    
+    def _check_conflict_minerals(self, framework: Dict, payload: Dict) -> Dict:
+        """Dodd-Frank Section 1502 (Conflict Minerals)"""
+        result = {"framework_id": "DODD_FRANK_1502", "compliant": True, "violations": [], "warnings": []}
+        
+        bom = payload.get("bill_of_materials", {})
+        minerals_3tg = framework["3TG_minerals"]
+        
+        for mineral, ore in minerals_3tg.items():
+            if mineral in bom:
+                smelter_verified = bom[mineral].get("smelter_verified", False)
+                if not smelter_verified:
+                    result["compliant"] = False
+                    result["violations"].append({
+                        "rule": f"Dodd-Frank 1502: {mineral.upper()} smelter source not verified",
+                        "mineral": mineral,
+                        "action_required": "Verify smelter source and trace origin"
+                    })
+        
+        return result
+    
+    # ========== ESG & CARBON CHECKERS ==========
+    
+    def _check_cbam(self, framework: Dict, payload: Dict) -> Dict:
+        """EU Carbon Border Adjustment Mechanism"""
+        result = {"framework_id": "CBAM", "compliant": True, "violations": [], "warnings": []}
+        
+        embedded_emissions = self.calculate_cbam_emissions(payload.get("logistics_data", {}))
+        cbam_declaration = payload.get("cbam_declaration_filed", False)
+        
+        if embedded_emissions > 0 and not cbam_declaration:
+            result["compliant"] = False
+            result["violations"].append({
+                "rule": "CBAM: Embedded emissions require CBAM declaration",
+                "embedded_emissions_tco2e": embedded_emissions,
+                "action_required": "File CBAM declaration and purchase certificates"
+            })
+        
+        result["embedded_emissions_tco2e"] = embedded_emissions
+        return result
+    
+    def calculate_cbam_emissions(self, logistics_data: Dict) -> float:
         """
-        provides_diagnosis = device_info.get("provides_diagnosis", False)
-        risk_level = device_info.get("risk_level", "low")
+        Calculate embedded emissions per logistics hop
+        
+        Args:
+            logistics_data: Dictionary with transport modes and distances
+        
+        Returns:
+            Total embedded emissions in tCO2e
+        """
+        emission_factors = {
+            "air_freight": 0.602,  # kg CO2e per tonne-km
+            "sea_freight": 0.016,
+            "road_freight": 0.062,
+            "rail_freight": 0.022,
+            "cold_chain_multiplier": 1.5
+        }
+        
+        total_emissions = 0.0
+        
+        for hop in logistics_data.get("hops", []):
+            mode = hop.get("transport_mode", "road_freight")
+            distance_km = hop.get("distance_km", 0)
+            weight_tonnes = hop.get("weight_tonnes", 0)
+            is_cold_chain = hop.get("cold_chain", False)
+            
+            emission_factor = emission_factors.get(mode, 0.062)
+            hop_emissions = (emission_factor * distance_km * weight_tonnes) / 1000  # Convert to tonnes
+            
+            if is_cold_chain:
+                hop_emissions *= emission_factors["cold_chain_multiplier"]
+            
+            total_emissions += hop_emissions
+        
+        return round(total_emissions, 3)
+    
+    def _check_paris_article_6(self, framework: Dict, payload: Dict) -> Dict:
+        """Paris Agreement Article 6.2 (Sovereign Carbon Transfers)"""
+        result = {"framework_id": "PARIS_ARTICLE_6_2", "compliant": True, "violations": [], "warnings": []}
+        
+        double_counting_check = payload.get("double_counting_check", False)
+        corresponding_adjustment = payload.get("corresponding_adjustment", False)
+        
+        if not double_counting_check:
+            result["compliant"] = False
+            result["violations"].append({
+                "rule": "Paris Article 6.2: Double counting check required on IP-09 Chrono-Ledger",
+                "action_required": "Verify corresponding adjustment and prevent double counting"
+            })
+        
+        if not corresponding_adjustment:
+            result["warnings"].append({
+                "rule": "Paris Article 6.2: Corresponding adjustment not logged",
+                "recommendation": "Ensure ITMO transfer includes corresponding adjustment"
+            })
+        
+        return result
+    
+    def _check_icvcm(self, framework: Dict, payload: Dict) -> Dict:
+        """ICVCM Core Carbon Principles"""
+        result = {"framework_id": "ICVCM_CCP", "compliant": True, "violations": [], "warnings": []}
+        
+        additionality_verified = payload.get("additionality_verified", False)
+        permanence_verified = payload.get("permanence_verified", False)
+        
+        if not additionality_verified:
+            result["compliant"] = False
+            result["violations"].append({
+                "rule": "ICVCM CCP: Additionality not verified before minting token",
+                "action_required": "Verify project is beyond business-as-usual"
+            })
+        
+        if not permanence_verified:
+            result["compliant"] = False
+            result["violations"].append({
+                "rule": "ICVCM CCP: Permanence not verified before minting token",
+                "action_required": "Verify long-term carbon storage and reversal risk management"
+            })
+        
+        return result
+    
+    # ========== HUMANITARIAN FINANCE CHECKERS ==========
+    
+    def _check_fatf_r8(self, framework: Dict, payload: Dict) -> Dict:
+        """FATF Recommendation 8 (Non-Profits & Terrorist Financing)"""
+        result = {"framework_id": "FATF_R8", "compliant": True, "violations": [], "warnings": []}
+        
+        kyb_check = payload.get("kyb_check_completed", False)
+        beneficiary_verified = payload.get("beneficiary_verified", False)
+        
+        if not kyb_check:
+            result["compliant"] = False
+            result["violations"].append({
+                "rule": "FATF R8: Know Your Beneficiary (KYB) check required",
+                "action_required": "Use Acorn Protocol to verify aid reached real humans"
+            })
+        
+        if not beneficiary_verified:
+            result["warnings"].append({
+                "rule": "FATF R8: Beneficiary verification recommended",
+                "recommendation": "Use biometric proof to prevent aid diversion"
+            })
+        
+        return result
+    
+    def _check_sanctions(self, framework: Dict, payload: Dict) -> Dict:
+        """OFAC/UN Sanctions Screening"""
+        result = {"framework_id": framework["id"], "compliant": True, "violations": [], "warnings": []}
+        
+        payee_id = payload.get("payee_id", "")
+        payee_name = payload.get("payee_name", "")
+        
+        if not payee_id and not payee_name:
+            result["warnings"].append({
+                "rule": f"{framework['id']}: No payee information provided",
+                "recommendation": "Provide payee_id or payee_name for sanctions screening"
+            })
+            return result
+        
+        # Check sanctions (real-time fuzzy matching)
+        sanctions_match = self.check_ofac(payee_id, payee_name)
+        
+        if sanctions_match["is_sanctioned"]:
+            result["compliant"] = False
+            result["violations"].append({
+                "rule": f"{framework['id']}: Payee matches sanctions list",
+                "payee_id": payee_id,
+                "payee_name": payee_name,
+                "match_score": sanctions_match["match_score"],
+                "sanctions_list": sanctions_match["list_name"],
+                "action_required": "Block transaction and freeze funds"
+            })
+        
+        return result
+    
+    def check_ofac(self, user_id: str, user_name: str = "") -> Dict:
+        """
+        Check OFAC sanctions list with fuzzy matching
+        
+        Args:
+            user_id: User identifier
+            user_name: User name for fuzzy matching
+        
+        Returns:
+            Sanctions check result
+        """
+        # Check cache first
+        cache_key = hashlib.sha256(f"{user_id}:{user_name}".encode()).hexdigest()
+        
+        if cache_key in self.sanctions_cache:
+            cached = self.sanctions_cache[cache_key]
+            if (datetime.utcnow() - cached["timestamp"]).total_seconds() < self.sanctions_cache_ttl:
+                return cached["result"]
+        
+        # In production, this would call real OFAC API
+        # For now, simulate with known sanctioned entities
+        sanctioned_entities = [
+            "SANCTIONED_ENTITY_1",
+            "BLOCKED_PERSON",
+            "TERRORIST_ORG"
+        ]
+        
+        is_sanctioned = False
+        match_score = 0.0
+        list_name = ""
+        
+        # Exact match on ID
+        if user_id in sanctioned_entities:
+            is_sanctioned = True
+            match_score = 1.0
+            list_name = "OFAC_SDN"
+        
+        # Fuzzy match on name
+        if user_name:
+            for sanctioned in sanctioned_entities:
+                score = fuzz.ratio(user_name.upper(), sanctioned.upper()) / 100.0
+                if score > 0.85:  # 85% match threshold
+                    is_sanctioned = True
+                    match_score = score
+                    list_name = "OFAC_SDN"
+                    break
+        
+        result = {
+            "is_sanctioned": is_sanctioned,
+            "match_score": match_score,
+            "list_name": list_name,
+            "checked_at": datetime.utcnow().isoformat()
+        }
+        
+        # Cache result
+        self.sanctions_cache[cache_key] = {
+            "result": result,
+            "timestamp": datetime.utcnow()
+        }
+        
+        return result
+    
+    def _check_iasc(self, framework: Dict, payload: Dict) -> Dict:
+        """IASC Guidelines on Data Responsibility"""
+        result = {"framework_id": "IASC_DATA_RESPONSIBILITY", "compliant": True, "violations": [], "warnings": []}
+        
+        population_type = payload.get("population_type", "")
+        location_data = payload.get("location_data", {})
+        
+        vulnerable_populations = framework["vulnerable_populations"]
+        
+        if population_type in vulnerable_populations:
+            requirements = vulnerable_populations[population_type]
+            
+            # Check location data redaction for refugees
+            if population_type == "refugees":
+                if location_data.get("precise_coordinates") and not location_data.get("redacted"):
+                    result["compliant"] = False
+                    result["violations"].append({
+                        "rule": "IASC: Precise location data for refugees must be redacted",
+                        "action_required": "Redact precise coordinates for vulnerable populations"
+                    })
+        
+        return result
+    
+    # ========== HEALTHCARE & PHARMA CHECKERS ==========
+    
+    def _check_eu_mdr(self, framework: Dict, payload: Dict) -> Dict:
+        """EU Medical Device Regulation"""
+        result = {"framework_id": "EU_MDR", "compliant": True, "violations": [], "warnings": []}
+        
+        provides_diagnosis = payload.get("provides_diagnosis", False)
+        clinical_evaluation_logged = payload.get("clinical_evaluation_logged", False)
+        pms_enabled = payload.get("post_market_surveillance_enabled", False)
         
         if provides_diagnosis:
-            if risk_level == "high":
-                return DeviceClass.CLASS_IIB
-            else:
-                return DeviceClass.CLASS_IIA
-        else:
-            return DeviceClass.CLASS_I
-    
-    def verify_mdr_compliance(
-        self,
-        device_info: Dict,
-        clinical_data: Optional[Dict] = None
-    ) -> Dict[str, any]:
-        """
-        Verify MDR compliance for medical device
-        
-        Args:
-            device_info: Device information
-            clinical_data: Clinical evaluation data
-        
-        Returns:
-            Compliance verification result
-        """
-        device_class = self.classify_device(device_info)
-        
-        result = {
-            "timestamp": datetime.utcnow().isoformat(),
-            "device_name": device_info.get("name", "Unknown"),
-            "device_class": device_class.value,
-            "mdr_compliant": False,
-            "requirements": [],
-            "violations": [],
-            "recommendations": []
-        }
-        
-        # Check Class IIa/IIb requirements
-        if device_class in [DeviceClass.CLASS_IIA, DeviceClass.CLASS_IIB]:
-            
-            # Requirement 1: Clinical Evaluation
-            if not clinical_data or not clinical_data.get("clinical_evaluation_complete", False):
+            if not clinical_evaluation_logged:
+                result["compliant"] = False
                 result["violations"].append({
-                    "requirement": "Clinical Evaluation (MDR Art. 61)",
-                    "severity": "HIGH",
-                    "message": "Clinical evaluation required for Class IIa/IIb devices"
+                    "rule": "EU MDR: Clinical evaluation required for diagnostic devices (Class IIa/b)",
+                    "action_required": "Log clinical evaluation data"
                 })
-            else:
-                result["requirements"].append("Clinical Evaluation: ✅ Complete")
             
-            # Requirement 2: Post-Market Surveillance (PMS)
-            if not clinical_data or not clinical_data.get("pms_plan_established", False):
-                result["violations"].append({
-                    "requirement": "Post-Market Surveillance (MDR Art. 83-92)",
-                    "severity": "HIGH",
-                    "message": "PMS plan required for Class IIa/IIb devices"
+            if not pms_enabled:
+                result["warnings"].append({
+                    "rule": "EU MDR: Post-Market Surveillance recommended",
+                    "recommendation": "Enable PMS event tracking"
                 })
-            else:
-                result["requirements"].append("Post-Market Surveillance: ✅ Established")
-            
-            # Requirement 3: Technical Documentation
-            if not device_info.get("technical_documentation_complete", False):
-                result["violations"].append({
-                    "requirement": "Technical Documentation (MDR Annex II)",
-                    "severity": "CRITICAL",
-                    "message": "Complete technical documentation required"
-                })
-            else:
-                result["requirements"].append("Technical Documentation: ✅ Complete")
-            
-            # Requirement 4: Risk Management
-            if not device_info.get("risk_management_complete", False):
-                result["violations"].append({
-                    "requirement": "Risk Management (ISO 14971)",
-                    "severity": "HIGH",
-                    "message": "Risk management file required"
-                })
-            else:
-                result["requirements"].append("Risk Management: ✅ Complete")
-        
-        # Determine overall compliance
-        if not result["violations"]:
-            result["mdr_compliant"] = True
-            logger.info(f"✅ MDR COMPLIANT: {result['device_name']} ({device_class.value})")
-        else:
-            logger.warning(f"❌ MDR NON-COMPLIANT: {result['device_name']} - {len(result['violations'])} violations")
-        
-        result["compliance_framework"] = "EU Medical Device Regulation 2017/745"
         
         return result
-
-
-class FDA21CFRPart11Checker:
-    """
-    FDA 21 CFR Part 11 Compliance Checker
-    Electronic Records and Electronic Signatures
-    """
     
-    def __init__(self):
-        logger.info("💊 FDA 21 CFR Part 11 Checker initialized")
-    
-    def verify_audit_trail(self, record: Dict) -> Dict[str, any]:
+    def verify_mdr_compliance(self, diagnosis_output: Dict) -> Dict:
         """
-        Verify audit trail meets 21 CFR Part 11 requirements
-        
-        Requirements:
-        - Timestamped
-        - Non-repudiable (cryptographic signature)
-        - Tamper-evident
-        - Secure
-        """
-        result = {
-            "timestamp": datetime.utcnow().isoformat(),
-            "record_id": record.get("id", "Unknown"),
-            "compliant": False,
-            "requirements_met": [],
-            "violations": []
-        }
-        
-        # Check timestamp
-        if record.get("timestamp"):
-            result["requirements_met"].append("Timestamped: ✅")
-        else:
-            result["violations"].append({
-                "requirement": "§11.10(e) Audit Trail - Timestamp",
-                "message": "Record must include secure timestamp"
-            })
-        
-        # Check cryptographic signature
-        if record.get("cryptographic_signature"):
-            result["requirements_met"].append("Non-repudiable: ✅")
-        else:
-            result["violations"].append({
-                "requirement": "§11.50 Signature Manifestations",
-                "message": "Record must include cryptographic signature"
-            })
-        
-        # Check tamper evidence
-        if record.get("hash_chain") or record.get("blockchain_anchor"):
-            result["requirements_met"].append("Tamper-evident: ✅")
-        else:
-            result["violations"].append({
-                "requirement": "§11.10(a) Validation",
-                "message": "Record must be tamper-evident (hash chain or blockchain)"
-            })
-        
-        # Check access controls
-        if record.get("access_controls_enabled"):
-            result["requirements_met"].append("Secure: ✅")
-        else:
-            result["violations"].append({
-                "requirement": "§11.10(d) Device Checks",
-                "message": "Access controls must be enabled"
-            })
-        
-        # Determine compliance
-        result["compliant"] = len(result["violations"]) == 0
-        result["compliance_framework"] = "FDA 21 CFR Part 11"
-        
-        if result["compliant"]:
-            logger.info(f"✅ FDA 21 CFR Part 11 COMPLIANT: {result['record_id']}")
-        else:
-            logger.warning(f"❌ FDA 21 CFR Part 11 NON-COMPLIANT: {result['record_id']}")
-        
-        return result
-
-
-class ParisAgreementChecker:
-    """
-    Paris Agreement Article 6.2 Compliance Checker
-    Sovereign Carbon Transfer Double Counting Prevention
-    """
-    
-    def __init__(self):
-        self.transfer_registry = {}  # In production, this would be IP-09 Chrono-Ledger
-        logger.info("🌐 Paris Agreement Art. 6.2 Checker initialized")
-    
-    def check_double_counting(
-        self,
-        credit_id: str,
-        source_country: str,
-        destination_country: str,
-        amount_tonnes_co2e: float
-    ) -> Dict[str, any]:
-        """
-        Check for double counting in carbon credit transfers
+        Verify MDR compliance for diagnostic output
         
         Args:
-            credit_id: Unique credit identifier
-            source_country: Originating country
-            destination_country: Receiving country
-            amount_tonnes_co2e: Amount of CO2e credits
+            diagnosis_output: Diagnostic output from FRENASA Engine
         
         Returns:
-            Double counting check result
+            MDR compliance verification result
         """
-        result = {
-            "timestamp": datetime.utcnow().isoformat(),
-            "credit_id": credit_id,
-            "source_country": source_country,
-            "destination_country": destination_country,
-            "amount_tonnes_co2e": amount_tonnes_co2e,
-            "double_counting_detected": False,
-            "compliant": False,
-            "action": "ALLOW_TRANSFER"
-        }
+        return self._check_eu_mdr(
+            {"id": "EU_MDR"},
+            {
+                "provides_diagnosis": True,
+                "clinical_evaluation_logged": diagnosis_output.get("clinical_evaluation_logged", False),
+                "post_market_surveillance_enabled": diagnosis_output.get("pms_enabled", False)
+            }
+        )
+    
+    def _check_fda_21_cfr_11(self, framework: Dict, payload: Dict) -> Dict:
+        """FDA 21 CFR Part 11 (Electronic Records & Signatures)"""
+        result = {"framework_id": "FDA_21_CFR_11", "compliant": True, "violations": [], "warnings": []}
         
-        # Check if credit already transferred
-        if credit_id in self.transfer_registry:
-            existing_transfer = self.transfer_registry[credit_id]
-            result["double_counting_detected"] = True
+        has_timestamp = payload.get("timestamped", False)
+        has_digital_signature = payload.get("digital_signature", False)
+        has_audit_trail = payload.get("audit_trail", False)
+        
+        if not has_timestamp:
             result["compliant"] = False
-            result["action"] = "BLOCK_TRANSFER"
-            result["violation"] = {
-                "message": f"Credit {credit_id} already transferred",
-                "previous_transfer": existing_transfer,
-                "framework": "Paris Agreement Article 6.2"
-            }
-            
-            logger.error(f"🚨 DOUBLE COUNTING DETECTED: {credit_id}")
-        else:
-            # Register transfer
-            self.transfer_registry[credit_id] = {
-                "timestamp": result["timestamp"],
-                "source_country": source_country,
-                "destination_country": destination_country,
-                "amount_tonnes_co2e": amount_tonnes_co2e
-            }
-            
-            result["compliant"] = True
-            result["action"] = "ALLOW_TRANSFER"
-            result["chrono_ledger_entry"] = "IP-09 Chrono-Ledger updated"
-            
-            logger.info(f"✅ PARIS AGREEMENT COMPLIANT: {credit_id} transfer allowed")
+            result["violations"].append({
+                "rule": "FDA 21 CFR 11: Electronic records must be timestamped",
+                "action_required": "Add timestamp to Golden Thread entry"
+            })
         
-        result["compliance_framework"] = "Paris Agreement Article 6.2 (Sovereign Carbon Transfers)"
+        if not has_digital_signature:
+            result["warnings"].append({
+                "rule": "FDA 21 CFR 11: Digital signature recommended",
+                "recommendation": "Add non-repudiable digital signature"
+            })
+        
+        if not has_audit_trail:
+            result["compliant"] = False
+            result["violations"].append({
+                "rule": "FDA 21 CFR 11: Audit trail required",
+                "action_required": "Enable audit trail for all record modifications"
+            })
+        
+        return result
+    
+    def _check_eu_ctr(self, framework: Dict, payload: Dict) -> Dict:
+        """EU Clinical Trials Regulation"""
+        result = {"framework_id": "EU_CTR", "compliant": True, "violations": [], "warnings": []}
+        
+        sponsor_data_separated = payload.get("sponsor_data_separated", False)
+        subject_data_pseudonymized = payload.get("subject_data_pseudonymized", False)
+        
+        if not sponsor_data_separated:
+            result["compliant"] = False
+            result["violations"].append({
+                "rule": "EU CTR: Sponsor data must be separated from subject clinical data",
+                "action_required": "Enforce strict data separation"
+            })
+        
+        if not subject_data_pseudonymized:
+            result["compliant"] = False
+            result["violations"].append({
+                "rule": "EU CTR: Subject data must be pseudonymized",
+                "action_required": "Pseudonymize all subject clinical data"
+            })
+        
+        return result
+    
+    # ========== CYBERSECURITY CHECKERS ==========
+    
+    def _check_nis2(self, framework: Dict, payload: Dict) -> Dict:
+        """NIS2 Directive"""
+        result = {"framework_id": "NIS2", "compliant": True, "violations": [], "warnings": []}
+        
+        is_significant_incident = payload.get("is_significant_incident", False)
+        cert_notified = payload.get("cert_notified", False)
+        notification_time_hours = payload.get("notification_time_hours", 0)
+        
+        if is_significant_incident:
+            if not cert_notified:
+                result["compliant"] = False
+                result["violations"].append({
+                    "rule": "NIS2: Significant incidents must be reported to national CERT within 24 hours",
+                    "action_required": "Notify national CERT immediately"
+                })
+            elif notification_time_hours > 24:
+                result["compliant"] = False
+                result["violations"].append({
+                    "rule": "NIS2: Early warning notification exceeded 24-hour deadline",
+                    "notification_time_hours": notification_time_hours,
+                    "action_required": "Improve incident detection and notification speed"
+                })
+        
+        return result
+    
+    def _check_cra(self, framework: Dict, payload: Dict) -> Dict:
+        """Cyber Resilience Act"""
+        result = {"framework_id": "CRA", "compliant": True, "violations": [], "warnings": []}
+        
+        sbom_generated = payload.get("sbom_generated", False)
+        vulnerability_monitoring = payload.get("vulnerability_monitoring_enabled", False)
+        support_period_years = payload.get("support_period_years", 0)
+        
+        if not sbom_generated:
+            result["compliant"] = False
+            result["violations"].append({
+                "rule": "CRA: Software Bill of Materials (SBOM) required",
+                "action_required": "Generate SBOM in SPDX or CycloneDX format"
+            })
+        
+        if not vulnerability_monitoring:
+            result["warnings"].append({
+                "rule": "CRA: Vulnerability monitoring recommended",
+                "recommendation": "Enable automated vulnerability monitoring for device lifecycle"
+            })
+        
+        if support_period_years < 5:
+            result["compliant"] = False
+            result["violations"].append({
+                "rule": "CRA: Minimum 5-year support period required",
+                "current_support_years": support_period_years,
+                "action_required": "Extend support period to 5 years minimum"
+            })
         
         return result
 
 
 # Example usage
 if __name__ == "__main__":
-    print("=" * 60)
-    print("SECTORAL COMPLIANCE MODULES")
-    print("=" * 60)
-    print()
+    sectoral = SectoralCompliance()
     
-    # Test 1: CBAM Carbon Emissions
-    print("TEST 1: CBAM Carbon Emissions Calculation")
-    print("-" * 60)
-    
-    cbam = CBAMCalculator()
-    logistics_chain = [
-        {
-            "transport_mode": "sea_freight",
-            "distance_km": 8000,
-            "weight_tonnes": 10,
-            "origin": "Mombasa, Kenya",
-            "destination": "Rotterdam, Netherlands"
-        },
-        {
-            "transport_mode": "road_truck",
-            "distance_km": 500,
-            "weight_tonnes": 10,
-            "origin": "Rotterdam, Netherlands",
-            "destination": "Berlin, Germany"
+    # Test supply chain compliance
+    supply_chain_result = sectoral.check_sectoral_compliance(
+        context=SectoralContext.SUPPLY_CHAIN,
+        payload={
+            "supplier_risk_score": 0.8,
+            "audit_proof_logged": False,
+            "component_origin": "China"
         }
-    ]
-    
-    emissions = cbam.calculate_embedded_emissions(logistics_chain)
-    print(cbam.generate_cbam_report(emissions))
-    
-    # Test 2: MDR Compliance
-    print("\nTEST 2: EU MDR Compliance Check")
-    print("-" * 60)
-    
-    mdr = MDRComplianceChecker()
-    device_info = {
-        "name": "FRENASA AI Diagnostic Engine",
-        "provides_diagnosis": True,
-        "risk_level": "high",
-        "technical_documentation_complete": True,
-        "risk_management_complete": True
-    }
-    
-    clinical_data = {
-        "clinical_evaluation_complete": True,
-        "pms_plan_established": True
-    }
-    
-    mdr_result = mdr.verify_mdr_compliance(device_info, clinical_data)
-    print(json.dumps(mdr_result, indent=2))
-    
-    # Test 3: FDA 21 CFR Part 11
-    print("\nTEST 3: FDA 21 CFR Part 11 Audit Trail")
-    print("-" * 60)
-    
-    fda = FDA21CFRPart11Checker()
-    record = {
-        "id": "RECORD-12345",
-        "timestamp": datetime.utcnow().isoformat(),
-        "cryptographic_signature": "SHA256:abc123...",
-        "hash_chain": "0x123abc...",
-        "access_controls_enabled": True
-    }
-    
-    fda_result = fda.verify_audit_trail(record)
-    print(json.dumps(fda_result, indent=2))
-    
-    # Test 4: Paris Agreement Double Counting
-    print("\nTEST 4: Paris Agreement Double Counting Check")
-    print("-" * 60)
-    
-    paris = ParisAgreementChecker()
-    
-    # First transfer (should pass)
-    result1 = paris.check_double_counting(
-        credit_id="CARBON-CREDIT-001",
-        source_country="Kenya",
-        destination_country="Switzerland",
-        amount_tonnes_co2e=1000.0
     )
-    print("First Transfer:")
-    print(json.dumps(result1, indent=2))
     
-    # Second transfer of same credit (should fail)
-    result2 = paris.check_double_counting(
-        credit_id="CARBON-CREDIT-001",
-        source_country="Kenya",
-        destination_country="Germany",
-        amount_tonnes_co2e=1000.0
-    )
-    print("\nSecond Transfer (Double Counting Attempt):")
-    print(json.dumps(result2, indent=2))
+    print(f"Supply Chain Compliance: {json.dumps(supply_chain_result, indent=2)}")
+    
+    # Test OFAC sanctions
+    sanctions_result = sectoral.check_ofac("USER_123", "John Doe")
+    print(f"Sanctions Check: {json.dumps(sanctions_result, indent=2)}")
+    
+    # Test CBAM emissions
+    emissions = sectoral.calculate_cbam_emissions({
+        "hops": [
+            {"transport_mode": "sea_freight", "distance_km": 5000, "weight_tonnes": 10, "cold_chain": True},
+            {"transport_mode": "road_freight", "distance_km": 200, "weight_tonnes": 10, "cold_chain": True}
+        ]
+    })
+    print(f"CBAM Emissions: {emissions} tCO2e")
