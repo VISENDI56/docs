@@ -1,0 +1,194 @@
+---
+title: API overview
+description: Core endpoints for voice processing and outbreak prediction
+---
+
+## Base URL
+
+```
+http://localhost:8080
+```
+
+For production deployments, replace with your Cloud Run or custom domain URL.
+
+## Authentication
+
+Currently, the API does not require authentication for local development. For production deployments, implement authentication using:
+
+- Google Cloud IAM
+- API keys
+- OAuth 2.0
+
+## Core endpoints
+
+<CardGroup cols={2}>
+  <Card
+    title="Health check"
+    icon="heart-pulse"
+    href="/api-reference/health"
+  >
+    Check service health and metadata
+  </Card>
+  <Card
+    title="Voice processing"
+    icon="microphone"
+    href="/api-reference/voice-processing"
+  >
+    Convert voice alerts to structured health data
+  </Card>
+  <Card
+    title="Outbreak prediction"
+    icon="chart-line"
+    href="/api-reference/outbreak-prediction"
+  >
+    Predict outbreak risk using Z-score analysis
+  </Card>
+  <Card
+    title="PubSub monitoring"
+    icon="bell"
+    href="/api-reference/pubsub"
+  >
+    Real-time alert system integration
+  </Card>
+</CardGroup>
+
+## Quick example
+
+### Start the API service
+
+```bash
+python api_service.py
+```
+
+### Test voice processing
+
+```bash
+# Generate test audio
+python generate_test_audio.py
+
+# Process voice alert
+curl -X POST http://localhost:8080/process-voice \
+  -H "Content-Type: audio/wav" \
+  --data-binary @swahili-symptom.wav
+```
+
+### Test outbreak prediction
+
+```bash
+curl -X POST http://localhost:8080/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "location": {"lat": 0.4221, "lng": 40.2255},
+    "symptoms": ["diarrhea", "vomiting"]
+  }'
+```
+
+## Response format
+
+All API responses follow a consistent format:
+
+### Success response
+
+```json
+{
+  "status": "success",
+  "timestamp": "2025-12-19T20:00:00.000Z",
+  "processing_time_ms": 45,
+  "data": {
+    // Endpoint-specific data
+  }
+}
+```
+
+### Error response
+
+```json
+{
+  "status": "error",
+  "error": "error_code",
+  "message": "Human-readable error message"
+}
+```
+
+## Common errors
+
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `no_audio_data` | 400 | No audio data in request |
+| `missing_location` | 400 | Location required but not provided |
+| `missing_symptoms` | 400 | Symptoms list required |
+| `invalid_content_type` | 400 | Wrong Content-Type header |
+| `sovereignty_violation` | 403 | Action violates compliance rules |
+| `processing_failed` | 500 | Internal processing error |
+
+## Integration with governance
+
+All API endpoints enforce sovereignty constraints through the `SovereignGuardrail`:
+
+- **Voice processing** - Data processed at edge (local node)
+- **Outbreak prediction** - Analytics comply with GDPR, KDPA, HIPAA
+- **Data transfers** - PHI never leaves sovereign territory
+
+```python
+from governance_kernel.vector_ledger import SovereignGuardrail
+
+guardrail = SovereignGuardrail()
+
+# All API actions are validated
+guardrail.validate_action(
+    action_type='Data_Transfer',
+    payload={'data_type': 'PHI', 'destination': 'Local_Node'},
+    jurisdiction='GDPR_EU'
+)
+```
+
+## Performance
+
+- **Voice Processing** - ~4.2s average (simulates real-time transcription)
+- **Outbreak Prediction** - ~45ms average
+- **PubSub Latency** - <100ms for alert delivery
+
+## Rate limits
+
+For production deployments, implement rate limiting using:
+
+- Google Cloud Armor
+- API Gateway
+- Custom middleware
+
+Recommended limits:
+- Voice processing: 10 requests/minute per IP
+- Outbreak prediction: 100 requests/minute per IP
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Voice processing"
+    icon="microphone"
+    href="/api-reference/voice-processing"
+  >
+    Detailed voice processing documentation
+  </Card>
+  <Card
+    title="Outbreak prediction"
+    icon="chart-line"
+    href="/api-reference/outbreak-prediction"
+  >
+    Detailed outbreak prediction documentation
+  </Card>
+  <Card
+    title="Deploy to GCP"
+    icon="cloud"
+    href="/deployment/gcp"
+  >
+    Deploy API to Google Cloud Platform
+  </Card>
+  <Card
+    title="Governance"
+    icon="shield-check"
+    href="/governance/overview"
+  >
+    Understand compliance enforcement
+  </Card>
+</CardGroup>

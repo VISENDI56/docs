@@ -1,0 +1,370 @@
+---
+title: Deployment overview
+description: Deploy iLuminara to GCP, edge devices, or hybrid infrastructure
+---
+
+## Deployment options
+
+iLuminara-Core supports multiple deployment scenarios to meet different operational requirements:
+
+<CardGroup cols={2}>
+  <Card
+    title="Google Cloud Platform"
+    icon="google"
+    href="/deployment/gcp"
+  >
+    Cloud-native deployment with Cloud Run, Vertex AI, and BigQuery
+  </Card>
+  <Card
+    title="Edge devices"
+    icon="microchip"
+    href="/deployment/edge"
+  >
+    NVIDIA Jetson Orin and resource-constrained environments
+  </Card>
+  <Card
+    title="Hybrid infrastructure"
+    icon="network-wired"
+    href="/deployment/hybrid"
+  >
+    Edge-to-cloud synchronization with offline capabilities
+  </Card>
+  <Card
+    title="Docker"
+    icon="docker"
+    href="/deployment/docker"
+  >
+    Containerized deployment with docker-compose
+  </Card>
+</CardGroup>
+
+## Quick deployment
+
+### Local development
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Launch all services
+chmod +x launch_all_services.sh
+./launch_all_services.sh
+```
+
+This launches:
+- **3 Streamlit Dashboards** (Ports 8501-8503)
+  - Command Console: http://0.0.0.0:8501
+  - Transparency Audit: http://0.0.0.0:8502
+  - Field Validation: http://0.0.0.0:8503
+- **Docker Services** (if available)
+  - Core API, Prometheus, Grafana, Nginx
+- **Support Services** (Port forwarder, etc.)
+
+### Google Cloud Platform
+
+```bash
+# Deploy to GCP
+chmod +x deploy_gcp_prototype.sh
+./deploy_gcp_prototype.sh
+```
+
+This script:
+1. Enables required GCP services
+2. Deploys FRENASA AI Engine to Cloud Run
+3. Sets up HSTPU Forecaster on Vertex AI
+4. Creates HSML Ledger using Cloud Spanner
+5. Generates demo outbreak data in BigQuery
+6. Launches dashboard on Cloud Run
+
+### Docker
+
+```bash
+# Build and run
+docker-compose up -d
+```
+
+## Architecture patterns
+
+### Edge-first deployment
+
+For resource-constrained environments with intermittent connectivity:
+
+```
+┌─────────────────────────────────────┐
+│         EDGE NODE                   │
+│  ┌──────────────────────────────┐  │
+│  │  FRENASA Engine              │  │
+│  │  - Voice processing          │  │
+│  │  - Symptom extraction        │  │
+│  │  - Local inference           │  │
+│  └──────────────────────────────┘  │
+│  ┌──────────────────────────────┐  │
+│  │  AI Agents                   │  │
+│  │  - Offline operation         │  │
+│  │  - Queue management          │  │
+│  │  - Local storage             │  │
+│  └──────────────────────────────┘  │
+│  ┌──────────────────────────────┐  │
+│  │  Governance Kernel           │  │
+│  │  - Sovereignty validation    │  │
+│  │  - Local audit trail         │  │
+│  └──────────────────────────────┘  │
+└─────────────────────────────────────┘
+              │
+              │ Sync when online
+              ▼
+┌─────────────────────────────────────┐
+│         CLOUD ORACLE                │
+│  - BigQuery aggregation             │
+│  - Vertex AI forecasting            │
+│  - Global analytics                 │
+└─────────────────────────────────────┘
+```
+
+### Cloud-first deployment
+
+For environments with reliable connectivity:
+
+```
+┌─────────────────────────────────────┐
+│         CLOUD SERVICES              │
+│  ┌──────────────────────────────┐  │
+│  │  Cloud Run                   │  │
+│  │  - API endpoints             │  │
+│  │  - Dashboard hosting         │  │
+│  └──────────────────────────────┘  │
+│  ┌──────────────────────────────┐  │
+│  │  Vertex AI                   │  │
+│  │  - Model training            │  │
+│  │  - Forecasting               │  │
+│  └──────────────────────────────┘  │
+│  ┌──────────────────────────────┐  │
+│  │  BigQuery                    │  │
+│  │  - Data warehouse            │  │
+│  │  - Analytics                 │  │
+│  └──────────────────────────────┘  │
+│  ┌──────────────────────────────┐  │
+│  │  Cloud Spanner               │  │
+│  │  - Audit ledger              │  │
+│  │  - Global consistency        │  │
+│  └──────────────────────────────┘  │
+└─────────────────────────────────────┘
+              │
+              │ Data collection
+              ▼
+┌─────────────────────────────────────┐
+│         EDGE DEVICES                │
+│  - Mobile apps                      │
+│  - IoT sensors                      │
+│  - CHV devices                      │
+└─────────────────────────────────────┘
+```
+
+### Hybrid deployment
+
+Best of both worlds - edge processing with cloud analytics:
+
+```
+┌─────────────────────────────────────┐
+│         EDGE NODE                   │
+│  - Critical processing              │
+│  - Offline operation                │
+│  - Local sovereignty                │
+└─────────────────────────────────────┘
+              │
+              │ Bidirectional sync
+              ▼
+┌─────────────────────────────────────┐
+│         CLOUD ORACLE                │
+│  - Global forecasting               │
+│  - Cross-region analytics           │
+│  - Model training                   │
+└─────────────────────────────────────┘
+```
+
+## Deployment checklist
+
+<Steps>
+  <Step title="Prerequisites">
+    Install dependencies, configure environment variables, set up GCP project (if using cloud)
+  </Step>
+  <Step title="Governance configuration">
+    Configure jurisdiction, enable tamper-proof audit, set retention policies
+  </Step>
+  <Step title="Infrastructure setup">
+    Deploy edge nodes, configure cloud services, set up networking
+  </Step>
+  <Step title="Data pipeline">
+    Configure data sources, set up sync protocols, enable monitoring
+  </Step>
+  <Step title="Testing">
+    Run integration tests, validate compliance, test offline scenarios
+  </Step>
+  <Step title="Production launch">
+    Enable monitoring, configure alerts, train operators
+  </Step>
+</Steps>
+
+## Environment variables
+
+### Core configuration
+
+```bash
+# Node identification
+export NODE_ID=JOR-47
+export JURISDICTION=KDPA_KE
+
+# API configuration
+export API_HOST=0.0.0.0
+export API_PORT=8080
+
+# GCP configuration (if using cloud)
+export GOOGLE_CLOUD_PROJECT=your-project-id
+export GCP_REGION=us-central1
+```
+
+### Governance configuration
+
+```bash
+# Compliance settings
+export ENABLE_TAMPER_PROOF_AUDIT=true
+export RETENTION_MAX_DAYS=1825
+export AUDIT_LOG_LEVEL=INFO
+
+# Sovereignty settings
+export DATA_SOVEREIGNTY_REQUIRED=true
+export REQUIRES_EXPLICIT_CONSENT=true
+```
+
+### AI agents configuration
+
+```bash
+# Offline operation
+export ENABLE_OFFLINE_MODE=true
+export SYNC_INTERVAL_SECONDS=300
+
+# Federated learning
+export FEDERATED_LEARNING_EPSILON=1.0
+export FEDERATED_LEARNING_DELTA=1e-5
+```
+
+## Monitoring and observability
+
+### Health checks
+
+```bash
+# API health
+curl http://localhost:8080/health
+
+# Dashboard status
+curl http://localhost:8501/_stcore/health
+```
+
+### Logs
+
+```bash
+# View API logs
+tail -f logs/api.log
+
+# View dashboard logs
+tail -f logs/dashboard.log
+
+# View audit logs
+tail -f logs/audit.log
+```
+
+### Metrics
+
+iLuminara exposes Prometheus-compatible metrics:
+
+- Request latency
+- Error rates
+- Compliance violations
+- Sync status
+- Agent health
+
+## Security considerations
+
+<AccordionGroup>
+  <Accordion title="Data sovereignty">
+    Ensure PHI never leaves sovereign territory. Configure jurisdiction-specific rules in governance kernel.
+  </Accordion>
+  <Accordion title="Network security">
+    Use VPN or private networking for edge-to-cloud communication. Enable TLS for all endpoints.
+  </Accordion>
+  <Accordion title="Access control">
+    Implement IAM roles for GCP services. Use service accounts with minimal permissions.
+  </Accordion>
+  <Accordion title="Audit logging">
+    Enable tamper-proof audit trail. Configure Cloud KMS for cryptographic signatures.
+  </Accordion>
+  <Accordion title="Encryption">
+    Enable encryption at rest and in transit. Use Cloud KMS for key management.
+  </Accordion>
+</AccordionGroup>
+
+## Performance tuning
+
+### Edge devices
+
+- **CPU**: Optimize for ARM64 architecture
+- **Memory**: Configure swap for resource-constrained devices
+- **Storage**: Use SSD for local database
+- **Network**: Configure retry logic for intermittent connectivity
+
+### Cloud services
+
+- **Cloud Run**: Configure autoscaling (min: 1, max: 100)
+- **BigQuery**: Use partitioned tables for time-series data
+- **Vertex AI**: Use batch prediction for cost optimization
+- **Dataflow**: Configure worker pools based on load
+
+## Disaster recovery
+
+<Steps>
+  <Step title="Backup strategy">
+    Daily backups of audit logs, weekly backups of operational data
+  </Step>
+  <Step title="Replication">
+    Multi-region replication for critical data (Cloud Spanner)
+  </Step>
+  <Step title="Failover">
+    Automatic failover to secondary region (Cloud Run)
+  </Step>
+  <Step title="Recovery testing">
+    Quarterly disaster recovery drills
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Deploy to GCP"
+    icon="google"
+    href="/deployment/gcp"
+  >
+    Detailed GCP deployment guide
+  </Card>
+  <Card
+    title="Edge deployment"
+    icon="microchip"
+    href="/deployment/edge"
+  >
+    Deploy to NVIDIA Jetson Orin
+  </Card>
+  <Card
+    title="Configuration"
+    icon="gear"
+    href="/deployment/configuration"
+  >
+    Configure for your environment
+  </Card>
+  <Card
+    title="Monitoring"
+    icon="chart-line"
+    href="/deployment/monitoring"
+  >
+    Set up monitoring and alerts
+  </Card>
+</CardGroup>

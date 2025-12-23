@@ -1,0 +1,239 @@
+---
+title: Voice processing
+description: Convert voice alerts to structured health data
+---
+
+## Endpoint
+
+```
+POST /process-voice
+```
+
+## Description
+
+Process voice alerts from Community Health Volunteers (CHVs) and convert them into structured health data. Supports Swahili language with edge fallback for offline scenarios.
+
+## Headers
+
+| Header | Value | Required |
+|--------|-------|----------|
+| `Content-Type` | `audio/wav` or `multipart/form-data` | Yes |
+
+## Query parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `language` | string | No | Language of the audio (default: "swahili") |
+| `lat` | float | No | Latitude coordinate |
+| `lng` | float | No | Longitude coordinate |
+
+## Request
+
+### With audio file
+
+```bash
+curl -X POST http://localhost:8080/process-voice \
+  -H "Content-Type: audio/wav" \
+  --data-binary @swahili-symptom.wav
+```
+
+### With location
+
+```bash
+curl -X POST "http://localhost:8080/process-voice?language=swahili&lat=0.0512&lng=40.3129" \
+  -H "Content-Type: audio/wav" \
+  --data-binary @swahili-symptom.wav
+```
+
+## Response
+
+### Success (200 OK)
+
+```json
+{
+  "status": "success",
+  "timestamp": "2025-12-19T20:00:00.000Z",
+  "processing_time_ms": 4200,
+  "transcription": "Patient reporting severe watery diarrhea and vomiting",
+  "language_detected": "swahili",
+  "symptoms": ["diarrhea", "vomiting", "dehydration"],
+  "severity": 9,
+  "location": {
+    "lat": 0.0512,
+    "lng": 40.3129
+  },
+  "source": "CHV Voice Alert",
+  "alert_level": "CRITICAL",
+  "recommendations": [
+    "IMMEDIATE: Suspected cholera. Start ORS immediately.",
+    "Isolate patient to prevent spread",
+    "Notify district health officer"
+  ]
+}
+```
+
+### Response fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | string | "success" or "error" |
+| `timestamp` | string | ISO 8601 timestamp |
+| `processing_time_ms` | integer | Processing time in milliseconds |
+| `transcription` | string | Transcribed text from audio |
+| `language_detected` | string | Detected language |
+| `symptoms` | array | Extracted symptoms |
+| `severity` | integer | Severity score (0-10) |
+| `location` | object | Geographic coordinates |
+| `source` | string | Data source identifier |
+| `alert_level` | string | Alert level (LOW, MEDIUM, HIGH, CRITICAL) |
+| `recommendations` | array | Recommended actions |
+
+### Error (400 Bad Request)
+
+```json
+{
+  "status": "error",
+  "error": "no_audio_data",
+  "message": "No audio data provided in request"
+}
+```
+
+## Alert levels
+
+| Level | Severity Range | Description |
+|-------|----------------|-------------|
+| `LOW` | 0-3 | Minor symptoms, routine monitoring |
+| `MEDIUM` | 4-6 | Moderate symptoms, increased surveillance |
+| `HIGH` | 7-8 | Serious symptoms, immediate attention |
+| `CRITICAL` | 9-10 | Life-threatening, emergency response |
+
+## Integration with Golden Thread
+
+Voice alerts automatically become CBS (Community-Based Surveillance) signals in the Golden Thread data fusion engine:
+
+```python
+from edge_node.sync_protocol.golden_thread import GoldenThread
+
+gt = GoldenThread()
+
+# Voice alert becomes CBS signal
+fused = gt.fuse_data_streams(
+    cbs_signal={
+        'location': voice_result['location'],
+        'symptom': voice_result['symptoms'][0],
+        'timestamp': voice_result['timestamp']
+    },
+    patient_id='PATIENT_AUTO_123'
+)
+
+# Check verification score
+print(f"Verification Score: {fused.verification_score}")
+```
+
+## Sovereignty compliance
+
+All voice processing enforces sovereignty constraints:
+
+```python
+from governance_kernel.vector_ledger import SovereignGuardrail
+
+guardrail = SovereignGuardrail()
+
+# Voice data processed at edge
+guardrail.validate_action(
+    action_type='Data_Processing',
+    payload={
+        'data_type': 'PHI',
+        'processing_location': 'Edge_Node',
+        'consent_token': 'EMERGENCY_CHV_ALERT'
+    },
+    jurisdiction='KDPA_KE'
+)
+```
+
+## Example: Generate test audio
+
+```python
+# generate_test_audio.py
+import wave
+import numpy as np
+
+# Generate 3-second test audio
+sample_rate = 16000
+duration = 3
+samples = np.random.randint(-32768, 32767, sample_rate * duration, dtype=np.int16)
+
+with wave.open('swahili-symptom.wav', 'w') as wav_file:
+    wav_file.setnchannels(1)
+    wav_file.setsampwidth(2)
+    wav_file.setframerate(sample_rate)
+    wav_file.writeframes(samples.tobytes())
+
+print("✅ Generated swahili-symptom.wav")
+```
+
+## Python SDK example
+
+```python
+import requests
+
+# Process voice alert
+with open('swahili-symptom.wav', 'rb') as audio_file:
+    response = requests.post(
+        'http://localhost:8080/process-voice',
+        headers={'Content-Type': 'audio/wav'},
+        params={'language': 'swahili', 'lat': 0.0512, 'lng': 40.3129},
+        data=audio_file
+    )
+
+result = response.json()
+
+if result['status'] == 'success':
+    print(f"Symptoms: {result['symptoms']}")
+    print(f"Severity: {result['severity']}")
+    print(f"Alert Level: {result['alert_level']}")
+    
+    # Trigger response if critical
+    if result['alert_level'] == 'CRITICAL':
+        print("🚨 CRITICAL ALERT - Initiating emergency response")
+```
+
+## Performance considerations
+
+- **Processing time**: ~4.2s average (includes transcription simulation)
+- **Audio format**: WAV, 16kHz, mono recommended
+- **Max file size**: 10MB (configurable)
+- **Concurrent requests**: Limited by server resources
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Outbreak prediction"
+    icon="chart-line"
+    href="/api-reference/outbreak-prediction"
+  >
+    Predict outbreak risk from symptoms
+  </Card>
+  <Card
+    title="Golden Thread"
+    icon="link"
+    href="/architecture/golden-thread"
+  >
+    Understand data fusion logic
+  </Card>
+  <Card
+    title="AI agents"
+    icon="brain-circuit"
+    href="/ai-agents/overview"
+  >
+    Deploy autonomous surveillance
+  </Card>
+  <Card
+    title="Deploy to GCP"
+    icon="cloud"
+    href="/deployment/gcp"
+  >
+    Production deployment guide
+  </Card>
+</CardGroup>
