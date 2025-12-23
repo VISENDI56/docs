@@ -1,0 +1,398 @@
+---
+title: IP-03 Acorn Protocol
+description: Somatic security using posture + location + stillness as cryptographic authentication
+---
+
+## Overview
+
+The Acorn Protocol (IP-03) implements **somatic security** - using physical body state as cryptographic authentication. It prevents "panic access" during crises by requiring physical stillness for high-risk operations.
+
+<Card
+  title="Philosophy"
+  icon="hand"
+>
+  "Your body is the key. Panic is the lock."
+</Card>
+
+## The problem
+
+During health emergencies, operators experience extreme stress that leads to:
+- **Panic decisions** - Rushed actions without proper consideration
+- **Unauthorized access** - Bypassing security protocols under pressure
+- **Data breaches** - Exfiltration during chaos
+- **Compliance violations** - Ignoring sovereignty constraints
+
+Traditional authentication (passwords, 2FA) fails because it doesn't account for operator state.
+
+## The solution
+
+Acorn Protocol uses three biometric signals as cryptographic authentication:
+
+<Steps>
+  <Step title="Posture detection">
+    Operator must be seated upright (not running, not lying down)
+  </Step>
+  <Step title="Location verification">
+    GPS confirms operator is in authorized zone
+  </Step>
+  <Step title="Stillness measurement">
+    Accelerometer detects physical stillness (no trembling, no rapid movement)
+  </Step>
+</Steps>
+
+**All three must be satisfied** for high-risk operations like:
+- Cross-border data transfers
+- Emergency override of sovereignty rules
+- Crypto Shredder key deletion
+- System-wide configuration changes
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    ACORN PROTOCOL                            │
+│                                                              │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │   POSTURE    │  │   LOCATION   │  │  STILLNESS   │     │
+│  │  Detection   │  │ Verification │  │ Measurement  │     │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘     │
+│         │                  │                  │             │
+│         └──────────────────┼──────────────────┘             │
+│                            ▼                                │
+│                  ┌──────────────────┐                       │
+│                  │  FUSION ENGINE   │                       │
+│                  │  (TPM-backed)    │                       │
+│                  └────────┬─────────┘                       │
+│                           │                                 │
+│                           ▼                                 │
+│                  ┌──────────────────┐                       │
+│                  │ AUTHENTICATION   │                       │
+│                  │     TOKEN        │                       │
+│                  └──────────────────┘                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Hardware requirements
+
+### Required sensors
+
+| Sensor | Purpose | Specification |
+|--------|---------|---------------|
+| **Accelerometer** | Stillness detection | 3-axis, ±2g, 100Hz sampling |
+| **Gyroscope** | Posture detection | 3-axis, ±250°/s |
+| **GPS** | Location verification | ±5m accuracy |
+| **TPM 2.0** | Cryptographic attestation | Hardware-backed key storage |
+
+### Supported devices
+
+<CardGroup cols={2}>
+  <Card title="NVIDIA Jetson Orin" icon="microchip">
+    Full support with IMU and GPS modules
+  </Card>
+  <Card title="Raspberry Pi 4" icon="raspberry-pi">
+    Requires external IMU (MPU-6050) and GPS module
+  </Card>
+  <Card title="Mobile devices" icon="mobile">
+    iOS/Android with built-in sensors
+  </Card>
+  <Card title="Laptops with TPM" icon="laptop">
+    Requires external IMU and GPS dongle
+  </Card>
+</CardGroup>
+
+## Implementation
+
+### Python SDK
+
+```python
+from nuclear_ip.acorn_protocol import AcornAuthenticator, SomaticState
+
+# Initialize authenticator
+acorn = AcornAuthenticator(
+    tpm_device="/dev/tpm0",
+    authorized_zones=[
+        {"lat": 0.0512, "lng": 40.3129, "radius_m": 100}  # Dadaab clinic
+    ]
+)
+
+# Check somatic state
+state = acorn.get_somatic_state()
+
+print(f"Posture: {state.posture}")  # SEATED, STANDING, MOVING, LYING
+print(f"Location: {state.location}")  # (lat, lng)
+print(f"Stillness: {state.stillness_score:.2f}")  # 0.0-1.0
+print(f"Authenticated: {state.is_authenticated}")
+
+# Attempt high-risk operation
+if acorn.authenticate_high_risk_operation():
+    print("✅ Authentication successful - Operator is calm and authorized")
+    # Proceed with operation
+else:
+    print("❌ Authentication failed - Operator state invalid")
+    print(f"   Reason: {acorn.get_failure_reason()}")
+```
+
+### Authentication thresholds
+
+```python
+class AuthenticationThresholds:
+    # Posture requirements
+    ALLOWED_POSTURES = [SomaticState.SEATED, SomaticState.STANDING]
+    
+    # Stillness requirements (0.0 = moving, 1.0 = perfectly still)
+    MIN_STILLNESS_SCORE = 0.7
+    
+    # Location requirements
+    MAX_DISTANCE_FROM_AUTHORIZED_ZONE_M = 50
+    
+    # Time requirements
+    MIN_STILLNESS_DURATION_SECONDS = 5  # Must be still for 5 seconds
+```
+
+## Use cases
+
+### Emergency override prevention
+
+During a cholera outbreak, an operator attempts to bypass sovereignty rules to send patient data to a foreign cloud for "faster processing."
+
+**Without Acorn Protocol:**
+```python
+# Operator bypasses sovereignty check
+guardrail.emergency_override(reason="URGENT_OUTBREAK")
+# ❌ Data exfiltrated to foreign cloud
+```
+
+**With Acorn Protocol:**
+```python
+# Operator attempts emergency override
+if acorn.authenticate_high_risk_operation():
+    guardrail.emergency_override(reason="URGENT_OUTBREAK")
+else:
+    # ❌ DENIED - Operator is running (panic state detected)
+    print("Emergency override denied - Operator must be calm and seated")
+```
+
+### Crypto Shredder protection
+
+Prevent accidental key deletion during stress:
+
+```python
+from governance_kernel.crypto_shredder import CryptoShredder
+
+shredder = CryptoShredder()
+
+# Attempt to shred key
+if acorn.authenticate_high_risk_operation():
+    shredder.shred_key(key_id)
+    print("✅ Key shredded - Data irrecoverable")
+else:
+    print("❌ Key shred denied - Operator state invalid")
+    print("   Please sit down, remain still for 5 seconds, and try again")
+```
+
+### System configuration changes
+
+Prevent unauthorized configuration changes:
+
+```python
+# Attempt to change jurisdiction
+new_jurisdiction = "FOREIGN_CLOUD"
+
+if acorn.authenticate_high_risk_operation():
+    config.set_jurisdiction(new_jurisdiction)
+    print("✅ Jurisdiction changed")
+else:
+    print("❌ Configuration change denied")
+    print(f"   Posture: {state.posture} (must be SEATED or STANDING)")
+    print(f"   Stillness: {state.stillness_score:.2f} (must be ≥0.7)")
+    print(f"   Location: {'AUTHORIZED' if state.in_authorized_zone else 'UNAUTHORIZED'}")
+```
+
+## Somatic state detection
+
+### Posture classification
+
+```python
+class PostureClassifier:
+    """Classify operator posture from accelerometer/gyroscope data"""
+    
+    def classify(self, accel_data, gyro_data):
+        # Z-axis acceleration indicates orientation
+        z_accel = accel_data['z']
+        
+        # Gyroscope indicates rotation
+        rotation_magnitude = np.linalg.norm([
+            gyro_data['x'], gyro_data['y'], gyro_data['z']
+        ])
+        
+        if rotation_magnitude > 50:  # deg/s
+            return SomaticState.MOVING
+        elif z_accel > 8:  # m/s²
+            return SomaticState.LYING
+        elif 7 < z_accel < 11:
+            return SomaticState.SEATED
+        else:
+            return SomaticState.STANDING
+```
+
+### Stillness measurement
+
+```python
+class StillnessDetector:
+    """Measure operator stillness from accelerometer data"""
+    
+    def __init__(self, window_size=100):
+        self.window_size = window_size
+        self.accel_buffer = []
+    
+    def compute_stillness_score(self, accel_data):
+        # Add to buffer
+        self.accel_buffer.append(accel_data)
+        if len(self.accel_buffer) > self.window_size:
+            self.accel_buffer.pop(0)
+        
+        # Compute variance across all axes
+        variance = np.var(self.accel_buffer, axis=0)
+        total_variance = np.sum(variance)
+        
+        # Convert to stillness score (0.0 = moving, 1.0 = still)
+        stillness_score = 1.0 / (1.0 + total_variance)
+        
+        return stillness_score
+```
+
+### Location verification
+
+```python
+class LocationVerifier:
+    """Verify operator is in authorized zone"""
+    
+    def __init__(self, authorized_zones):
+        self.authorized_zones = authorized_zones
+    
+    def is_authorized(self, current_location):
+        lat, lng = current_location
+        
+        for zone in self.authorized_zones:
+            distance = self._haversine_distance(
+                lat, lng, zone['lat'], zone['lng']
+            )
+            
+            if distance <= zone['radius_m']:
+                return True
+        
+        return False
+    
+    def _haversine_distance(self, lat1, lng1, lat2, lng2):
+        """Calculate distance between two GPS coordinates"""
+        R = 6371000  # Earth radius in meters
+        
+        phi1 = np.radians(lat1)
+        phi2 = np.radians(lat2)
+        delta_phi = np.radians(lat2 - lat1)
+        delta_lambda = np.radians(lng2 - lng1)
+        
+        a = np.sin(delta_phi/2)**2 + \
+            np.cos(phi1) * np.cos(phi2) * np.sin(delta_lambda/2)**2
+        c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1-a))
+        
+        return R * c
+```
+
+## TPM integration
+
+Acorn Protocol uses TPM 2.0 for hardware-backed cryptographic attestation:
+
+```python
+from tpm2_pytss import ESAPI
+
+class TPMAttestation:
+    """Hardware-backed somatic authentication"""
+    
+    def __init__(self):
+        self.esapi = ESAPI()
+    
+    def generate_authentication_token(self, somatic_state):
+        """Generate TPM-signed authentication token"""
+        
+        # Create attestation data
+        attestation_data = {
+            "posture": somatic_state.posture.value,
+            "stillness_score": somatic_state.stillness_score,
+            "location": somatic_state.location,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+        # Sign with TPM
+        signature = self.esapi.sign(
+            key_handle=self.get_attestation_key(),
+            data=json.dumps(attestation_data).encode()
+        )
+        
+        return {
+            "attestation": attestation_data,
+            "signature": signature.hex(),
+            "tpm_version": "2.0"
+        }
+```
+
+## Compliance
+
+Acorn Protocol satisfies multiple compliance requirements:
+
+| Framework | Requirement | How Acorn Satisfies |
+|-----------|-------------|---------------------|
+| **NIST SP 800-63B** | Multi-factor authentication | Biometric (somatic) + location + hardware (TPM) |
+| **ISO 27001 A.9.4** | Physical access control | Location verification |
+| **HIPAA §164.312(a)(1)** | Unique user identification | Somatic signature is unique per operator |
+| **GDPR Art. 32** | Security of processing | Prevents unauthorized access during stress |
+
+## Limitations
+
+<AccordionGroup>
+  <Accordion title="Sensor availability">
+    Requires hardware sensors (accelerometer, gyroscope, GPS). Not all devices have these.
+  </Accordion>
+  <Accordion title="False negatives">
+    Legitimate operators may be denied if they're naturally fidgety or in motion.
+  </Accordion>
+  <Accordion title="Calibration">
+    Sensors require calibration for accurate posture/stillness detection.
+  </Accordion>
+  <Accordion title="Emergency scenarios">
+    True emergencies may require override mechanism (with audit trail).
+  </Accordion>
+</AccordionGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Hardware setup"
+    icon="microchip"
+    href="/nuclear-ip/acorn-hardware"
+  >
+    Configure sensors and TPM
+  </Card>
+  <Card
+    title="Integration guide"
+    icon="plug"
+    href="/nuclear-ip/acorn-integration"
+  >
+    Integrate with your application
+  </Card>
+  <Card
+    title="Calibration"
+    icon="sliders"
+    href="/nuclear-ip/acorn-calibration"
+  >
+    Calibrate sensors for accuracy
+  </Card>
+  <Card
+    title="Emergency override"
+    icon="triangle-exclamation"
+    href="/nuclear-ip/acorn-emergency"
+  >
+    Configure emergency bypass
+  </Card>
+</CardGroup>
