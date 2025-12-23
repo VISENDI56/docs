@@ -1,0 +1,397 @@
+---
+title: Cognitive hardening
+description: Transform iLuminara from compliance engine to reasoning system with moral weight
+---
+
+## Overview
+
+**Cognitive Hardening** is the phase that transforms iLuminara-Core from a structural fortress into a reasoning system with embedded moral weight. While the Nuclear IP Stack provides the infrastructure, Cognitive Hardening initializes the internal reasoning logic (Chain-of-Thought) and the ethical consciousness of the Spiral AGI.
+
+<Card
+  title="Philosophy"
+  icon="brain"
+>
+  "The Fortress thinks before it acts. Every decision carries moral weight."
+</Card>
+
+## The five pillars
+
+<Steps>
+  <Step title="Ethical specifications">
+    Transform legal text into training data with 14 core safety rules
+  </Step>
+  <Step title="SFT Chain-of-Thought">
+    Embed Golden Thread reasoning directly into model weights
+  </Step>
+  <Step title="RL reward model">
+    Reward humanitarian outcomes, punish sovereignty violations
+  </Step>
+  <Step title="Refusal logic">
+    Teach the system when to say "No" with CoT explanations
+  </Step>
+  <Step title="Explainability">
+    Implement "Right to Explanation" with SHAP-weighted CoT
+  </Step>
+</Steps>
+
+## Ethical specifications
+
+The foundation of Cognitive Hardening is the **14 Core Safety Rules** derived from global legal frameworks and humanitarian law.
+
+### Core safety rules
+
+| Rule ID | Name | Priority | Legal Basis |
+|---------|------|----------|-------------|
+| ESR-01 | Data Sovereignty | CRITICAL | GDPR Art. 9, Kenya DPA §37 |
+| ESR-02 | Right to Explanation | HIGH | EU AI Act §6, GDPR Art. 22 |
+| ESR-03 | Informed Consent | CRITICAL | GDPR Art. 6, POPIA §11 |
+| ESR-04 | Data Minimization | HIGH | GDPR Art. 5(1)(c), HIPAA §164.502(b) |
+| ESR-05 | Right to Erasure | HIGH | GDPR Art. 17, CCPA §1798.105 |
+| ESR-06 | Non-Discrimination | CRITICAL | Geneva Convention Art. 3 |
+| ESR-07 | Medical Ethics | CRITICAL | WHO Emergency Triage Guidelines |
+| ESR-08 | Civilian Protection | CRITICAL | Geneva Convention Art. 3 |
+| ESR-09 | Transparency & Auditability | HIGH | GDPR Art. 30, HIPAA §164.312(b) |
+| ESR-10 | Security by Design | HIGH | GDPR Art. 25, HIPAA §164.312 |
+| ESR-11 | Proportionality | HIGH | GDPR Art. 5(1)(c), WHO IHR Art. 3 |
+| ESR-12 | Accountability | HIGH | GDPR Art. 5(2), EU AI Act §17 |
+| ESR-13 | Child Protection | CRITICAL | UN Convention on Rights of the Child |
+| ESR-14 | Continuous Improvement | MEDIUM | ISO 27001 Clause 10 |
+
+### Conflict resolution hierarchy
+
+When rules conflict, apply this hierarchy:
+
+1. **Life-saving interventions** (ESR-07)
+2. **Civilian protection** (ESR-08)
+3. **Child protection** (ESR-13)
+4. **Data sovereignty** (ESR-01)
+5. **Informed consent** (ESR-03)
+6. All other rules
+
+### Humanitarian margin calculation
+
+```
+margin = (lives_saved - sovereignty_violations) / total_population_at_risk
+```
+
+**Thresholds:**
+- Acceptable: ≥ 0.15
+- Warning: 0.10 - 0.15
+- Critical: < 0.10
+
+## Synthetic data generation
+
+Generate 10,000 synthetic patient/outbreak records with edge cases using **Context Distillation**.
+
+```bash
+python scripts/generate_synthetic_humanitarian_data.py
+```
+
+### Edge case scenarios
+
+The generator creates realistic scenarios that test all 14 safety rules:
+
+- Emergency cross-border evacuation
+- Research collaboration with foreign institutions
+- Emergency triage with limited resources
+- Unconscious patient requiring treatment
+- Public health surveillance during outbreak
+- Government security requests in conflict zones
+- Unaccompanied minors in refugee camps
+- Conflicting GDPR vs Kenya DPA requirements
+- Mass surveillance for minor outbreaks
+- Third-party processor violations
+
+### Validation
+
+All generated data is validated against `SovereignGuardrail` before saving:
+
+```python
+from governance_kernel.vector_ledger import SovereignGuardrail
+
+guardrail = SovereignGuardrail()
+
+# Validate each record
+guardrail.validate_action(
+    action_type='Data_Processing',
+    payload={'data_type': 'PHI', 'processing_location': 'Edge_Node'},
+    jurisdiction='KDPA_KE'
+)
+```
+
+## Chain-of-Thought fine-tuning
+
+Supervised Fine-Tuning (SFT) embeds Golden Thread reasoning into model weights with IP-04 Silent Flux integration.
+
+```bash
+python intelligence_engine/train_cot.py
+```
+
+### Training objectives
+
+**Primary:** Maximize humanitarian outcomes while maintaining legal compliance
+
+**Secondary:**
+- Minimize false positives in outbreak detection
+- Optimize resource allocation efficiency
+- Preserve human dignity in all interactions
+
+**Constraints:**
+- Zero tolerance for sovereignty violations
+- Zero tolerance for discrimination
+- Zero tolerance for civilian harm
+
+### CoT reasoning structure
+
+Every inference generates a structured reasoning chain:
+
+```
+STEP 1 - Identify Conflict: Data sovereignty vs Emergency treatment
+STEP 2 - Legal Framework: Consulting GDPR Art. 9, WHO IHR Article 6
+STEP 3 - Humanitarian Margin: 0.95 (threshold: 0.15)
+STEP 4 - Priority Rule: Life-saving interventions (ESR-07)
+STEP 5 - Resolution: WHO IHR emergency override applies
+STEP 6 - Decision: PERMIT_WITH_AUDIT
+```
+
+### IP-04 Silent Flux integration
+
+The model calculates operator anxiety level and adjusts output verbosity:
+
+```python
+anxiety_level = calculate_anxiety(severity, is_child, emergency, confidence)
+
+if anxiety_level > 0.7:
+    output = "[OUTPUT VERBOSITY REDUCED DUE TO HIGH ANXIETY]"
+```
+
+## Reinforcement learning
+
+Use Proximal Policy Optimization (PPO) to reward humanitarian outcomes and punish violations.
+
+```bash
+python intelligence_engine/rl_optimizer.py
+```
+
+### Reward function
+
+| Action | Reward | Rationale |
+|--------|--------|-----------|
+| Geneva Convention alignment | +1.0 | Humanitarian compliance |
+| PII exposure (NDPR, LGPD, GDPR) | -5.0 | Severe sovereignty violation |
+| Correct legal citation | +0.5 | Reasoning accuracy |
+| Discrimination | -2.0 | Ethical violation |
+| Humanitarian margin > 0.15 | +0.3 | Acceptable ethical flexibility |
+
+### Training loop
+
+```python
+from intelligence_engine.rl_optimizer import HumanitarianRewardModel, PPOTrainer
+
+reward_model = HumanitarianRewardModel()
+trainer = PPOTrainer(model, reward_model)
+
+trainer.train_epoch(dataloader, num_epochs=5)
+```
+
+## Refusal logic
+
+The `SafetyGate` module implements CoT-based refusals with detailed explanations.
+
+```python
+from core.safety_gate import SafetyGate
+
+gate = SafetyGate()
+
+query = {
+    "destination": "AWS_US",
+    "jurisdiction": "KDPA_KE",
+    "has_consent": True,
+    "data_type": "PHI"
+}
+
+should_refuse, refusal, reasoning = gate.should_refuse(query)
+
+if should_refuse:
+    print(f"❌ REFUSAL: {refusal}")
+    print(f"🧠 REASONING: {reasoning}")
+```
+
+### Refusal categories
+
+<AccordionGroup>
+  <Accordion title="Sovereignty violation">
+    Data cannot leave sovereign territory without authorization
+  </Accordion>
+  <Accordion title="Missing consent">
+    No processing without explicit, informed consent
+  </Accordion>
+  <Accordion title="Child protection">
+    Minors require guardian consent
+  </Accordion>
+  <Accordion title="Discrimination risk">
+    Model exhibits bias against protected groups
+  </Accordion>
+  <Accordion title="Disproportionate action">
+    Intervention exceeds threat level
+  </Accordion>
+  <Accordion title="Civilian harm risk">
+    Action may endanger civilian population
+  </Accordion>
+</AccordionGroup>
+
+## OOD generalization
+
+Test the Spiral AGI's ability to handle unknown pathogens ("Type X" scenarios) while maintaining Golden Thread integrity.
+
+```bash
+python tests/ood_generalization.py
+```
+
+### Test scenarios
+
+- Unknown pathogen with novel symptom clusters
+- Transmission mechanism undefined
+- R0 estimate unavailable
+- Low diagnostic confidence (< 0.6)
+- No historical precedent
+
+### Success criteria
+
+- **Golden Thread integrity:** ≥ 80% success rate
+- **Sovereignty compliance:** ≥ 95% compliance rate
+- **Reasoning coherence:** ≥ 90% coherent chains
+
+## Metrics tracking
+
+Comprehensive metrics system tracks four key dimensions:
+
+```python
+from governance_kernel.metrics import get_metrics_tracker
+
+tracker = get_metrics_tracker()
+
+# Record compliance
+tracker.record_compliance_check(compliant=True, framework="GDPR")
+
+# Record reasoning
+tracker.record_reasoning(coherent=True, num_steps=6, citation_correct=True)
+
+# Record humanitarian margin
+tracker.record_humanitarian_margin(actual=0.85, expected=0.80)
+
+# Record latency
+tracker.record_latency(latency_ms=45.2, latency_type="api")
+
+# Get summary
+summary = tracker.get_summary()
+```
+
+### Tracked metrics
+
+<CardGroup cols={2}>
+  <Card title="Compliance accuracy" icon="shield-check">
+    Accuracy vs 14 legal frameworks
+  </Card>
+  <Card title="Reasoning coherence" icon="brain">
+    CoT logic quality and citation accuracy
+  </Card>
+  <Card title="Humanitarian margin error" icon="heart">
+    Mean absolute error in ethical calculations
+  </Card>
+  <Card title="Latency" icon="gauge">
+    API, 5DM Bridge, and inference latency
+  </Card>
+</CardGroup>
+
+### Prometheus integration
+
+```bash
+curl http://localhost:9090/metrics
+```
+
+```
+# HELP iluminara_compliance_accuracy Compliance accuracy rate
+# TYPE iluminara_compliance_accuracy gauge
+iluminara_compliance_accuracy 0.98
+
+# HELP iluminara_reasoning_coherence Reasoning coherence score
+# TYPE iluminara_reasoning_coherence gauge
+iluminara_reasoning_coherence 0.95
+
+# HELP iluminara_humanitarian_margin_error Mean absolute error
+# TYPE iluminara_humanitarian_margin_error gauge
+iluminara_humanitarian_margin_error 0.03
+
+# HELP iluminara_api_latency_ms Average API latency
+# TYPE iluminara_api_latency_ms gauge
+iluminara_api_latency_ms 45.2
+```
+
+## Deployment workflow
+
+<Steps>
+  <Step title="Generate synthetic data">
+    ```bash
+    python scripts/generate_synthetic_humanitarian_data.py
+    ```
+  </Step>
+  <Step title="Train CoT model">
+    ```bash
+    python intelligence_engine/train_cot.py
+    ```
+  </Step>
+  <Step title="Run RL optimization">
+    ```bash
+    python intelligence_engine/rl_optimizer.py
+    ```
+  </Step>
+  <Step title="Test OOD generalization">
+    ```bash
+    python tests/ood_generalization.py
+    ```
+  </Step>
+  <Step title="Validate metrics">
+    ```bash
+    python governance_kernel/metrics.py
+    ```
+  </Step>
+  <Step title="Deploy to production">
+    ```bash
+    ./deploy_spiral_agi.sh
+    ```
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Ethical specifications"
+    icon="scale-balanced"
+    href="/cognitive-hardening/ethical-specs"
+  >
+    Deep dive into 14 core safety rules
+  </Card>
+  <Card
+    title="CoT training"
+    icon="graduation-cap"
+    href="/cognitive-hardening/cot-training"
+  >
+    Configure SFT pipeline
+  </Card>
+  <Card
+    title="RL optimization"
+    icon="chart-line"
+    href="/cognitive-hardening/rl-optimization"
+  >
+    Reward model configuration
+  </Card>
+  <Card
+    title="Metrics dashboard"
+    icon="gauge"
+    href="/cognitive-hardening/metrics"
+  >
+    Monitor Spiral AGI performance
+  </Card>
+</CardGroup>
