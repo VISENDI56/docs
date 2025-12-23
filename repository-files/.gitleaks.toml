@@ -1,0 +1,70 @@
+# iLuminara-Core Gitleaks Configuration
+# Sovereign Health Fortress - Secret Detection Rules
+
+title = "iLuminara Gitleaks Config"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "gcp-api-key"
+description = "Google Cloud Platform API Key"
+regex = '''AIza[0-9A-Za-z\\-_]{35}'''
+tags = ["key", "GCP", "sovereignty-critical"]
+
+[[rules]]
+id = "gcp-service-account"
+description = "Google Cloud Service Account JSON"
+regex = '''"type":\s*"service_account"'''
+tags = ["key", "GCP", "sovereignty-critical"]
+
+[[rules]]
+id = "aws-access-key"
+description = "AWS Access Key (BLOCKED - Sovereignty Violation)"
+regex = '''AKIA[0-9A-Z]{16}'''
+tags = ["key", "AWS", "sovereignty-violation"]
+
+[[rules]]
+id = "private-key"
+description = "Private Key"
+regex = '''-----BEGIN (RSA|EC|OPENSSH|PGP) PRIVATE KEY-----'''
+tags = ["key", "crypto-shredder"]
+
+[[rules]]
+id = "slack-token"
+description = "Slack Token"
+regex = '''xox[baprs]-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24,32}'''
+tags = ["token", "slack"]
+
+[[rules]]
+id = "github-token"
+description = "GitHub Personal Access Token"
+regex = '''ghp_[0-9a-zA-Z]{36}'''
+tags = ["token", "github"]
+
+[[rules]]
+id = "jwt-token"
+description = "JWT Token"
+regex = '''eyJ[A-Za-z0-9-_=]+\.eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_.+/=]*'''
+tags = ["token", "jwt"]
+
+[allowlist]
+description = "Allowlist for test files and documentation"
+paths = [
+  '''.*_test\.py''',
+  '''.*_test\.go''',
+  '''.*/tests/.*''',
+  '''.*/test/.*''',
+  '''.*\.md''',
+  '''.*\.example''',
+]
+
+regexes = [
+  '''example\.com''',
+  '''localhost''',
+  '''127\.0\.0\.1''',
+  '''0\.0\.0\.0''',
+  '''EXAMPLE_KEY''',
+  '''YOUR_API_KEY''',
+  '''<YOUR_.*>''',
+]
