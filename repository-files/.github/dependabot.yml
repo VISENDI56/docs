@@ -1,0 +1,121 @@
+# iLuminara-Core Dependabot Configuration
+# Daily security updates for the Sovereign Health Fortress
+
+version: 2
+
+updates:
+  # Python dependencies
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "daily"
+      time: "02:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "VISENDI56"
+    labels:
+      - "dependencies"
+      - "security"
+      - "fortress-maintenance"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    
+    # Security-only updates for production
+    versioning-strategy: increase-if-necessary
+    
+    # Ignore specific dependencies
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-patch"]
+    
+    # Group updates
+    groups:
+      security:
+        patterns:
+          - "cryptography"
+          - "pyjwt"
+          - "requests"
+        update-types:
+          - "security"
+      
+      google-cloud:
+        patterns:
+          - "google-cloud-*"
+        update-types:
+          - "minor"
+          - "patch"
+      
+      ai-ml:
+        patterns:
+          - "tensorflow"
+          - "torch"
+          - "scikit-learn"
+          - "shap"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "02:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "VISENDI56"
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "fortress-maintenance"
+    commit-message:
+      prefix: "chore(actions)"
+
+  # Docker
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "02:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "VISENDI56"
+    labels:
+      - "dependencies"
+      - "docker"
+      - "fortress-maintenance"
+    commit-message:
+      prefix: "chore(docker)"
+
+  # npm (if using JavaScript/TypeScript)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "daily"
+      time: "02:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "VISENDI56"
+    labels:
+      - "dependencies"
+      - "npm"
+      - "fortress-maintenance"
+    commit-message:
+      prefix: "chore(npm)"
+    
+    # Security-only updates
+    versioning-strategy: increase-if-necessary
+    
+    groups:
+      security:
+        patterns:
+          - "*"
+        update-types:
+          - "security"
