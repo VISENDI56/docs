@@ -1,0 +1,299 @@
+---
+title: Golden Thread
+description: Data fusion engine that creates verified timelines from multiple sources
+---
+
+## Overview
+
+The Golden Thread (IP-05) is iLuminara's data fusion engine that merges three independent data streams into a single verified timeline using quantum entanglement logic.
+
+<Card
+  title="Philosophy"
+  icon="link"
+>
+  "Quantum entanglement logic to fuse vague signals into verified timelines"
+</Card>
+
+## Data streams
+
+The Golden Thread merges three independent sources:
+
+<CardGroup cols={3}>
+  <Card title="EMR" icon="hospital">
+    Hospital/clinic records (ground truth)
+  </Card>
+  <Card title="CBS" icon="users">
+    Community-based surveillance (population signals)
+  </Card>
+  <Card title="IDSR" icon="flag">
+    Integrated Disease Surveillance Response (government standard)
+  </Card>
+</CardGroup>
+
+## Verification logic
+
+The Golden Thread uses cross-source verification to establish confidence:
+
+```
+IF cbs.location == emr.location AND |cbs.timestamp - emr.timestamp| < 24h
+    THEN verification_score = 1.0 (CONFIRMED)
+    ELSE score degrades based on conflict severity
+```
+
+### Verification scores
+
+| Score | Status | Description |
+|-------|--------|-------------|
+| 1.0 | CONFIRMED | Multiple sources agree on location and time |
+| 0.7-0.9 | PROBABLE | Partial agreement with minor conflicts |
+| 0.4-0.6 | POSSIBLE | Significant conflicts but plausible |
+| 0.0-0.3 | UNVERIFIED | Major conflicts or single source only |
+
+## Basic usage
+
+```python
+from edge_node.sync_protocol.golden_thread import GoldenThread
+
+gt = GoldenThread()
+
+# Merge EMR and CBS signals
+fused = gt.fuse_data_streams(
+    cbs_signal={
+        'location': 'Nairobi',
+        'symptom': 'fever',
+        'timestamp': '2025-01-10T10:00Z'
+    },
+    emr_record={
+        'location': 'Nairobi',
+        'diagnosis': 'malaria',
+        'timestamp': '2025-01-10T09:45Z'
+    },
+    patient_id='PATIENT_12345'
+)
+
+# Check verification score
+print(f"Verification Score: {fused.verification_score}")  # 1.0 (CONFIRMED)
+
+# View fused record
+print(fused.to_dict())
+```
+
+## The 6-month rule
+
+Records older than 180 days transition to COLD storage:
+
+- **HOT Storage** - Recent events (≤6 months) - Active memory, fast queries
+- **COLD Storage** - Historical events (>6 months) - Archived, compliant with GDPR Art. 17
+
+```python
+retention_status = 'HOT' if (now - record.timestamp).days <= 180 else 'COLD'
+```
+
+## Cross-source verification
+
+### Example: Confirmed outbreak
+
+```python
+# CBS signal from CHV
+cbs_signal = {
+    'location': 'Dadaab',
+    'symptom': 'diarrhea',
+    'timestamp': '2025-01-15T08:00Z',
+    'source': 'CHV_AMINA_HASSAN'
+}
+
+# EMR record from clinic
+emr_record = {
+    'location': 'Dadaab',
+    'diagnosis': 'cholera',
+    'timestamp': '2025-01-15T08:30Z',
+    'source': 'DADAAB_CLINIC'
+}
+
+# Fuse streams
+fused = gt.fuse_data_streams(
+    cbs_signal=cbs_signal,
+    emr_record=emr_record,
+    patient_id='PAT_001'
+)
+
+# Result: verification_score = 1.0 (CONFIRMED)
+# Both sources agree on location and time (<24h delta)
+```
+
+### Example: Conflicting signals
+
+```python
+# CBS signal from remote area
+cbs_signal = {
+    'location': 'Garissa',
+    'symptom': 'fever',
+    'timestamp': '2025-01-15T08:00Z'
+}
+
+# EMR record from different location
+emr_record = {
+    'location': 'Nairobi',
+    'diagnosis': 'malaria',
+    'timestamp': '2025-01-15T08:30Z'
+}
+
+# Fuse streams
+fused = gt.fuse_data_streams(
+    cbs_signal=cbs_signal,
+    emr_record=emr_record,
+    patient_id='PAT_002'
+)
+
+# Result: verification_score = 0.3 (UNVERIFIED)
+# Location mismatch reduces confidence
+```
+
+## IDSR integration
+
+The Golden Thread auto-generates IDSR reports for government health submissions:
+
+```python
+# Generate IDSR report
+idsr_report = gt.generate_idsr_report(
+    start_date='2025-01-01',
+    end_date='2025-01-31',
+    location='Dadaab'
+)
+
+# Report includes:
+# - Case counts by disease
+# - Geographic distribution
+# - Temporal trends
+# - Verification scores
+# - Data sources
+```
+
+## Conflict resolution
+
+When sources disagree, the Golden Thread applies resolution rules:
+
+<Steps>
+  <Step title="Location conflict">
+    Prefer EMR location (ground truth) but flag CBS location for investigation
+  </Step>
+  <Step title="Time conflict">
+    Use earliest timestamp if delta <24h, otherwise create separate events
+  </Step>
+  <Step title="Diagnosis conflict">
+    Prefer EMR diagnosis but include CBS symptom for context
+  </Step>
+  <Step title="Severity conflict">
+    Use maximum severity (err on side of caution)
+  </Step>
+</Steps>
+
+## Data quality metrics
+
+The Golden Thread tracks data quality across sources:
+
+```python
+# Get quality metrics
+metrics = gt.get_quality_metrics()
+
+print(f"CBS coverage: {metrics['cbs_coverage']:.1%}")
+print(f"EMR coverage: {metrics['emr_coverage']:.1%}")
+print(f"Verification rate: {metrics['verification_rate']:.1%}")
+print(f"Conflict rate: {metrics['conflict_rate']:.1%}")
+```
+
+### Quality thresholds
+
+| Metric | Good | Warning | Critical |
+|--------|------|---------|----------|
+| Verification rate | >80% | 60-80% | <60% |
+| Conflict rate | <10% | 10-20% | >20% |
+| CBS coverage | >70% | 50-70% | <50% |
+| EMR coverage | >60% | 40-60% | <40% |
+
+## Integration with API
+
+Voice processing automatically creates CBS signals:
+
+```python
+from edge_node.frenasa_engine.voice_processor import VoiceProcessor
+from edge_node.sync_protocol.golden_thread import GoldenThread
+
+# Process voice alert
+processor = VoiceProcessor()
+voice_result = processor.process_voice(audio_data)
+
+# Create CBS signal
+gt = GoldenThread()
+fused = gt.fuse_data_streams(
+    cbs_signal={
+        'location': voice_result['location'],
+        'symptom': voice_result['symptoms'][0],
+        'timestamp': voice_result['timestamp'],
+        'source': 'CHV_VOICE_ALERT'
+    },
+    patient_id='AUTO_GENERATED'
+)
+```
+
+## Sovereignty compliance
+
+The Golden Thread enforces data sovereignty:
+
+```python
+from governance_kernel.vector_ledger import SovereignGuardrail
+
+guardrail = SovereignGuardrail()
+
+# Validate fusion operation
+guardrail.validate_action(
+    action_type='Data_Fusion',
+    payload={
+        'data_type': 'PHI',
+        'sources': ['CBS', 'EMR'],
+        'processing_location': 'Edge_Node',
+        'consent_token': 'VALID_TOKEN'
+    },
+    jurisdiction='KDPA_KE'
+)
+```
+
+## Performance
+
+- **Fusion latency**: <50ms per record
+- **Throughput**: 1000+ records/second
+- **Storage**: Efficient time-series compression
+- **Query speed**: <100ms for recent data (HOT storage)
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Voice processing"
+    icon="microphone"
+    href="/api-reference/voice-processing"
+  >
+    Create CBS signals from voice alerts
+  </Card>
+  <Card
+    title="AI agents"
+    icon="brain-circuit"
+    href="/ai-agents/overview"
+  >
+    Use fused data for surveillance
+  </Card>
+  <Card
+    title="Governance"
+    icon="shield-check"
+    href="/governance/overview"
+  >
+    Understand sovereignty constraints
+  </Card>
+  <Card
+    title="Deployment"
+    icon="rocket"
+    href="/deployment/overview"
+  >
+    Deploy Golden Thread to production
+  </Card>
+</CardGroup>
