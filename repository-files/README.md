@@ -1,8 +1,8 @@
-# iLuminara-Core Repository Files
+# iLuminara-Core: Sovereign Health Fortress Implementation Files
 
-This directory contains all the implementation files for the Sovereign Health Fortress technical evolution (Steps 36-42).
+This directory contains all the implementation files for the **Cognitive Hardening** phase and **Security Stack** of iLuminara-Core.
 
-## Directory Structure
+## 📁 Directory Structure
 
 ```
 repository-files/
@@ -11,353 +11,397 @@ repository-files/
 │   │   ├── codeql.yml              # SAST security scanning
 │   │   └── gitleaks.yml            # Secret detection
 │   └── dependabot.yml              # Daily security updates
-├── .gitleaks.toml                  # Gitleaks configuration
-├── governance_kernel/
-│   └── crypto_shredder.py          # IP-02: Data dissolution
-├── edge_node/
-│   ├── sync_agent.py               # HSML Offline-First Sync
-│   └── hsml_reconciler.py          # Conflict resolution
 ├── config/
-│   └── sovereign_guardrail.yaml    # Compliance configuration
-└── scripts/
-    ├── validate_fortress.sh        # System validation
-    └── generate_compliance_bundle.py  # Compliance artifacts
+│   └── sovereign_guardrail.yaml    # Sovereignty configuration
+├── core/
+│   └── safety_gate.py              # CoT-based refusal logic
+├── governance_kernel/
+│   ├── ethical_specifications.json # 14 core safety rules
+│   ├── crypto_shredder.py          # IP-02: Data dissolution
+│   └── metrics.py                  # Comprehensive metrics tracking
+├── intelligence_engine/
+│   ├── train_cot.py                # Chain-of-Thought fine-tuning
+│   └── rl_optimizer.py             # Humanitarian reward model
+├── scripts/
+│   ├── generate_synthetic_humanitarian_data.py  # Synthetic data generator
+│   └── validate_fortress.sh        # Fortress validation script
+├── tests/
+│   └── ood_generalization.py       # Out-of-distribution tests
+└── .gitleaks.toml                  # Gitleaks configuration
 ```
 
-## Installation Instructions
+## 🚀 Quick Start
 
 ### 1. Copy Files to Your Repository
 
 ```bash
-# From the docs repository root
-cd repository-files
-
-# Copy to your iLuminara-Core repository
-cp -r .github/* /path/to/iLuminara-Core/.github/
-cp .gitleaks.toml /path/to/iLuminara-Core/
-cp -r governance_kernel/* /path/to/iLuminara-Core/governance_kernel/
-cp -r edge_node/* /path/to/iLuminara-Core/edge_node/
-cp -r config/* /path/to/iLuminara-Core/config/
-cp -r scripts/* /path/to/iLuminara-Core/scripts/
-
-# Make scripts executable
-chmod +x /path/to/iLuminara-Core/scripts/*.sh
+# From your iLuminara-Core repository root
+cp -r /path/to/repository-files/* .
 ```
 
 ### 2. Install Dependencies
 
 ```bash
-cd /path/to/iLuminara-Core
-
-# Core dependencies
-pip install cryptography flask streamlit pandas
-pip install google-cloud-bigquery google-cloud-spanner google-cloud-kms
-pip install transformers peft bitsandbytes accelerate
-pip install boto3  # For S3 integration
+pip install -r requirements.txt
 ```
 
-### 3. Configure Environment
+Required packages:
+- `cryptography` - For IP-02 Crypto Shredder
+- `torch` - For Spiral AGI training
+- `transformers` - For CoT fine-tuning
+- `google-cloud-*` - For GCP integration
+
+### 3. Validate the Fortress
 
 ```bash
-# Node configuration
-export NODE_ID=JOR-47
-export JURISDICTION=KDPA_KE
-
-# GCP configuration
-export GOOGLE_CLOUD_PROJECT=your-project-id
-export GCP_REGION=africa-south1
-
-# Security configuration
-export ENABLE_TAMPER_PROOF_AUDIT=true
-export RETENTION_MAX_DAYS=1825
-```
-
-### 4. Validate Installation
-
-```bash
-# Run fortress validation
+chmod +x scripts/validate_fortress.sh
 ./scripts/validate_fortress.sh
-
-# Generate compliance bundle
-python scripts/generate_compliance_bundle.py
-
-# Check output
-ls -la compliance/artifacts/
 ```
 
-## Component Overview
-
-### Security Audit Layer
-
-#### CodeQL Workflow (`.github/workflows/codeql.yml`)
-- **Purpose:** SAST security scanning
-- **Schedule:** Weekly + on push/PR
-- **Languages:** Python, JavaScript
-- **Compliance:** GDPR Art. 32, ISO 27001 A.12.6
-
-#### Gitleaks Workflow (`.github/workflows/gitleaks.yml`)
-- **Purpose:** Secret detection
-- **Schedule:** Daily at 2 AM UTC
-- **Compliance:** NIST SP 800-53 IA-5, HIPAA §164.312(a)(2)(i)
-
-#### Dependabot (`.github/dependabot.yml`)
-- **Purpose:** Daily security updates
-- **Ecosystems:** pip, npm, docker, github-actions
-- **Strategy:** Security-only updates
-
-### Governance Kernel
-
-#### Crypto Shredder (`governance_kernel/crypto_shredder.py`)
-- **IP-02:** Data dissolution (not deletion)
-- **Features:**
-  - Ephemeral key encryption (AES-256-GCM)
-  - Automatic key shredding
-  - Retention policy enforcement
-  - Sovereignty zone support
-- **Compliance:** GDPR Art. 17, HIPAA §164.530(j), NIST SP 800-88
-
-### Edge Node
-
-#### HSML Sync Agent (`edge_node/sync_agent.py`)
-- **Purpose:** Offline-first data synchronization
-- **Features:**
-  - Vector Clock conflict resolution
-  - SQLite local buffer
-  - 0% data loss guarantee
-  - Automatic reconciliation
-- **Compliance:** GDPR Art. 32, HIPAA §164.312(b)
-
-#### HSML Reconciler (`edge_node/hsml_reconciler.py`)
-- **Purpose:** Advanced conflict resolution
-- **Features:**
-  - Three-way merge
-  - Semantic conflict detection
-  - Automatic resolution strategies
-  - Manual review queue
-- **Compliance:** GDPR Art. 5, HIPAA §164.312(c)(1)
-
-### Configuration
-
-#### SovereignGuardrail Config (`config/sovereign_guardrail.yaml`)
-- **Purpose:** Compliance enforcement configuration
-- **Features:**
-  - 14 global legal frameworks
-  - Data sovereignty rules
-  - Consent management
-  - Retention policies
-  - Audit trail settings
-
-### Scripts
-
-#### Fortress Validator (`scripts/validate_fortress.sh`)
-- **Purpose:** System integrity validation
-- **Phases:**
-  1. Security Audit Layer
-  2. Governance Kernel
-  3. Edge Node & AI Agents
-  4. Cloud Oracle
-  5. Python Dependencies
-  6. Environment Configuration
-  7. Nuclear IP Stack Status
-
-#### Compliance Bundle Generator (`scripts/generate_compliance_bundle.py`)
-- **Purpose:** Automated compliance evidence
-- **Generates:**
-  - Encryption proofs
-  - IAM logs
-  - SovereignGuardrail stats
-  - NIST SP 800-53 mappings
-  - ISO 27001 Annex A mappings
-  - SOC 2 Trust Criteria mappings
-  - Executive summary
-
-## Usage Examples
-
-### Example 1: Create Offline Event
-
-```python
-from edge_node.sync_agent import HSMLSyncAgent, EventType
-
-# Initialize agent
-agent = HSMLSyncAgent(node_id="JOR-47")
-
-# Create event while offline
-event = agent.create_event(
-    event_type=EventType.CBS_REPORT,
-    payload={
-        "location": "Dadaab",
-        "symptom": "diarrhea",
-        "severity": 8,
-        "reporter": "CHV_AMINA_HASSAN"
-    }
-)
-
-# Check buffer stats
-stats = agent.get_buffer_stats()
-print(f"Pending events: {stats.get('pending', 0)}")
-
-# Sync when connectivity returns
-# stats = agent.sync_to_golden_thread(golden_thread_client)
+Expected output:
+```
+🛡️  FORTRESS STATUS: OPERATIONAL
+✓  All critical components validated
+✓  Security audit layer active
+✓  Governance kernel operational
+✓  Nuclear IP stack initialized
 ```
 
-### Example 2: Encrypt with Crypto Shredder
+## 🔐 Security Stack
 
+### CodeQL SAST Scanning
+
+Continuous static application security testing.
+
+**File:** `.github/workflows/codeql.yml`
+
+**Compliance:**
+- GDPR Art. 32 (Security of Processing)
+- ISO 27001 A.12.6 (Technical Vulnerability Management)
+
+**Trigger:** Push to main/develop, PRs, Weekly schedule
+
+### Gitleaks Secret Scanning
+
+Detects hardcoded secrets and credentials.
+
+**File:** `.github/workflows/gitleaks.yml`
+
+**Compliance:**
+- NIST SP 800-53 (IA-5 Authenticator Management)
+- HIPAA §164.312(a)(2)(i)
+
+**Trigger:** Push to main/develop, Daily at 2 AM UTC
+
+### Dependabot Security Updates
+
+Daily automated dependency updates.
+
+**File:** `.github/dependabot.yml`
+
+**Features:**
+- Daily Python dependency updates
+- Weekly GitHub Actions updates
+- Security-only updates for production
+- Grouped updates by category
+
+## 🧠 Cognitive Hardening
+
+### 1. Ethical Specifications
+
+**File:** `governance_kernel/ethical_specifications.json`
+
+Defines 14 core safety rules with:
+- Legal basis (GDPR, KDPA, HIPAA, etc.)
+- Edge case scenarios
+- Conflict resolution hierarchy
+- Humanitarian margin calculations
+
+### 2. Synthetic Data Generation
+
+**File:** `scripts/generate_synthetic_humanitarian_data.py`
+
+Generates 10,000 synthetic patient/outbreak records with:
+- 30% edge cases
+- Validation against SovereignGuardrail
+- Context distillation for training
+
+**Usage:**
+```bash
+python scripts/generate_synthetic_humanitarian_data.py
+```
+
+**Output:**
+- `data/synthetic/humanitarian_training_data.jsonl`
+- `data/synthetic/dataset_metadata.json`
+
+### 3. Chain-of-Thought Fine-Tuning
+
+**File:** `intelligence_engine/train_cot.py`
+
+Supervised Fine-Tuning with:
+- Golden Thread reasoning embedded in weights
+- IP-04 Silent Flux anxiety regulation
+- Legal citation training
+- Humanitarian margin calculations
+
+**Usage:**
+```bash
+python intelligence_engine/train_cot.py
+```
+
+**Requirements:**
+- GPU recommended (CUDA)
+- 16GB+ RAM
+- ~50GB disk space for model
+
+### 4. RL Optimization
+
+**File:** `intelligence_engine/rl_optimizer.py`
+
+Proximal Policy Optimization with humanitarian reward model:
+- +1.0 for Geneva Convention alignment
+- -5.0 for PII exposure violations
+- +0.5 for correct legal citations
+- -2.0 for discrimination
+
+**Usage:**
+```bash
+python intelligence_engine/rl_optimizer.py
+```
+
+### 5. Refusal Logic
+
+**File:** `core/safety_gate.py`
+
+CoT-based refusal system with:
+- Sovereignty violation detection
+- Consent validation
+- Child protection checks
+- Detailed reasoning chains
+
+**Usage:**
 ```python
-from governance_kernel.crypto_shredder import CryptoShredder, RetentionPolicy, SovereigntyZone
+from core.safety_gate import SafetyGate
 
-# Initialize shredder
-shredder = CryptoShredder(
-    sovereignty_zone=SovereigntyZone.KENYA,
-    enable_audit=True
-)
+gate = SafetyGate()
+should_refuse, refusal, reasoning = gate.should_refuse(query)
+```
 
-# Encrypt patient data
-patient_data = b"Patient ID: 12345, Diagnosis: Malaria"
+### 6. OOD Generalization Tests
+
+**File:** `tests/ood_generalization.py`
+
+Tests unknown pathogen scenarios ("Type X"):
+- Golden Thread integrity
+- Sovereignty compliance
+- Reasoning coherence
+
+**Usage:**
+```bash
+python tests/ood_generalization.py
+```
+
+**Success Criteria:**
+- Golden Thread: ≥80% success
+- Sovereignty: ≥95% compliance
+
+## 📊 Metrics Tracking
+
+**File:** `governance_kernel/metrics.py`
+
+Tracks four key dimensions:
+
+1. **Compliance Accuracy** - vs 14 legal frameworks
+2. **Reasoning Coherence** - CoT logic quality
+3. **Humanitarian Margin Error** - Ethical calculation accuracy
+4. **Latency** - API, 5DM Bridge, inference
+
+**Usage:**
+```python
+from governance_kernel.metrics import get_metrics_tracker
+
+tracker = get_metrics_tracker()
+tracker.record_compliance_check(True, "GDPR")
+summary = tracker.get_summary()
+```
+
+**Prometheus Export:**
+```python
+metrics = tracker.export_prometheus_metrics()
+```
+
+## 🛡️ IP-02: Crypto Shredder
+
+**File:** `governance_kernel/crypto_shredder.py`
+
+Data is not deleted; it is cryptographically dissolved.
+
+**Features:**
+- Ephemeral key encryption (AES-256-GCM)
+- Retention policies (HOT, WARM, COLD, ETERNAL)
+- Auto-shred expired keys
+- Tamper-proof audit trail
+
+**Usage:**
+```python
+from governance_kernel.crypto_shredder import CryptoShredder, RetentionPolicy
+
+shredder = CryptoShredder(sovereignty_zone=SovereigntyZone.KENYA)
+
+# Encrypt
 encrypted_data, key_id = shredder.encrypt_with_ephemeral_key(
-    data=patient_data,
-    retention_policy=RetentionPolicy.HOT,
-    metadata={
-        "patient_id": "12345",
-        "jurisdiction": "KDPA_KE",
-        "data_type": "PHI"
-    }
+    data=patient_record,
+    retention_policy=RetentionPolicy.HOT
 )
 
-print(f"Encrypted with key: {key_id}")
-
-# After retention period, shred key
-# shredder.shred_key(key_id)
+# Shred key (data becomes irrecoverable)
+shredder.shred_key(key_id)
 ```
 
-### Example 3: Generate Compliance Bundle
+## ⚙️ Configuration
 
-```bash
-# Generate full compliance pack
-python scripts/generate_compliance_bundle.py
+### SovereignGuardrail Configuration
 
-# Output files:
-# - compliance/artifacts/encryption_proofs.json
-# - compliance/artifacts/iam_least_privilege_logs.json
-# - compliance/artifacts/sovereign_guardrail_stats.json
-# - compliance/artifacts/nist_sp_800_53_mapping.json
-# - compliance/artifacts/iso_27001_annex_a_mapping.json
-# - compliance/artifacts/soc2_trust_criteria_mapping.json
-# - compliance/artifacts/EXECUTIVE_SUMMARY.md
+**File:** `config/sovereign_guardrail.yaml`
+
+Configure:
+- Jurisdiction (primary and secondary)
+- Data residency rules
+- Cross-border transfer policies
+- Consent management
+- Retention policies
+- Audit settings
+- Humanitarian constraints
+
+**Example:**
+```yaml
+jurisdiction:
+  primary: "KDPA_KE"
+  secondary:
+    - "GDPR_EU"
+    - "POPIA_ZA"
+
+sovereignty:
+  data_residency:
+    enabled: true
+    enforcement_level: "STRICT"
 ```
 
-### Example 4: Validate Fortress
+## 🧪 Testing
+
+### Run All Tests
 
 ```bash
-# Run complete validation
+# Validate fortress
 ./scripts/validate_fortress.sh
 
-# Expected output:
-# ✅ Security Audit Layer: OPERATIONAL
-# ✅ Governance Kernel: OPERATIONAL
-# ✅ Edge Node: OPERATIONAL
-# ✅ Nuclear IP Stack: ACTIVE
-# 🛡️ FORTRESS STATUS: OPERATIONAL
+# Test OOD generalization
+python tests/ood_generalization.py
+
+# Test safety gate
+python core/safety_gate.py
+
+# Test metrics
+python governance_kernel/metrics.py
 ```
 
-## GitHub Workflow Setup
+### Expected Results
 
-### Enable Workflows
+All tests should pass with:
+- ✅ Fortress validation: OPERATIONAL
+- ✅ OOD generalization: ≥80% success
+- ✅ Safety gate: Correct refusals
+- ✅ Metrics: Accurate tracking
+
+## 📝 Deployment Checklist
+
+- [ ] Copy all files to repository
+- [ ] Install dependencies
+- [ ] Configure `config/sovereign_guardrail.yaml`
+- [ ] Set environment variables (NODE_ID, JURISDICTION)
+- [ ] Run fortress validation
+- [ ] Generate synthetic data
+- [ ] Train CoT model
+- [ ] Run RL optimization
+- [ ] Test OOD generalization
+- [ ] Enable GitHub workflows
+- [ ] Configure Dependabot
+- [ ] Set up Prometheus monitoring
+
+## 🔗 Integration Points
+
+### With Existing iLuminara Components
+
+1. **Governance Kernel** - Integrates with existing `vector_ledger.py`
+2. **Edge Node** - Uses Golden Thread for data fusion
+3. **Cloud Oracle** - Metrics exported to Prometheus
+4. **Dashboard** - CoT reasoning displayed in UI
+5. **API Service** - Safety gate validates all requests
+
+## 📚 Documentation
+
+Full documentation available at:
+- **Security Stack:** `/security/overview`
+- **Cognitive Hardening:** `/cognitive-hardening/overview`
+- **Governance Kernel:** `/governance/overview`
+- **AI Agents:** `/ai-agents/overview`
+
+## 🆘 Troubleshooting
+
+### Fortress Validation Fails
 
 ```bash
-# Refresh GitHub permissions
-gh auth refresh -s workflow,repo,write:packages,admin:repo_hook
+# Check missing dependencies
+pip install -r requirements.txt
 
-# Commit and push workflows
-git add .github/
-git commit -m "feat: add security workflows (CodeQL, Gitleaks, Dependabot)"
-git push
+# Verify file structure
+ls -la governance_kernel/
+ls -la .github/workflows/
 ```
 
-### Enable Branch Protection
+### Training Fails (GPU)
 
 ```bash
-# Require status checks
-gh api repos/:owner/:repo/branches/main/protection \
-  -X PUT \
-  -f required_status_checks[strict]=true \
-  -f required_status_checks[contexts][]=CodeQL \
-  -f required_status_checks[contexts][]=Gitleaks
+# Check CUDA availability
+python -c "import torch; print(torch.cuda.is_available())"
 
-# Require pull request reviews
-gh api repos/:owner/:repo/branches/main/protection \
-  -X PUT \
-  -f required_pull_request_reviews[required_approving_review_count]=1
+# Use CPU fallback
+export CUDA_VISIBLE_DEVICES=""
 ```
 
-## Testing
-
-### Unit Tests
+### Metrics Not Tracking
 
 ```bash
-# Test Crypto Shredder
-python -m pytest tests/test_crypto_shredder.py
-
-# Test HSML Sync Agent
-python -m pytest tests/test_sync_agent.py
-
-# Test HSML Reconciler
-python -m pytest tests/test_reconciler.py
+# Initialize metrics tracker
+python -c "from governance_kernel.metrics import get_metrics_tracker; tracker = get_metrics_tracker(); print(tracker.get_summary())"
 ```
 
-### Integration Tests
+## 🎯 Next Steps
 
-```bash
-# Test full offline workflow
-python tests/integration/test_offline_workflow.py
+1. **Deploy to Production**
+   ```bash
+   ./deploy_gcp_prototype.sh
+   ```
 
-# Test compliance bundle generation
-python tests/integration/test_compliance_bundle.py
-```
+2. **Monitor Metrics**
+   ```bash
+   curl http://localhost:9090/metrics
+   ```
 
-## Troubleshooting
+3. **Continuous Improvement**
+   - Review audit logs daily
+   - Retrain models monthly
+   - Update ethical specifications quarterly
 
-### Issue: CodeQL workflow fails
+## 📞 Support
 
-**Solution:** Ensure Python 3.8+ is installed and all dependencies are in `requirements.txt`
+For issues or questions:
+- GitHub Issues: https://github.com/VISENDI56/iLuminara-Core/issues
+- Documentation: https://docs.iluminara.health
 
-### Issue: Gitleaks detects false positives
+---
 
-**Solution:** Add patterns to `.gitleaks.toml` allowlist:
+**The Sovereign Health Fortress is now operational.**
 
-```toml
-[allowlist]
-regexes = [
-  '''your-pattern-here'''
-]
-```
-
-### Issue: Crypto Shredder key storage permission denied
-
-**Solution:** Ensure key storage directory is writable:
-
-```bash
-mkdir -p ./keys
-chmod 700 ./keys
-```
-
-### Issue: HSML Sync Agent database locked
-
-**Solution:** Close any open connections to `hsml_buffer.db`:
-
-```python
-# Ensure proper connection cleanup
-agent = HSMLSyncAgent(node_id="JOR-47")
-# ... use agent ...
-# Connection auto-closes when agent goes out of scope
-```
-
-## Support
-
-For implementation assistance:
-- **Technical Support:** tech@iluminara.health
-- **Compliance Questions:** compliance@iluminara.health
-- **Security Issues:** security@iluminara.health
-
-## License
-
-Copyright © 2025 iLuminara-Core. All rights reserved.
+Transform preventable suffering from statistical inevitability to historical anomaly.
