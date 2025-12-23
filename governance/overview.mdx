@@ -110,6 +110,75 @@ iLuminara implements the most comprehensive compliance stack in global health te
 | **Geneva Conventions** | 🌐 Global | ✅ Enforced | Medical data as neutral asset in conflict zones |
 | **AU Malabo Convention** | 🌍 Africa | ✅ Enforced | Art. 13 (Pan-African data protection) |
 
+## Sectoral Compliance Engine
+
+The Governance Kernel now includes a **Sectoral Abstraction Layer** that routes compliance checks based on operational context.
+
+### Usage
+
+```python
+from governance_kernel.compliance_matrix import ComplianceMatrix, SectoralContext
+
+matrix = ComplianceMatrix()
+
+# Check supply chain compliance
+result = matrix.check_sectoral_compliance(
+    context=SectoralContext.SUPPLY_CHAIN,
+    payload={
+        "component_origin": "XUAR",
+        "hardware_components": ["Tin", "Tantalum"]
+    }
+)
+
+# Check humanitarian finance compliance (OFAC)
+result = matrix.check_sectoral_compliance(
+    context=SectoralContext.HUMANITARIAN_FINANCE,
+    payload={
+        "payment_initiation": True,
+        "payee_id": "BENEFICIARY_001",
+        "ofac_check_passed": False
+    }
+)
+
+# Check ESG carbon compliance (CBAM)
+result = matrix.check_sectoral_compliance(
+    context=SectoralContext.ESG_CARBON,
+    payload={
+        "goods_destination": "EU",
+        "carbon_intensive": True,
+        "embedded_emissions_calculated": False
+    }
+)
+```
+
+### Example: KDPA §37 Logic Gate
+
+```python
+# IF Region == "Kenya" AND Data_Type == "HIV_Status" AND Target_Server == "USA"
+# THEN Block_Transfer() (citing KDPA Sec 37)
+
+result = matrix.check_sectoral_compliance(
+    context=SectoralContext.DATA_PRIVACY,
+    payload={
+        "region": "Kenya",
+        "data_type": "HIV_Status",
+        "target_server": "USA"
+    }
+)
+
+# Result:
+# {
+#   "status": "VIOLATION",
+#   "violations": [{
+#     "framework": "KDPA §37",
+#     "severity": "CRITICAL",
+#     "message": "Cross-border transfer of sensitive health data blocked",
+#     "action": "BLOCK TRANSFER - Sovereignty violation",
+#     "citation": "Kenya Data Protection Act Section 37"
+#   }]
+# }
+```
+
 ## SovereignGuardrail
 
 The core enforcement engine that validates all actions against compliance constraints.
