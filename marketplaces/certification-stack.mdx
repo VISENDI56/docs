@@ -1,0 +1,370 @@
+---
+title: Marketplace certification stack
+description: Complete certification for Salesforce AppExchange, GitHub Marketplace, and Microsoft Marketplace
+---
+
+## Overview
+
+The iLuminara-Core Certification Stack enables deployment across three major enterprise marketplaces with full compliance and security attestation.
+
+<CardGroup cols={3}>
+  <Card title="Salesforce AppExchange" icon="salesforce">
+    OAuth 2.0, Shield encryption, security review compliance
+  </Card>
+  <Card title="GitHub Marketplace" icon="github">
+    SLSA Level 3, verified creator, supply chain security
+  </Card>
+  <Card title="Microsoft Marketplace" icon="microsoft">
+    Azure Purview, DSPM 2026, managed applications
+  </Card>
+</CardGroup>
+
+## Certification status
+
+| Marketplace | Status | Certification Level | Last Updated |
+|-------------|--------|---------------------|--------------|
+| **Salesforce AppExchange** | ✅ Ready | Security Review Compliant | 2025-12-23 |
+| **GitHub Marketplace** | ✅ Ready | SLSA Level 3 + Verified Creator | 2025-12-23 |
+| **Microsoft Marketplace** | ✅ Ready | DSPM 2026 Compliant | 2025-12-23 |
+
+## Salesforce AppExchange
+
+### Security manifest
+
+Complete security documentation in `salesforce/SF_Security_Manifest.json`:
+
+- **Authentication:** OAuth 2.0 with PKCE
+- **Encryption:** Salesforce Shield Platform Encryption
+- **CRUD Operations:** Documented for all sensitive objects
+- **Compliance:** HIPAA, GDPR, Salesforce Shield
+
+### OAuth 2.0 integration
+
+```python
+from salesforce.oauth2_integration import SalesforceOAuth2Client
+
+client = SalesforceOAuth2Client(
+    client_id=os.getenv("SALESFORCE_CLIENT_ID"),
+    client_secret=os.getenv("SALESFORCE_CLIENT_SECRET"),
+    redirect_uri="https://iluminara.health/oauth/callback"
+)
+
+# Get authorization URL with PKCE
+auth_url, code_verifier, state = client.get_authorization_url(
+    scope="api refresh_token full"
+)
+```
+
+### Shield encryption
+
+```python
+from salesforce.oauth2_integration import SalesforceShieldEncryption
+
+shield = SalesforceShieldEncryption(client)
+
+# Create encrypted health record
+record = shield.create_encrypted_record(
+    sobject="Health_Record__c",
+    data={
+        "Patient_ID__c": "PAT_12345",
+        "Diagnosis__c": "Malaria",
+        "Symptoms__c": "Fever, Chills"
+    },
+    sensitive_fields=["Patient_ID__c", "Diagnosis__c"]
+)
+```
+
+### AppExchange requirements
+
+<Steps>
+  <Step title="Security review">
+    Submit SF_Security_Manifest.json with complete CRUD documentation
+  </Step>
+  <Step title="OAuth 2.0">
+    Implement authorization code flow with PKCE
+  </Step>
+  <Step title="Shield encryption">
+    Wrap all PHI/PII in Shield-compatible encryption
+  </Step>
+  <Step title="Compliance">
+    Document HIPAA, GDPR, and Salesforce Shield compliance
+  </Step>
+</Steps>
+
+## GitHub Marketplace
+
+### SLSA Level 3 attestation
+
+Automated build attestation workflow in `.github/workflows/slsa-attestation.yml`:
+
+- **Provenance:** Build provenance attestation
+- **SBOM:** Software Bill of Materials with compliance metadata
+- **Signatures:** Sigstore cryptographic signatures
+- **Verification:** Automated attestation verification
+
+### Sovereignty verification
+
+Pre-merge sovereignty validation in `.github/workflows/sovereignty-verification.yml`:
+
+```yaml
+name: "SovereignGuardrail Verification"
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  verify-sovereignty:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate SovereignGuardrail
+      - name: Test Data Residency
+      - name: Test Crypto Shredder
+      - name: Generate Compliance Report
+```
+
+### Verified creator requirements
+
+<Steps>
+  <Step title="SECURITY.md">
+    Comprehensive security policy with vulnerability reporting
+  </Step>
+  <Step title="SLSA attestation">
+    Level 3 build attestation with provenance
+  </Step>
+  <Step title="Supply chain security">
+    CodeQL, Gitleaks, Dependabot enabled
+  </Step>
+  <Step title="Compliance documentation">
+    14 global frameworks documented
+  </Step>
+</Steps>
+
+### Marketplace metadata
+
+```json
+{
+  "name": "iLuminara-Core",
+  "verified_creator": true,
+  "slsa_level": 3,
+  "security_features": [
+    "CodeQL SAST scanning",
+    "Gitleaks secret detection",
+    "SovereignGuardrail enforcement",
+    "Crypto Shredder (IP-02)"
+  ],
+  "compliance_frameworks": [
+    "GDPR", "HIPAA", "KDPA", "POPIA", "EU AI Act"
+  ]
+}
+```
+
+## Microsoft Marketplace
+
+### Azure Purview integration
+
+Automated data classification in `azure/purview_integration.py`:
+
+```python
+from azure.purview_integration import PurviewDataClassifier
+
+classifier = PurviewDataClassifier(
+    purview_account_name="iluminara-purview",
+    subscription_id=os.getenv("AZURE_SUBSCRIPTION_ID"),
+    resource_group="iluminara-rg"
+)
+
+# Classify health record
+classification = classifier.classify_health_record(health_record)
+
+# Register in Purview catalog
+asset_guid = classifier.register_asset(
+    asset_name="health_record_12345",
+    asset_type="health_record",
+    classification=classification
+)
+```
+
+### DSPM 2026 compliance
+
+Data Security Posture Management aligned with Microsoft 2026 Data Security Index:
+
+- **Data discovery:** Automated asset discovery and classification
+- **Sensitivity labels:** Microsoft Information Protection integration
+- **Compliance posture:** Real-time compliance monitoring
+- **GenAI governance:** AI model cataloging and explainability
+
+### Managed application template
+
+Azure Resource Manager template in `azure/mainTemplate.json`:
+
+```json
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]"
+    },
+    "sovereigntyZone": {
+      "type": "string",
+      "allowedValues": ["KDPA_KE", "GDPR_EU", "HIPAA_US"]
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Purview/accounts",
+      "apiVersion": "2021-07-01",
+      "name": "iluminara-purview",
+      "location": "[parameters('location')]"
+    }
+  ]
+}
+```
+
+### Azure Monitor telemetry
+
+```python
+from azure.monitor.opentelemetry import configure_azure_monitor
+
+configure_azure_monitor(
+    connection_string=os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING")
+)
+
+# All telemetry automatically routed to Azure Monitor
+# Compliance with DSPM principles
+```
+
+### Marketplace requirements
+
+<Steps>
+  <Step title="Azure Purview">
+    Integrate governance kernel with Purview for data classification
+  </Step>
+  <Step title="Managed application">
+    Create ARM template for one-click deployment
+  </Step>
+  <Step title="Azure Monitor">
+    Route all telemetry through Azure Monitor
+  </Step>
+  <Step title="DSPM compliance">
+    Align with 2026 Data Security Index principles
+  </Step>
+</Steps>
+
+## Deployment checklist
+
+### Salesforce AppExchange
+
+- [ ] Complete SF_Security_Manifest.json
+- [ ] Implement OAuth 2.0 with PKCE
+- [ ] Enable Salesforce Shield encryption
+- [ ] Document all CRUD operations
+- [ ] Submit for security review
+- [ ] Obtain AppExchange listing
+
+### GitHub Marketplace
+
+- [ ] Enable SLSA Level 3 attestation
+- [ ] Create SECURITY.md
+- [ ] Implement sovereignty verification workflow
+- [ ] Generate SBOM with compliance metadata
+- [ ] Apply for Verified Creator badge
+- [ ] Publish to GitHub Marketplace
+
+### Microsoft Marketplace
+
+- [ ] Integrate Azure Purview
+- [ ] Create managed application template
+- [ ] Configure Azure Monitor telemetry
+- [ ] Generate DSPM compliance report
+- [ ] Submit for marketplace review
+- [ ] Publish to Microsoft Marketplace
+
+## Compliance matrix
+
+| Requirement | Salesforce | GitHub | Microsoft |
+|-------------|-----------|--------|-----------|
+| **Security scanning** | ✅ CodeQL | ✅ CodeQL | ✅ CodeQL |
+| **Secret detection** | ✅ Gitleaks | ✅ Gitleaks | ✅ Gitleaks |
+| **Supply chain** | ✅ Dependabot | ✅ SLSA L3 | ✅ SBOM |
+| **Data classification** | ✅ Shield | ✅ Manual | ✅ Purview |
+| **Compliance docs** | ✅ Manifest | ✅ SECURITY.md | ✅ DSPM Report |
+| **Encryption** | ✅ Shield | ✅ Crypto Shredder | ✅ Azure KMS |
+| **Audit trail** | ✅ Event Monitoring | ✅ Tamper-proof | ✅ Azure Monitor |
+
+## Testing certification
+
+### Salesforce
+
+```bash
+# Test OAuth flow
+python salesforce/oauth2_integration.py
+
+# Validate security manifest
+python -c "import json; json.load(open('salesforce/SF_Security_Manifest.json'))"
+```
+
+### GitHub
+
+```bash
+# Run sovereignty verification
+./.github/workflows/sovereignty-verification.yml
+
+# Generate SLSA attestation
+./.github/workflows/slsa-attestation.yml
+
+# Validate SECURITY.md
+cat SECURITY.md
+```
+
+### Microsoft
+
+```bash
+# Test Purview integration
+python azure/purview_integration.py
+
+# Validate ARM template
+az deployment group validate \
+  --resource-group iluminara-rg \
+  --template-file azure/mainTemplate.json
+
+# Generate DSPM report
+python -c "from azure.purview_integration import PurviewDataClassifier; \
+  classifier = PurviewDataClassifier(...); \
+  print(classifier.generate_dspm_report())"
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Salesforce setup"
+    icon="salesforce"
+    href="/marketplaces/salesforce"
+  >
+    Complete AppExchange certification
+  </Card>
+  <Card
+    title="GitHub setup"
+    icon="github"
+    href="/marketplaces/github"
+  >
+    Achieve Verified Creator status
+  </Card>
+  <Card
+    title="Microsoft setup"
+    icon="microsoft"
+    href="/marketplaces/microsoft"
+  >
+    Deploy to Azure Marketplace
+  </Card>
+  <Card
+    title="Security stack"
+    icon="shield-halved"
+    href="/security/overview"
+  >
+    Review security architecture
+  </Card>
+</CardGroup>

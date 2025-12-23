@@ -1,6 +1,6 @@
 """
 Data Security Posture Management (DSPM) Engine
-Aligns with 2026 Data Security Index: 82% prioritize DSPM
+Implements 2026 Data Security Index recommendation: 79% prioritize automated classification
 
 Key Functions:
 - Identify data exposure risks (82% priority)
@@ -8,9 +8,10 @@ Key Functions:
 - Automated classification (79% priority)
 
 Compliance:
-- GDPR Art. 30 (Records of Processing)
+- GDPR Art. 30 (Records of Processing Activities)
 - HIPAA §164.308(a)(1)(ii)(A) (Risk Analysis)
-- ISO 27001 A.8.1 (Inventory of Assets)
+- ISO 27001 A.8.2.1 (Classification of Information)
+- NIST SP 800-53 (AC-16 Security Attributes)
 """
 
 import re
@@ -28,391 +29,387 @@ logger = logging.getLogger(__name__)
 
 class DataClassification(Enum):
     """Data classification levels"""
-    PHI = "Protected Health Information"  # HIPAA
-    PII = "Personally Identifiable Information"  # GDPR
-    FINANCIAL = "Financial Data"
-    OPERATIONAL = "Operational Data"
-    PUBLIC = "Public Data"
-    UNKNOWN = "Unclassified"
+    PUBLIC = "PUBLIC"
+    INTERNAL = "INTERNAL"
+    CONFIDENTIAL = "CONFIDENTIAL"
+    PHI = "PHI"  # Protected Health Information
+    PII = "PII"  # Personally Identifiable Information
+    RESTRICTED = "RESTRICTED"
 
 
-class RiskLevel(Enum):
-    """Risk severity levels"""
-    CRITICAL = "critical"
-    HIGH = "high"
-    MEDIUM = "medium"
-    LOW = "low"
-    NONE = "none"
+class ExposureRisk(Enum):
+    """Data exposure risk levels"""
+    CRITICAL = "CRITICAL"  # Public exposure of PHI/PII
+    HIGH = "HIGH"  # Misconfigured access controls
+    MEDIUM = "MEDIUM"  # Overly permissive sharing
+    LOW = "LOW"  # Proper controls in place
+    NONE = "NONE"  # No risk detected
 
 
 class DSPMEngine:
     """
-    Automated Data Security Posture Management Engine
+    Data Security Posture Management Engine
     
-    Discovers, classifies, and monitors sensitive data across environments.
+    Discovers, classifies, and monitors sensitive data across the iLuminara stack
     """
     
-    def __init__(
-        self,
-        scan_paths: List[str] = None,
-        enable_ml_classification: bool = False,
-        jurisdiction: str = "KDPA_KE"
-    ):
-        self.scan_paths = scan_paths or ["./"]
-        self.enable_ml_classification = enable_ml_classification
-        self.jurisdiction = jurisdiction
+    def __init__(self, scan_paths: Optional[List[str]] = None):
+        self.scan_paths = scan_paths or ["./edge_node", "./governance_kernel", "./api_service.py"]
+        self.classification_results = []
+        self.exposure_risks = []
+        self.access_patterns = []
         
-        # Classification patterns (regex-based)
-        self.patterns = self._initialize_patterns()
-        
-        # Scan results
-        self.scan_results = {
-            "scan_date": None,
-            "total_files_scanned": 0,
-            "total_data_assets": 0,
-            "classified_assets": 0,
-            "unclassified_assets": 0,
-            "classification_coverage": 0.0,
-            "exposure_risks": {
-                "critical": 0,
-                "high": 0,
-                "medium": 0,
-                "low": 0
-            },
-            "data_types": {
-                "PHI": 0,
-                "PII": 0,
-                "Financial": 0,
-                "Operational": 0,
-                "Public": 0,
-                "Unknown": 0
-            },
-            "access_anomalies": [],
-            "misconfigurations": [],
-            "findings": []
-        }
-        
-        logger.info(f"🔍 DSPM Engine initialized - Jurisdiction: {jurisdiction}")
-    
-    def _initialize_patterns(self) -> Dict[DataClassification, List[re.Pattern]]:
-        """Initialize regex patterns for data classification"""
-        return {
-            DataClassification.PHI: [
-                re.compile(r'\b(patient|diagnosis|treatment|medication|prescription|medical_record)\b', re.IGNORECASE),
-                re.compile(r'\b(symptom|disease|condition|vital_signs|lab_result)\b', re.IGNORECASE),
-                re.compile(r'\b(ICD-\d{2}|CPT-\d{5})\b'),  # Medical codes
-                re.compile(r'\b(blood_pressure|heart_rate|temperature|oxygen_saturation)\b', re.IGNORECASE),
+        # Regex patterns for sensitive data detection
+        self.patterns = {
+            "PHI": [
+                # Patient identifiers
+                r'\b(?:patient[_\s]?id|medical[_\s]?record[_\s]?number|mrn)\s*[:=]\s*["\']?([A-Z0-9\-]+)["\']?',
+                # Diagnosis codes
+                r'\b(?:icd[_\s]?10|diagnosis[_\s]?code)\s*[:=]\s*["\']?([A-Z0-9\.]+)["\']?',
+                # Medical conditions
+                r'\b(?:diagnosis|condition|disease)\s*[:=]\s*["\']?(cholera|malaria|tuberculosis|hiv|aids|covid)["\']?',
+                # Vital signs
+                r'\b(?:blood[_\s]?pressure|heart[_\s]?rate|temperature|oxygen[_\s]?saturation)\s*[:=]\s*["\']?(\d+)["\']?',
             ],
-            DataClassification.PII: [
-                re.compile(r'\b[A-Z][a-z]+ [A-Z][a-z]+\b'),  # Names
-                re.compile(r'\b\d{3}-\d{2}-\d{4}\b'),  # SSN
-                re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'),  # Email
-                re.compile(r'\b\d{10,15}\b'),  # Phone numbers
-                re.compile(r'\b\d{1,5}\s\w+\s(Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd)\b', re.IGNORECASE),  # Address
-                re.compile(r'\b(passport|driver_license|national_id)\b', re.IGNORECASE),
+            "PII": [
+                # Names
+                r'\b(?:first[_\s]?name|last[_\s]?name|full[_\s]?name)\s*[:=]\s*["\']?([A-Za-z\s]+)["\']?',
+                # Email addresses
+                r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
+                # Phone numbers
+                r'\b(?:\+?254|0)?[17]\d{8}\b',  # Kenyan phone numbers
+                # National IDs
+                r'\b(?:national[_\s]?id|id[_\s]?number)\s*[:=]\s*["\']?(\d{7,8})["\']?',
+                # GPS coordinates (can identify individuals)
+                r'\b(?:lat|latitude)\s*[:=]\s*["\']?([-+]?\d+\.\d+)["\']?',
             ],
-            DataClassification.FINANCIAL: [
-                re.compile(r'\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b'),  # Credit card
-                re.compile(r'\b(account_number|routing_number|iban|swift)\b', re.IGNORECASE),
-                re.compile(r'\b(payment|transaction|invoice|billing)\b', re.IGNORECASE),
-            ],
-            DataClassification.OPERATIONAL: [
-                re.compile(r'\b(api_key|access_token|secret|password|credential)\b', re.IGNORECASE),
-                re.compile(r'\b(config|configuration|settings|environment)\b', re.IGNORECASE),
+            "CREDENTIALS": [
+                # API keys
+                r'(?:api[_\s]?key|apikey)\s*[:=]\s*["\']?([A-Za-z0-9\-_]{20,})["\']?',
+                # Passwords
+                r'(?:password|passwd|pwd)\s*[:=]\s*["\']?([^\s"\']+)["\']?',
+                # Tokens
+                r'(?:token|auth[_\s]?token)\s*[:=]\s*["\']?([A-Za-z0-9\-_\.]+)["\']?',
+                # AWS keys (sovereignty violation)
+                r'AKIA[0-9A-Z]{16}',
             ]
         }
     
-    def classify_text(self, text: str) -> Tuple[DataClassification, float]:
+    def scan_file(self, file_path: Path) -> Dict:
         """
-        Classify text using regex patterns
+        Scan a single file for sensitive data
         
         Returns:
-            (classification, confidence_score)
-        """
-        scores = {classification: 0 for classification in DataClassification}
-        
-        for classification, patterns in self.patterns.items():
-            for pattern in patterns:
-                matches = pattern.findall(text)
-                scores[classification] += len(matches)
-        
-        # Determine classification
-        max_score = max(scores.values())
-        
-        if max_score == 0:
-            return DataClassification.UNKNOWN, 0.0
-        
-        classification = max(scores, key=scores.get)
-        confidence = min(max_score / 10.0, 1.0)  # Normalize to 0-1
-        
-        return classification, confidence
-    
-    def classify_file(self, file_path: Path) -> Dict:
-        """
-        Classify a single file
-        
-        Returns:
-            Classification result with metadata
+            Classification results with detected patterns
         """
         try:
-            # Skip binary files
-            if file_path.suffix in ['.pyc', '.so', '.dll', '.exe', '.bin']:
-                return None
-            
-            # Read file content
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 content = f.read()
-            
-            # Classify
-            classification, confidence = self.classify_text(content)
-            
-            # Calculate file hash
-            file_hash = hashlib.sha256(content.encode()).hexdigest()[:16]
-            
-            # Assess risk
-            risk_level = self._assess_risk(file_path, classification, confidence)
-            
-            return {
-                "file_path": str(file_path),
-                "file_name": file_path.name,
-                "file_size": file_path.stat().st_size,
-                "classification": classification.name,
-                "confidence": confidence,
-                "risk_level": risk_level.value,
-                "file_hash": file_hash,
-                "last_modified": datetime.fromtimestamp(file_path.stat().st_mtime).isoformat(),
-                "scan_timestamp": datetime.utcnow().isoformat()
-            }
-        
         except Exception as e:
-            logger.error(f"Error classifying {file_path}: {e}")
-            return None
-    
-    def _assess_risk(
-        self,
-        file_path: Path,
-        classification: DataClassification,
-        confidence: float
-    ) -> RiskLevel:
-        """Assess exposure risk based on file location and classification"""
+            logger.error(f"Failed to read {file_path}: {e}")
+            return {}
         
-        # Critical: PHI/PII in public directories
-        if classification in [DataClassification.PHI, DataClassification.PII]:
-            if any(x in str(file_path).lower() for x in ['public', 'static', 'www', 'html']):
-                return RiskLevel.CRITICAL
-            
-            # High: PHI/PII without encryption
-            if not any(x in str(file_path).lower() for x in ['encrypted', 'secure', 'vault']):
-                return RiskLevel.HIGH
+        findings = {
+            "file": str(file_path),
+            "scan_date": datetime.utcnow().isoformat(),
+            "classifications": [],
+            "exposure_risk": ExposureRisk.NONE.value,
+            "line_numbers": []
+        }
         
-        # High: Financial data in logs
-        if classification == DataClassification.FINANCIAL:
-            if 'log' in str(file_path).lower():
-                return RiskLevel.HIGH
+        # Scan for each classification type
+        for classification, patterns in self.patterns.items():
+            for pattern in patterns:
+                matches = re.finditer(pattern, content, re.IGNORECASE)
+                
+                for match in matches:
+                    # Calculate line number
+                    line_num = content[:match.start()].count('\n') + 1
+                    
+                    # Redact matched value
+                    matched_value = match.group(0)
+                    redacted_value = self._redact_value(matched_value)
+                    
+                    findings["classifications"].append({
+                        "type": classification,
+                        "pattern": pattern[:50] + "...",
+                        "line": line_num,
+                        "redacted_value": redacted_value,
+                        "context": self._get_context(content, match.start(), match.end())
+                    })
+                    
+                    findings["line_numbers"].append(line_num)
         
-        # Medium: Operational data in version control
-        if classification == DataClassification.OPERATIONAL:
-            if '.git' in str(file_path):
-                return RiskLevel.MEDIUM
-        
-        # Low: Everything else with classification
-        if classification != DataClassification.UNKNOWN:
-            return RiskLevel.LOW
-        
-        return RiskLevel.NONE
-    
-    def scan_directory(self, directory: Path) -> List[Dict]:
-        """Scan a directory recursively"""
-        findings = []
-        
-        for file_path in directory.rglob('*'):
-            if file_path.is_file():
-                result = self.classify_file(file_path)
-                if result:
-                    findings.append(result)
-                    self.scan_results["total_files_scanned"] += 1
+        # Determine exposure risk
+        if findings["classifications"]:
+            findings["exposure_risk"] = self._calculate_exposure_risk(file_path, findings["classifications"])
         
         return findings
     
+    def scan_directory(self, directory: Path) -> List[Dict]:
+        """
+        Recursively scan directory for sensitive data
+        
+        Returns:
+            List of classification results
+        """
+        results = []
+        
+        # File extensions to scan
+        extensions = ['.py', '.js', '.json', '.yaml', '.yml', '.txt', '.md', '.env']
+        
+        for file_path in directory.rglob('*'):
+            if file_path.is_file() and file_path.suffix in extensions:
+                # Skip test files and virtual environments
+                if any(skip in str(file_path) for skip in ['test', 'venv', 'node_modules', '__pycache__']):
+                    continue
+                
+                findings = self.scan_file(file_path)
+                
+                if findings and findings.get("classifications"):
+                    results.append(findings)
+        
+        return results
+    
     def run_full_scan(self) -> Dict:
         """
-        Run complete DSPM scan across all configured paths
+        Run full DSPM scan across all configured paths
         
         Returns:
             Comprehensive scan results
         """
         logger.info("🔍 Starting DSPM full scan...")
         
-        self.scan_results["scan_date"] = datetime.utcnow().isoformat()
-        all_findings = []
+        all_results = []
         
         for scan_path in self.scan_paths:
             path = Path(scan_path)
-            if path.exists():
-                logger.info(f"Scanning: {scan_path}")
-                findings = self.scan_directory(path)
-                all_findings.extend(findings)
-        
-        # Aggregate results
-        self.scan_results["total_data_assets"] = len(all_findings)
-        self.scan_results["findings"] = all_findings
-        
-        # Count classifications
-        for finding in all_findings:
-            classification = finding["classification"]
-            risk_level = finding["risk_level"]
             
-            # Update data type counts
-            if classification in self.scan_results["data_types"]:
-                self.scan_results["data_types"][classification] += 1
+            if path.is_file():
+                findings = self.scan_file(path)
+                if findings and findings.get("classifications"):
+                    all_results.append(findings)
             
-            # Update risk counts
-            if risk_level in self.scan_results["exposure_risks"]:
-                self.scan_results["exposure_risks"][risk_level] += 1
-            
-            # Count classified vs unclassified
-            if classification != "UNKNOWN":
-                self.scan_results["classified_assets"] += 1
-            else:
-                self.scan_results["unclassified_assets"] += 1
+            elif path.is_dir():
+                results = self.scan_directory(path)
+                all_results.extend(results)
         
-        # Calculate coverage
-        if self.scan_results["total_data_assets"] > 0:
-            self.scan_results["classification_coverage"] = (
-                self.scan_results["classified_assets"] / 
-                self.scan_results["total_data_assets"] * 100
-            )
+        # Aggregate statistics
+        summary = self._generate_summary(all_results)
         
-        # Detect misconfigurations
-        self._detect_misconfigurations(all_findings)
+        # Save results
+        self._save_results(all_results, summary)
         
-        # Detect access anomalies
-        self._detect_access_anomalies(all_findings)
+        logger.info(f"✅ DSPM scan complete - {summary['total_files']} files, {summary['total_findings']} findings")
         
-        logger.info(f"✅ DSPM scan complete - {len(all_findings)} assets analyzed")
-        
-        return self.scan_results
+        return {
+            "scan_date": datetime.utcnow().isoformat(),
+            "summary": summary,
+            "results": all_results
+        }
     
-    def _detect_misconfigurations(self, findings: List[Dict]):
-        """Detect security misconfigurations"""
-        misconfigurations = []
+    def detect_access_patterns(self, audit_log_path: str = "./keys/audit.jsonl") -> List[Dict]:
+        """
+        Detect anomalous access patterns (81% priority in 2026 DSI)
         
-        for finding in findings:
-            # PHI/PII in public directories
-            if finding["classification"] in ["PHI", "PII"]:
-                if any(x in finding["file_path"].lower() for x in ['public', 'static', 'www']):
-                    misconfigurations.append({
-                        "type": "sensitive_data_in_public_directory",
-                        "severity": "critical",
-                        "file": finding["file_path"],
-                        "classification": finding["classification"],
-                        "recommendation": "Move to secure storage with access controls"
-                    })
-            
-            # Credentials in code
-            if finding["classification"] == "OPERATIONAL":
-                if any(x in finding["file_name"].lower() for x in ['.py', '.js', '.java']):
-                    misconfigurations.append({
-                        "type": "credentials_in_source_code",
-                        "severity": "high",
-                        "file": finding["file_path"],
-                        "recommendation": "Use environment variables or secret management"
-                    })
-        
-        self.scan_results["misconfigurations"] = misconfigurations
-    
-    def _detect_access_anomalies(self, findings: List[Dict]):
-        """Detect unusual access patterns"""
+        Returns:
+            List of detected anomalies
+        """
         anomalies = []
         
-        # Group by classification
-        phi_files = [f for f in findings if f["classification"] == "PHI"]
+        if not os.path.exists(audit_log_path):
+            return anomalies
         
-        # Anomaly: Too many PHI files in one location
-        if len(phi_files) > 100:
-            anomalies.append({
-                "type": "excessive_phi_concentration",
-                "severity": "medium",
-                "count": len(phi_files),
-                "recommendation": "Distribute PHI across secure storage zones"
+        access_counts = {}
+        
+        with open(audit_log_path, 'r') as f:
+            for line in f:
+                try:
+                    entry = json.loads(line)
+                    
+                    # Track access by actor
+                    actor = entry.get("metadata", {}).get("actor", "unknown")
+                    action = entry.get("action", "unknown")
+                    
+                    key = f"{actor}:{action}"
+                    access_counts[key] = access_counts.get(key, 0) + 1
+                    
+                except json.JSONDecodeError:
+                    continue
+        
+        # Detect anomalies (simple threshold-based)
+        for key, count in access_counts.items():
+            if count > 100:  # More than 100 accesses
+                actor, action = key.split(":", 1)
+                anomalies.append({
+                    "actor": actor,
+                    "action": action,
+                    "count": count,
+                    "severity": "HIGH" if count > 500 else "MEDIUM",
+                    "description": f"Unusual access pattern: {count} {action} operations by {actor}"
+                })
+        
+        return anomalies
+    
+    def identify_exposure_risks(self) -> List[Dict]:
+        """
+        Identify data exposure risks (82% priority in 2026 DSI)
+        
+        Returns:
+            List of exposure risks
+        """
+        risks = []
+        
+        # Check for common misconfigurations
+        risk_checks = [
+            {
+                "check": "public_s3_buckets",
+                "description": "S3 buckets with public access",
+                "severity": ExposureRisk.CRITICAL,
+                "remediation": "Enable S3 Block Public Access"
+            },
+            {
+                "check": "overly_permissive_iam",
+                "description": "IAM roles with wildcard permissions",
+                "severity": ExposureRisk.HIGH,
+                "remediation": "Apply principle of least privilege"
+            },
+            {
+                "check": "unencrypted_data_at_rest",
+                "description": "Data stored without encryption",
+                "severity": ExposureRisk.HIGH,
+                "remediation": "Enable encryption at rest"
+            },
+            {
+                "check": "missing_mfa",
+                "description": "Admin accounts without MFA",
+                "severity": ExposureRisk.MEDIUM,
+                "remediation": "Enforce MFA for all admin accounts"
+            }
+        ]
+        
+        # In production, these would be actual checks against cloud infrastructure
+        # For now, return template
+        for check in risk_checks:
+            risks.append({
+                "check_id": check["check"],
+                "description": check["description"],
+                "severity": check["severity"].value,
+                "remediation": check["remediation"],
+                "detected": False  # Would be True if misconfiguration found
             })
         
-        self.scan_results["access_anomalies"] = anomalies
+        return risks
     
-    def export_results(self, output_path: str = "./security_telemetry/dspm_metrics.json"):
-        """Export scan results to JSON"""
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        
-        with open(output_path, 'w') as f:
-            json.dump(self.scan_results, f, indent=2)
-        
-        logger.info(f"📊 DSPM results exported to {output_path}")
+    def _redact_value(self, value: str) -> str:
+        """Redact sensitive value for logging"""
+        if len(value) <= 4:
+            return "***"
+        return value[:2] + "*" * (len(value) - 4) + value[-2:]
     
-    def generate_report(self) -> str:
-        """Generate human-readable DSPM report"""
-        report = []
-        report.append("=" * 60)
-        report.append("iLuminara DSPM Scan Report")
-        report.append("=" * 60)
-        report.append(f"Scan Date: {self.scan_results['scan_date']}")
-        report.append(f"Jurisdiction: {self.jurisdiction}")
-        report.append("")
+    def _get_context(self, content: str, start: int, end: int, context_chars: int = 50) -> str:
+        """Get surrounding context for a match"""
+        context_start = max(0, start - context_chars)
+        context_end = min(len(content), end + context_chars)
         
-        report.append("SUMMARY")
-        report.append("-" * 60)
-        report.append(f"Total Files Scanned: {self.scan_results['total_files_scanned']}")
-        report.append(f"Total Data Assets: {self.scan_results['total_data_assets']}")
-        report.append(f"Classified Assets: {self.scan_results['classified_assets']}")
-        report.append(f"Classification Coverage: {self.scan_results['classification_coverage']:.1f}%")
-        report.append("")
+        context = content[context_start:context_end]
         
-        report.append("DATA CLASSIFICATION")
-        report.append("-" * 60)
-        for data_type, count in self.scan_results['data_types'].items():
-            report.append(f"{data_type}: {count}")
-        report.append("")
+        # Redact the actual match
+        match_start = start - context_start
+        match_end = end - context_start
+        context = context[:match_start] + "***REDACTED***" + context[match_end:]
         
-        report.append("EXPOSURE RISKS")
-        report.append("-" * 60)
-        for risk_level, count in self.scan_results['exposure_risks'].items():
-            report.append(f"{risk_level.upper()}: {count}")
-        report.append("")
+        return context.replace('\n', ' ').strip()
+    
+    def _calculate_exposure_risk(self, file_path: Path, classifications: List[Dict]) -> str:
+        """Calculate exposure risk based on file location and classification"""
         
-        report.append("MISCONFIGURATIONS")
-        report.append("-" * 60)
-        if self.scan_results['misconfigurations']:
-            for misc in self.scan_results['misconfigurations']:
-                report.append(f"[{misc['severity'].upper()}] {misc['type']}")
-                report.append(f"  File: {misc['file']}")
-                report.append(f"  Recommendation: {misc['recommendation']}")
-                report.append("")
-        else:
-            report.append("No misconfigurations detected")
+        # Check if file is in public directory
+        if any(public_dir in str(file_path) for public_dir in ['public', 'static', 'assets']):
+            return ExposureRisk.CRITICAL.value
         
-        report.append("=" * 60)
+        # Check for PHI/PII in API endpoints
+        if 'api' in str(file_path).lower():
+            if any(c['type'] in ['PHI', 'PII'] for c in classifications):
+                return ExposureRisk.HIGH.value
         
-        return "\n".join(report)
+        # Check for credentials
+        if any(c['type'] == 'CREDENTIALS' for c in classifications):
+            return ExposureRisk.HIGH.value
+        
+        # Default to medium for any sensitive data
+        if classifications:
+            return ExposureRisk.MEDIUM.value
+        
+        return ExposureRisk.NONE.value
+    
+    def _generate_summary(self, results: List[Dict]) -> Dict:
+        """Generate summary statistics"""
+        summary = {
+            "total_files": len(results),
+            "total_findings": sum(len(r.get("classifications", [])) for r in results),
+            "by_classification": {},
+            "by_risk": {},
+            "critical_files": []
+        }
+        
+        for result in results:
+            # Count by classification
+            for classification in result.get("classifications", []):
+                class_type = classification["type"]
+                summary["by_classification"][class_type] = summary["by_classification"].get(class_type, 0) + 1
+            
+            # Count by risk
+            risk = result.get("exposure_risk", ExposureRisk.NONE.value)
+            summary["by_risk"][risk] = summary["by_risk"].get(risk, 0) + 1
+            
+            # Track critical files
+            if risk in [ExposureRisk.CRITICAL.value, ExposureRisk.HIGH.value]:
+                summary["critical_files"].append(result["file"])
+        
+        return summary
+    
+    def _save_results(self, results: List[Dict], summary: Dict):
+        """Save scan results to disk"""
+        output_dir = Path("./security_telemetry")
+        output_dir.mkdir(exist_ok=True)
+        
+        output_file = output_dir / f"dspm_scan_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"
+        
+        with open(output_file, 'w') as f:
+            json.dump({
+                "scan_date": datetime.utcnow().isoformat(),
+                "summary": summary,
+                "results": results
+            }, f, indent=2)
+        
+        logger.info(f"📊 Results saved to {output_file}")
 
 
 # Example usage
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    
     # Initialize DSPM engine
-    dspm = DSPMEngine(
-        scan_paths=["./edge_node", "./governance_kernel", "./api_service.py"],
-        jurisdiction="KDPA_KE"
-    )
+    dspm = DSPMEngine(scan_paths=["./edge_node", "./governance_kernel"])
     
     # Run full scan
-    results = dspm.run_full_scan()
+    scan_results = dspm.run_full_scan()
     
-    # Export results
-    dspm.export_results()
+    print(f"\n📊 DSPM Scan Summary:")
+    print(f"   Files scanned: {scan_results['summary']['total_files']}")
+    print(f"   Findings: {scan_results['summary']['total_findings']}")
+    print(f"\n   By Classification:")
+    for class_type, count in scan_results['summary']['by_classification'].items():
+        print(f"      {class_type}: {count}")
+    print(f"\n   By Risk:")
+    for risk, count in scan_results['summary']['by_risk'].items():
+        print(f"      {risk}: {count}")
     
-    # Generate report
-    print(dspm.generate_report())
+    # Detect access patterns
+    anomalies = dspm.detect_access_patterns()
+    print(f"\n🔍 Access Pattern Anomalies: {len(anomalies)}")
     
-    # Print summary
-    print(f"\n✅ DSPM Scan Complete")
-    print(f"📊 Classification Coverage: {results['classification_coverage']:.1f}%")
-    print(f"🔴 Critical Risks: {results['exposure_risks']['critical']}")
-    print(f"🟡 High Risks: {results['exposure_risks']['high']}")
+    # Identify exposure risks
+    risks = dspm.identify_exposure_risks()
+    print(f"\n⚠️  Exposure Risks: {len([r for r in risks if r['detected']])}")
