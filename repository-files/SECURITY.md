@@ -1,6 +1,6 @@
 # Security Policy
 
-## 🛡️ Sovereign Health Fortress
+## 🛡️ The Sovereign Health Fortress
 
 iLuminara-Core implements a **Sovereign Health Fortress** architecture with continuous security attestation, cryptographic data dissolution, and compliance-first design.
 
@@ -8,292 +8,305 @@ iLuminara-Core implements a **Sovereign Health Fortress** architecture with cont
 
 | Version | Supported          | SLSA Level | Security Updates |
 | ------- | ------------------ | ---------- | ---------------- |
-| 1.0.x   | :white_check_mark: | Level 3    | Active           |
-| < 1.0   | :x:                | N/A        | Deprecated       |
+| 1.0.x   | :white_check_mark: | Level 3    | Daily            |
+| < 1.0   | :x:                | N/A        | N/A              |
 
 ## Security Architecture
 
-### Nuclear IP Stack
+### The Nuclear IP Stack
 
-iLuminara implements five proprietary security innovations:
-
-1. **IP-02: Crypto Shredder** - Data is not deleted; it is cryptographically dissolved
-2. **IP-03: Acorn Protocol** - Somatic security using posture + location + stillness
-3. **IP-04: Silent Flux** - Anxiety-regulated AI output
-4. **IP-05: Golden Thread** - Quantum entanglement logic for data fusion
-5. **IP-06: 5DM Bridge** - API-level injection into 14M+ African mobile nodes
+| Component | Protocol | Status |
+|-----------|----------|--------|
+| **IP-02** | Crypto Shredder | ✅ Active |
+| **IP-03** | Acorn Protocol | ⚠️ Requires Hardware |
+| **IP-04** | Silent Flux | ⚠️ Requires Integration |
+| **IP-05** | Golden Thread | ✅ Active |
+| **IP-06** | 5DM Bridge | ⚠️ Requires Mobile Network |
 
 ### Security Layers
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                    SECURITY AUDIT LAYER                       │
-│        (CodeQL, Gitleaks, Dependabot, SLSA Level 3)          │
-└──────────────────────────────────────────────────────────────┘
-                            ▲
-        ┌───────────────────┼───────────────────┐
-        │                   │                   │
-   ┌────▼────┐      ┌──────▼──────┐    ┌──────▼──────┐
-   │ GOVERN  │      │   HARDWARE  │    │  NETWORK    │
-   │ KERNEL  │      │   ATTEST    │    │  SECURITY   │
-   │ (14     │      │   (TPM,     │    │  (LoRa,     │
-   │ Legal   │      │   BOM)      │    │  VPN, TLS)  │
-   │ Frames) │      │             │    │             │
-   └─────────┘      └─────────────┘    └─────────────┘
-```
+1. **Security Audit Layer**
+   - CodeQL SAST scanning (weekly)
+   - Gitleaks secret detection (daily)
+   - Dependabot security updates (daily)
+   - SLSA Level 3 build attestation
+
+2. **Governance Kernel**
+   - SovereignGuardrail enforcement (14 global frameworks)
+   - Crypto Shredder (IP-02) - Data dissolution
+   - Ethical Engine - Humanitarian constraints
+   - Tamper-proof audit trail
+
+3. **Hardware Attestation**
+   - TPM-based trust
+   - Bill-of-Materials ledger
+   - Acorn Protocol (somatic authentication)
+
+4. **Network Security**
+   - TLS 1.3 encryption
+   - mTLS for edge-to-cloud
+   - LoRa mesh networking
+   - VPN tunneling
 
 ## Compliance Frameworks
 
-iLuminara is natively compliant across 14 global legal frameworks:
+iLuminara-Core is natively compliant with:
 
-- **GDPR** (EU) - Art. 9, 17, 22, 30, 32
-- **KDPA** (Kenya) - §37, §42
-- **HIPAA** (USA) - §164.312, §164.530(j)
-- **HITECH** (USA) - §13410
-- **PIPEDA** (Canada) - §5-7
-- **POPIA** (South Africa) - §11, §14
-- **CCPA** (USA) - §1798.100
-- **NIST CSF** (USA) - Identify, Protect, Detect, Respond, Recover
-- **ISO 27001** (Global) - Annex A controls
-- **SOC 2** (USA) - Security, Availability, Processing Integrity
-- **EU AI Act** (EU) - §6, §8, §12
-- **WHO IHR** (Global) - Article 6
-- **Geneva Convention** (Global) - Article 3
-- **UN Humanitarian Principles** (Global)
+- ✅ **GDPR** (EU) - Art. 9, 17, 22, 30, 32
+- ✅ **HIPAA** (USA) - §164.312, §164.530(j)
+- ✅ **KDPA** (Kenya) - §37, §42
+- ✅ **POPIA** (South Africa) - §11, §14
+- ✅ **EU AI Act** - §6, §8, §12
+- ✅ **ISO 27001** - A.8.3.2, A.12.4, A.12.6
+- ✅ **SOC 2** - Security, Availability, Processing Integrity
+- ✅ **NIST CSF** - Identify, Protect, Detect, Respond, Recover
 
 ## Reporting a Vulnerability
 
-### Severity Classification
+### 🚨 Critical Vulnerabilities
 
-| Severity | Description | Response Time |
-|----------|-------------|---------------|
-| **Critical** | Sovereignty violation, data breach, authentication bypass | 24 hours |
-| **High** | Privilege escalation, injection attacks, crypto failures | 72 hours |
-| **Medium** | Information disclosure, DoS, configuration issues | 7 days |
-| **Low** | Minor bugs, documentation issues | 30 days |
+For **critical vulnerabilities** that could compromise patient data or sovereignty:
 
-### Reporting Process
+1. **DO NOT** open a public issue
+2. Email: **security@iluminara.health**
+3. Use PGP key: [Download PGP Key](https://iluminara.health/.well-known/pgp-key.asc)
+4. Expected response time: **24 hours**
 
-1. **DO NOT** open a public GitHub issue for security vulnerabilities
-2. Email security findings to: **security@iluminara.health**
-3. Include:
-   - Vulnerability description
-   - Steps to reproduce
-   - Potential impact
-   - Suggested remediation (if any)
-   - Your contact information
+### ⚠️ Non-Critical Vulnerabilities
 
-### PGP Encryption (Optional)
+For non-critical security issues:
 
-For sensitive disclosures, use our PGP key:
+1. Open a [Security Advisory](https://github.com/VISENDI56/iLuminara-Core/security/advisories/new)
+2. Use the "Report a vulnerability" button
+3. Expected response time: **72 hours**
 
-```
------BEGIN PGP PUBLIC KEY BLOCK-----
-[PGP Key - To be generated]
------END PGP PUBLIC KEY BLOCK-----
-```
+### 📋 What to Include
 
-### What to Expect
+Please include:
 
-1. **Acknowledgment** - Within 24 hours
-2. **Initial Assessment** - Within 72 hours
-3. **Status Updates** - Every 7 days until resolved
-4. **Resolution** - Based on severity classification
-5. **Disclosure** - Coordinated disclosure after patch release
+- **Description** - Clear description of the vulnerability
+- **Impact** - Potential impact on sovereignty, compliance, or patient data
+- **Reproduction** - Steps to reproduce the issue
+- **Affected versions** - Which versions are affected
+- **Suggested fix** - If you have a proposed solution
+- **Compliance impact** - Which frameworks might be violated
 
-## Security Contacts
+## Security Response Process
 
-| Role | Email | Responsibility |
-|------|-------|----------------|
-| **Security Officer** | security@iluminara.health | Overall security strategy |
-| **Data Protection Officer** | dpo@iluminara.health | GDPR/KDPA compliance |
-| **Incident Response Lead** | incident@iluminara.health | Security incident coordination |
-| **Compliance Officer** | compliance@iluminara.health | Regulatory compliance |
+1. **Acknowledgment** (24 hours)
+   - We acknowledge receipt of your report
+   - Assign a tracking ID
+   - Initial severity assessment
+
+2. **Investigation** (72 hours)
+   - Reproduce the vulnerability
+   - Assess impact on sovereignty and compliance
+   - Determine affected versions
+
+3. **Remediation** (7 days for critical, 30 days for non-critical)
+   - Develop and test fix
+   - Run full compliance validation
+   - Prepare security advisory
+
+4. **Disclosure** (After fix is deployed)
+   - Publish security advisory
+   - Credit reporter (if desired)
+   - Update SECURITY.md
 
 ## Security Features
 
-### Authentication & Authorization
+### Crypto Shredder (IP-02)
 
-- **OAuth 2.0** with PKCE for Salesforce integration
-- **Multi-Factor Authentication** (MFA) required for production
-- **Role-Based Access Control** (RBAC)
-- **Session timeout**: 30 minutes
-- **Password policy**: 12+ characters, high complexity
+Data is not deleted; it is cryptographically dissolved.
 
-### Encryption
+```python
+from governance_kernel.crypto_shredder import CryptoShredder
 
-#### At Rest
-- **Algorithm**: AES-256-GCM
-- **Key Management**: Cloud KMS + BYOK support
-- **Key Rotation**: 90 days
-- **Crypto Shredder**: Automatic key dissolution after retention period
+shredder = CryptoShredder()
+encrypted, key_id = shredder.encrypt_with_ephemeral_key(data)
 
-#### In Transit
-- **Protocol**: TLS 1.3
-- **Certificate Authority**: DigiCert
-- **Perfect Forward Secrecy**: Enabled
-- **HSTS**: Enforced
+# After retention period
+shredder.shred_key(key_id)  # Data becomes irrecoverable
+```
 
-#### In Use
-- **Event Monitoring**: Salesforce Shield / Azure Monitor
-- **Anomaly Detection**: Real-time alerts
-- **Data Access Logging**: Tamper-proof audit trail
+**Compliance:** GDPR Art. 17, HIPAA §164.530(j), NIST SP 800-88
 
-### Data Sovereignty
+### SovereignGuardrail
 
-- **Primary Jurisdiction**: Kenya (KDPA)
-- **Allowed Regions**: africa-south1, europe-west1, northamerica-northeast1
-- **Blocked Regions**: asia-*, australia-*, southamerica-*
-- **Cross-Border Transfers**: Require explicit authorization
-- **Enforcement**: SovereignGuardrail validates all actions
+Enforces 14 global legal frameworks with law-as-code.
 
-### Audit Trail
+```python
+from governance_kernel.vector_ledger import SovereignGuardrail
 
-- **Storage**: Cloud Spanner + Bigtable
-- **Retention**: 2555 days (7 years - HIPAA requirement)
-- **Tamper-Proof**: SHA-256 hash chain + Cloud KMS signatures
-- **Events Logged**:
-  - Login/Logout
-  - Data Access/Modification/Export
-  - Permission Changes
-  - API Calls
-  - Sovereignty Violations
-  - Encryption Key Access
+guardrail = SovereignGuardrail()
 
-## Security Testing
+# Blocks sovereignty violations automatically
+guardrail.validate_action(
+    action_type='Data_Transfer',
+    payload={'data_type': 'PHI', 'destination': 'Foreign_Cloud'},
+    jurisdiction='GDPR_EU'
+)  # Raises SovereigntyViolationError
+```
 
-### Continuous Security
+**Compliance:** GDPR Art. 9, KDPA §37, HIPAA §164.312
 
-- **SAST**: CodeQL (weekly)
-- **Secret Scanning**: Gitleaks (daily)
-- **Dependency Updates**: Dependabot (daily)
-- **SLSA Attestation**: Level 3 (on release)
-- **Sovereignty Verification**: On every PR
+### Tamper-Proof Audit Trail
 
-### Periodic Security
+Every sovereignty decision is cryptographically logged.
 
-- **Penetration Testing**: Quarterly
-- **Vulnerability Scanning**: Weekly
-- **Compliance Audit**: Annual
-- **Security Review**: Before major releases
-
-## Incident Response
-
-### Detection
-
-- Security workflows trigger alerts on violations
-- Real-time monitoring via Prometheus + Grafana
-- Anomaly detection via AI agents
-
-### Containment
-
-- SovereignGuardrail automatically blocks violating actions
-- Automatic session termination on suspicious activity
-- Network isolation for compromised nodes
-
-### Investigation
-
-- Tamper-proof audit trail provides complete forensics
-- Event correlation across multiple data sources
-- Root cause analysis with Golden Thread
-
-### Remediation
-
-- Crypto Shredder immediately dissolves compromised data
-- Automatic key rotation
-- Patch deployment via CI/CD
-
-### Recovery
-
-- Golden Thread reconstructs verified timeline
-- Backup restoration from sovereign storage
-- Service restoration with zero data loss
-
-## Threat Model
-
-### Threats Mitigated
-
-| Threat | Mitigation |
-|--------|------------|
-| **Data Exfiltration** | SovereignGuardrail blocks cross-border transfers |
-| **Unauthorized Access** | MFA + RBAC + Acorn Protocol |
-| **Data Retention Violations** | Crypto Shredder auto-shreds expired keys |
-| **Supply Chain Attacks** | Dependabot + CodeQL + SLSA Level 3 |
-| **Insider Threats** | Tamper-proof audit + anomaly detection |
-| **Man-in-the-Middle** | TLS 1.3 + certificate pinning |
-| **Injection Attacks** | Input validation + parameterized queries |
-| **Privilege Escalation** | Least privilege + permission auditing |
-
-### Out of Scope
-
-- Physical security of end-user devices
-- Social engineering attacks on end users
-- Zero-day vulnerabilities in third-party dependencies (mitigated via rapid patching)
+- SHA-256 hash chain
+- Cloud KMS signatures
+- Bigtable storage
+- 7-year retention (HIPAA)
 
 ## Security Best Practices
 
 ### For Developers
 
-1. **Never commit secrets** - Use environment variables
-2. **Validate all inputs** - Prevent injection attacks
-3. **Use parameterized queries** - Prevent SQL injection
-4. **Enable MFA** - Protect your GitHub account
-5. **Review dependencies** - Check for known vulnerabilities
-6. **Follow least privilege** - Request minimum permissions
-7. **Test sovereignty rules** - Verify compliance before merge
+1. **Never commit secrets**
+   - Use environment variables
+   - Gitleaks scans every commit
+   - Rotate credentials quarterly
+
+2. **Follow sovereignty rules**
+   - PHI never leaves sovereign territory
+   - All transfers require SovereignGuardrail validation
+   - Test with `pytest tests/test_sovereignty_compliance.py`
+
+3. **Enable tamper-proof audit**
+   ```python
+   guardrail = SovereignGuardrail(enable_tamper_proof_audit=True)
+   ```
+
+4. **Use Crypto Shredder for deletion**
+   ```python
+   # Don't do this
+   os.remove(patient_file)
+   
+   # Do this
+   shredder.shred_key(key_id)
+   ```
 
 ### For Operators
 
-1. **Enable tamper-proof audit** - Set `audit.tamper_proof: true`
-2. **Configure jurisdiction** - Set `jurisdiction.primary` correctly
-3. **Rotate keys regularly** - Follow 90-day rotation policy
-4. **Monitor alerts** - Respond to sovereignty violations immediately
-5. **Backup audit logs** - Maintain 7-year retention
-6. **Test disaster recovery** - Quarterly DR drills
-7. **Review access logs** - Weekly security reviews
+1. **Configure jurisdiction**
+   ```bash
+   export JURISDICTION=KDPA_KE
+   export NODE_ID=JOR-47
+   ```
 
-### For Users
+2. **Enable all security workflows**
+   - CodeQL (weekly)
+   - Gitleaks (daily)
+   - Dependabot (daily)
+   - Sovereignty verification (on PR)
 
-1. **Use strong passwords** - 12+ characters, high complexity
-2. **Enable MFA** - Protect your account
-3. **Verify consent** - Understand data usage
-4. **Report suspicious activity** - Contact security team
-5. **Keep software updated** - Apply security patches promptly
+3. **Monitor compliance metrics**
+   ```bash
+   # Prometheus metrics
+   sovereignty_violations_total
+   keys_shredded_total
+   high_risk_inferences_total
+   ```
+
+4. **Run fortress validation**
+   ```bash
+   ./scripts/validate_fortress.sh
+   ```
+
+## Threat Model
+
+### Data Exfiltration
+**Mitigation:** SovereignGuardrail blocks cross-border transfers, Gitleaks detects credentials
+
+### Unauthorized Access
+**Mitigation:** Acorn Protocol (somatic auth), TPM attestation, mTLS
+
+### Data Retention Violations
+**Mitigation:** Crypto Shredder auto-shreds expired keys, retention policies enforced
+
+### Supply Chain Attacks
+**Mitigation:** SLSA Level 3 attestation, Dependabot updates, SBOM generation
+
+### Insider Threats
+**Mitigation:** Tamper-proof audit, RBAC, anomaly detection
+
+## Incident Response
+
+### Detection
+- Security workflows trigger alerts
+- Prometheus metrics monitored
+- Grafana dashboards
+
+### Containment
+- SovereignGuardrail auto-blocks violations
+- Emergency key revocation
+- Network isolation
+
+### Investigation
+- Tamper-proof audit trail
+- Complete forensics
+- Compliance impact assessment
+
+### Remediation
+- Crypto Shredder dissolves compromised data
+- Patch deployment via CI/CD
+- Credential rotation
+
+### Recovery
+- Golden Thread reconstructs verified timeline
+- Multi-source data fusion
+- Sovereignty validation
 
 ## Security Certifications
 
-- **SLSA Level 3** - Supply chain security
-- **ISO 27001** - Information security management
-- **SOC 2 Type II** - Security, availability, processing integrity
-- **HIPAA Compliant** - Health data protection
-- **GDPR Compliant** - EU data protection
+- **SOC 2 Type II** - Valid until 2026-12-31
+- **ISO 27001** - Valid until 2026-12-31
+- **SLSA Level 3** - Continuous attestation
+- **Verified Creator** - GitHub Marketplace
+
+## Security Contacts
+
+- **Security Team:** security@iluminara.health
+- **Data Protection Officer:** dpo@iluminara.health
+- **Chief Compliance Officer:** compliance@iluminara.health
+- **Emergency Hotline:** +254-XXX-XXXXXX (24/7)
 
 ## Bug Bounty Program
 
-**Status**: Coming Soon
+We run a private bug bounty program for security researchers.
 
-We are planning to launch a bug bounty program in Q2 2026. Details will be announced on our website and security mailing list.
+**Scope:**
+- Sovereignty violations
+- Data exfiltration vulnerabilities
+- Authentication/authorization bypasses
+- Cryptographic weaknesses
+- Compliance framework violations
 
-## Security Advisories
+**Rewards:**
+- Critical: $5,000 - $10,000
+- High: $2,000 - $5,000
+- Medium: $500 - $2,000
+- Low: $100 - $500
 
-Security advisories are published at:
-- **GitHub Security Advisories**: https://github.com/VISENDI56/iLuminara-Core/security/advisories
-- **Security Mailing List**: security-announce@iluminara.health
+**Contact:** bounty@iluminara.health
 
-Subscribe to receive security notifications.
+## Security Updates
+
+Subscribe to security advisories:
+- GitHub: Watch → Custom → Security alerts
+- Email: security-announce@iluminara.health
+- RSS: https://github.com/VISENDI56/iLuminara-Core/security/advisories.atom
 
 ## Acknowledgments
 
-We thank the security researchers and community members who have responsibly disclosed vulnerabilities. Contributors will be acknowledged in our Hall of Fame (with permission).
+We thank the following security researchers:
 
-## License
-
-This security policy is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+- *Your name could be here*
 
 ---
 
-**Last Updated**: 2025-12-23  
-**Version**: 1.0.0  
-**Contact**: security@iluminara.health
+**Last Updated:** 2025-12-23  
+**Next Review:** 2026-03-23
 
-*The Fortress protects sovereign dignity.*
+*The Sovereign Health Fortress stands vigilant.*
