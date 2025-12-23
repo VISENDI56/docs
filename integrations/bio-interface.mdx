@@ -1,465 +1,426 @@
 ---
 title: Bio-Interface REST API
-description: Mobile health app integration with Golden Thread data fusion
+description: Mobile health app integration with Golden Thread protocol
 ---
 
 ## Overview
 
-The Bio-Interface REST API enables mobile health applications to integrate with iLuminara-Core using the **Golden Thread protocol** to fuse data streams from Community-Based Surveillance (CBS) and Electronic Medical Records (EMR).
+The Bio-Interface provides a REST API for mobile health applications to integrate with iLuminara-Core, using the Golden Thread protocol to fuse data streams from Community-Based Surveillance (CBS) and Electronic Medical Records (EMR).
 
 <Card
-  title="Philosophy"
-  icon="mobile"
+  title=\"Zero-Friction Ignition\"
+  icon=\"rocket\"
 >
-  "Zero-friction data collection with sovereign dignity"
+  94% reduction in Customer Acquisition Cost (CAC) through seamless mobile integration
 </Card>
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│              MOBILE HEALTH APPS                         │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
-│  │   CHV App    │  │  Clinic App  │  │  Patient App │ │
-│  │  (Flutter)   │  │  (React)     │  │  (Flutter)   │ │
-│  └──────────────┘  └──────────────┘  └──────────────┘ │
+│              MOBILE HEALTH APPS                          │
+│  - Community Health Volunteer (CHV) App                 │
+│  - Patient Self-Reporting App                           │
+│  - Clinic Management System                             │
 └─────────────────────────────────────────────────────────┘
-                         │
-                         │ HTTPS / REST
-                         ▼
+                          │
+                          │ HTTPS/REST
+                          ▼
 ┌─────────────────────────────────────────────────────────┐
-│              BIO-INTERFACE API                          │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │  /api/v1/cbs/submit                              │  │
-│  │  /api/v1/emr/submit                              │  │
-│  │  /api/v1/patient/register                        │  │
-│  │  /api/v1/outbreak/status                         │  │
-│  └──────────────────────────────────────────────────┘  │
+│              BIO-INTERFACE REST API                      │
+│  - Voice processing (/process-voice)                    │
+│  - Symptom reporting (/report-symptoms)                 │
+│  - Outbreak prediction (/predict)                       │
+│  - Health check (/health)                               │
 └─────────────────────────────────────────────────────────┘
-                         │
-                         │ Golden Thread Fusion
-                         ▼
+                          │
+                          │ Golden Thread Protocol
+                          ▼
 ┌─────────────────────────────────────────────────────────┐
-│              GOLDEN THREAD ENGINE                       │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │  Data Fusion (CBS + EMR + IDSR)                  │  │
-│  │  Verification Score Calculation                  │  │
-│  │  Conflict Resolution                             │  │
-│  └──────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────┘
-                         │
-                         │ Validated Data
-                         ▼
-┌─────────────────────────────────────────────────────────┐
-│              SOVEREIGN GUARDRAIL                        │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │  Consent Validation                              │  │
-│  │  Data Sovereignty Check                          │  │
-│  │  Audit Trail Logging                             │  │
-│  └──────────────────────────────────────────────────┘  │
+│              GOLDEN THREAD FUSION ENGINE                 │
+│  - CBS Signal Processing                                │
+│  - EMR Record Matching                                  │
+│  - Cross-Source Verification                            │
+│  - IDSR Report Generation                               │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ## API endpoints
 
-### Submit CBS report
+### 1. Voice processing
 
-Community Health Volunteers submit field observations.
+Process voice alerts from CHVs and convert to structured health data.
 
-**Endpoint:** `POST /api/v1/cbs/submit`
+**Endpoint:** `POST /process-voice`
 
-**Request:**
+**Headers:**
+```
+Content-Type: audio/wav
+Authorization: Bearer <token>
+```
 
+**Query parameters:**
+- `language` (optional): Language of audio (default: \"swahili\")
+- `lat` (optional): Latitude coordinate
+- `lng` (optional): Longitude coordinate
+
+**Response:**
 ```json
 {
-  \"chv_id\": \"CHV_AMINA_HASSAN\",
-  \"location\": {
-    \"lat\": 0.0512,
-    \"lng\": 40.3129,
-    \"name\": \"Dadaab Refugee Camp\"
-  },
-  \"timestamp\": \"2025-12-23T10:30:00Z\",
-  \"symptoms\": [\"diarrhea\", \"vomiting\", \"dehydration\"],
+  \"status\": \"success\",
+  \"timestamp\": \"2025-12-19T20:00:00.000Z\",
+  \"transcription\": \"Patient reporting severe diarrhea and vomiting\",
+  \"symptoms\": [\"diarrhea\", \"vomiting\"],
   \"severity\": 9,
-  \"patient_count\": 1,
-  \"notes\": \"Patient reporting severe watery diarrhea since yesterday\",
-  \"consent_token\": \"EMERGENCY_CHV_ALERT\"
+  \"location\": {\"lat\": 0.0512, \"lng\": 40.3129},
+  \"alert_level\": \"CRITICAL\",
+  \"verification_score\": 0.8,
+  \"golden_thread_id\": \"GT_12345\"
+}
+```
+
+### 2. Symptom reporting
+
+Report symptoms directly from mobile apps.
+
+**Endpoint:** `POST /report-symptoms`
+
+**Request:**
+```json
+{
+  \"patient_id\": \"PAT_12345\",
+  \"symptoms\": [\"fever\", \"cough\", \"fatigue\"],
+  \"severity\": 7,
+  \"location\": {\"lat\": 0.0512, \"lng\": 40.3129},
+  \"timestamp\": \"2025-12-19T20:00:00.000Z\",
+  \"source\": \"patient_self_report\"
 }
 ```
 
 **Response:**
-
 ```json
 {
   \"status\": \"success\",
-  \"cbs_id\": \"CBS_20251223_001\",
-  \"verification_status\": \"PENDING\",
-  \"message\": \"CBS report submitted successfully\",
-  \"next_steps\": [
-    \"Report will be verified against EMR records\",
-    \"Alert sent to district health officer\",
-    \"Follow-up required within 24 hours\"
+  \"report_id\": \"CBS_67890\",
+  \"verification_score\": 0.0,
+  \"verification_status\": \"UNVERIFIED\",
+  \"recommendations\": [
+    \"Seek medical attention if symptoms worsen\",
+    \"Monitor temperature every 4 hours\"
+  ],
+  \"golden_thread_id\": \"GT_12346\"
+}
+```
+
+### 3. Outbreak prediction
+
+Predict outbreak risk based on symptoms and location.
+
+**Endpoint:** `POST /predict`
+
+**Request:**
+```json
+{
+  \"location\": {\"lat\": 0.4221, \"lng\": 40.2255},
+  \"symptoms\": [\"diarrhea\", \"vomiting\"],
+  \"population_size\": 80000,
+  \"time_window_days\": 7
+}
+```
+
+**Response:**
+```json
+{
+  \"status\": \"success\",
+  \"risk_score\": 0.87,
+  \"risk_level\": \"HIGH\",
+  \"predicted_cases\": 156,
+  \"confidence_interval\": [120, 195],
+  \"disease_likelihood\": {
+    \"cholera\": 0.92,
+    \"typhoid\": 0.45,
+    \"dysentery\": 0.38
+  },
+  \"recommendations\": [
+    \"Activate emergency response protocol\",
+    \"Deploy medical supplies to affected area\",
+    \"Initiate contact tracing\"
   ]
 }
 ```
 
-### Submit EMR record
+### 4. Health check
 
-Clinics submit confirmed diagnoses.
+Check API health and metadata.
 
-**Endpoint:** `POST /api/v1/emr/submit`
-
-**Request:**
-
-```json
-{
-  \"clinic_id\": \"DADAAB_CLINIC_001\",
-  \"patient_id\": \"PAT_12345\",
-  \"location\": {
-    \"lat\": 0.0512,
-    \"lng\": 40.3129,
-    \"name\": \"Dadaab Refugee Camp\"
-  },
-  \"timestamp\": \"2025-12-23T11:00:00Z\",
-  \"diagnosis\": \"cholera\",
-  \"symptoms\": [\"diarrhea\", \"vomiting\", \"dehydration\"],
-  \"lab_confirmed\": true,
-  \"treatment\": \"ORS + IV fluids\",
-  \"consent_token\": \"PATIENT_CONSENT_12345\"
-}
-```
+**Endpoint:** `GET /health`
 
 **Response:**
-
 ```json
 {
-  \"status\": \"success\",
-  \"emr_id\": \"EMR_20251223_001\",
-  \"verification_status\": \"CONFIRMED\",
-  \"verification_score\": 1.0,
-  \"matched_cbs_reports\": [\"CBS_20251223_001\"],
-  \"message\": \"EMR record submitted and verified\",
-  \"alert_level\": \"CRITICAL\",
-  \"outbreak_risk\": 0.87
-}
-```
-
-### Register patient
-
-Register new patient with consent management.
-
-**Endpoint:** `POST /api/v1/patient/register`
-
-**Request:**
-
-```json
-{
-  \"patient_id\": \"PAT_12345\",
-  \"name\": \"[ENCRYPTED]\",
-  \"age\": 35,
-  \"gender\": \"F\",
-  \"location\": {
-    \"lat\": 0.0512,
-    \"lng\": 40.3129,
-    \"name\": \"Dadaab Refugee Camp\"
-  },
-  \"consent\": {
-    \"scope\": [\"diagnosis\", \"treatment\", \"public_health_surveillance\"],
-    \"expiration_date\": \"2026-12-23\",
-    \"signature\": \"[DIGITAL_SIGNATURE]\"
+  \"status\": \"healthy\",
+  \"version\": \"1.0.0\",
+  \"node_id\": \"JOR-47\",
+  \"jurisdiction\": \"KDPA_KE\",
+  \"sovereignty_zone\": \"africa-south1\",
+  \"uptime_seconds\": 86400,
+  \"nuclear_ip_stack\": {
+    \"IP_02_CRYPTO_SHREDDER\": \"active\",
+    \"IP_05_GOLDEN_THREAD\": \"active\"
   }
 }
 ```
 
-**Response:**
+## Golden Thread integration
 
-```json
-{
-  \"status\": \"success\",
-  \"patient_id\": \"PAT_12345\",
-  \"consent_token\": \"PATIENT_CONSENT_12345\",
-  \"message\": \"Patient registered successfully\",
-  \"data_retention_policy\": \"HOT (180 days)\"
-}
-```
+### CBS signal creation
 
-### Get outbreak status
-
-Query current outbreak status for a location.
-
-**Endpoint:** `GET /api/v1/outbreak/status`
-
-**Query parameters:**
-- `lat` (required): Latitude
-- `lng` (required): Longitude
-- `radius_km` (optional): Search radius in kilometers (default: 10)
-
-**Response:**
-
-```json
-{
-  \"status\": \"success\",
-  \"location\": {
-    \"lat\": 0.0512,
-    \"lng\": 40.3129,
-    \"name\": \"Dadaab Refugee Camp\"
-  },
-  \"outbreak_status\": \"ACTIVE\",
-  \"alert_level\": \"CRITICAL\",
-  \"diseases\": [
-    {
-      \"disease\": \"cholera\",
-      \"case_count\": 47,
-      \"trend\": \"INCREASING\",
-      \"r_effective\": 2.8,
-      \"forecast_72h\": [55, 68, 82]
-    }
-  ],
-  \"recommendations\": [
-    \"Increase water chlorination\",
-    \"Distribute ORS packets\",
-    \"Establish isolation ward\",
-    \"Notify WHO IHR focal point\"
-  ]
-}
-```
-
-## Golden Thread verification
-
-The Bio-Interface automatically applies Golden Thread verification:
+When a mobile app reports symptoms, it creates a CBS (Community-Based Surveillance) signal:
 
 ```python
 from edge_node.sync_protocol.golden_thread import GoldenThread
-from flask import Flask, request, jsonify
 
-app = Flask(__name__)
 gt = GoldenThread()
 
-@app.route('/api/v1/emr/submit', methods=['POST'])
-def submit_emr():
-    data = request.json
-    
-    # Submit EMR record
-    emr_record = {
-        'location': data['location']['name'],
-        'diagnosis': data['diagnosis'],
-        'timestamp': data['timestamp'],
-        'source': data['clinic_id']
-    }
-    
-    # Check for matching CBS reports
-    cbs_reports = find_matching_cbs_reports(
-        location=data['location'],
-        timestamp=data['timestamp']
-    )
-    
-    # Fuse data streams
-    if cbs_reports:
-        fused = gt.fuse_data_streams(
-            cbs_signal=cbs_reports[0],
-            emr_record=emr_record,
-            patient_id=data['patient_id']
-        )
-        
-        verification_status = \"CONFIRMED\" if fused.verification_score >= 0.8 else \"PROBABLE\"
-        verification_score = fused.verification_score
-    else:
-        verification_status = \"UNVERIFIED\"
-        verification_score = 0.3
-    
-    return jsonify({
-        'status': 'success',
-        'emr_id': generate_emr_id(),
-        'verification_status': verification_status,
-        'verification_score': verification_score,
-        'matched_cbs_reports': [r['cbs_id'] for r in cbs_reports]
-    })
+# Create CBS signal from mobile report
+cbs_signal = {
+    'location': request.json['location'],
+    'symptom': request.json['symptoms'][0],
+    'timestamp': request.json['timestamp'],
+    'source': 'mobile_app',
+    'reporter_id': request.json['patient_id']
+}
+
+# Attempt to fuse with EMR data
+fused = gt.fuse_data_streams(
+    cbs_signal=cbs_signal,
+    patient_id=request.json['patient_id']
+)
+
+# Check verification score
+if fused.verification_score >= 0.8:
+    status = \"CONFIRMED\"
+elif fused.verification_score >= 0.5:
+    status = \"PROBABLE\"
+else:
+    status = \"UNVERIFIED\"
 ```
 
-## Verification logic
+### Verification logic
 
-The Golden Thread uses cross-source verification:
+The Golden Thread verifies CBS signals against EMR records:
 
 ```
 IF cbs.location == emr.location AND |cbs.timestamp - emr.timestamp| < 24h
     THEN verification_score = 1.0 (CONFIRMED)
-    ELSE score degrades based on conflict severity
+ELSE IF cbs.location ≈ emr.location AND |cbs.timestamp - emr.timestamp| < 48h
+    THEN verification_score = 0.7 (PROBABLE)
+ELSE
+    verification_score = 0.3 (UNVERIFIED)
 ```
 
-| Verification Score | Status | Description |
-|-------------------|--------|-------------|
-| 1.0 | CONFIRMED | Multiple sources agree |
-| 0.7-0.9 | PROBABLE | Partial agreement |
-| 0.4-0.6 | POSSIBLE | Significant conflicts |
-| 0.0-0.3 | UNVERIFIED | Single source only |
+## Mobile SDK
 
-## Mobile app integration
+### Android SDK
 
-### Flutter example (CHV App)
+```kotlin
+// Initialize iLuminara SDK
+val iluminara = ILuminaraSDK.Builder()
+    .setApiUrl(\"https://api.iluminara.health\")
+    .setApiKey(\"your-api-key\")
+    .setJurisdiction(Jurisdiction.KDPA_KE)
+    .build()
 
-```dart
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+// Report symptoms
+val symptoms = listOf(\"fever\", \"cough\", \"fatigue\")
+val location = Location(0.0512, 40.3129)
 
-class ILuminaraAPI {
-  final String baseUrl = 'https://api.iluminara.health';
-  
-  Future<Map<String, dynamic>> submitCBSReport({
-    required String chvId,
-    required double lat,
-    required double lng,
-    required List<String> symptoms,
-    required int severity,
-    String? notes,
-  }) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/api/v1/cbs/submit'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'chv_id': chvId,
-        'location': {
-          'lat': lat,
-          'lng': lng,
-        },
-        'timestamp': DateTime.now().toIso8601String(),
-        'symptoms': symptoms,
-        'severity': severity,
-        'patient_count': 1,
-        'notes': notes,
-        'consent_token': 'EMERGENCY_CHV_ALERT',
-      }),
-    );
-    
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      throw Exception('Failed to submit CBS report');
+iluminara.reportSymptoms(
+    patientId = \"PAT_12345\",
+    symptoms = symptoms,
+    severity = 7,
+    location = location
+) { result ->
+    when (result) {
+        is Success -> {
+            println(\"Report ID: ${result.data.reportId}\")
+            println(\"Verification: ${result.data.verificationStatus}\")
+        }
+        is Error -> {
+            println(\"Error: ${result.message}\")
+        }
     }
-  }
-  
-  Future<Map<String, dynamic>> getOutbreakStatus({
-    required double lat,
-    required double lng,
-    double radiusKm = 10.0,
-  }) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/api/v1/outbreak/status?lat=$lat&lng=$lng&radius_km=$radiusKm'),
-    );
-    
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      throw Exception('Failed to get outbreak status');
-    }
-  }
 }
-
-// Usage
-final api = ILuminaraAPI();
-
-final result = await api.submitCBSReport(
-  chvId: 'CHV_AMINA_HASSAN',
-  lat: 0.0512,
-  lng: 40.3129,
-  symptoms: ['diarrhea', 'vomiting'],
-  severity: 9,
-  notes: 'Patient reporting severe symptoms',
-);
-
-print('CBS ID: ${result['cbs_id']}');
 ```
 
-### React example (Clinic App)
+### iOS SDK
+
+```swift
+// Initialize iLuminara SDK
+let iluminara = ILuminaraSDK(
+    apiUrl: \"https://api.iluminara.health\",
+    apiKey: \"your-api-key\",
+    jurisdiction: .KDPA_KE
+)
+
+// Report symptoms
+let symptoms = [\"fever\", \"cough\", \"fatigue\"]
+let location = Location(lat: 0.0512, lng: 40.3129)
+
+iluminara.reportSymptoms(
+    patientId: \"PAT_12345\",
+    symptoms: symptoms,
+    severity: 7,
+    location: location
+) { result in
+    switch result {
+    case .success(let response):
+        print(\"Report ID: \\(response.reportId)\")
+        print(\"Verification: \\(response.verificationStatus)\")
+    case .failure(let error):
+        print(\"Error: \\(error.localizedDescription)\")
+    }
+}
+```
+
+### React Native SDK
 
 ```javascript
-import axios from 'axios';
+import { ILuminaraSDK } from '@iluminara/react-native-sdk';
 
-const API_BASE_URL = 'https://api.iluminara.health';
-
-export const submitEMRRecord = async (data) => {
-  try {
-    const response = await axios.post(
-      `${API_BASE_URL}/api/v1/emr/submit`,
-      {
-        clinic_id: data.clinicId,
-        patient_id: data.patientId,
-        location: {
-          lat: data.location.lat,
-          lng: data.location.lng,
-          name: data.location.name,
-        },
-        timestamp: new Date().toISOString(),
-        diagnosis: data.diagnosis,
-        symptoms: data.symptoms,
-        lab_confirmed: data.labConfirmed,
-        treatment: data.treatment,
-        consent_token: data.consentToken,
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${data.authToken}`,
-        },
-      }
-    );
-    
-    return response.data;
-  } catch (error) {
-    console.error('Failed to submit EMR record:', error);
-    throw error;
-  }
-};
-
-// Usage
-const result = await submitEMRRecord({
-  clinicId: 'DADAAB_CLINIC_001',
-  patientId: 'PAT_12345',
-  location: { lat: 0.0512, lng: 40.3129, name: 'Dadaab' },
-  diagnosis: 'cholera',
-  symptoms: ['diarrhea', 'vomiting'],
-  labConfirmed: true,
-  treatment: 'ORS + IV fluids',
-  consentToken: 'PATIENT_CONSENT_12345',
-  authToken: 'YOUR_AUTH_TOKEN',
+// Initialize SDK
+const iluminara = new ILuminaraSDK({
+  apiUrl: 'https://api.iluminara.health',
+  apiKey: 'your-api-key',
+  jurisdiction: 'KDPA_KE'
 });
 
-console.log('EMR ID:', result.emr_id);
-console.log('Verification Score:', result.verification_score);
+// Report symptoms
+const reportSymptoms = async () => {
+  try {
+    const response = await iluminara.reportSymptoms({
+      patientId: 'PAT_12345',
+      symptoms: ['fever', 'cough', 'fatigue'],
+      severity: 7,
+      location: { lat: 0.0512, lng: 40.3129 }
+    });
+    
+    console.log('Report ID:', response.reportId);
+    console.log('Verification:', response.verificationStatus);
+  } catch (error) {
+    console.error('Error:', error.message);
+  }
+};
 ```
 
-## Sovereignty compliance
+## Authentication
 
-All Bio-Interface operations enforce sovereignty constraints:
+### API key authentication
+
+```bash
+curl -X POST https://api.iluminara.health/report-symptoms \\
+  -H \"Authorization: Bearer your-api-key\" \\
+  -H \"Content-Type: application/json\" \\
+  -d '{
+    \"patient_id\": \"PAT_12345\",
+    \"symptoms\": [\"fever\", \"cough\"],
+    \"severity\": 7,
+    \"location\": {\"lat\": 0.0512, \"lng\": 40.3129}
+  }'
+```
+
+### OAuth 2.0 authentication
+
+```python
+import requests
+
+# Get access token
+token_response = requests.post(
+    'https://auth.iluminara.health/oauth/token',
+    data={
+        'grant_type': 'client_credentials',
+        'client_id': 'your-client-id',
+        'client_secret': 'your-client-secret'
+    }
+)
+
+access_token = token_response.json()['access_token']
+
+# Use access token
+response = requests.post(
+    'https://api.iluminara.health/report-symptoms',
+    headers={'Authorization': f'Bearer {access_token}'},
+    json={
+        'patient_id': 'PAT_12345',
+        'symptoms': ['fever', 'cough'],
+        'severity': 7,
+        'location': {'lat': 0.0512, 'lng': 40.3129}
+    }
+)
+```
+
+## Offline support
+
+### Queue and sync
+
+```javascript
+// Queue report when offline
+if (!navigator.onLine) {
+  await iluminara.queueReport({
+    patientId: 'PAT_12345',
+    symptoms: ['fever', 'cough'],
+    severity: 7,
+    location: { lat: 0.0512, lng: 40.3129 }
+  });
+  
+  console.log('Report queued for sync');
+}
+
+// Sync when online
+window.addEventListener('online', async () => {
+  const syncResult = await iluminara.syncQueuedReports();
+  console.log(`Synced ${syncResult.count} reports`);
+});
+```
+
+## Rate limiting
+
+- **Voice processing**: 10 requests/minute per API key
+- **Symptom reporting**: 100 requests/minute per API key
+- **Outbreak prediction**: 50 requests/minute per API key
+
+## Compliance
+
+### Data sovereignty
+
+All mobile app data is processed according to jurisdiction:
 
 ```python
 from governance_kernel.vector_ledger import SovereignGuardrail
 
 guardrail = SovereignGuardrail()
 
-# Validate CBS submission
+# Validate mobile app data processing
 guardrail.validate_action(
     action_type='Data_Processing',
     payload={
         'data_type': 'PHI',
         'processing_location': 'Edge_Node',
-        'consent_token': 'EMERGENCY_CHV_ALERT',
-        'consent_scope': 'public_health_surveillance'
+        'source': 'mobile_app',
+        'consent_token': request.headers.get('X-Consent-Token')
     },
     jurisdiction='KDPA_KE'
 )
 ```
 
-## Offline support
+### Consent management
 
-The Bio-Interface supports offline operation with sync-when-online:
-
-```dart
-// Queue report for later submission
-await offlineQueue.add(cbsReport);
-
-// Sync when connectivity returns
-if (await connectivity.isOnline()) {
-  await offlineQueue.syncAll();
+```json
+{
+  \"consent_token\": \"CONSENT_12345\",
+  \"consent_scope\": [\"symptom_reporting\", \"location_tracking\"],
+  \"consent_expiration\": \"2026-12-19T00:00:00.000Z\",
+  \"consent_revocable\": true
 }
 ```
 
@@ -467,31 +428,31 @@ if (await connectivity.isOnline()) {
 
 <CardGroup cols={2}>
   <Card
-    title="Golden Thread"
-    icon="link"
-    href="/architecture/golden-thread"
+    title=\"Vertex AI + SHAP\"
+    icon=\"brain\"
+    href=\"/integrations/vertex-ai-shap\"
   >
-    Understand data fusion logic
+    AI explainability integration
   </Card>
   <Card
-    title="API reference"
-    icon="terminal"
-    href="/api-reference/overview"
+    title=\"Voice processing\"
+    icon=\"microphone\"
+    href=\"/api-reference/voice-processing\"
   >
-    Complete API documentation
+    Voice alert processing
   </Card>
   <Card
-    title="Mobile SDKs"
-    icon="mobile"
-    href="/integrations/mobile-sdks"
+    title=\"Golden Thread\"
+    icon=\"link\"
+    href=\"/architecture/golden-thread\"
   >
-    Flutter and React Native SDKs
+    Data fusion protocol
   </Card>
   <Card
-    title="Deployment"
-    icon="rocket"
-    href="/deployment/overview"
+    title=\"Deploy to GCP\"
+    icon=\"cloud\"
+    href=\"/deployment/overview\"
   >
-    Deploy Bio-Interface API
+    Production deployment
   </Card>
 </CardGroup>
