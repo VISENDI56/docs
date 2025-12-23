@@ -1,331 +1,338 @@
 ---
 title: Branch protection setup
-description: Configure GitHub branch protection for the Sovereign Health Fortress
+description: Automate GitHub branch protection for the Sovereign Health Fortress
 ---
 
 ## Overview
 
-Branch protection ensures that all code changes pass security scans (CodeQL, Gitleaks) and compliance checks before merging to production.
+The branch protection setup script automates the configuration of GitHub security rules, ensuring all commits to `main` pass security scans and require code review.
 
 <Card
-  title="Security principle"
-  icon="shield-check"
+  title="Automation"
+  icon="shield-halved"
 >
-  "The Fortress is continuously attested. No code enters without validation."
+  One-command setup for complete branch protection and security features
 </Card>
+
+## Quick setup
+
+```bash
+# Make script executable
+chmod +x scripts/setup_branch_protection.sh
+
+# Run setup
+./scripts/setup_branch_protection.sh
+```
+
+## What it does
+
+<Steps>
+  <Step title="Authenticate">
+    Verifies GitHub CLI authentication and refreshes permissions
+  </Step>
+  <Step title="Branch protection">
+    Configures protection rules for the `main` branch
+  </Step>
+  <Step title="Security features">
+    Enables Dependabot, secret scanning, and push protection
+  </Step>
+  <Step title="Verification">
+    Displays complete security configuration summary
+  </Step>
+</Steps>
 
 ## Prerequisites
 
-Ensure you have the required permissions:
+### Install GitHub CLI
+
+```bash
+# macOS
+brew install gh
+
+# Linux
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+sudo apt update
+sudo apt install gh
+
+# Windows
+winget install --id GitHub.cli
+```
+
+### Authenticate
+
+```bash
+gh auth login
+```
+
+### Refresh permissions
 
 ```bash
 gh auth refresh -s workflow,repo,write:packages,admin:repo_hook
 ```
 
-## Automated setup
+## Branch protection rules
 
-### Using GitHub CLI
-
-```bash
-# Enable branch protection on main
-gh api repos/VISENDI56/iLuminara-Core/branches/main/protection \
-  --method PUT \
-  --field required_status_checks[strict]=true \
-  --field required_status_checks[contexts][]=CodeQL \
-  --field required_status_checks[contexts][]=Gitleaks \
-  --field enforce_admins=true \
-  --field required_pull_request_reviews[required_approving_review_count]=1 \
-  --field required_pull_request_reviews[dismiss_stale_reviews]=true \
-  --field required_pull_request_reviews[require_code_owner_reviews]=true \
-  --field restrictions=null
-```
-
-### Using script
-
-Create `scripts/setup_branch_protection.sh`:
-
-```bash
-#!/bin/bash
-
-set -e
-
-REPO="VISENDI56/iLuminara-Core"
-BRANCH="main"
-
-echo "🛡️ Setting up branch protection for ${REPO}:${BRANCH}"
-
-# Enable branch protection
-gh api repos/${REPO}/branches/${BRANCH}/protection \
-  --method PUT \
-  --input - <<EOF
-{
-  "required_status_checks": {
-    "strict": true,
-    "contexts": [
-      "CodeQL",
-      "Gitleaks",
-      "build"
-    ]
-  },
-  "enforce_admins": true,
-  "required_pull_request_reviews": {
-    "dismissal_restrictions": {},
-    "dismiss_stale_reviews": true,
-    "require_code_owner_reviews": true,
-    "required_approving_review_count": 1,
-    "require_last_push_approval": false
-  },
-  "restrictions": null,
-  "required_linear_history": true,
-  "allow_force_pushes": false,
-  "allow_deletions": false,
-  "block_creations": false,
-  "required_conversation_resolution": true,
-  "lock_branch": false,
-  "allow_fork_syncing": true
-}
-EOF
-
-echo "✅ Branch protection enabled"
-```
-
-Run the script:
-
-```bash
-chmod +x scripts/setup_branch_protection.sh
-./scripts/setup_branch_protection.sh
-```
-
-## Manual setup via GitHub UI
-
-<Steps>
-  <Step title="Navigate to settings">
-    Go to repository → Settings → Branches
-  </Step>
-  <Step title="Add rule">
-    Click "Add branch protection rule"
-  </Step>
-  <Step title="Configure branch name">
-    Enter `main` as the branch name pattern
-  </Step>
-  <Step title="Enable required checks">
-    Check "Require status checks to pass before merging"
-    - Select "CodeQL"
-    - Select "Gitleaks"
-    - Check "Require branches to be up to date before merging"
-  </Step>
-  <Step title="Enable pull request reviews">
-    Check "Require a pull request before merging"
-    - Set "Required approving reviews" to 1
-    - Check "Dismiss stale pull request approvals when new commits are pushed"
-    - Check "Require review from Code Owners"
-  </Step>
-  <Step title="Additional protections">
-    - Check "Require linear history"
-    - Check "Require conversation resolution before merging"
-    - Uncheck "Allow force pushes"
-    - Uncheck "Allow deletions"
-  </Step>
-  <Step title="Save">
-    Click "Create" to save the protection rule
-  </Step>
-</Steps>
-
-## Protection rules
+The script configures the following rules for `main`:
 
 ### Required status checks
 
-| Check | Purpose | Compliance |
-|-------|---------|------------|
-| **CodeQL** | SAST security scanning | GDPR Art. 32, ISO 27001 A.12.6 |
-| **Gitleaks** | Secret detection | NIST SP 800-53 IA-5 |
-| **Build** | Compilation and tests | SOC 2 (Processing Integrity) |
+<AccordionGroup>
+  <Accordion title="CodeQL Security Analysis">
+    SAST scanning for Python and JavaScript code
+  </Accordion>
+  <Accordion title="Gitleaks Secret Scanning">
+    Detects hardcoded secrets and credentials
+  </Accordion>
+</AccordionGroup>
 
 ### Pull request requirements
 
-- **1 approving review** - Peer review required
-- **Dismiss stale reviews** - Re-review after new commits
-- **Code owner review** - Domain experts must approve
-- **Conversation resolution** - All comments must be resolved
+- **1 approving review** required before merge
+- **Dismiss stale reviews** on new commits
+- **Require conversation resolution** before merge
+- **No force pushes** allowed
+- **No branch deletion** allowed
 
-### Additional protections
+### Administrator enforcement
 
-- **Linear history** - No merge commits (rebase only)
-- **No force pushes** - Prevents history rewriting
-- **No deletions** - Branch cannot be deleted
-- **Up-to-date branches** - Must merge latest main before PR
+Branch protection rules apply to **all users**, including administrators.
 
-## CODEOWNERS file
+## Security features enabled
 
-Create `.github/CODEOWNERS` to enforce domain expert reviews:
+### Dependabot security updates
 
+Automatically creates PRs for security vulnerabilities in dependencies.
+
+```yaml
+# .github/dependabot.yml
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "daily"
 ```
-# iLuminara-Core Code Owners
-# These owners will be requested for review when someone opens a pull request.
 
-# Global owners
-* @VISENDI56
+### Dependabot alerts
 
-# Governance Kernel
-/governance_kernel/ @VISENDI56 @compliance-team
-/config/sovereign_guardrail.yaml @VISENDI56 @compliance-team
+Notifies maintainers of known security vulnerabilities.
 
-# Security workflows
-/.github/workflows/codeql.yml @VISENDI56 @security-team
-/.github/workflows/gitleaks.yml @VISENDI56 @security-team
-/.gitleaks.toml @VISENDI56 @security-team
+### Secret scanning
 
-# AI Agents
-/edge_node/ai_agents/ @VISENDI56 @ai-team
+Scans repository for exposed secrets (requires GitHub Advanced Security).
 
-# API
-/api_service.py @VISENDI56 @backend-team
+### Secret scanning push protection
 
-# Documentation
-/docs/ @VISENDI56 @docs-team
-*.md @VISENDI56 @docs-team
+Blocks commits containing secrets from being pushed.
+
+## Manual configuration
+
+If you prefer manual setup, follow these steps:
+
+### 1. Enable branch protection
+
+```bash
+gh api \
+  --method PUT \
+  -H "Accept: application/vnd.github+json" \
+  "/repos/OWNER/REPO/branches/main/protection" \
+  -f required_status_checks[strict]=true \
+  -f "required_status_checks[contexts][]=CodeQL" \
+  -f "required_status_checks[contexts][]=Gitleaks Secret Scanning"
+```
+
+### 2. Enable Dependabot
+
+```bash
+# Security updates
+gh api --method PUT \
+  "/repos/OWNER/REPO/automated-security-fixes"
+
+# Alerts
+gh api --method PUT \
+  "/repos/OWNER/REPO/vulnerability-alerts"
+```
+
+### 3. Enable secret scanning
+
+```bash
+# Secret scanning
+gh api --method PUT \
+  "/repos/OWNER/REPO/secret-scanning"
+
+# Push protection
+gh api --method PUT \
+  "/repos/OWNER/REPO/secret-scanning/push-protection"
+```
+
+## Verification
+
+After running the script, verify the configuration:
+
+### Check branch protection
+
+```bash
+gh api "/repos/OWNER/REPO/branches/main/protection"
+```
+
+### Check security features
+
+```bash
+# Dependabot status
+gh api "/repos/OWNER/REPO/automated-security-fixes"
+
+# Secret scanning status
+gh api "/repos/OWNER/REPO/secret-scanning"
 ```
 
 ## Workflow integration
 
-Ensure workflows run on pull requests:
+The branch protection rules integrate with GitHub Actions workflows:
 
 ```yaml
 # .github/workflows/codeql.yml
+name: "CodeQL Security Analysis"
+
 on:
   push:
     branches: [ "main", "develop" ]
   pull_request:
-    branches: [ "main" ]  # ← Required for branch protection
+    branches: [ "main" ]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    # ... CodeQL analysis steps
 ```
-
-## Bypass protection (emergency only)
-
-In emergencies, admins can bypass protection:
-
-```bash
-# Temporarily disable protection
-gh api repos/VISENDI56/iLuminara-Core/branches/main/protection \
-  --method DELETE
-
-# Make emergency commit
-git push origin main
-
-# Re-enable protection
-./scripts/setup_branch_protection.sh
-```
-
-**⚠️ Warning:** All bypasses are logged in audit trail.
-
-## Verification
-
-Verify branch protection is active:
-
-```bash
-# Check protection status
-gh api repos/VISENDI56/iLuminara-Core/branches/main/protection
-
-# Expected output:
-# {
-#   "required_status_checks": {
-#     "strict": true,
-#     "contexts": ["CodeQL", "Gitleaks"]
-#   },
-#   "enforce_admins": true,
-#   ...
-# }
-```
-
-## Testing protection
-
-Test that protection works:
-
-```bash
-# Try to push directly to main (should fail)
-git checkout main
-echo "test" >> README.md
-git commit -am "test: direct push"
-git push origin main
-
-# Expected error:
-# remote: error: GH006: Protected branch update failed for refs/heads/main.
-# remote: error: Required status check "CodeQL" is expected.
-```
-
-## Compliance mapping
-
-Branch protection enforces these compliance requirements:
-
-| Framework | Requirement | Implementation |
-|-----------|-------------|----------------|
-| **GDPR Art. 32** | Security of Processing | CodeQL SAST scanning |
-| **ISO 27001 A.12.6** | Technical Vulnerability Management | Required security checks |
-| **SOC 2** | Change Management | Pull request reviews |
-| **NIST SP 800-53** | Configuration Management | Linear history, no force pushes |
-| **HIPAA §164.312** | Access Control | Code owner reviews |
 
 ## Troubleshooting
 
-### Status checks not appearing
+### Permission denied
+
+```bash
+# Error: Resource not accessible by integration
+# Solution: Refresh permissions
+gh auth refresh -s workflow,repo,write:packages,admin:repo_hook
+```
+
+### GitHub Advanced Security required
+
+Some features (secret scanning, push protection) require GitHub Advanced Security:
+
+- **Public repositories**: Free
+- **Private repositories**: Requires GitHub Enterprise or Advanced Security license
+
+### Status checks not found
 
 Ensure workflows have run at least once:
 
 ```bash
-# Trigger workflows manually
-gh workflow run codeql.yml
-gh workflow run gitleaks.yml
+# Trigger CodeQL workflow
+git commit --allow-empty -m "trigger: CodeQL scan"
+git push
 ```
 
-### Cannot merge PR
+## Best practices
 
-Check that all required checks have passed:
+<AccordionGroup>
+  <Accordion title="Run security scans before merging">
+    Always wait for CodeQL and Gitleaks to complete before merging PRs
+  </Accordion>
+  <Accordion title="Review Dependabot PRs promptly">
+    Security updates should be reviewed and merged within 24 hours
+  </Accordion>
+  <Accordion title="Never bypass branch protection">
+    Even administrators should follow the same rules
+  </Accordion>
+  <Accordion title="Monitor security alerts">
+    Set up notifications for Dependabot and secret scanning alerts
+  </Accordion>
+</AccordionGroup>
+
+## Script output
 
 ```bash
-# View PR status
-gh pr view 123 --json statusCheckRollup
+╔════════════════════════════════════════════════════════════╗
+║     iLuminara-Core Branch Protection Setup                 ║
+╚════════════════════════════════════════════════════════════╝
 
-# Re-run failed checks
-gh run rerun <run-id>
-```
+🔐 Checking GitHub authentication... ✓ AUTHENTICATED
+🔑 Refreshing GitHub permissions... ✓ PERMISSIONS GRANTED
 
-### Admin bypass not working
+═══════════════════════════════════════════════════════════
+Configuring Branch Protection for 'main'
+═══════════════════════════════════════════════════════════
 
-Verify admin permissions:
+📦 Repository: VISENDI56/iLuminara-Core
 
-```bash
-# Check your permissions
-gh api repos/VISENDI56/iLuminara-Core --jq .permissions
+🛡️ Enabling branch protection rules...
+
+✅ Branch protection rules applied
+
+═══════════════════════════════════════════════════════════
+Branch Protection Summary
+═══════════════════════════════════════════════════════════
+
+✓ Required status checks:
+  - CodeQL Security Analysis
+  - Gitleaks Secret Scanning
+
+✓ Pull request requirements:
+  - 1 approving review required
+  - Dismiss stale reviews on new commits
+  - Require conversation resolution
+
+✓ Restrictions:
+  - Force pushes: BLOCKED
+  - Branch deletion: BLOCKED
+  - Enforce for administrators: YES
+
+═══════════════════════════════════════════════════════════
+Enabling Security Features
+═══════════════════════════════════════════════════════════
+
+🤖 Enabling Dependabot security updates... ✓ ENABLED
+🔔 Enabling Dependabot alerts... ✓ ENABLED
+🔐 Enabling secret scanning... ✓ ENABLED
+🛡️ Enabling secret scanning push protection... ✓ ENABLED
+
+╔════════════════════════════════════════════════════════════╗
+║                    FORTRESS SECURED                        ║
+╚════════════════════════════════════════════════════════════╝
+
+🛡️ The Sovereign Health Fortress is now protected
 ```
 
 ## Next steps
 
 <CardGroup cols={2}>
   <Card
-    title="Security workflows"
-    icon="workflow"
-    href="/security/workflows"
-  >
-    Configure CodeQL and Gitleaks
-  </Card>
-  <Card
-    title="Deployment checklist"
-    icon="list-check"
+    title="Validate fortress"
+    icon="check-circle"
     href="/deployment/checklist"
   >
-    Complete deployment checklist
+    Run complete validation
+  </Card>
+  <Card
+    title="Security workflows"
+    icon="workflow"
+    href="/security/overview"
+  >
+    Understand security stack
+  </Card>
+  <Card
+    title="Deploy to GCP"
+    icon="google"
+    href="/deployment/gcp"
+  >
+    Production deployment
   </Card>
   <Card
     title="Governance"
     icon="shield-check"
     href="/governance/overview"
   >
-    Configure compliance enforcement
-  </Card>
-  <Card
-    title="Security overview"
-    icon="shield-halved"
-    href="/security/overview"
-  >
-    Review security architecture
+    Configure compliance
   </Card>
 </CardGroup>
