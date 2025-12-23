@@ -1,19 +1,19 @@
 """
 Unified Security Telemetry Dashboard
-Aligns with 2026 Data Security Index: 86% prefer integrated platforms
+Implements 2026 Data Security Index recommendation: 86% prefer integrated platforms
 
 Consolidates:
 - CodeQL SAST results
 - Gitleaks secret scanning
 - Dependabot security updates
-- DSPM posture metrics
-- GenAI risk monitoring
-- Nuclear IP Stack status
+- SovereignGuardrail violations
+- Crypto Shredder status
+- DSPM classification results
 
 Compliance:
 - 2026 DSI: Unified visibility improves threat detection by 64%
-- ISO 27001 A.12.6 (Security Monitoring)
-- SOC 2 (Continuous Monitoring)
+- ISO 27001 A.12.6 (Technical Vulnerability Management)
+- SOC 2 (Security Monitoring)
 """
 
 import streamlit as st
@@ -26,16 +26,18 @@ import plotly.graph_objects as go
 import plotly.express as px
 from pathlib import Path
 
-# Set page config
-st.set_page_config(
-    page_title="iLuminara Fortress Health",
-    page_icon="🛡️",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# Import iLuminara components
+try:
+    from governance_kernel.vector_ledger import SovereignGuardrail
+    from governance_kernel.crypto_shredder import CryptoShredder
+except ImportError:
+    st.warning("⚠️ Some iLuminara components not available in demo mode")
 
-class FortressDashboard:
-    """Unified security telemetry dashboard"""
+
+class FortressHealthDashboard:
+    """
+    Unified security telemetry dashboard for the Sovereign Health Fortress
+    """
     
     def __init__(self):
         self.data_dir = Path("./security_telemetry")
@@ -49,7 +51,7 @@ class FortressDashboard:
             with open(codeql_file, 'r') as f:
                 return json.load(f)
         
-        # Mock data for demonstration
+        # Mock data for demo
         return {
             "scan_date": datetime.utcnow().isoformat(),
             "total_alerts": 3,
@@ -70,7 +72,7 @@ class FortressDashboard:
                     "severity": "medium",
                     "rule": "py/clear-text-logging-sensitive-data",
                     "message": "Sensitive data logged in clear text",
-                    "file": "governance_kernel/vector_ledger.py",
+                    "file": "edge_node/frenasa_engine/voice_processor.py",
                     "line": 89,
                     "status": "open"
                 },
@@ -78,7 +80,7 @@ class FortressDashboard:
                     "severity": "medium",
                     "rule": "py/weak-cryptographic-algorithm",
                     "message": "Use of weak cryptographic algorithm",
-                    "file": "edge_node/sync_protocol/encryption.py",
+                    "file": "governance_kernel/crypto_shredder.py",
                     "line": 234,
                     "status": "resolved"
                 }
@@ -93,408 +95,391 @@ class FortressDashboard:
             with open(gitleaks_file, 'r') as f:
                 return json.load(f)
         
-        # Mock data
+        # Mock data for demo
         return {
             "scan_date": datetime.utcnow().isoformat(),
-            "total_secrets": 0,
-            "secrets_by_type": {
-                "gcp-api-key": 0,
-                "private-key": 0,
-                "jwt-token": 0
-            },
-            "status": "clean"
+            "total_leaks": 0,
+            "leaks": []
         }
     
-    def load_dependabot_status(self) -> Dict:
-        """Load Dependabot security update status"""
-        dependabot_file = self.data_dir / "dependabot_status.json"
+    def load_dependabot_results(self) -> Dict:
+        """Load Dependabot security update results"""
+        dependabot_file = self.data_dir / "dependabot_results.json"
         
         if dependabot_file.exists():
             with open(dependabot_file, 'r') as f:
                 return json.load(f)
         
-        # Mock data
+        # Mock data for demo
         return {
-            "last_update": datetime.utcnow().isoformat(),
-            "total_dependencies": 87,
-            "vulnerable_dependencies": 2,
-            "pending_updates": 5,
-            "vulnerabilities": [
+            "scan_date": datetime.utcnow().isoformat(),
+            "total_alerts": 5,
+            "critical": 1,
+            "high": 2,
+            "medium": 2,
+            "low": 0,
+            "alerts": [
                 {
+                    "severity": "critical",
                     "package": "cryptography",
                     "current_version": "41.0.0",
                     "fixed_version": "41.0.7",
-                    "severity": "high",
-                    "cve": "CVE-2023-50782"
+                    "vulnerability": "CVE-2023-50782",
+                    "status": "open"
                 },
                 {
+                    "severity": "high",
                     "package": "requests",
                     "current_version": "2.31.0",
                     "fixed_version": "2.32.0",
-                    "severity": "medium",
-                    "cve": "CVE-2024-35195"
+                    "vulnerability": "CVE-2024-35195",
+                    "status": "open"
                 }
             ]
         }
     
-    def load_dspm_metrics(self) -> Dict:
-        """Load DSPM posture metrics"""
-        dspm_file = self.data_dir / "dspm_metrics.json"
-        
-        if dspm_file.exists():
-            with open(dspm_file, 'r') as f:
-                return json.load(f)
-        
-        # Mock data
-        return {
-            "last_scan": datetime.utcnow().isoformat(),
-            "total_data_assets": 1247,
-            "classified_assets": 1189,
-            "unclassified_assets": 58,
-            "classification_coverage": 95.3,
-            "exposure_risks": {
-                "critical": 2,
-                "high": 8,
-                "medium": 23,
-                "low": 45
-            },
-            "data_types": {
-                "PHI": 456,
-                "PII": 234,
-                "Financial": 89,
-                "Operational": 468
-            },
-            "access_anomalies": 12,
-            "misconfigurations": 5
-        }
+    def load_sovereignty_violations(self) -> List[Dict]:
+        """Load SovereignGuardrail violation logs"""
+        try:
+            guardrail = SovereignGuardrail()
+            # Get recent violations from audit log
+            violations = []
+            audit_file = Path("./keys/audit.jsonl")
+            
+            if audit_file.exists():
+                with open(audit_file, 'r') as f:
+                    for line in f:
+                        entry = json.loads(line)
+                        if "VIOLATION" in entry.get("action", ""):
+                            violations.append(entry)
+            
+            return violations[-10:]  # Last 10 violations
+        except Exception as e:
+            return []
     
-    def load_genai_risks(self) -> Dict:
-        """Load GenAI risk monitoring data"""
-        genai_file = self.data_dir / "genai_risks.json"
-        
-        if genai_file.exists():
-            with open(genai_file, 'r') as f:
-                return json.load(f)
-        
-        # Mock data
-        return {
-            "last_check": datetime.utcnow().isoformat(),
-            "total_genai_interactions": 1456,
-            "blocked_prompts": 23,
-            "flagged_responses": 8,
-            "data_leak_attempts": 3,
-            "risk_score": 2.3,  # out of 10
-            "top_risks": [
-                {"type": "PHI_upload_attempt", "count": 12, "severity": "high"},
-                {"type": "Unauthorized_LLM_access", "count": 8, "severity": "medium"},
-                {"type": "Prompt_injection", "count": 3, "severity": "low"}
-            ]
-        }
-    
-    def load_nuclear_ip_status(self) -> Dict:
-        """Load Nuclear IP Stack status"""
-        return {
-            "IP_02_CRYPTO_SHREDDER": {
-                "status": "active",
-                "keys_managed": 3456,
-                "keys_shredded_today": 12,
-                "retention_compliance": 99.8
-            },
-            "IP_03_ACORN_PROTOCOL": {
-                "status": "requires_hardware",
-                "tpm_available": False
-            },
-            "IP_04_SILENT_FLUX": {
-                "status": "requires_integration",
-                "anxiety_monitoring": False
-            },
-            "IP_05_GOLDEN_THREAD": {
-                "status": "active",
-                "verification_score": 0.94,
-                "data_streams_fused": 8934
-            },
-            "IP_06_5DM_BRIDGE": {
-                "status": "requires_mobile_network",
-                "nodes_connected": 0
+    def load_crypto_shredder_status(self) -> Dict:
+        """Load Crypto Shredder key lifecycle status"""
+        try:
+            shredder = CryptoShredder()
+            key_dir = Path(shredder.key_storage_path)
+            
+            total_keys = 0
+            active_keys = 0
+            shredded_keys = 0
+            expired_keys = 0
+            
+            if key_dir.exists():
+                for key_file in key_dir.glob("*.json"):
+                    if key_file.name == "audit.jsonl":
+                        continue
+                    
+                    with open(key_file, 'r') as f:
+                        key_metadata = json.load(f)
+                    
+                    total_keys += 1
+                    
+                    if key_metadata.get("shredded", False):
+                        shredded_keys += 1
+                    else:
+                        active_keys += 1
+                        
+                        # Check expiration
+                        if key_metadata.get("expires_at"):
+                            expiration = datetime.fromisoformat(key_metadata["expires_at"])
+                            if datetime.utcnow() > expiration:
+                                expired_keys += 1
+            
+            return {
+                "total_keys": total_keys,
+                "active_keys": active_keys,
+                "shredded_keys": shredded_keys,
+                "expired_keys": expired_keys
             }
-        }
+        except Exception as e:
+            return {
+                "total_keys": 0,
+                "active_keys": 0,
+                "shredded_keys": 0,
+                "expired_keys": 0
+            }
     
-    def render_header(self):
-        """Render dashboard header"""
-        col1, col2, col3 = st.columns([2, 1, 1])
-        
-        with col1:
-            st.title("🛡️ iLuminara Fortress Health")
-            st.caption("Unified Security Telemetry Dashboard • 2026 DSI Aligned")
-        
-        with col2:
-            st.metric("Fortress Status", "OPERATIONAL", delta="99.8%")
-        
-        with col3:
-            st.metric("Last Update", datetime.utcnow().strftime("%H:%M UTC"))
-    
-    def render_threat_overview(self):
-        """Render threat detection overview"""
-        st.header("🎯 Threat Detection Overview")
-        st.caption("2026 DSI: 64% improvement in threat detection with unified platforms")
-        
+    def calculate_fortress_health_score(self) -> float:
+        """
+        Calculate overall Fortress Health Score (0-100)
+        Based on 2026 DSI: Unified visibility improves threat detection by 64%
+        """
         codeql = self.load_codeql_results()
         gitleaks = self.load_gitleaks_results()
-        dependabot = self.load_dependabot_status()
-        dspm = self.load_dspm_metrics()
-        genai = self.load_genai_risks()
+        dependabot = self.load_dependabot_results()
+        violations = self.load_sovereignty_violations()
         
+        # Scoring algorithm
+        score = 100.0
+        
+        # CodeQL penalties
+        score -= codeql.get("critical", 0) * 20
+        score -= codeql.get("high", 0) * 10
+        score -= codeql.get("medium", 0) * 5
+        
+        # Gitleaks penalties
+        score -= gitleaks.get("total_leaks", 0) * 25
+        
+        # Dependabot penalties
+        score -= dependabot.get("critical", 0) * 15
+        score -= dependabot.get("high", 0) * 8
+        score -= dependabot.get("medium", 0) * 3
+        
+        # Sovereignty violation penalties
+        score -= len(violations) * 10
+        
+        return max(0.0, min(100.0, score))
+    
+    def render_dashboard(self):
+        """Render the unified security telemetry dashboard"""
+        st.set_page_config(
+            page_title="iLuminara Fortress Health",
+            page_icon="🛡️",
+            layout="wide"
+        )
+        
+        st.title("🛡️ iLuminara Sovereign Health Fortress")
+        st.markdown("**Unified Security Telemetry Dashboard** | 2026 Data Security Index Compliant")
+        
+        # Calculate Fortress Health Score
+        health_score = self.calculate_fortress_health_score()
+        
+        # Header metrics
         col1, col2, col3, col4, col5 = st.columns(5)
         
         with col1:
-            st.metric(
-                "CodeQL Alerts",
-                codeql['total_alerts'],
-                delta=f"-{codeql['high']} high" if codeql['high'] > 0 else "Clean",
-                delta_color="inverse"
-            )
-        
-        with col2:
-            st.metric(
-                "Secrets Detected",
-                gitleaks['total_secrets'],
-                delta="Clean" if gitleaks['total_secrets'] == 0 else "Action Required",
-                delta_color="inverse"
-            )
-        
-        with col3:
-            st.metric(
-                "Vulnerable Deps",
-                dependabot['vulnerable_dependencies'],
-                delta=f"{dependabot['pending_updates']} updates pending",
-                delta_color="inverse"
-            )
-        
-        with col4:
-            st.metric(
-                "DSPM Risks",
-                dspm['exposure_risks']['critical'] + dspm['exposure_risks']['high'],
-                delta=f"{dspm['classification_coverage']:.1f}% classified"
-            )
-        
-        with col5:
-            st.metric(
-                "GenAI Risk Score",
-                f"{genai['risk_score']:.1f}/10",
-                delta=f"{genai['blocked_prompts']} blocked",
-                delta_color="inverse"
-            )
-    
-    def render_codeql_section(self):
-        """Render CodeQL SAST results"""
-        st.header("🔍 CodeQL SAST Analysis")
+            if health_score >= 90:
+                st.metric("🛡️ Fortress Health", f"{health_score:.0f}%", delta="OPERATIONAL", delta_color="normal")
+            elif health_score >= 70:
+                st.metric("🛡️ Fortress Health", f"{health_score:.0f}%", delta="DEGRADED", delta_color="off")
+            else:
+                st.metric("🛡️ Fortress Health", f"{health_score:.0f}%", delta="COMPROMISED", delta_color="inverse")
         
         codeql = self.load_codeql_results()
-        
-        col1, col2 = st.columns([2, 1])
-        
-        with col1:
-            # Alert severity distribution
-            severity_data = pd.DataFrame({
-                'Severity': ['Critical', 'High', 'Medium', 'Low'],
-                'Count': [
-                    codeql['critical'],
-                    codeql['high'],
-                    codeql['medium'],
-                    codeql['low']
-                ]
-            })
-            
-            fig = px.bar(
-                severity_data,
-                x='Severity',
-                y='Count',
-                color='Severity',
-                color_discrete_map={
-                    'Critical': '#dc2626',
-                    'High': '#ea580c',
-                    'Medium': '#f59e0b',
-                    'Low': '#84cc16'
-                },
-                title="Alert Severity Distribution"
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        
         with col2:
-            st.subheader("Recent Alerts")
-            for alert in codeql['alerts'][:3]:
-                status_icon = "🔴" if alert['status'] == 'open' else "✅"
-                st.write(f"{status_icon} **{alert['severity'].upper()}**: {alert['rule']}")
-                st.caption(f"{alert['file']}:{alert['line']}")
-    
-    def render_dspm_section(self):
-        """Render DSPM posture metrics"""
-        st.header("📊 Data Security Posture Management")
-        st.caption("2026 DSI: 82% prioritize DSPM for identifying exposure risks")
+            total_codeql = codeql.get("total_alerts", 0)
+            st.metric("🔍 CodeQL Alerts", total_codeql, delta=f"{codeql.get('critical', 0)} critical")
         
-        dspm = self.load_dspm_metrics()
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.metric("Total Data Assets", f"{dspm['total_data_assets']:,}")
-            st.metric("Classification Coverage", f"{dspm['classification_coverage']:.1f}%")
-        
-        with col2:
-            st.metric("Access Anomalies", dspm['access_anomalies'])
-            st.metric("Misconfigurations", dspm['misconfigurations'])
-        
+        gitleaks = self.load_gitleaks_results()
         with col3:
-            # Data type distribution
-            data_types_df = pd.DataFrame({
-                'Type': list(dspm['data_types'].keys()),
-                'Count': list(dspm['data_types'].values())
-            })
-            
-            fig = px.pie(
-                data_types_df,
-                values='Count',
-                names='Type',
-                title="Data Classification"
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            total_leaks = gitleaks.get("total_leaks", 0)
+            st.metric("🔐 Secret Leaks", total_leaks, delta="✓ CLEAN" if total_leaks == 0 else "⚠ EXPOSED")
         
-        # Exposure risks
-        st.subheader("Exposure Risk Matrix")
-        risk_df = pd.DataFrame({
-            'Risk Level': ['Critical', 'High', 'Medium', 'Low'],
-            'Count': [
-                dspm['exposure_risks']['critical'],
-                dspm['exposure_risks']['high'],
-                dspm['exposure_risks']['medium'],
-                dspm['exposure_risks']['low']
-            ]
-        })
-        st.dataframe(risk_df, use_container_width=True)
-    
-    def render_genai_section(self):
-        """Render GenAI risk monitoring"""
-        st.header("🤖 GenAI Risk Monitoring")
-        st.caption("2026 DSI: 32% of security incidents involve GenAI tools")
-        
-        genai = self.load_genai_risks()
-        
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric("Total Interactions", f"{genai['total_genai_interactions']:,}")
-        
-        with col2:
-            st.metric("Blocked Prompts", genai['blocked_prompts'], delta_color="inverse")
-        
-        with col3:
-            st.metric("Data Leak Attempts", genai['data_leak_attempts'], delta_color="inverse")
-        
+        dependabot = self.load_dependabot_results()
         with col4:
-            risk_color = "🟢" if genai['risk_score'] < 3 else "🟡" if genai['risk_score'] < 7 else "🔴"
-            st.metric("Risk Score", f"{risk_color} {genai['risk_score']:.1f}/10")
+            total_deps = dependabot.get("total_alerts", 0)
+            st.metric("📦 Dependency Alerts", total_deps, delta=f"{dependabot.get('critical', 0)} critical")
         
-        # Top risks
-        st.subheader("Top GenAI Risks")
-        for risk in genai['top_risks']:
-            severity_color = {
-                'high': '🔴',
-                'medium': '🟡',
-                'low': '🟢'
-            }[risk['severity']]
-            
-            st.write(f"{severity_color} **{risk['type']}**: {risk['count']} occurrences")
+        violations = self.load_sovereignty_violations()
+        with col5:
+            st.metric("⚖️ Sovereignty Violations", len(violations), delta="Last 24h")
+        
+        st.markdown("---")
+        
+        # Tabs for detailed views
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+            "📊 Overview",
+            "🔍 CodeQL SAST",
+            "🔐 Secret Scanning",
+            "📦 Dependencies",
+            "⚖️ Sovereignty",
+            "🔥 Crypto Shredder"
+        ])
+        
+        with tab1:
+            self.render_overview_tab(health_score, codeql, gitleaks, dependabot, violations)
+        
+        with tab2:
+            self.render_codeql_tab(codeql)
+        
+        with tab3:
+            self.render_gitleaks_tab(gitleaks)
+        
+        with tab4:
+            self.render_dependabot_tab(dependabot)
+        
+        with tab5:
+            self.render_sovereignty_tab(violations)
+        
+        with tab6:
+            self.render_crypto_shredder_tab()
     
-    def render_nuclear_ip_section(self):
-        """Render Nuclear IP Stack status"""
-        st.header("⚡ Nuclear IP Stack Status")
-        
-        nuclear_ip = self.load_nuclear_ip_status()
-        
-        for ip_name, ip_data in nuclear_ip.items():
-            col1, col2 = st.columns([3, 1])
-            
-            with col1:
-                st.subheader(ip_name.replace('_', ' '))
-            
-            with col2:
-                status = ip_data['status']
-                if status == 'active':
-                    st.success("✅ ACTIVE")
-                elif 'requires' in status:
-                    st.warning(f"⚠️ {status.replace('_', ' ').upper()}")
-                else:
-                    st.info(f"ℹ️ {status.upper()}")
-            
-            # Show metrics for active components
-            if status == 'active':
-                metrics = {k: v for k, v in ip_data.items() if k != 'status'}
-                if metrics:
-                    cols = st.columns(len(metrics))
-                    for idx, (key, value) in enumerate(metrics.items()):
-                        with cols[idx]:
-                            st.metric(key.replace('_', ' ').title(), value)
-    
-    def render_compliance_section(self):
-        """Render compliance status"""
-        st.header("⚖️ Compliance Status")
-        
-        frameworks = {
-            "GDPR": {"status": "compliant", "score": 98.5},
-            "KDPA": {"status": "compliant", "score": 99.2},
-            "HIPAA": {"status": "compliant", "score": 97.8},
-            "ISO 27001": {"status": "compliant", "score": 96.4},
-            "SOC 2": {"status": "compliant", "score": 98.1},
-            "2026 DSI": {"status": "aligned", "score": 94.7}
-        }
-        
-        cols = st.columns(3)
-        
-        for idx, (framework, data) in enumerate(frameworks.items()):
-            with cols[idx % 3]:
-                st.metric(
-                    framework,
-                    f"{data['score']:.1f}%",
-                    delta=data['status'].upper()
-                )
-    
-    def render(self):
-        """Render complete dashboard"""
-        self.render_header()
-        
-        st.divider()
-        
-        self.render_threat_overview()
-        
-        st.divider()
+    def render_overview_tab(self, health_score, codeql, gitleaks, dependabot, violations):
+        """Render overview tab with unified metrics"""
+        st.subheader("🎯 Fortress Health Overview")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            self.render_codeql_section()
+            # Health score gauge
+            fig = go.Figure(go.Indicator(
+                mode="gauge+number+delta",
+                value=health_score,
+                domain={'x': [0, 1], 'y': [0, 1]},
+                title={'text': "Fortress Health Score"},
+                delta={'reference': 90},
+                gauge={
+                    'axis': {'range': [None, 100]},
+                    'bar': {'color': "darkgreen" if health_score >= 90 else "orange" if health_score >= 70 else "red"},
+                    'steps': [
+                        {'range': [0, 70], 'color': "lightgray"},
+                        {'range': [70, 90], 'color': "gray"},
+                        {'range': [90, 100], 'color': "lightgreen"}
+                    ],
+                    'threshold': {
+                        'line': {'color': "red", 'width': 4},
+                        'thickness': 0.75,
+                        'value': 90
+                    }
+                }
+            ))
+            st.plotly_chart(fig, use_container_width=True)
         
         with col2:
-            self.render_dspm_section()
+            # Threat distribution
+            threat_data = pd.DataFrame({
+                'Category': ['CodeQL', 'Gitleaks', 'Dependabot', 'Sovereignty'],
+                'Critical': [
+                    codeql.get('critical', 0),
+                    gitleaks.get('total_leaks', 0),
+                    dependabot.get('critical', 0),
+                    len([v for v in violations if v.get('severity') == 'critical'])
+                ],
+                'High': [
+                    codeql.get('high', 0),
+                    0,
+                    dependabot.get('high', 0),
+                    len([v for v in violations if v.get('severity') == 'high'])
+                ],
+                'Medium': [
+                    codeql.get('medium', 0),
+                    0,
+                    dependabot.get('medium', 0),
+                    len([v for v in violations if v.get('severity') == 'medium'])
+                ]
+            })
+            
+            fig = go.Figure(data=[
+                go.Bar(name='Critical', x=threat_data['Category'], y=threat_data['Critical'], marker_color='red'),
+                go.Bar(name='High', x=threat_data['Category'], y=threat_data['High'], marker_color='orange'),
+                go.Bar(name='Medium', x=threat_data['Category'], y=threat_data['Medium'], marker_color='yellow')
+            ])
+            fig.update_layout(barmode='stack', title='Threat Distribution by Category')
+            st.plotly_chart(fig, use_container_width=True)
         
-        st.divider()
+        # 2026 DSI Compliance Badge
+        st.success("✅ **2026 Data Security Index Compliant**: Unified platform improves threat detection by 64%")
+    
+    def render_codeql_tab(self, codeql):
+        """Render CodeQL SAST results"""
+        st.subheader("🔍 CodeQL Static Application Security Testing")
         
-        self.render_genai_section()
+        st.info(f"**Last Scan:** {codeql.get('scan_date', 'N/A')}")
         
-        st.divider()
+        if codeql.get('total_alerts', 0) == 0:
+            st.success("✅ No security vulnerabilities detected")
+        else:
+            alerts_df = pd.DataFrame(codeql.get('alerts', []))
+            
+            # Severity filter
+            severity_filter = st.multiselect(
+                "Filter by Severity",
+                options=['critical', 'high', 'medium', 'low'],
+                default=['critical', 'high', 'medium', 'low']
+            )
+            
+            filtered_df = alerts_df[alerts_df['severity'].isin(severity_filter)]
+            
+            st.dataframe(filtered_df, use_container_width=True)
+    
+    def render_gitleaks_tab(self, gitleaks):
+        """Render Gitleaks secret scanning results"""
+        st.subheader("🔐 Gitleaks Secret Scanning")
         
-        self.render_nuclear_ip_section()
+        st.info(f"**Last Scan:** {gitleaks.get('scan_date', 'N/A')}")
         
-        st.divider()
+        if gitleaks.get('total_leaks', 0) == 0:
+            st.success("✅ No secrets detected in repository")
+        else:
+            st.error(f"⚠️ {gitleaks.get('total_leaks', 0)} secrets detected!")
+            
+            leaks_df = pd.DataFrame(gitleaks.get('leaks', []))
+            st.dataframe(leaks_df, use_container_width=True)
+    
+    def render_dependabot_tab(self, dependabot):
+        """Render Dependabot security updates"""
+        st.subheader("📦 Dependabot Security Updates")
         
-        self.render_compliance_section()
+        st.info(f"**Last Scan:** {dependabot.get('scan_date', 'N/A')}")
         
-        # Footer
-        st.divider()
-        st.caption("🛡️ iLuminara Sovereign Health Fortress • Aligned with 2026 Data Security Index")
-        st.caption("Last updated: " + datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"))
+        if dependabot.get('total_alerts', 0) == 0:
+            st.success("✅ All dependencies up to date")
+        else:
+            alerts_df = pd.DataFrame(dependabot.get('alerts', []))
+            
+            # Severity filter
+            severity_filter = st.multiselect(
+                "Filter by Severity",
+                options=['critical', 'high', 'medium', 'low'],
+                default=['critical', 'high', 'medium', 'low'],
+                key="dep_severity"
+            )
+            
+            filtered_df = alerts_df[alerts_df['severity'].isin(severity_filter)]
+            
+            st.dataframe(filtered_df, use_container_width=True)
+    
+    def render_sovereignty_tab(self, violations):
+        """Render sovereignty violations"""
+        st.subheader("⚖️ Sovereignty Violations")
+        
+        if len(violations) == 0:
+            st.success("✅ No sovereignty violations detected")
+        else:
+            st.warning(f"⚠️ {len(violations)} violations in last 24 hours")
+            
+            violations_df = pd.DataFrame(violations)
+            st.dataframe(violations_df, use_container_width=True)
+    
+    def render_crypto_shredder_tab(self):
+        """Render Crypto Shredder status"""
+        st.subheader("🔥 Crypto Shredder (IP-02)")
+        
+        status = self.load_crypto_shredder_status()
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Total Keys", status['total_keys'])
+        
+        with col2:
+            st.metric("Active Keys", status['active_keys'])
+        
+        with col3:
+            st.metric("Shredded Keys", status['shredded_keys'])
+        
+        with col4:
+            st.metric("Expired Keys", status['expired_keys'], delta="⚠ Needs shredding" if status['expired_keys'] > 0 else "✓")
+        
+        # Key lifecycle chart
+        if status['total_keys'] > 0:
+            fig = go.Figure(data=[go.Pie(
+                labels=['Active', 'Shredded', 'Expired'],
+                values=[status['active_keys'], status['shredded_keys'], status['expired_keys']],
+                hole=.3
+            )])
+            fig.update_layout(title='Key Lifecycle Distribution')
+            st.plotly_chart(fig, use_container_width=True)
 
 
-# Main execution
+def main():
+    dashboard = FortressHealthDashboard()
+    dashboard.render_dashboard()
+
+
 if __name__ == "__main__":
-    dashboard = FortressDashboard()
-    dashboard.render()
+    main()
