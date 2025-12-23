@@ -18,35 +18,34 @@ IP-02 Crypto Shredder implements a revolutionary approach to data deletion: inst
 
 Traditional data deletion has fundamental problems:
 
-- **Forensic recovery** - Deleted data can often be recovered
-- **Compliance ambiguity** - "Deletion" is not well-defined legally
-- **Storage overhead** - Secure deletion requires multiple overwrites
-- **Audit trail loss** - No proof that deletion occurred
+<AccordionGroup>
+  <Accordion title="Problem 1: Deletion is never complete">
+    Data persists in backups, logs, caches, and replicas. True deletion is impossible in distributed systems.
+  </Accordion>
+  <Accordion title="Problem 2: Compliance burden">
+    GDPR Art. 17 requires "erasure" but doesn't specify how. Proving deletion is harder than proving encryption.
+  </Accordion>
+  <Accordion title="Problem 3: Forensic recovery">
+    Deleted data can often be recovered using forensic tools, violating privacy guarantees.
+  </Accordion>
+</AccordionGroup>
 
-Crypto Shredder solves all of these:
-
-✅ **Cryptographically irrecoverable** - No forensic recovery possible  
-✅ **Compliance-first** - Meets GDPR Art. 17 "Right to Erasure"  
-✅ **Zero overhead** - No data overwriting required  
-✅ **Tamper-proof audit** - Complete key lifecycle logging  
+**Crypto Shredder solves this:** Encrypted data can remain forever, but without the key, it's mathematically irrecoverable.
 
 ## How it works
 
 <Steps>
   <Step title="Encrypt with ephemeral key">
-    Data is encrypted with a randomly generated 256-bit AES key
+    Generate a unique 256-bit AES key for each data record
   </Step>
   <Step title="Store encrypted data">
-    Encrypted data remains in storage (no deletion needed)
-  </Step>
-  <Step title="Store key with expiration">
-    Key is stored separately with retention policy metadata
+    Save encrypted data with retention metadata
   </Step>
   <Step title="Shred key after retention">
-    Key is overwritten with random data (DoD 5220.22-M standard)
+    Overwrite key with random data (DoD 5220.22-M standard)
   </Step>
   <Step title="Data becomes irrecoverable">
-    Without the key, encrypted data is cryptographically useless
+    Without the key, encrypted data is cryptographically dissolved
   </Step>
 </Steps>
 
@@ -153,10 +152,10 @@ shredded_count = shredder.auto_shred_expired_keys()
 print(f"🔥 Auto-shred complete - {shredded_count} keys shredded")
 ```
 
-Schedule auto-shred with cron:
+**Recommended schedule:** Daily at 2 AM UTC
 
 ```bash
-# Daily at 2 AM UTC
+# Cron job
 0 2 * * * python -c "from governance_kernel.crypto_shredder import CryptoShredder; CryptoShredder().auto_shred_expired_keys()"
 ```
 
@@ -170,9 +169,8 @@ status = shredder.get_key_status(key_id)
 print(f"Key ID: {status['key_id']}")
 print(f"Created: {status['created_at']}")
 print(f"Expires: {status['expires_at']}")
-print(f"Retention: {status['retention_policy']}")
 print(f"Shredded: {status['shredded']}")
-print(f"Zone: {status['sovereignty_zone']}")
+print(f"Sovereignty Zone: {status['sovereignty_zone']}")
 ```
 
 ## Audit trail
@@ -184,29 +182,17 @@ Every Crypto Shredder operation is logged:
 shredder = CryptoShredder(enable_audit=True)
 
 # All operations are automatically logged
-shredder.encrypt_with_ephemeral_key(data, RetentionPolicy.HOT)
-shredder.decrypt_with_key(encrypted_data, key_id)
-shredder.shred_key(key_id)
+# - ENCRYPT
+# - DECRYPT
+# - SHRED
+# - DECRYPT_FAILED_SHREDDED
 
-# Audit log is persisted to disk
-# Location: ./keys/audit.jsonl
+# View audit log
+for entry in shredder.audit_log:
+    print(f"{entry['timestamp']} - {entry['action']} - {entry['key_id']}")
 ```
 
-Audit log format:
-
-```json
-{
-  "timestamp": "2025-12-23T10:00:00.000Z",
-  "action": "ENCRYPT",
-  "key_id": "a1b2c3d4e5f6g7h8",
-  "sovereignty_zone": "africa-south1",
-  "metadata": {
-    "patient_id": "12345",
-    "jurisdiction": "KDPA_KE",
-    "data_type": "PHI"
-  }
-}
-```
+Audit logs are persisted to `keys/audit.jsonl` in JSONL format for easy parsing.
 
 ## Compliance mapping
 
@@ -214,35 +200,42 @@ Crypto Shredder satisfies multiple compliance requirements:
 
 ### GDPR Art. 17 (Right to Erasure)
 
-> "The data subject shall have the right to obtain from the controller the erasure of personal data..."
+```python
+# Patient requests data deletion
+shredder.shred_key(patient_key_id)
 
-✅ **Satisfied:** Key shredding makes data cryptographically irrecoverable, equivalent to erasure.
+# Data is now cryptographically irrecoverable
+# Compliance: GDPR Art. 17 satisfied
+```
 
 ### HIPAA §164.530(j) (Documentation)
 
-> "Retain documentation for 6 years from the date of its creation or the date when it last was in effect..."
-
-✅ **Satisfied:** Retention policies enforce minimum 1-year retention (WARM policy).
+```python
+# HIPAA requires 6-year retention minimum
+encrypted, key_id = shredder.encrypt_with_ephemeral_key(
+    data=patient_record,
+    retention_policy=RetentionPolicy.COLD,  # 5 years
+    metadata={"compliance": "HIPAA_164_530_j"}
+)
+```
 
 ### NIST SP 800-88 (Media Sanitization)
 
-> "Clear, Purge, or Destroy information from storage media..."
+```python
+# DoD 5220.22-M standard: Overwrite with random data
+shredder.shred_key(key_id)
 
-✅ **Satisfied:** Key shredding uses DoD 5220.22-M overwrite standard.
-
-### ISO 27001 A.8.3.2 (Disposal of Media)
-
-> "Media shall be disposed of securely when no longer required..."
-
-✅ **Satisfied:** Ephemeral keys are securely shredded after retention period.
+# Key is overwritten 3 times with random data
+# Compliance: NIST SP 800-88 satisfied
+```
 
 ## Integration with SovereignGuardrail
 
-Crypto Shredder integrates seamlessly with the Governance Kernel:
+Crypto Shredder integrates with the Governance Kernel:
 
 ```python
 from governance_kernel.vector_ledger import SovereignGuardrail
-from governance_kernel.crypto_shredder import CryptoShredder, RetentionPolicy
+from governance_kernel.crypto_shredder import CryptoShredder
 
 guardrail = SovereignGuardrail()
 shredder = CryptoShredder()
@@ -253,12 +246,12 @@ guardrail.validate_action(
     payload={
         'data_type': 'PHI',
         'processing_location': 'Edge_Node',
-        'consent_token': 'VALID_TOKEN'
+        'retention_policy': 'HOT'
     },
     jurisdiction='KDPA_KE'
 )
 
-# Encrypt with Crypto Shredder
+# Encrypt with validated parameters
 encrypted, key_id = shredder.encrypt_with_ephemeral_key(
     data=patient_data,
     retention_policy=RetentionPolicy.HOT
@@ -269,25 +262,45 @@ encrypted, key_id = shredder.encrypt_with_ephemeral_key(
 
 - **Encryption**: ~1ms per record (AES-256-GCM)
 - **Decryption**: ~1ms per record
-- **Key shredding**: ~5ms per key (DoD overwrite)
+- **Key shredding**: ~5ms per key (3-pass overwrite)
 - **Auto-shred**: ~100 keys/second
 
 ## Security guarantees
 
-<AccordionGroup>
-  <Accordion title="Cryptographic strength">
-    AES-256-GCM with 256-bit keys (NIST approved, FIPS 140-2 compliant)
-  </Accordion>
-  <Accordion title="Key randomness">
-    Keys generated using `secrets.token_bytes()` (cryptographically secure PRNG)
-  </Accordion>
-  <Accordion title="Shredding standard">
-    DoD 5220.22-M overwrite standard (3-pass random overwrite)
-  </Accordion>
-  <Accordion title="Audit integrity">
-    Tamper-proof audit trail with SHA-256 hash chain
-  </Accordion>
-</AccordionGroup>
+<CardGroup cols={2}>
+  <Card title="AES-256-GCM" icon="lock">
+    Military-grade encryption with authenticated encryption
+  </Card>
+  <Card title="Ephemeral keys" icon="key">
+    Unique key per record, never reused
+  </Card>
+  <Card title="DoD 5220.22-M" icon="shield">
+    3-pass overwrite for key destruction
+  </Card>
+  <Card title="Tamper-proof audit" icon="file-contract">
+    Complete audit trail of all operations
+  </Card>
+</CardGroup>
+
+## Best practices
+
+<Steps>
+  <Step title="Use appropriate retention policies">
+    Match retention to legal requirements (HOT for operations, COLD for legal hold)
+  </Step>
+  <Step title="Enable audit logging">
+    Always enable audit for compliance and forensics
+  </Step>
+  <Step title="Schedule auto-shred">
+    Run daily auto-shred to ensure expired keys are destroyed
+  </Step>
+  <Step title="Monitor key status">
+    Regularly check key status to ensure proper lifecycle management
+  </Step>
+  <Step title="Integrate with SovereignGuardrail">
+    Validate all operations against compliance constraints
+  </Step>
+</Steps>
 
 ## Next steps
 
@@ -300,24 +313,24 @@ encrypted, key_id = shredder.encrypt_with_ephemeral_key(
     Integrate with compliance enforcement
   </Card>
   <Card
-    title="Retention policies"
-    icon="clock"
-    href="/governance/retention"
-  >
-    Configure data retention rules
-  </Card>
-  <Card
-    title="Audit trail"
-    icon="file-contract"
-    href="/governance/audit"
-  >
-    Set up tamper-proof logging
-  </Card>
-  <Card
     title="Security stack"
     icon="shield-halved"
     href="/security/overview"
   >
     Complete security architecture
+  </Card>
+  <Card
+    title="Deployment"
+    icon="rocket"
+    href="/deployment/overview"
+  >
+    Deploy Crypto Shredder to production
+  </Card>
+  <Card
+    title="API reference"
+    icon="code"
+    href="/api-reference/overview"
+  >
+    API integration examples
   </Card>
 </CardGroup>
