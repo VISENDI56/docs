@@ -1,0 +1,196 @@
+---
+title: Health check
+description: Check service health and metadata
+---
+
+## Endpoint
+
+```
+GET /health
+```
+
+## Description
+
+Returns the health status of the iLuminara API service, including version information, uptime, and system metadata.
+
+## Request
+
+No parameters required.
+
+```bash
+curl http://localhost:8080/health
+```
+
+## Response
+
+### Success (200 OK)
+
+```json
+{
+  "status": "healthy",
+  "version": "1.0.0",
+  "service": "iLuminara-Core API",
+  "timestamp": "2025-12-24T11:00:00.000Z",
+  "uptime_seconds": 3600,
+  "node_id": "JOR-47",
+  "jurisdiction": "KDPA_KE",
+  "fortress_status": "OPERATIONAL",
+  "components": {
+    "governance_kernel": "operational",
+    "crypto_shredder": "operational",
+    "golden_thread": "operational",
+    "ai_agents": "operational"
+  },
+  "nuclear_ip_stack": {
+    "IP_02_CRYPTO_SHREDDER": "active",
+    "IP_03_ACORN_PROTOCOL": "requires_hardware",
+    "IP_04_SILENT_FLUX": "active",
+    "IP_05_GOLDEN_THREAD": "active",
+    "IP_06_5DM_BRIDGE": "requires_mobile_network"
+  }
+}
+```
+
+### Response fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | string | Health status ("healthy" or "unhealthy") |
+| `version` | string | API version |
+| `service` | string | Service name |
+| `timestamp` | string | Current server timestamp (ISO 8601) |
+| `uptime_seconds` | integer | Service uptime in seconds |
+| `node_id` | string | Edge node identifier |
+| `jurisdiction` | string | Primary jurisdiction |
+| `fortress_status` | string | Overall Fortress status |
+| `components` | object | Status of individual components |
+| `nuclear_ip_stack` | object | Status of Nuclear IP protocols |
+
+## Component status values
+
+| Status | Description |
+|--------|-------------|
+| `operational` | Component is fully operational |
+| `degraded` | Component is operational but with reduced performance |
+| `offline` | Component is not available |
+| `requires_hardware` | Component requires hardware integration |
+| `requires_mobile_network` | Component requires mobile network integration |
+
+## Use cases
+
+### Kubernetes liveness probe
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 10
+```
+
+### Kubernetes readiness probe
+
+```yaml
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 5
+```
+
+### Monitoring script
+
+```bash
+#!/bin/bash
+
+HEALTH_URL="http://localhost:8080/health"
+
+while true; do
+  STATUS=$(curl -s $HEALTH_URL | jq -r '.status')
+  
+  if [ "$STATUS" != "healthy" ]; then
+    echo "⚠️ Service unhealthy: $STATUS"
+    # Send alert
+  else
+    echo "✅ Service healthy"
+  fi
+  
+  sleep 60
+done
+```
+
+### Python health check
+
+```python
+import requests
+import time
+
+def check_health():
+    try:
+        response = requests.get('http://localhost:8080/health', timeout=5)
+        data = response.json()
+        
+        if data['status'] == 'healthy':
+            print(f"✅ Service healthy - Uptime: {data['uptime_seconds']}s")
+            return True
+        else:
+            print(f"⚠️ Service unhealthy: {data['status']}")
+            return False
+    
+    except Exception as e:
+        print(f"❌ Health check failed: {e}")
+        return False
+
+# Continuous monitoring
+while True:
+    check_health()
+    time.sleep(60)
+```
+
+## Integration with Fortress validation
+
+The health endpoint integrates with the Fortress validation script:
+
+```bash
+# Check if API is healthy
+./scripts/validate_fortress.sh
+
+# Output includes health check
+🔍 Checking API service... ✓ OPERATIONAL
+   └─ Health endpoint responding
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Voice processing"
+    icon="microphone"
+    href="/api-reference/voice-processing"
+  >
+    Process voice alerts
+  </Card>
+  <Card
+    title="Outbreak prediction"
+    icon="chart-line"
+    href="/api-reference/outbreak-prediction"
+  >
+    Predict outbreak risk
+  </Card>
+  <Card
+    title="API overview"
+    icon="terminal"
+    href="/api-reference/overview"
+  >
+    Complete API documentation
+  </Card>
+  <Card
+    title="Deployment"
+    icon="cloud"
+    href="/deployment/overview"
+  >
+    Deploy to production
+  </Card>
+</CardGroup>
