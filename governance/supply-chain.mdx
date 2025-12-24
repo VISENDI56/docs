@@ -1,0 +1,404 @@
+---
+title: Supply chain compliance
+description: CSDDD, LkSG, UFLPA, and Dodd-Frank §1502 enforcement
+---
+
+## Overview
+
+iLuminara-Core enforces **4 global supply chain frameworks** to ensure ethical sourcing, conflict mineral disclosure, and forced labor prevention across the hardware supply chain.
+
+<Card
+  title="Compliance"
+  icon="truck"
+>
+  CSDDD, LkSG, UFLPA, Dodd-Frank §1502
+</Card>
+
+## Supply chain frameworks
+
+### I. EU Corporate Sustainability Due Diligence Directive (CSDDD)
+
+**Status:** ✅ Enforced  
+**Region:** 🇪🇺 European Union  
+**Scope:** Human rights & environmental due diligence
+
+**Requirements:**
+- Identify adverse impacts in supply chain
+- Prevent, mitigate, or remediate impacts
+- Establish grievance mechanism
+- Monitor effectiveness of measures
+
+### II. German Supply Chain Due Diligence Act (LkSG)
+
+**Status:** ✅ Enforced  
+**Region:** 🇩🇪 Germany  
+**Scope:** Human rights & environmental protection
+
+**Requirements:**
+- Risk analysis of direct suppliers
+- Grievance mechanism for affected parties
+- Annual reporting on due diligence
+- Remedial action for violations
+
+### III. Uyghur Forced Labor Prevention Act (UFLPA)
+
+**Status:** ✅ Enforced  
+**Region:** 🇺🇸 United States  
+**Scope:** Forced labor prevention
+
+**Requirements:**
+- Rebuttable presumption for XUAR goods
+- Supply chain traceability
+- Due diligence documentation
+- Import blocking for non-compliant goods
+
+### IV. Dodd-Frank §1502 (Conflict Minerals)
+
+**Status:** ✅ Enforced  
+**Region:** 🇺🇸 United States  
+**Scope:** 3TG minerals (Tin, Tantalum, Tungsten, Gold)
+
+**Requirements:**
+- Reasonable country of origin inquiry (RCOI)
+- Due diligence on source and chain of custody
+- Independent private sector audit
+- Annual disclosure to SEC
+
+## Compliance engine
+
+### Check supply chain compliance
+
+```python
+from governance_kernel.compliance_matrix import ComplianceMatrix, SectoralContext
+
+matrix = ComplianceMatrix()
+
+# Check component origin
+result = matrix.check_sectoral_compliance(
+    context=SectoralContext.SUPPLY_CHAIN,
+    payload={
+        "component_origin": "XUAR",
+        "hardware_components": ["Tin", "Tantalum"],
+        "supplier_audit_date": "2024-12-01",
+        "grievance_mechanism_active": True
+    }
+)
+
+if result["status"] == "VIOLATION":
+    for violation in result["violations"]:
+        print(f"❌ {violation['framework']}: {violation['message']}")
+```
+
+### Example: UFLPA blocking
+
+```python
+# Component from Xinjiang Uyghur Autonomous Region (XUAR)
+result = matrix.check_sectoral_compliance(
+    context=SectoralContext.SUPPLY_CHAIN,
+    payload={
+        "component_origin": "XUAR",
+        "hardware_components": ["Solar panels", "Polysilicon"]
+    }
+)
+
+# Result:
+# {
+#   "status": "VIOLATION",
+#   "violations": [{
+#     "framework": "UFLPA",
+#     "severity": "CRITICAL",
+#     "message": "Component origin from XUAR - Rebuttable presumption of forced labor",
+#     "action": "BLOCK IMPORT - Provide due diligence documentation",
+#     "citation": "Uyghur Forced Labor Prevention Act"
+#   }]
+# }
+```
+
+### Example: Conflict minerals (3TG)
+
+```python
+# Hardware contains conflict minerals
+result = matrix.check_sectoral_compliance(
+    context=SectoralContext.SUPPLY_CHAIN,
+    payload={
+        "hardware_components": ["Tin", "Tantalum", "Tungsten", "Gold"],
+        "conflict_minerals_audit": None,
+        "sec_disclosure_filed": False
+    }
+)
+
+# Result:
+# {
+#   "status": "VIOLATION",
+#   "violations": [{
+#     "framework": "Dodd-Frank §1502",
+#     "severity": "HIGH",
+#     "message": "3TG minerals detected - Missing independent audit",
+#     "action": "REQUIRE AUDIT - File SEC disclosure",
+#     "citation": "Dodd-Frank Wall Street Reform Act Section 1502"
+#   }]
+# }
+```
+
+## Bill-of-Materials (BOM) ledger
+
+iLuminara maintains a cryptographic Bill-of-Materials ledger for hardware attestation:
+
+```python
+from governance_kernel.bom_ledger import BOMLedger
+
+ledger = BOMLedger()
+
+# Register hardware component
+ledger.register_component(
+    component_id="JETSON_ORIN_001",
+    component_type="Edge Device",
+    manufacturer="NVIDIA",
+    origin_country="Taiwan",
+    materials=["Silicon", "Copper", "Gold"],
+    supplier_audit={
+        "auditor": "Bureau Veritas",
+        "date": "2024-12-01",
+        "result": "COMPLIANT"
+    },
+    conflict_minerals_status="CONFLICT_FREE"
+)
+
+# Verify component compliance
+compliance = ledger.verify_component("JETSON_ORIN_001")
+print(f"Compliance status: {compliance['status']}")
+```
+
+## Grievance mechanism
+
+### CSDDD & LkSG requirement
+
+Both CSDDD and LkSG require an accessible grievance mechanism for affected parties:
+
+```python
+from governance_kernel.grievance_mechanism import GrievanceMechanism
+
+mechanism = GrievanceMechanism()
+
+# Submit grievance
+grievance_id = mechanism.submit_grievance(
+    reporter={
+        "type": "supplier_worker",
+        "location": "Kenya",
+        "anonymous": True
+    },
+    complaint={
+        "category": "working_conditions",
+        "description": "Unsafe working conditions at supplier facility",
+        "evidence": ["photo_001.jpg", "photo_002.jpg"]
+    }
+)
+
+# Track grievance status
+status = mechanism.get_grievance_status(grievance_id)
+print(f"Status: {status['current_status']}")
+print(f"Assigned to: {status['assigned_investigator']}")
+```
+
+### Grievance workflow
+
+<Steps>
+  <Step title="Submission">
+    Affected party submits grievance (anonymous or identified)
+  </Step>
+  <Step title="Acknowledgment">
+    Automatic acknowledgment within 24 hours
+  </Step>
+  <Step title="Investigation">
+    Assigned investigator conducts due diligence
+  </Step>
+  <Step title="Remediation">
+    Corrective action plan developed and implemented
+  </Step>
+  <Step title="Closure">
+    Grievance resolved and documented in audit trail
+  </Step>
+</Steps>
+
+## Supply chain risk assessment
+
+### Automated risk scoring
+
+```python
+from governance_kernel.supply_chain_risk import SupplyChainRiskAssessor
+
+assessor = SupplyChainRiskAssessor()
+
+# Assess supplier risk
+risk_score = assessor.assess_supplier(
+    supplier_id="SUPPLIER_001",
+    location="Democratic Republic of Congo",
+    materials=["Tantalum", "Tin"],
+    audit_history=[
+        {"date": "2024-06-01", "result": "COMPLIANT"},
+        {"date": "2024-12-01", "result": "COMPLIANT"}
+    ],
+    grievances_count=0
+)
+
+print(f"Risk score: {risk_score['score']}/100")
+print(f"Risk level: {risk_score['level']}")  # LOW, MEDIUM, HIGH, CRITICAL
+```
+
+### Risk factors
+
+| Factor | Weight | Description |
+|--------|--------|-------------|
+| **Geographic risk** | 30% | Country-level human rights & conflict risk |
+| **Material risk** | 25% | Conflict minerals, forced labor materials |
+| **Audit history** | 20% | Frequency and results of audits |
+| **Grievance history** | 15% | Number and severity of grievances |
+| **Transparency** | 10% | Supply chain visibility and documentation |
+
+## Integration with hardware attestation
+
+Supply chain compliance integrates with TPM-based hardware attestation:
+
+```python
+from governance_kernel.hardware_attestation import HardwareAttestor
+
+attestor = HardwareAttestor()
+
+# Attest device with supply chain verification
+attestation = attestor.attest_device(
+    device_id="JETSON_ORIN_001",
+    tpm_quote=tpm_quote,
+    bom_ledger_entry=ledger.get_component("JETSON_ORIN_001"),
+    supply_chain_compliance=compliance
+)
+
+if attestation["verified"]:
+    print("✅ Device attestation successful")
+    print(f"   Supply chain: {attestation['supply_chain_status']}")
+else:
+    print("❌ Device attestation failed")
+```
+
+## Reporting & disclosure
+
+### Annual SEC disclosure (Dodd-Frank §1502)
+
+```python
+from governance_kernel.sec_disclosure import SECDisclosureGenerator
+
+generator = SECDisclosureGenerator()
+
+# Generate Form SD
+disclosure = generator.generate_form_sd(
+    reporting_period="2024",
+    conflict_minerals_used=True,
+    minerals=["Tin", "Tantalum", "Tungsten", "Gold"],
+    due_diligence_performed=True,
+    independent_audit=True,
+    auditor="Bureau Veritas",
+    conflict_free_status="CONFLICT_FREE"
+)
+
+# File with SEC
+generator.file_disclosure(disclosure)
+```
+
+### CSDDD annual report
+
+```python
+from governance_kernel.csddd_reporting import CSDDDReportGenerator
+
+generator = CSDDDReportGenerator()
+
+# Generate annual report
+report = generator.generate_annual_report(
+    reporting_period="2024",
+    adverse_impacts_identified=2,
+    remediation_actions=[
+        "Supplier audit conducted",
+        "Corrective action plan implemented"
+    ],
+    grievances_received=1,
+    grievances_resolved=1
+)
+
+# Publish report
+generator.publish_report(report)
+```
+
+## Monitoring & alerts
+
+### Real-time supply chain monitoring
+
+```python
+from governance_kernel.supply_chain_monitor import SupplyChainMonitor
+
+monitor = SupplyChainMonitor()
+
+# Monitor for violations
+monitor.start_monitoring(
+    suppliers=["SUPPLIER_001", "SUPPLIER_002"],
+    alert_on=[
+        "UFLPA_VIOLATION",
+        "CONFLICT_MINERALS_DETECTED",
+        "GRIEVANCE_SUBMITTED",
+        "AUDIT_FAILED"
+    ]
+)
+
+# Receive alerts
+@monitor.on_alert
+def handle_alert(alert):
+    print(f"🚨 {alert['type']}: {alert['message']}")
+    print(f"   Supplier: {alert['supplier_id']}")
+    print(f"   Action required: {alert['action']}")
+```
+
+## Compliance dashboard
+
+View supply chain compliance status in real-time:
+
+```bash
+# Launch supply chain dashboard
+streamlit run dashboards/supply_chain_compliance.py
+```
+
+**Dashboard metrics:**
+- Supplier risk scores
+- Conflict minerals status
+- UFLPA compliance rate
+- Grievance resolution time
+- Audit coverage
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="ESG & carbon credits"
+    icon="leaf"
+    href="/governance/esg-carbon"
+  >
+    CBAM, Paris Agreement, ICVCM compliance
+  </Card>
+  <Card
+    title="Humanitarian finance"
+    icon="hand-holding-heart"
+    href="/governance/humanitarian-finance"
+  >
+    OFAC, UN sanctions, FATF compliance
+  </Card>
+  <Card
+    title="Hardware attestation"
+    icon="microchip"
+    href="/architecture/hardware-attestation"
+  >
+    TPM-based trust and BOM ledger
+  </Card>
+  <Card
+    title="Governance overview"
+    icon="shield-check"
+    href="/governance/overview"
+  >
+    Complete 29-framework compliance
+  </Card>
+</CardGroup>

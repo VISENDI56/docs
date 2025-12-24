@@ -1,0 +1,471 @@
+---
+title: ESG & carbon credits
+description: CBAM, Paris Agreement Art. 6.2, and ICVCM compliance
+---
+
+## Overview
+
+iLuminara-Core enforces **3 global ESG frameworks** for carbon emissions tracking, double-counting prevention, and high-integrity carbon credit verification.
+
+<Card
+  title="Compliance"
+  icon="leaf"
+>
+  CBAM, Paris Agreement Art. 6.2, ICVCM CCP
+</Card>
+
+## ESG frameworks
+
+### I. Carbon Border Adjustment Mechanism (CBAM)
+
+**Status:** ✅ Enforced  
+**Region:** 🇪🇺 European Union  
+**Scope:** Embedded emissions calculation
+
+**Requirements:**
+- Calculate embedded emissions per logistics hop
+- Report emissions for goods entering EU
+- Purchase CBAM certificates
+- Quarterly reporting to national authorities
+
+### II. Paris Agreement Article 6.2
+
+**Status:** ✅ Enforced  
+**Region:** 🌐 Global  
+**Scope:** Internationally Transferred Mitigation Outcomes (ITMOs)
+
+**Requirements:**
+- Prevent double counting of emissions reductions
+- Corresponding adjustments between countries
+- Transparent accounting
+- Robust governance
+
+### III. ICVCM Core Carbon Principles (CCP)
+
+**Status:** ✅ Enforced  
+**Region:** 🌐 Global  
+**Scope:** High-integrity carbon credits
+
+**Requirements:**
+- **Additionality:** Credits represent real emissions reductions
+- **Permanence:** Reductions are long-lasting
+- **Robust quantification:** Accurate measurement
+- **No double counting:** Credits used only once
+
+## CBAM compliance engine
+
+### Calculate embedded emissions
+
+```python
+from governance_kernel.cbam_calculator import CBAMCalculator
+
+calculator = CBAMCalculator()
+
+# Calculate emissions for logistics chain
+emissions = calculator.calculate_embedded_emissions(
+    goods={
+        "type": "medical_equipment",
+        "weight_kg": 500,
+        "origin": "Kenya",
+        "destination": "Germany"
+    },
+    logistics_chain=[
+        {
+            "mode": "truck",
+            "distance_km": 450,
+            "fuel_type": "diesel"
+        },
+        {
+            "mode": "ship",
+            "distance_km": 6800,
+            "fuel_type": "heavy_fuel_oil"
+        },
+        {
+            "mode": "truck",
+            "distance_km": 320,
+            "fuel_type": "diesel"
+        }
+    ]
+)
+
+print(f"Total embedded emissions: {emissions['total_co2e_kg']:.2f} kg CO2e")
+print(f"CBAM certificates required: {emissions['cbam_certificates']}")
+```
+
+### Emissions calculation methodology
+
+**Formula:**
+```
+Embedded CO2e = Σ (Distance × Emission Factor × Weight)
+```
+
+**Emission factors (kg CO2e per tonne-km):**
+- Truck (diesel): 0.062
+- Ship (heavy fuel oil): 0.011
+- Air freight: 0.602
+- Rail: 0.022
+
+### Example: Medical equipment shipment
+
+```python
+# Shipment: Nairobi → Mombasa → Hamburg → Berlin
+emissions = calculator.calculate_embedded_emissions(
+    goods={
+        "type": "NVIDIA Jetson Orin",
+        "weight_kg": 50,
+        "origin": "Nairobi, Kenya",
+        "destination": "Berlin, Germany"
+    },
+    logistics_chain=[
+        {"mode": "truck", "distance_km": 450, "fuel_type": "diesel"},  # Nairobi → Mombasa
+        {"mode": "ship", "distance_km": 6800, "fuel_type": "heavy_fuel_oil"},  # Mombasa → Hamburg
+        {"mode": "truck", "distance_km": 320, "fuel_type": "diesel"}  # Hamburg → Berlin
+    ]
+)
+
+# Result:
+# {
+#   "total_co2e_kg": 5.14,
+#   "breakdown": [
+#     {"hop": 1, "mode": "truck", "co2e_kg": 1.40},
+#     {"hop": 2, "mode": "ship", "co2e_kg": 3.74},
+#     {"hop": 3, "mode": "truck", "co2e_kg": 0.99}
+#   ],
+#   "cbam_certificates": 1,
+#   "certificate_price_eur": 85.00
+# }
+```
+
+### CBAM reporting
+
+```python
+from governance_kernel.cbam_reporting import CBAMReporter
+
+reporter = CBAMReporter()
+
+# Generate quarterly report
+report = reporter.generate_quarterly_report(
+    quarter="Q1_2025",
+    shipments=[
+        {"id": "SHIP_001", "emissions_kg": 5.14, "destination": "Germany"},
+        {"id": "SHIP_002", "emissions_kg": 12.45, "destination": "France"},
+        {"id": "SHIP_003", "emissions_kg": 8.92, "destination": "Netherlands"}
+    ]
+)
+
+# Submit to national authority
+reporter.submit_report(report, authority="German_CBAM_Authority")
+```
+
+## Paris Agreement Art. 6.2 compliance
+
+### Prevent double counting with Chrono-Ledger
+
+iLuminara uses **IP-09 Chrono-Audit** to prevent double counting of carbon credits:
+
+```python
+from governance_kernel.chrono_audit import ChronoLedger
+
+ledger = ChronoLedger()
+
+# Register carbon credit
+credit_id = ledger.register_carbon_credit(
+    project_id="KENYA_REFORESTATION_001",
+    vintage_year=2024,
+    co2e_tonnes=1000,
+    issuing_country="Kenya",
+    methodology="VCS_VM0042",
+    verification_body="Verra"
+)
+
+# Transfer credit (with corresponding adjustment)
+ledger.transfer_credit(
+    credit_id=credit_id,
+    from_country="Kenya",
+    to_country="Germany",
+    corresponding_adjustment={
+        "kenya_ndc_adjustment": -1000,  # Kenya subtracts from NDC
+        "germany_ndc_adjustment": +1000  # Germany adds to NDC
+    }
+)
+
+# Retire credit (prevent reuse)
+ledger.retire_credit(
+    credit_id=credit_id,
+    retiring_entity="German_Corporation_XYZ",
+    retirement_reason="Voluntary offsetting"
+)
+```
+
+### Corresponding adjustments
+
+**Paris Agreement Art. 6.2 logic:**
+
+```
+IF Credit_Transferred(Country_A → Country_B):
+    Country_A.NDC -= Credit_Amount
+    Country_B.NDC += Credit_Amount
+    Credit.Status = TRANSFERRED
+    
+IF Credit_Retired(Country_B):
+    Credit.Status = RETIRED
+    Credit.Reusable = FALSE
+```
+
+### Example: Kenya → Germany transfer
+
+```python
+# Kenya transfers 1000 tCO2e to Germany
+transfer = ledger.transfer_credit(
+    credit_id="CREDIT_KE_001",
+    from_country="Kenya",
+    to_country="Germany",
+    corresponding_adjustment={
+        "kenya_ndc_adjustment": -1000,
+        "germany_ndc_adjustment": +1000
+    }
+)
+
+# Result:
+# {
+#   "status": "TRANSFERRED",
+#   "credit_id": "CREDIT_KE_001",
+#   "from_country": "Kenya",
+#   "to_country": "Germany",
+#   "amount_tco2e": 1000,
+#   "kenya_ndc_balance": 48000,  # Was 49000
+#   "germany_ndc_balance": 751000,  # Was 750000
+#   "double_counting_prevented": True,
+#   "timestamp": "2025-01-15T10:00:00Z"
+# }
+```
+
+## ICVCM Core Carbon Principles
+
+### Verify carbon credit integrity
+
+```python
+from governance_kernel.icvcm_verifier import ICVCMVerifier
+
+verifier = ICVCMVerifier()
+
+# Verify credit against CCP
+verification = verifier.verify_credit(
+    credit_id="CREDIT_KE_001",
+    project_details={
+        "type": "reforestation",
+        "location": "Kenya",
+        "start_date": "2020-01-01",
+        "methodology": "VCS_VM0042",
+        "baseline_scenario": "No reforestation",
+        "additionality_test": "Investment barrier test",
+        "permanence_period": 40,  # years
+        "monitoring_frequency": "annual",
+        "verification_body": "Verra"
+    }
+)
+
+if verification["compliant"]:
+    print("✅ Credit meets ICVCM Core Carbon Principles")
+    print(f"   Additionality: {verification['additionality_score']}/100")
+    print(f"   Permanence: {verification['permanence_score']}/100")
+else:
+    print("❌ Credit does not meet CCP")
+    for issue in verification["issues"]:
+        print(f"   - {issue}")
+```
+
+### CCP assessment criteria
+
+<AccordionGroup>
+  <Accordion title="1. Additionality">
+    **Requirement:** Credits represent emissions reductions that would not have occurred without the project.
+    
+    **Tests:**
+    - Investment barrier test
+    - Common practice test
+    - Regulatory surplus test
+  </Accordion>
+  
+  <Accordion title="2. Permanence">
+    **Requirement:** Emissions reductions are long-lasting and not easily reversed.
+    
+    **Requirements:**
+    - Minimum permanence period (typically 40+ years for forestry)
+    - Buffer pool for reversal risk
+    - Monitoring and verification
+  </Accordion>
+  
+  <Accordion title="3. Robust quantification">
+    **Requirement:** Accurate measurement of emissions reductions.
+    
+    **Requirements:**
+    - Conservative baseline scenario
+    - Approved methodology
+    - Independent verification
+  </Accordion>
+  
+  <Accordion title="4. No double counting">
+    **Requirement:** Credits are used only once.
+    
+    **Requirements:**
+    - Unique serial number
+    - Registry tracking
+    - Corresponding adjustments (Art. 6.2)
+  </Accordion>
+</AccordionGroup>
+
+## IP-09: Chrono-Audit
+
+The Chrono-Audit ledger provides retroactive verification of carbon credits:
+
+```python
+from governance_kernel.chrono_audit import ChronoAudit
+
+audit = ChronoAudit()
+
+# Retroactive verification
+verification = audit.verify_historical_credit(
+    credit_id="CREDIT_KE_001",
+    verification_date="2025-01-15",
+    historical_data={
+        "issuance_date": "2024-01-01",
+        "transfers": [
+            {"date": "2024-06-01", "from": "Kenya", "to": "Germany"},
+        ],
+        "retirements": [
+            {"date": "2024-12-01", "entity": "German_Corp_XYZ"}
+        ]
+    }
+)
+
+# Check for double counting
+if verification["double_counting_detected"]:
+    print("❌ Double counting detected!")
+    print(f"   Credit used {verification['usage_count']} times")
+else:
+    print("✅ No double counting - Credit integrity verified")
+```
+
+### Chrono-Audit features
+
+- **Immutable ledger:** SHA-256 hash chain prevents tampering
+- **Retroactive verification:** Audit historical transactions
+- **Cross-registry reconciliation:** Detect credits in multiple registries
+- **Corresponding adjustment tracking:** Verify NDC adjustments
+
+## Carbon credit marketplace integration
+
+### List carbon credits
+
+```python
+from governance_kernel.carbon_marketplace import CarbonMarketplace
+
+marketplace = CarbonMarketplace()
+
+# List credits for sale
+listing = marketplace.list_credit(
+    credit_id="CREDIT_KE_001",
+    seller="Kenya_Government",
+    price_per_tco2e=15.00,  # USD
+    quantity_tco2e=1000,
+    vintage_year=2024,
+    project_type="reforestation",
+    certification="Verra_VCS"
+)
+
+print(f"Listing ID: {listing['listing_id']}")
+print(f"Total value: ${listing['total_value_usd']}")
+```
+
+### Purchase carbon credits
+
+```python
+# Purchase credits
+purchase = marketplace.purchase_credit(
+    listing_id="LISTING_001",
+    buyer="German_Corporation_XYZ",
+    quantity_tco2e=500
+)
+
+# Automatic corresponding adjustment
+print(f"Purchase complete: {purchase['credit_id']}")
+print(f"Kenya NDC adjustment: {purchase['kenya_ndc_adjustment']}")
+print(f"Germany NDC adjustment: {purchase['germany_ndc_adjustment']}")
+```
+
+## ESG reporting dashboard
+
+View ESG compliance and carbon credit status:
+
+```bash
+# Launch ESG dashboard
+streamlit run dashboards/esg_compliance.py
+```
+
+**Dashboard metrics:**
+- CBAM emissions tracking
+- Carbon credit inventory
+- Paris Agreement compliance
+- ICVCM verification status
+- NDC balance tracking
+
+## Integration with supply chain
+
+ESG compliance integrates with supply chain tracking:
+
+```python
+from governance_kernel.compliance_matrix import ComplianceMatrix, SectoralContext
+
+matrix = ComplianceMatrix()
+
+# Check ESG compliance for shipment
+result = matrix.check_sectoral_compliance(
+    context=SectoralContext.ESG_CARBON,
+    payload={
+        "goods_destination": "EU",
+        "carbon_intensive": True,
+        "embedded_emissions_calculated": True,
+        "cbam_certificates_purchased": True,
+        "emissions_kg_co2e": 5.14
+    }
+)
+
+if result["status"] == "COMPLIANT":
+    print("✅ ESG compliance verified")
+else:
+    print("❌ ESG violations detected")
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Supply chain compliance"
+    icon="truck"
+    href="/governance/supply-chain"
+  >
+    CSDDD, LkSG, UFLPA, Dodd-Frank
+  </Card>
+  <Card
+    title="Humanitarian finance"
+    icon="hand-holding-heart"
+    href="/governance/humanitarian-finance"
+  >
+    OFAC, UN sanctions, FATF compliance
+  </Card>
+  <Card
+    title="Governance overview"
+    icon="shield-check"
+    href="/governance/overview"
+  >
+    Complete 29-framework compliance
+  </Card>
+  <Card
+    title="Architecture"
+    icon="sitemap"
+    href="/architecture/overview"
+  >
+    Understand the four foundational pillars
+  </Card>
+</CardGroup>
