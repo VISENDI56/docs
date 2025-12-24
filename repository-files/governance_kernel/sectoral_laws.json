@@ -1,625 +1,557 @@
 {
-  "version": "1.0.0",
-  "description": "iLuminara Sectoral Compliance Framework - 15 Additional Global Laws",
-  "total_frameworks": 29,
-  "expansion_date": "2025-12-23",
+  "version": "3.0.0",
+  "name": "iLuminara Regulatory Singularity Stack",
+  "description": "45+ global legal frameworks as executable code",
+  "last_updated": "2025-12-24T00:00:00Z",
   
   "sectors": {
-    "supply_chain": {
-      "name": "Supply Chain & Manufacturing (Ethical Operations Stack)",
-      "use_case": "Track vaccines, medical hardware, and aid supplies",
+    "AI_Trust": {
+      "description": "AI safety, transparency, and risk management",
       "frameworks": [
         {
-          "id": "CSDDD",
+          "id": "EU_AI_ACT",
+          "name": "EU AI Act (2024)",
+          "jurisdiction": "EU",
+          "effective_date": "2024-08-01",
+          "risk_pyramid": {
+            "PROHIBITED": {
+              "description": "Unacceptable risk - Banned systems",
+              "examples": [
+                "Social scoring by governments",
+                "Real-time biometric identification in public spaces",
+                "Subliminal manipulation",
+                "Exploitation of vulnerabilities"
+              ],
+              "enforcement_action": "BLOCK",
+              "penalty": "Up to €35M or 7% global turnover"
+            },
+            "HIGH_RISK": {
+              "description": "High-risk AI systems requiring conformity assessment",
+              "examples": [
+                "Medical devices (diagnosis, treatment)",
+                "Critical infrastructure management",
+                "Law enforcement",
+                "Employment decisions"
+              ],
+              "requirements": [
+                "Risk management system",
+                "Data governance",
+                "Technical documentation",
+                "Record-keeping",
+                "Transparency",
+                "Human oversight",
+                "Accuracy, robustness, cybersecurity"
+              ],
+              "enforcement_action": "REQUIRE_CONFORMITY_ASSESSMENT",
+              "trigger_condition": "context == 'diagnosis' OR context == 'treatment' OR risk_score > 0.7"
+            },
+            "LIMITED_RISK": {
+              "description": "Transparency obligations",
+              "examples": [
+                "Chatbots",
+                "Emotion recognition",
+                "Biometric categorization"
+              ],
+              "requirements": [
+                "Inform users they are interacting with AI"
+              ],
+              "enforcement_action": "REQUIRE_DISCLOSURE"
+            },
+            "MINIMAL_RISK": {
+              "description": "No specific obligations",
+              "examples": [
+                "AI-enabled video games",
+                "Spam filters"
+              ],
+              "enforcement_action": "LOG_ONLY"
+            }
+          },
+          "trigger_condition": "region IN ['EU', 'EEA'] OR data_subjects_in_eu > 0",
+          "retroactive": false
+        },
+        {
+          "id": "US_HEALTHCARE_CYBER_ACT",
+          "name": "Healthcare Cybersecurity Act (2022)",
+          "jurisdiction": "USA",
+          "effective_date": "2022-01-01",
+          "requirements": [
+            "Cybersecurity performance goals for healthcare",
+            "Incident reporting to HHS",
+            "Supply chain risk management"
+          ],
+          "trigger_condition": "context == 'healthcare' AND region == 'USA'",
+          "enforcement_action": "REQUIRE_CYBER_ATTESTATION",
+          "retroactive": false
+        }
+      ]
+    },
+    
+    "Pandemic_Sentinel": {
+      "description": "Outbreak detection, reporting, and response",
+      "frameworks": [
+        {
+          "id": "IHR_2005_2025",
+          "name": "International Health Regulations (2005, 2025 Amendments)",
+          "jurisdiction": "GLOBAL",
+          "effective_date": "2025-05-01",
+          "key_amendments": [
+            "Enhanced surveillance obligations",
+            "Mandatory genomic sequencing data sharing",
+            "48-hour notification window for PHEIC events",
+            "Equity provisions for pandemic response"
+          ],
+          "trigger_condition": "outbreak_detected == true OR z_score > 3.0 OR ecf_entropy > 0.15",
+          "enforcement_action": "TRIGGER_IHR_NOTIFICATION",
+          "notification_authority": "WHO National Focal Point",
+          "notification_window_hours": 48,
+          "retroactive": true,
+          "retroactive_window_days": 90
+        },
+        {
+          "id": "WHO_DATA_SHARING",
+          "name": "WHO Pandemic Data Sharing Framework",
+          "jurisdiction": "GLOBAL",
+          "effective_date": "2024-01-01",
+          "requirements": [
+            "Real-time genomic data sharing",
+            "Anonymized case data",
+            "Benefit-sharing for pathogen access"
+          ],
+          "trigger_condition": "pandemic_emergency == true",
+          "enforcement_action": "ENABLE_WHO_DATA_STREAM",
+          "retroactive": false
+        }
+      ]
+    },
+    
+    "African_Sovereignty": {
+      "description": "African data sovereignty and digital rights",
+      "frameworks": [
+        {
+          "id": "AU_MALABO_CONVENTION",
+          "name": "African Union Malabo Convention on Cyber Security and Personal Data Protection",
+          "jurisdiction": "AFRICAN_UNION",
+          "effective_date": "2023-06-08",
+          "key_provisions": [
+            "Data localization for critical infrastructure",
+            "Cross-border data transfer restrictions",
+            "Adequacy assessment for third countries",
+            "Harmonized data protection standards"
+          ],
+          "trigger_condition": "origin_country IN AU_MEMBER_STATES AND data_type == 'PHI'",
+          "enforcement_action": "ENFORCE_MALABO_ADEQUACY",
+          "adequacy_whitelist": ["EU", "UK", "Canada"],
+          "retroactive": false
+        },
+        {
+          "id": "KENYA_DPA",
+          "name": "Kenya Data Protection Act (2019)",
+          "jurisdiction": "KENYA",
+          "effective_date": "2019-11-25",
+          "key_sections": {
+            "37": "Cross-border data transfer restrictions",
+            "42": "Data subject rights (access, rectification, erasure)",
+            "50": "Data breach notification (72 hours)"
+          },
+          "trigger_condition": "jurisdiction == 'KENYA' OR data_subjects_in_kenya > 0",
+          "enforcement_action": "ENFORCE_KDPA_SOVEREIGNTY",
+          "retroactive": false
+        },
+        {
+          "id": "NIGERIA_NDPR",
+          "name": "Nigeria Data Protection Regulation (2019)",
+          "jurisdiction": "NIGERIA",
+          "effective_date": "2019-01-25",
+          "requirements": [
+            "Data Protection Compliance Organization (DPCO) appointment",
+            "Data protection audit every 2 years",
+            "Consent for data processing"
+          ],
+          "trigger_condition": "jurisdiction == 'NIGERIA'",
+          "enforcement_action": "REQUIRE_NDPR_COMPLIANCE",
+          "retroactive": false
+        },
+        {
+          "id": "SOUTH_AFRICA_POPIA",
+          "name": "Protection of Personal Information Act (2013)",
+          "jurisdiction": "SOUTH_AFRICA",
+          "effective_date": "2021-07-01",
+          "key_sections": {
+            "11": "Lawfulness of processing",
+            "14": "Purpose specification",
+            "72": "Cross-border information transfers"
+          },
+          "trigger_condition": "jurisdiction == 'SOUTH_AFRICA'",
+          "enforcement_action": "ENFORCE_POPIA_COMPLIANCE",
+          "retroactive": false
+        }
+      ]
+    },
+    
+    "Planetary_Baseline": {
+      "description": "Climate disclosure and carbon accounting",
+      "frameworks": [
+        {
+          "id": "IFRS_S2",
+          "name": "IFRS S2 Climate-related Disclosures",
+          "jurisdiction": "GLOBAL",
+          "effective_date": "2024-01-01",
+          "requirements": [
+            "Scope 1, 2, 3 emissions disclosure",
+            "Climate-related risks and opportunities",
+            "Transition plans",
+            "Scenario analysis"
+          ],
+          "trigger_condition": "entity_type == 'public_company' OR revenue > 50000000",
+          "enforcement_action": "REQUIRE_CLIMATE_DISCLOSURE",
+          "retroactive": false
+        },
+        {
+          "id": "EU_CBAM",
+          "name": "EU Carbon Border Adjustment Mechanism",
+          "jurisdiction": "EU",
+          "effective_date": "2026-01-01",
+          "covered_sectors": [
+            "Cement",
+            "Iron and steel",
+            "Aluminum",
+            "Fertilizers",
+            "Electricity",
+            "Hydrogen"
+          ],
+          "trigger_condition": "import_to_eu == true AND sector IN CBAM_SECTORS",
+          "enforcement_action": "REQUIRE_CARBON_CERTIFICATE",
+          "retroactive": false
+        },
+        {
+          "id": "PARIS_AGREEMENT_6_2",
+          "name": "Paris Agreement Article 6.2 (Carbon Markets)",
+          "jurisdiction": "GLOBAL",
+          "effective_date": "2024-01-01",
+          "requirements": [
+            "Corresponding adjustments for ITMOs",
+            "Robust accounting to avoid double counting",
+            "Transparency in carbon credit transfers"
+          ],
+          "trigger_condition": "carbon_credits_traded == true",
+          "enforcement_action": "ENFORCE_CORRESPONDING_ADJUSTMENTS",
+          "retroactive": false
+        }
+      ]
+    },
+    
+    "Supply_Chain": {
+      "description": "Supply chain due diligence and forced labor prevention",
+      "frameworks": [
+        {
+          "id": "EU_CSDDD",
           "name": "EU Corporate Sustainability Due Diligence Directive",
-          "region": "EU",
-          "status": "active",
-          "effective_date": "2024-07-01",
-          "description": "Mandates human rights and environmental due diligence in supply chain",
-          "trigger_conditions": {
-            "context": ["supply_chain", "procurement", "vendor_management"],
-            "data_types": ["supplier_data", "audit_reports", "risk_assessments"]
+          "jurisdiction": "EU",
+          "effective_date": "2027-01-01",
+          "scope": {
+            "large_companies": "500+ employees, €150M+ turnover",
+            "high_risk_sectors": "Textiles, agriculture, mining, construction"
           },
-          "enforcement_logic": {
-            "rule": "IF Supplier_Risk_Score > Threshold THEN block_procurement UNTIL Audit_Proof_Logged",
-            "threshold": 0.7,
-            "actions": ["BLOCK", "REQUIRE_AUDIT", "LOG_VIOLATION"]
-          },
-          "key_requirements": [
-            "Human rights due diligence",
-            "Environmental impact assessment",
-            "Grievance mechanism",
-            "Supply chain transparency"
+          "requirements": [
+            "Identify adverse human rights and environmental impacts",
+            "Prevent, mitigate, or remediate impacts",
+            "Establish complaints mechanism",
+            "Monitor and report"
           ],
-          "penalties": {
-            "max_fine_eur": 5000000,
-            "percentage_turnover": 0.05
-          }
+          "trigger_condition": "employees > 500 OR (sector IN HIGH_RISK_SECTORS AND employees > 250)",
+          "enforcement_action": "REQUIRE_DUE_DILIGENCE_REPORT",
+          "retroactive": false
         },
         {
-          "id": "LkSG",
+          "id": "GERMANY_LKSG",
           "name": "German Supply Chain Due Diligence Act (Lieferkettensorgfaltspflichtengesetz)",
-          "region": "Germany",
-          "status": "active",
+          "jurisdiction": "GERMANY",
           "effective_date": "2023-01-01",
-          "description": "Required for German-funded NGO or pharma partners (Bayer, GIZ)",
-          "trigger_conditions": {
-            "context": ["supply_chain", "german_partnership"],
-            "funding_source": ["Germany", "GIZ", "BMZ"],
-            "partners": ["Bayer", "Merck", "German_NGO"]
-          },
-          "enforcement_logic": {
-            "rule": "MUST log Grievance_Mechanism access for every supply chain node",
-            "actions": ["LOG_GRIEVANCE_ACCESS", "VERIFY_MECHANISM", "AUDIT_TRAIL"]
-          },
-          "key_requirements": [
-            "Risk analysis in own operations",
-            "Risk analysis for direct suppliers",
+          "requirements": [
+            "Risk analysis",
             "Preventive measures",
-            "Grievance mechanism",
-            "Annual reporting"
+            "Complaints procedure",
+            "Documentation and reporting"
           ],
-          "penalties": {
-            "max_fine_eur": 8000000,
-            "percentage_turnover": 0.02,
-            "exclusion_from_public_contracts": true
-          }
+          "trigger_condition": "jurisdiction == 'GERMANY' AND employees > 1000",
+          "enforcement_action": "REQUIRE_LKSG_COMPLIANCE",
+          "retroactive": false
         },
         {
-          "id": "UFLPA",
+          "id": "US_UFLPA",
           "name": "Uyghur Forced Labor Prevention Act",
-          "region": "USA",
-          "status": "active",
+          "jurisdiction": "USA",
           "effective_date": "2022-06-21",
-          "description": "Critical for hardware (sensors/phones) entering US market",
-          "trigger_conditions": {
-            "context": ["hardware_import", "supply_chain", "us_market"],
-            "product_types": ["sensors", "mobile_devices", "electronics"],
-            "destination": ["USA"]
-          },
-          "enforcement_logic": {
-            "rule": "IF Component_Origin == 'XUAR' THEN flag Compliance_Alert: SEVERE",
-            "blocked_regions": ["XUAR", "Xinjiang"],
-            "actions": ["BLOCK_IMPORT", "SEVERE_ALERT", "CBP_NOTIFICATION"]
-          },
-          "key_requirements": [
-            "Rebuttable presumption of forced labor",
-            "Supply chain tracing",
-            "Due diligence documentation",
-            "Third-party audits"
+          "rebuttable_presumption": "All goods from Xinjiang are made with forced labor",
+          "requirements": [
+            "Supply chain mapping",
+            "Due diligence system",
+            "Evidence of non-forced labor"
           ],
-          "penalties": {
-            "seizure": true,
-            "civil_penalties": true,
-            "criminal_prosecution": true
-          }
+          "trigger_condition": "import_to_usa == true AND (origin == 'XINJIANG' OR supply_chain_includes_xinjiang == true)",
+          "enforcement_action": "BLOCK_IMPORT_UNLESS_REBUTTED",
+          "retroactive": false
         },
         {
           "id": "DODD_FRANK_1502",
-          "name": "Dodd-Frank Section 1502 (Conflict Minerals)",
-          "region": "USA",
-          "status": "active",
+          "name": "Dodd-Frank Act Section 1502 (Conflict Minerals)",
+          "jurisdiction": "USA",
           "effective_date": "2012-08-22",
-          "description": "Relevant for 5DM Bridge mobile devices and Acorn Protocol hardware",
-          "trigger_conditions": {
-            "context": ["hardware_manufacturing", "supply_chain"],
-            "product_types": ["mobile_devices", "sensors", "electronics"],
-            "materials": ["tin", "tantalum", "tungsten", "gold"]
-          },
-          "enforcement_logic": {
-            "rule": "Verify 3TG smelter sources in hardware BOM (Bill of Materials)",
-            "conflict_regions": ["DRC", "adjoining_countries"],
-            "actions": ["VERIFY_SMELTER", "TRACE_ORIGIN", "SEC_FILING"]
-          },
-          "key_requirements": [
-            "Reasonable country of origin inquiry (RCOI)",
-            "Due diligence on source and chain of custody",
-            "Independent private sector audit",
-            "Annual SEC filing (Form SD)"
-          ],
-          "3TG_minerals": {
-            "tin": "cassiterite",
-            "tantalum": "columbite-tantalite",
-            "tungsten": "wolframite",
-            "gold": "gold"
-          }
+          "covered_minerals": ["Tin", "Tantalum", "Tungsten", "Gold"],
+          "conflict_countries": ["DRC", "Angola", "Burundi", "CAR", "Congo", "Rwanda", "South Sudan", "Tanzania", "Uganda", "Zambia"],
+          "trigger_condition": "uses_conflict_minerals == true AND sec_filer == true",
+          "enforcement_action": "REQUIRE_CONFLICT_MINERALS_REPORT",
+          "retroactive": false
         }
       ]
     },
     
-    "esg_carbon": {
-      "name": "ESG & Carbon Credits (Green Sovereign Stack)",
-      "use_case": "Monetize 'Health as Climate Action' - reduce disease vectors, reduce carbon-heavy interventions",
+    "Humanitarian": {
+      "description": "Sanctions compliance and humanitarian exemptions",
       "frameworks": [
         {
-          "id": "CBAM",
-          "name": "EU Carbon Border Adjustment Mechanism",
-          "region": "EU",
-          "status": "active",
-          "effective_date": "2023-10-01",
-          "description": "Carbon-intensive medical goods (cold chain logistics) entering EU",
-          "trigger_conditions": {
-            "context": ["logistics", "import_eu", "cold_chain"],
-            "product_types": ["vaccines", "medical_supplies", "pharmaceuticals"],
-            "destination": ["EU"]
-          },
-          "enforcement_logic": {
-            "rule": "Calculate Embedded_Emissions per logistics hop; automate EU import reporting",
-            "actions": ["CALCULATE_EMISSIONS", "CBAM_DECLARATION", "CERTIFICATE_PURCHASE"]
-          },
-          "key_requirements": [
-            "Quarterly CBAM reporting",
-            "Embedded emissions calculation",
-            "CBAM certificate purchase",
-            "Verification by accredited verifier"
+          "id": "FATF_REC_8",
+          "name": "FATF Recommendation 8 (Non-Profit Organizations)",
+          "jurisdiction": "GLOBAL",
+          "effective_date": "2012-02-01",
+          "requirements": [
+            "Risk-based approach to NPO oversight",
+            "Prevent terrorist financing abuse",
+            "Maintain humanitarian space"
           ],
-          "covered_sectors": [
-            "cement",
-            "electricity",
-            "fertilizers",
-            "iron_and_steel",
-            "aluminum",
-            "hydrogen"
-          ],
-          "emission_calculation": {
-            "method": "Product-specific embedded emissions",
-            "scope": ["direct_emissions", "indirect_emissions"],
-            "unit": "tCO2e per tonne"
-          }
-        },
-        {
-          "id": "PARIS_ARTICLE_6_2",
-          "name": "Paris Agreement Article 6.2 (Sovereign Carbon Transfers)",
-          "region": "Global",
-          "status": "active",
-          "effective_date": "2021-11-13",
-          "description": "Trading 'Sovereign Health Credits' between nations (Kenya → Switzerland)",
-          "trigger_conditions": {
-            "context": ["carbon_trading", "sovereign_credits", "health_credits"],
-            "transaction_type": ["ITMOs"]
-          },
-          "enforcement_logic": {
-            "rule": "Ensure Double_Counting_Check == true on IP-09 Chrono-Ledger",
-            "actions": ["VERIFY_CORRESPONDING_ADJUSTMENT", "LOG_ITMO_TRANSFER", "PREVENT_DOUBLE_COUNTING"]
-          },
-          "key_requirements": [
-            "Corresponding adjustments",
-            "Robust accounting",
-            "Transparency",
-            "Environmental integrity",
-            "Sustainable development"
-          ],
-          "ITMO_tracking": {
-            "registry": "International Registry",
-            "corresponding_adjustment": "mandatory",
-            "double_counting_prevention": "cryptographic_proof"
-          }
-        },
-        {
-          "id": "ICVCM_CCP",
-          "name": "Integrity Council for Voluntary Carbon Market - Core Carbon Principles",
-          "region": "Global",
-          "status": "active",
-          "effective_date": "2023-03-29",
-          "description": "High-integrity carbon credits standard",
-          "trigger_conditions": {
-            "context": ["carbon_credits", "voluntary_market", "credit_issuance"],
-            "credit_type": ["VCM"]
-          },
-          "enforcement_logic": {
-            "rule": "Enforce Permanence and Additionality checks before minting any token",
-            "actions": ["VERIFY_ADDITIONALITY", "VERIFY_PERMANENCE", "VERIFY_QUANTIFICATION"]
-          },
-          "core_carbon_principles": [
-            {
-              "principle": "Effective governance",
-              "requirements": ["Clear roles", "Transparent processes", "Accountability"]
-            },
-            {
-              "principle": "Tracking",
-              "requirements": ["Unique serialization", "Registry", "Retirement tracking"]
-            },
-            {
-              "principle": "Transparency",
-              "requirements": ["Public information", "Methodology disclosure", "Verification reports"]
-            },
-            {
-              "principle": "Robust independent third-party validation",
-              "requirements": ["Accredited validators", "Independent verification", "Conflict of interest management"]
-            },
-            {
-              "principle": "Additionality",
-              "requirements": ["Beyond business-as-usual", "Regulatory surplus", "Common practice analysis"]
-            },
-            {
-              "principle": "Permanence",
-              "requirements": ["Long-term storage", "Reversal risk management", "Buffer pools"]
-            },
-            {
-              "principle": "Robust quantification",
-              "requirements": ["Conservative baselines", "Leakage accounting", "Uncertainty management"]
-            },
-            {
-              "principle": "No double counting",
-              "requirements": ["Corresponding adjustments", "Registry controls", "Claim tracking"]
-            },
-            {
-              "principle": "Sustainable development",
-              "requirements": ["Safeguards", "Stakeholder consultation", "SDG contribution"]
-            },
-            {
-              "principle": "Transition towards net-zero",
-              "requirements": ["Paris-aligned", "Long-term decarbonization", "Avoid lock-in"]
-            }
-          ]
-        }
-      ]
-    },
-    
-    "humanitarian_finance": {
-      "name": "Humanitarian Finance & Non-Profit (Clean Money Stack)",
-      "use_case": "Prevent aid diversion and satisfy banking regulators",
-      "frameworks": [
-        {
-          "id": "FATF_R8",
-          "name": "FATF Recommendation 8 (Non-Profits & Terrorist Financing)",
-          "region": "Global",
-          "status": "active",
-          "effective_date": "2012-02-16",
-          "description": "The #1 reason humanitarian funds get frozen - banks view NGOs as high risk",
-          "trigger_conditions": {
-            "context": ["ngo_operations", "humanitarian_aid", "financial_transactions"],
-            "entity_type": ["NPO", "NGO", "charity"]
-          },
-          "enforcement_logic": {
-            "rule": "Automated Know Your Beneficiary (KYB) using Acorn Protocol to prove aid reached real humans",
-            "actions": ["KYB_CHECK", "BENEFICIARY_VERIFICATION", "BIOMETRIC_PROOF", "SANCTIONS_SCREENING"]
-          },
-          "key_requirements": [
-            "Risk-based approach to NPOs",
-            "Outreach to NPO sector",
-            "Supervision or monitoring",
-            "Effective information gathering",
-            "International cooperation",
-            "Targeted responses"
-          ],
-          "risk_indicators": [
-            "Operations in high-risk jurisdictions",
-            "Cash-intensive operations",
-            "Lack of transparency",
-            "Rapid fund transfers",
-            "Unusual transaction patterns"
-          ]
+          "trigger_condition": "entity_type == 'NGO' OR entity_type == 'NPO'",
+          "enforcement_action": "REQUIRE_FATF_SCREENING",
+          "retroactive": false
         },
         {
           "id": "OFAC_SANCTIONS",
-          "name": "OFAC Sanctions Lists (USA)",
-          "region": "USA",
-          "status": "active",
-          "effective_date": "ongoing",
-          "description": "Immediate legal requirement for any US/UN transaction",
-          "trigger_conditions": {
-            "context": ["financial_transaction", "us_jurisdiction", "international_transfer"],
-            "transaction_types": ["payment", "transfer", "procurement"]
-          },
-          "enforcement_logic": {
-            "rule": "Real-time fuzzy matching of all Payee_IDs against daily-updated sanctions databases",
-            "match_threshold": 0.85,
-            "actions": ["BLOCK_TRANSACTION", "FREEZE_FUNDS", "REPORT_OFAC", "ALERT_COMPLIANCE"]
-          },
-          "sanctions_programs": [
-            "SDN List (Specially Designated Nationals)",
-            "Sectoral Sanctions",
-            "Country-based sanctions",
-            "Non-SDN lists"
+          "name": "US OFAC Sanctions Programs",
+          "jurisdiction": "USA",
+          "effective_date": "ONGOING",
+          "sanctioned_entities": "DYNAMIC_LIST",
+          "humanitarian_exemptions": [
+            "Medicine and medical devices",
+            "Agricultural commodities",
+            "Humanitarian assistance"
           ],
-          "screening_requirements": {
-            "frequency": "real-time",
-            "match_algorithm": "fuzzy_matching",
-            "false_positive_handling": "manual_review",
-            "update_frequency": "daily"
-          },
-          "penalties": {
-            "civil": "up to $311,562 per violation",
-            "criminal": "up to $1,000,000 and 20 years imprisonment"
-          }
+          "trigger_condition": "transaction_involves_sanctioned_entity == true",
+          "enforcement_action": "BLOCK_UNLESS_HUMANITARIAN_EXEMPTION",
+          "retroactive": false
         },
         {
-          "id": "UN_SANCTIONS",
-          "name": "UN Security Council Consolidated List",
-          "region": "Global",
-          "status": "active",
-          "effective_date": "ongoing",
-          "description": "UN sanctions for terrorist financing and proliferation",
-          "trigger_conditions": {
-            "context": ["international_transaction", "un_jurisdiction"],
-            "transaction_types": ["payment", "transfer", "procurement"]
-          },
-          "enforcement_logic": {
-            "rule": "Real-time fuzzy matching against UN Consolidated List",
-            "match_threshold": 0.85,
-            "actions": ["BLOCK_TRANSACTION", "FREEZE_ASSETS", "REPORT_UN", "ALERT_MEMBER_STATE"]
-          },
-          "sanctions_committees": [
-            "ISIL (Da'esh) and Al-Qaida",
-            "Taliban",
-            "DPRK",
-            "Iran",
-            "Libya",
-            "Somalia",
-            "Yemen"
-          ]
-        },
-        {
-          "id": "IASC_DATA_RESPONSIBILITY",
-          "name": "IASC Guidelines on Data Responsibility in Humanitarian Action",
-          "region": "Global",
-          "status": "active",
-          "effective_date": "2021-06-01",
-          "description": "Operational standard for UN OCHA and WFP",
-          "trigger_conditions": {
-            "context": ["humanitarian_operations", "vulnerable_populations", "refugee_data"],
-            "data_types": ["PII", "location_data", "biometric_data"]
-          },
-          "enforcement_logic": {
-            "rule": "Implement Data Minimization for Vulnerable Populations (redact location data for refugees)",
-            "actions": ["DATA_MINIMIZATION", "LOCATION_REDACTION", "CONSENT_VERIFICATION", "PURPOSE_LIMITATION"]
-          },
-          "key_principles": [
+          "id": "IASC_GUIDELINES",
+          "name": "IASC Operational Data Responsibility Guidelines",
+          "jurisdiction": "GLOBAL",
+          "effective_date": "2021-01-01",
+          "principles": [
             "Do no harm",
             "Respect data rights",
             "Manage data responsibly",
-            "Prepare for and respond to data incidents"
+            "Prepare for the future"
           ],
-          "vulnerable_populations": {
-            "refugees": {
-              "location_data": "redact_precise_coordinates",
-              "biometric_data": "encrypted_only",
-              "consent": "explicit_informed"
-            },
-            "children": {
-              "data_collection": "minimal",
-              "consent": "guardian_required",
-              "retention": "limited"
-            },
-            "survivors_of_violence": {
-              "data_protection": "maximum",
-              "access_control": "strict",
-              "anonymization": "mandatory"
-            }
-          }
+          "trigger_condition": "context == 'humanitarian_response'",
+          "enforcement_action": "ENFORCE_IASC_PRINCIPLES",
+          "retroactive": false
         }
       ]
     },
     
-    "healthcare_pharma": {
-      "name": "Healthcare & Pharma (Clinical Grade Stack)",
-      "use_case": "Move from 'Surveillance' to 'Diagnosis' and 'Treatment'",
+    "Clinical": {
+      "description": "Medical device regulation and clinical trials",
       "frameworks": [
         {
           "id": "EU_MDR",
-          "name": "EU Medical Device Regulation (MDR) 2017/745",
-          "region": "EU",
-          "status": "active",
+          "name": "EU Medical Device Regulation (2017/745)",
+          "jurisdiction": "EU",
           "effective_date": "2021-05-26",
-          "description": "If FRENASA Engine provides diagnosis, it is a Class IIa/b Medical Device",
-          "trigger_conditions": {
-            "context": ["diagnosis", "clinical_decision_support", "medical_device"],
-            "functionality": ["diagnosis_output", "treatment_recommendation"]
+          "device_classes": {
+            "I": "Low risk (e.g., bandages)",
+            "IIa": "Medium risk (e.g., contact lenses)",
+            "IIb": "Medium-high risk (e.g., ventilators)",
+            "III": "High risk (e.g., heart valves)"
           },
-          "enforcement_logic": {
-            "rule": "Log Clinical Evaluation data and Post-Market Surveillance (PMS) events automatically",
-            "actions": ["LOG_CLINICAL_EVALUATION", "PMS_REPORTING", "ADVERSE_EVENT_TRACKING", "NOTIFIED_BODY_NOTIFICATION"]
-          },
-          "device_classification": {
-            "Class_I": "Low risk",
-            "Class_IIa": "Medium risk - FRENASA diagnostic output",
-            "Class_IIb": "Medium-high risk - Treatment recommendations",
-            "Class_III": "High risk - Life-sustaining devices"
-          },
-          "key_requirements": [
+          "requirements": [
             "Clinical evaluation",
             "Post-market surveillance",
-            "Vigilance reporting",
             "Unique Device Identification (UDI)",
-            "Technical documentation",
-            "Notified Body assessment"
+            "Notified Body assessment (Class IIa+)"
           ],
-          "conformity_assessment": {
-            "Class_IIa": "Notified Body involvement required",
-            "timeline": "12-18 months",
-            "cost": "€50,000 - €200,000"
-          }
+          "trigger_condition": "device_type == 'medical_device' AND market == 'EU'",
+          "enforcement_action": "REQUIRE_MDR_CONFORMITY",
+          "retroactive": false
         },
         {
           "id": "FDA_21_CFR_11",
-          "name": "FDA 21 CFR Part 11 (Electronic Records & Signatures)",
-          "region": "USA",
-          "status": "active",
+          "name": "FDA 21 CFR Part 11 (Electronic Records)",
+          "jurisdiction": "USA",
           "effective_date": "1997-08-20",
-          "description": "Gold standard for pharma data integrity",
-          "trigger_conditions": {
-            "context": ["pharma_operations", "clinical_trials", "electronic_records"],
-            "data_types": ["clinical_data", "manufacturing_records", "quality_records"]
-          },
-          "enforcement_logic": {
-            "rule": "Ensure every Golden Thread entry has timestamped, non-repudiable audit trail",
-            "actions": ["TIMESTAMP_RECORD", "DIGITAL_SIGNATURE", "AUDIT_TRAIL", "ACCESS_CONTROL"]
-          },
-          "key_requirements": [
+          "requirements": [
             "Validation of systems",
-            "Audit trail",
-            "Record retention",
+            "Audit trails",
             "Electronic signatures",
-            "System access controls",
-            "Authority checks"
+            "System access controls"
           ],
-          "electronic_signature_requirements": {
-            "unique_to_one_individual": true,
-            "not_reused": true,
-            "not_reassigned": true,
-            "biometric_or_token_based": true
-          },
-          "audit_trail_requirements": {
-            "secure": true,
-            "computer_generated": true,
-            "timestamped": true,
-            "independent_review": true
-          }
+          "trigger_condition": "context == 'clinical_trial' AND jurisdiction == 'USA'",
+          "enforcement_action": "REQUIRE_21_CFR_11_COMPLIANCE",
+          "retroactive": false
         },
         {
-          "id": "EU_CTR",
-          "name": "Clinical Trials Regulation (EU) No 536/2014",
-          "region": "EU",
-          "status": "active",
+          "id": "EU_CLINICAL_TRIALS_REG",
+          "name": "EU Clinical Trials Regulation (536/2014)",
+          "jurisdiction": "EU",
           "effective_date": "2022-01-31",
-          "description": "If iLuminara tracks vaccine efficacy trials in real-time",
-          "trigger_conditions": {
-            "context": ["clinical_trials", "vaccine_trials", "real_time_monitoring"],
-            "trial_phase": ["Phase_I", "Phase_II", "Phase_III", "Phase_IV"]
-          },
-          "enforcement_logic": {
-            "rule": "Enforce strict separation of Sponsor data and Subject clinical data",
-            "actions": ["DATA_SEPARATION", "BLINDING_ENFORCEMENT", "SUBJECT_PROTECTION", "CTIS_SUBMISSION"]
-          },
-          "key_requirements": [
-            "EU Clinical Trials Information System (CTIS) submission",
-            "Single application for multi-country trials",
-            "Transparency requirements",
-            "Simplified reporting",
-            "Inspection cooperation"
+          "requirements": [
+            "Single EU portal for submissions",
+            "Transparency (results published within 1 year)",
+            "Simplified procedures for low-intervention trials"
           ],
-          "data_protection": {
-            "sponsor_data": "separate_database",
-            "subject_data": "pseudonymized",
-            "blinding": "cryptographic_enforcement",
-            "unblinding": "emergency_only"
-          }
+          "trigger_condition": "context == 'clinical_trial' AND region == 'EU'",
+          "enforcement_action": "REQUIRE_CTIS_REGISTRATION",
+          "retroactive": false
         }
       ]
     },
     
-    "cybersecurity_infrastructure": {
-      "name": "Cybersecurity & Critical Infrastructure (Digital Fortress Stack)",
-      "use_case": "Act as national critical infrastructure",
+    "Cyber": {
+      "description": "Cybersecurity and digital resilience",
       "frameworks": [
         {
-          "id": "NIS2",
-          "name": "NIS2 Directive (EU)",
-          "region": "EU",
-          "status": "active",
+          "id": "EU_NIS2",
+          "name": "EU Network and Information Security Directive 2",
+          "jurisdiction": "EU",
           "effective_date": "2024-10-17",
-          "description": "Mandates security for Essential Entities (Health, Digital Infrastructure)",
-          "trigger_conditions": {
-            "context": ["critical_infrastructure", "health_sector", "digital_infrastructure"],
-            "entity_type": ["essential_entity", "important_entity"]
-          },
-          "enforcement_logic": {
-            "rule": "Mandatory 24-hour incident reporting to national CERTs",
-            "actions": ["INCIDENT_DETECTION", "CERT_NOTIFICATION", "EARLY_WARNING", "SIGNIFICANT_INCIDENT_REPORT"]
-          },
-          "key_requirements": [
-            "Risk management measures",
-            "Incident handling",
-            "Business continuity",
-            "Supply chain security",
-            "Security in network and information systems acquisition",
-            "Policies on vulnerability disclosure",
-            "Use of cryptography and encryption"
+          "covered_sectors": [
+            "Energy",
+            "Transport",
+            "Banking",
+            "Healthcare",
+            "Digital infrastructure",
+            "Public administration"
           ],
-          "incident_reporting": {
-            "early_warning": "24 hours",
-            "incident_notification": "72 hours",
-            "final_report": "1 month",
-            "significant_incidents_only": true
-          },
-          "penalties": {
-            "essential_entities": "€10,000,000 or 2% global turnover",
-            "important_entities": "€7,000,000 or 1.4% global turnover"
-          }
+          "requirements": [
+            "Risk management measures",
+            "Incident reporting (24h initial, 72h detailed)",
+            "Supply chain security",
+            "Business continuity"
+          ],
+          "trigger_condition": "sector IN NIS2_SECTORS AND (size == 'medium' OR size == 'large')",
+          "enforcement_action": "REQUIRE_NIS2_COMPLIANCE",
+          "retroactive": false
         },
         {
-          "id": "CRA",
-          "name": "Cyber Resilience Act (CRA) - EU",
-          "region": "EU",
-          "status": "proposed",
+          "id": "EU_CYBER_RESILIENCE_ACT",
+          "name": "EU Cyber Resilience Act",
+          "jurisdiction": "EU",
           "effective_date": "2027-01-01",
-          "description": "Applies to products with digital elements (sensors/edge nodes)",
-          "trigger_conditions": {
-            "context": ["hardware_manufacturing", "iot_devices", "edge_nodes"],
-            "product_types": ["sensors", "edge_devices", "connected_products"]
-          },
-          "enforcement_logic": {
-            "rule": "Automated SBOM generation and vulnerability handling for device lifecycle",
-            "actions": ["GENERATE_SBOM", "VULNERABILITY_MONITORING", "PATCH_MANAGEMENT", "LIFECYCLE_SUPPORT"]
-          },
-          "key_requirements": [
+          "scope": "Products with digital elements",
+          "requirements": [
             "Secure by design",
-            "Software Bill of Materials (SBOM)",
             "Vulnerability handling",
             "Security updates (5 years minimum)",
-            "CE marking",
-            "Conformity assessment"
+            "CE marking for cybersecurity"
+          ],
+          "trigger_condition": "product_has_digital_elements == true AND market == 'EU'",
+          "enforcement_action": "REQUIRE_CRA_CONFORMITY",
+          "retroactive": false
+        }
+      ]
+    },
+    
+    "Data_Protection": {
+      "description": "Core data protection and privacy frameworks",
+      "frameworks": [
+        {
+          "id": "GDPR",
+          "name": "General Data Protection Regulation",
+          "jurisdiction": "EU",
+          "effective_date": "2018-05-25",
+          "key_articles": {
+            "6": "Lawfulness of processing",
+            "9": "Special categories of personal data",
+            "17": "Right to erasure",
+            "22": "Automated decision-making",
+            "30": "Records of processing activities",
+            "32": "Security of processing",
+            "33": "Breach notification (72 hours)",
+            "44-50": "International data transfers"
           },
-          "product_classification": {
-            "default": "Standard cybersecurity requirements",
-            "important": "Third-party conformity assessment",
-            "critical": "EU certification"
+          "trigger_condition": "data_subjects_in_eu > 0 OR establishment_in_eu == true",
+          "enforcement_action": "ENFORCE_GDPR",
+          "max_penalty": "€20M or 4% global turnover",
+          "retroactive": false
+        },
+        {
+          "id": "HIPAA",
+          "name": "Health Insurance Portability and Accountability Act",
+          "jurisdiction": "USA",
+          "effective_date": "1996-08-21",
+          "key_rules": {
+            "Privacy_Rule": "PHI use and disclosure limits",
+            "Security_Rule": "Administrative, physical, technical safeguards",
+            "Breach_Notification_Rule": "60-day notification"
           },
-          "SBOM_requirements": {
-            "format": ["SPDX", "CycloneDX"],
-            "components": "all_dependencies",
-            "update_frequency": "on_change",
-            "public_availability": true
-          },
-          "support_period": {
-            "minimum": "5 years",
-            "security_updates": "mandatory",
-            "vulnerability_disclosure": "coordinated"
-          }
+          "trigger_condition": "context == 'healthcare' AND jurisdiction == 'USA'",
+          "enforcement_action": "ENFORCE_HIPAA",
+          "retroactive": false
+        },
+        {
+          "id": "CCPA",
+          "name": "California Consumer Privacy Act",
+          "jurisdiction": "USA_CALIFORNIA",
+          "effective_date": "2020-01-01",
+          "rights": [
+            "Right to know",
+            "Right to delete",
+            "Right to opt-out of sale",
+            "Right to non-discrimination"
+          ],
+          "trigger_condition": "california_residents > 0 AND (revenue > 25000000 OR personal_data_count > 50000)",
+          "enforcement_action": "ENFORCE_CCPA",
+          "retroactive": false
         }
       ]
     }
   },
   
-  "cross_cutting_requirements": {
-    "audit_trail": {
-      "all_frameworks": true,
-      "retention": "7 years minimum",
-      "tamper_proof": true,
-      "cryptographic_signing": true
-    },
-    "data_minimization": {
-      "applicable_frameworks": ["GDPR", "IASC_DATA_RESPONSIBILITY", "FATF_R8"],
-      "enforcement": "automatic"
-    },
-    "transparency": {
-      "applicable_frameworks": ["CSDDD", "LkSG", "ICVCM_CCP", "EU_MDR"],
-      "public_reporting": true
-    },
-    "sanctions_screening": {
-      "applicable_frameworks": ["OFAC_SANCTIONS", "UN_SANCTIONS", "FATF_R8"],
-      "frequency": "real-time",
-      "databases": ["OFAC_SDN", "UN_Consolidated", "EU_Sanctions"]
-    }
+  "conflict_resolution_rules": {
+    "description": "Quantum Nexus harmonization logic",
+    "rules": [
+      {
+        "conflict": "GDPR_Minimization vs MDR_Safety_Retention",
+        "resolution": "Prioritize MDR for safety-critical data, but apply GDPR encryption and access controls",
+        "rationale": "Safety > Privacy when lives are at stake, but privacy must still be maximized"
+      },
+      {
+        "conflict": "Data_Sovereignty vs Cloud_Processing",
+        "resolution": "Use regional cloud zones with data residency guarantees, or edge processing",
+        "rationale": "Sovereignty is non-negotiable; technology must adapt"
+      },
+      {
+        "conflict": "IHR_Transparency vs Patient_Privacy",
+        "resolution": "Anonymize data for IHR reporting, retain identifiable data locally with consent",
+        "rationale": "Public health requires transparency, but individual privacy must be protected"
+      },
+      {
+        "conflict": "OFAC_Sanctions vs Humanitarian_Imperative",
+        "resolution": "Apply humanitarian exemptions for medicine, food, and emergency aid",
+        "rationale": "Sanctions must not prevent life-saving humanitarian assistance"
+      }
+    ]
   },
   
-  "integration_points": {
-    "IP_02_CRYPTO_SHREDDER": {
-      "frameworks": ["GDPR", "HIPAA", "FDA_21_CFR_11"],
-      "function": "Cryptographic data dissolution"
-    },
-    "IP_03_ACORN_PROTOCOL": {
-      "frameworks": ["FATF_R8", "IASC_DATA_RESPONSIBILITY"],
-      "function": "Biometric beneficiary verification"
-    },
-    "IP_05_GOLDEN_THREAD": {
-      "frameworks": ["CSDDD", "LkSG", "FDA_21_CFR_11", "EU_CTR"],
-      "function": "Supply chain traceability and clinical data integrity"
-    },
-    "IP_09_CHRONO_AUDIT": {
-      "frameworks": ["ALL"],
-      "function": "Retroactive compliance verification when laws change"
-    }
+  "retroactive_compliance": {
+    "description": "ChronoAudit engine configuration",
+    "enabled": true,
+    "scan_frequency": "weekly",
+    "retroactive_laws": [
+      "IHR_2005_2025",
+      "EU_AI_ACT"
+    ],
+    "remediation_actions": [
+      "FLAG_FOR_REVIEW",
+      "AUTO_ANONYMIZE",
+      "TRIGGER_CONSENT_REFRESH",
+      "GENERATE_COMPLIANCE_REPORT"
+    ]
   }
 }
