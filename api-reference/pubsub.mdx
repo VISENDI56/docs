@@ -1,0 +1,368 @@
+---
+title: PubSub monitoring
+description: Real-time alert system integration with Google Cloud Pub/Sub
+---
+
+## Overview
+
+The iLuminara PubSub monitoring system provides real-time alert delivery for outbreak detection, sovereignty violations, and system events using Google Cloud Pub/Sub.
+
+## Topics
+
+### Outbreak alerts
+
+**Topic:** `projects/{project-id}/topics/outbreak-alerts`
+
+Publishes real-time outbreak detection events.
+
+```json
+{
+  "event_type": "outbreak_detected",
+  "timestamp": "2025-12-24T11:00:00.000Z",
+  "location": {
+    "lat": 0.4221,
+    "lng": 40.2255,
+    "name": "Dadaab Refugee Camp"
+  },
+  "disease": "cholera",
+  "z_score": 10.3,
+  "risk_level": "CRITICAL",
+  "cases": 11776,
+  "r0": 2.8,
+  "recommendations": [
+    "IMMEDIATE: Activate emergency response",
+    "Deploy ORS to affected areas",
+    "Notify WHO within 24 hours"
+  ]
+}
+```
+
+### Sovereignty violations
+
+**Topic:** `projects/{project-id}/topics/sovereignty-violations`
+
+Publishes compliance violations detected by the SovereignGuardrail.
+
+```json
+{
+  "event_type": "sovereignty_violation",
+  "timestamp": "2025-12-24T11:00:00.000Z",
+  "violation_type": "cross_border_transfer",
+  "action_blocked": true,
+  "details": {
+    "action_type": "Data_Transfer",
+    "data_type": "PHI",
+    "source": "africa-south1",
+    "destination": "us-central1",
+    "jurisdiction": "KDPA_KE"
+  },
+  "frameworks_violated": [
+    "GDPR Art. 9",
+    "KDPA §37",
+    "POPIA §14"
+  ],
+  "severity": "HIGH"
+}
+```
+
+### System events
+
+**Topic:** `projects/{project-id}/topics/system-events`
+
+Publishes system health and operational events.
+
+```json
+{
+  "event_type": "key_shredded",
+  "timestamp": "2025-12-24T11:00:00.000Z",
+  "key_id": "a3f8c2d1e5b9",
+  "retention_policy": "HOT",
+  "data_type": "PHI",
+  "sovereignty_zone": "africa-south1",
+  "compliance": [
+    "GDPR Art. 17",
+    "HIPAA §164.530(j)"
+  ]
+}
+```
+
+## Subscribing to alerts
+
+### Python subscriber
+
+```python
+from google.cloud import pubsub_v1
+import json
+
+project_id = "your-project-id"
+subscription_id = "outbreak-alerts-sub"
+
+subscriber = pubsub_v1.SubscriberClient()
+subscription_path = subscriber.subscription_path(project_id, subscription_id)
+
+def callback(message):
+    data = json.loads(message.data.decode('utf-8'))
+    
+    if data['event_type'] == 'outbreak_detected':
+        print(f"🚨 OUTBREAK ALERT")
+        print(f"   Location: {data['location']['name']}")
+        print(f"   Disease: {data['disease']}")
+        print(f"   Z-Score: {data['z_score']}")
+        print(f"   Risk: {data['risk_level']}")
+        
+        # Trigger emergency response
+        if data['risk_level'] == 'CRITICAL':
+            trigger_emergency_response(data)
+    
+    message.ack()
+
+# Start listening
+streaming_pull_future = subscriber.subscribe(subscription_path, callback=callback)
+print(f"Listening for messages on {subscription_path}...")
+
+try:
+    streaming_pull_future.result()
+except KeyboardInterrupt:
+    streaming_pull_future.cancel()
+```
+
+### Cloud Function trigger
+
+```python
+import base64
+import json
+
+def process_outbreak_alert(event, context):
+    """Triggered from a message on a Cloud Pub/Sub topic."""
+    
+    pubsub_message = base64.b64decode(event['data']).decode('utf-8')
+    data = json.loads(pubsub_message)
+    
+    if data['event_type'] == 'outbreak_detected':
+        # Send SMS alerts
+        send_sms_alerts(data)
+        
+        # Update dashboard
+        update_dashboard(data)
+        
+        # Notify WHO if required
+        if data['z_score'] > 8.0:
+            notify_who(data)
+    
+    return 'OK'
+```
+
+### Node.js subscriber
+
+```javascript
+const {PubSub} = require('@google-cloud/pubsub');
+
+const pubsub = new PubSub({projectId: 'your-project-id'});
+const subscription = pubsub.subscription('outbreak-alerts-sub');
+
+subscription.on('message', message => {
+  const data = JSON.parse(message.data.toString());
+  
+  if (data.event_type === 'outbreak_detected') {
+    console.log(`🚨 OUTBREAK ALERT: ${data.disease} in ${data.location.name}`);
+    console.log(`   Z-Score: ${data.z_score}`);
+    console.log(`   Risk: ${data.risk_level}`);
+    
+    // Trigger response
+    if (data.risk_level === 'CRITICAL') {
+      triggerEmergencyResponse(data);
+    }
+  }
+  
+  message.ack();
+});
+
+console.log('Listening for outbreak alerts...');
+```
+
+## Publishing alerts
+
+### From API service
+
+```python
+from google.cloud import pubsub_v1
+import json
+
+publisher = pubsub_v1.PublisherClient()
+topic_path = publisher.topic_path('your-project-id', 'outbreak-alerts')
+
+def publish_outbreak_alert(outbreak_data):
+    message = {
+        'event_type': 'outbreak_detected',
+        'timestamp': datetime.utcnow().isoformat(),
+        'location': outbreak_data['location'],
+        'disease': outbreak_data['disease'],
+        'z_score': outbreak_data['z_score'],
+        'risk_level': outbreak_data['risk_level'],
+        'cases': outbreak_data['cases'],
+        'r0': outbreak_data['r0'],
+        'recommendations': outbreak_data['recommendations']
+    }
+    
+    # Publish message
+    future = publisher.publish(
+        topic_path,
+        json.dumps(message).encode('utf-8')
+    )
+    
+    message_id = future.result()
+    print(f"Published outbreak alert: {message_id}")
+    
+    return message_id
+```
+
+### From AI agents
+
+```python
+from edge_node.ai_agents import EarlyWarningSystemAgent
+from google.cloud import pubsub_v1
+
+agent = EarlyWarningSystemAgent(location="Dadaab")
+
+# Generate alerts
+alerts = agent.generate_alerts()
+
+# Publish to PubSub
+publisher = pubsub_v1.PublisherClient()
+topic_path = publisher.topic_path('your-project-id', 'outbreak-alerts')
+
+for alert in alerts:
+    if alert.severity == 'CRITICAL':
+        message = {
+            'event_type': 'outbreak_detected',
+            'timestamp': alert.timestamp,
+            'location': alert.location,
+            'disease': alert.disease,
+            'z_score': alert.z_score,
+            'risk_level': alert.severity
+        }
+        
+        publisher.publish(
+            topic_path,
+            json.dumps(message).encode('utf-8')
+        )
+```
+
+## Alert routing
+
+Configure alert routing based on severity:
+
+```yaml
+# alert_routing.yaml
+routes:
+  - name: "Critical Outbreaks"
+    condition: "risk_level == 'CRITICAL'"
+    destinations:
+      - type: "PubSub"
+        topic: "outbreak-alerts"
+      - type: "SMS"
+        recipients: ["+254700000000"]
+      - type: "Email"
+        recipients: ["emergency@health.gov"]
+      - type: "Slack"
+        webhook: "${SLACK_WEBHOOK_URL}"
+  
+  - name: "Sovereignty Violations"
+    condition: "event_type == 'sovereignty_violation'"
+    destinations:
+      - type: "PubSub"
+        topic: "sovereignty-violations"
+      - type: "Email"
+        recipients: ["compliance@iluminara.health"]
+      - type: "Audit_Log"
+        retention_days: 2555
+```
+
+## Integration with Fortress
+
+The PubSub system integrates with the Sovereign Health Fortress:
+
+```python
+from governance_kernel.vector_ledger import SovereignGuardrail
+
+guardrail = SovereignGuardrail()
+
+# Validate alert publishing
+guardrail.validate_action(
+    action_type='Data_Transfer',
+    payload={
+        'data_type': 'Aggregated_Health_Data',
+        'destination': 'PubSub_Topic',
+        'consent_token': 'PUBLIC_HEALTH_SURVEILLANCE'
+    },
+    jurisdiction='KDPA_KE'
+)
+```
+
+## Latency & performance
+
+- **Publishing latency**: <100ms
+- **Delivery latency**: <500ms (99th percentile)
+- **Throughput**: 10,000+ messages/second
+- **Reliability**: At-least-once delivery guarantee
+
+## Monitoring
+
+Monitor PubSub metrics in Grafana:
+
+```
+# Prometheus metrics
+pubsub_messages_published_total
+pubsub_messages_delivered_total
+pubsub_publish_latency_seconds
+pubsub_delivery_latency_seconds
+```
+
+## Security
+
+All PubSub topics enforce IAM permissions:
+
+```bash
+# Grant publish permission
+gcloud pubsub topics add-iam-policy-binding outbreak-alerts \
+  --member="serviceAccount:api-service@project.iam.gserviceaccount.com" \
+  --role="roles/pubsub.publisher"
+
+# Grant subscribe permission
+gcloud pubsub subscriptions add-iam-policy-binding outbreak-alerts-sub \
+  --member="serviceAccount:alert-processor@project.iam.gserviceaccount.com" \
+  --role="roles/pubsub.subscriber"
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Outbreak prediction"
+    icon="chart-line"
+    href="/api-reference/outbreak-prediction"
+  >
+    Generate outbreak predictions
+  </Card>
+  <Card
+    title="AI agents"
+    icon="brain-circuit"
+    href="/ai-agents/overview"
+  >
+    Deploy autonomous alert generation
+  </Card>
+  <Card
+    title="Governance"
+    icon="shield-check"
+    href="/governance/overview"
+  >
+    Configure sovereignty alerts
+  </Card>
+  <Card
+    title="Deployment"
+    icon="cloud"
+    href="/deployment/overview"
+  >
+    Deploy PubSub infrastructure
+  </Card>
+</CardGroup>
