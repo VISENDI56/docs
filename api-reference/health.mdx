@@ -1,0 +1,259 @@
+---
+title: Health check
+description: Check service health and metadata
+---
+
+## Endpoint
+
+```
+GET /health
+```
+
+## Description
+
+Returns the health status of the iLuminara API service, including version information, uptime, and component status.
+
+## Request
+
+No parameters required.
+
+```bash
+curl http://localhost:8080/health
+```
+
+## Response
+
+### Success (200 OK)
+
+```json
+{
+  "status": "healthy",
+  "timestamp": "2025-12-24T11:00:00.000Z",
+  "version": "1.0.0",
+  "uptime_seconds": 3600,
+  "components": {
+    "api": {
+      "status": "operational",
+      "latency_ms": 2
+    },
+    "governance_kernel": {
+      "status": "operational",
+      "sovereignty_zone": "africa-south1",
+      "jurisdiction": "KDPA_KE"
+    },
+    "frenasa_engine": {
+      "status": "operational",
+      "voice_processing": "enabled"
+    },
+    "golden_thread": {
+      "status": "operational",
+      "verification_enabled": true
+    },
+    "database": {
+      "status": "operational",
+      "connection_pool": "healthy"
+    }
+  },
+  "fortress_status": "OPERATIONAL",
+  "nuclear_ip_stack": {
+    "IP_02_CRYPTO_SHREDDER": "active",
+    "IP_03_ACORN_PROTOCOL": "inactive",
+    "IP_04_SILENT_FLUX": "inactive",
+    "IP_05_GOLDEN_THREAD": "active",
+    "IP_06_5DM_BRIDGE": "inactive"
+  }
+}
+```
+
+### Service degraded (200 OK)
+
+```json
+{
+  "status": "degraded",
+  "timestamp": "2025-12-24T11:00:00.000Z",
+  "version": "1.0.0",
+  "uptime_seconds": 3600,
+  "components": {
+    "api": {
+      "status": "operational"
+    },
+    "database": {
+      "status": "degraded",
+      "error": "High latency detected",
+      "latency_ms": 500
+    }
+  },
+  "warnings": [
+    "Database latency above threshold"
+  ]
+}
+```
+
+### Service unavailable (503 Service Unavailable)
+
+```json
+{
+  "status": "unhealthy",
+  "timestamp": "2025-12-24T11:00:00.000Z",
+  "version": "1.0.0",
+  "components": {
+    "api": {
+      "status": "operational"
+    },
+    "database": {
+      "status": "down",
+      "error": "Connection refused"
+    }
+  },
+  "errors": [
+    "Database connection failed"
+  ]
+}
+```
+
+## Response fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | string | Overall health status: "healthy", "degraded", or "unhealthy" |
+| `timestamp` | string | ISO 8601 timestamp |
+| `version` | string | API version |
+| `uptime_seconds` | integer | Service uptime in seconds |
+| `components` | object | Status of individual components |
+| `fortress_status` | string | Sovereign Health Fortress status |
+| `nuclear_ip_stack` | object | Status of proprietary IP protocols |
+
+## Component statuses
+
+| Status | Description |
+|--------|-------------|
+| `operational` | Component functioning normally |
+| `degraded` | Component functioning with reduced performance |
+| `down` | Component unavailable |
+
+## Monitoring integration
+
+### Prometheus
+
+```yaml
+# prometheus.yml
+scrape_configs:
+  - job_name: 'iluminara'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['localhost:8080']
+```
+
+### Kubernetes liveness probe
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+```
+
+### Kubernetes readiness probe
+
+```yaml
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 2
+```
+
+## Example usage
+
+### Python
+
+```python
+import requests
+
+response = requests.get('http://localhost:8080/health')
+health = response.json()
+
+if health['status'] == 'healthy':
+    print("✅ Service is healthy")
+    print(f"Fortress Status: {health['fortress_status']}")
+else:
+    print(f"⚠️ Service is {health['status']}")
+    if 'errors' in health:
+        for error in health['errors']:
+            print(f"  - {error}")
+```
+
+### JavaScript
+
+```javascript
+fetch('http://localhost:8080/health')
+  .then(response => response.json())
+  .then(health => {
+    if (health.status === 'healthy') {
+      console.log('✅ Service is healthy');
+      console.log(`Fortress Status: ${health.fortress_status}`);
+    } else {
+      console.warn(`⚠️ Service is ${health.status}`);
+      if (health.errors) {
+        health.errors.forEach(error => console.error(`  - ${error}`));
+      }
+    }
+  });
+```
+
+### Bash
+
+```bash
+#!/bin/bash
+
+HEALTH=$(curl -s http://localhost:8080/health)
+STATUS=$(echo $HEALTH | jq -r '.status')
+
+if [ "$STATUS" == "healthy" ]; then
+  echo "✅ Service is healthy"
+  exit 0
+else
+  echo "⚠️ Service is $STATUS"
+  exit 1
+fi
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Voice processing"
+    icon="microphone"
+    href="/api-reference/voice-processing"
+  >
+    Process voice alerts
+  </Card>
+  <Card
+    title="Outbreak prediction"
+    icon="chart-line"
+    href="/api-reference/outbreak-prediction"
+  >
+    Predict outbreak risk
+  </Card>
+  <Card
+    title="PubSub monitoring"
+    icon="bell"
+    href="/api-reference/pubsub"
+  >
+    Real-time alerts
+  </Card>
+  <Card
+    title="Deployment"
+    icon="rocket"
+    href="/deployment/overview"
+  >
+    Deploy to production
+  </Card>
+</CardGroup>
