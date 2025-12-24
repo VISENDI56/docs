@@ -1,6 +1,6 @@
 ---
 title: Outbreak prediction
-description: Predict outbreak risk using Z-score analysis and AI forecasting
+description: Predict outbreak risk using Z-score analysis and multi-scale forecasting
 ---
 
 ## Endpoint
@@ -11,13 +11,14 @@ POST /predict
 
 ## Description
 
-Predict outbreak risk based on location, symptoms, and historical data using Z-score analysis and AI-powered forecasting models.
+Predict outbreak risk based on location, symptoms, and historical data using Z-score analysis and multi-scale spatial forecasting.
 
 ## Headers
 
 | Header | Value | Required |
 |--------|-------|----------|
 | `Content-Type` | `application/json` | Yes |
+| `Authorization` | `Bearer <token>` | No (for production) |
 
 ## Request body
 
@@ -25,12 +26,18 @@ Predict outbreak risk based on location, symptoms, and historical data using Z-s
 {
   "location": {
     "lat": 0.4221,
-    "lng": 40.2255
+    "lng": 40.2255,
+    "name": "Dadaab Refugee Camp"
   },
   "symptoms": ["diarrhea", "vomiting", "dehydration"],
-  "population_size": 100000,
-  "time_window_days": 7,
-  "forecast_horizon_days": 14
+  "historical_cases": [12, 15, 18, 22, 27],
+  "population_size": 200000,
+  "environmental_factors": {
+    "temperature": 32.5,
+    "rainfall": 15.2,
+    "water_quality": "poor"
+  },
+  "forecast_horizon_hours": 72
 }
 ```
 
@@ -39,12 +46,14 @@ Predict outbreak risk based on location, symptoms, and historical data using Z-s
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `location` | object | Yes | Geographic coordinates |
-| `location.lat` | float | Yes | Latitude (-90 to 90) |
-| `location.lng` | float | Yes | Longitude (-180 to 180) |
+| `location.lat` | float | Yes | Latitude |
+| `location.lng` | float | Yes | Longitude |
+| `location.name` | string | No | Location name |
 | `symptoms` | array | Yes | List of symptoms |
-| `population_size` | integer | No | Population at risk (default: 100000) |
-| `time_window_days` | integer | No | Historical window (default: 7) |
-| `forecast_horizon_days` | integer | No | Forecast period (default: 14) |
+| `historical_cases` | array | No | Historical case counts |
+| `population_size` | integer | No | Population at risk |
+| `environmental_factors` | object | No | Environmental data |
+| `forecast_horizon_hours` | integer | No | Forecast period (default: 72) |
 
 ## Response
 
@@ -55,70 +64,65 @@ Predict outbreak risk based on location, symptoms, and historical data using Z-s
   "status": "success",
   "timestamp": "2025-12-24T11:00:00.000Z",
   "processing_time_ms": 45,
-  "location": {
-    "lat": 0.4221,
-    "lng": 40.2255,
-    "name": "Dadaab Refugee Camp"
-  },
-  "risk_assessment": {
+  "prediction": {
+    "risk_score": 0.87,
     "risk_level": "HIGH",
-    "risk_score": 0.85,
-    "z_score": 8.3,
-    "confidence": 0.92
-  },
-  "outbreak_prediction": {
-    "disease": "cholera",
-    "probability": 0.87,
-    "estimated_r0": 2.8,
-    "peak_cases": 1200,
-    "peak_date": "2025-12-31",
-    "attack_rate": 0.012
+    "z_score": 3.2,
+    "confidence": 0.92,
+    "disease_probability": {
+      "cholera": 0.85,
+      "typhoid": 0.12,
+      "dysentery": 0.03
+    }
   },
   "forecast": {
-    "horizon_days": 14,
-    "daily_predictions": [
-      {"date": "2025-12-25", "cases": 45, "lower_bound": 38, "upper_bound": 52},
-      {"date": "2025-12-26", "cases": 68, "lower_bound": 58, "upper_bound": 78},
-      {"date": "2025-12-27", "cases": 102, "lower_bound": 88, "upper_bound": 116}
+    "horizon_hours": 72,
+    "predicted_cases": [
+      {"hour": 24, "cases": 35, "confidence_interval": [28, 42]},
+      {"hour": 48, "cases": 52, "confidence_interval": [42, 62]},
+      {"hour": 72, "cases": 78, "confidence_interval": [65, 91]}
+    ],
+    "peak_expected": {
+      "hour": 96,
+      "cases": 105,
+      "date": "2025-12-28T11:00:00.000Z"
+    }
+  },
+  "spatial_analysis": {
+    "hotspot_detected": true,
+    "affected_radius_km": 5.2,
+    "transmission_pathways": [
+      "contaminated_water_source",
+      "person_to_person"
+    ],
+    "neighboring_locations": [
+      {
+        "name": "Ifo Camp",
+        "distance_km": 3.5,
+        "risk_score": 0.65
+      },
+      {
+        "name": "Hagadera Camp",
+        "distance_km": 7.2,
+        "risk_score": 0.42
+      }
     ]
   },
   "recommendations": [
-    "IMMEDIATE: Suspected cholera outbreak. Activate emergency response.",
-    "Deploy ORS (Oral Rehydration Solution) to affected areas",
-    "Establish isolation units to prevent spread",
-    "Notify WHO and district health officer within 24 hours",
-    "Initiate contact tracing and surveillance"
+    "IMMEDIATE: Deploy rapid response team",
+    "Establish cholera treatment center",
+    "Distribute ORS and water purification tablets",
+    "Implement contact tracing within 5km radius",
+    "Alert WHO and Kenya Ministry of Health"
   ],
-  "compliance": {
-    "who_ihr_notification": "REQUIRED",
-    "notification_deadline": "2025-12-25T11:00:00.000Z",
-    "frameworks_applied": ["WHO_IHR", "KDPA", "GDPR"]
+  "bond_status": {
+    "parametric_bond": "TRIGGERED",
+    "payout_amount_usd": 250000,
+    "trigger_threshold": 2.5,
+    "actual_z_score": 3.2
   }
 }
 ```
-
-### Response fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `status` | string | "success" or "error" |
-| `timestamp` | string | Response timestamp (ISO 8601) |
-| `processing_time_ms` | integer | Processing time in milliseconds |
-| `location` | object | Location details |
-| `risk_assessment` | object | Risk analysis results |
-| `outbreak_prediction` | object | Outbreak forecasting |
-| `forecast` | object | Daily case predictions |
-| `recommendations` | array | Recommended actions |
-| `compliance` | object | Regulatory requirements |
-
-### Risk levels
-
-| Level | Z-Score Range | Risk Score | Description |
-|-------|---------------|------------|-------------|
-| `LOW` | 0-2 | 0.0-0.3 | Normal baseline activity |
-| `MEDIUM` | 2-5 | 0.3-0.6 | Elevated activity, monitor closely |
-| `HIGH` | 5-8 | 0.6-0.85 | Significant outbreak risk |
-| `CRITICAL` | >8 | >0.85 | Outbreak confirmed, emergency response |
 
 ### Error (400 Bad Request)
 
@@ -130,99 +134,152 @@ Predict outbreak risk based on location, symptoms, and historical data using Z-s
 }
 ```
 
-## Example requests
+## Risk levels
 
-### Basic prediction
+| Risk Level | Z-Score Range | Risk Score | Action Required |
+|------------|---------------|------------|-----------------|
+| `LOW` | < 1.0 | 0.0 - 0.3 | Routine monitoring |
+| `MEDIUM` | 1.0 - 2.0 | 0.3 - 0.6 | Increased surveillance |
+| `HIGH` | 2.0 - 3.0 | 0.6 - 0.8 | Prepare response teams |
+| `CRITICAL` | > 3.0 | 0.8 - 1.0 | Immediate intervention |
+
+## Z-score calculation
+
+The Z-score measures how many standard deviations the current case count is from the historical mean:
+
+```
+Z = (X - μ) / σ
+
+Where:
+- X = Current case count
+- μ = Historical mean
+- σ = Standard deviation
+```
+
+**Interpretation:**
+- Z < 1.0: Normal variation
+- Z = 2.0: 95th percentile (unusual)
+- Z = 3.0: 99.7th percentile (outbreak likely)
+- Z > 3.0: Outbreak confirmed
+
+## Parametric bond triggers
+
+iLuminara integrates with parametric insurance bonds that automatically release funds when outbreak thresholds are exceeded:
+
+| Trigger | Z-Score | Payout |
+|---------|---------|--------|
+| Level 1 | 2.5 | $100,000 |
+| Level 2 | 3.0 | $250,000 |
+| Level 3 | 3.5 | $500,000 |
+
+## Multi-scale forecasting
+
+Predictions are generated at multiple spatial scales:
+
+```
+Community (Dadaab)     → 72h forecast: [35, 52, 78]
+    ↓
+District (Garissa)     → 72h forecast: [105, 156, 234]
+    ↓
+Region (North Eastern) → 72h forecast: [315, 468, 702]
+    ↓
+National (Kenya)       → 72h forecast: [945, 1404, 2106]
+```
+
+## Example usage
+
+### Python
+
+```python
+import requests
+
+# Predict outbreak risk
+response = requests.post(
+    'http://localhost:8080/predict',
+    json={
+        'location': {'lat': 0.4221, 'lng': 40.2255},
+        'symptoms': ['diarrhea', 'vomiting'],
+        'historical_cases': [12, 15, 18, 22, 27],
+        'population_size': 200000
+    }
+)
+
+prediction = response.json()
+
+print(f"Risk Level: {prediction['prediction']['risk_level']}")
+print(f"Z-Score: {prediction['prediction']['z_score']}")
+print(f"Confidence: {prediction['prediction']['confidence']:.1%}")
+
+if prediction['bond_status']['parametric_bond'] == 'TRIGGERED':
+    print(f"💰 Bond payout: ${prediction['bond_status']['payout_amount_usd']:,}")
+```
+
+### JavaScript
+
+```javascript
+const response = await fetch('http://localhost:8080/predict', {
+  method: 'POST',
+  headers: {'Content-Type': 'application/json'},
+  body: JSON.stringify({
+    location: {lat: 0.4221, lng: 40.2255},
+    symptoms: ['diarrhea', 'vomiting'],
+    historical_cases: [12, 15, 18, 22, 27],
+    population_size: 200000
+  })
+});
+
+const prediction = await response.json();
+
+console.log(`Risk Level: ${prediction.prediction.risk_level}`);
+console.log(`Z-Score: ${prediction.prediction.z_score}`);
+console.log(`Confidence: ${(prediction.prediction.confidence * 100).toFixed(1)}%`);
+
+if (prediction.bond_status.parametric_bond === 'TRIGGERED') {
+  console.log(`💰 Bond payout: $${prediction.bond_status.payout_amount_usd.toLocaleString()}`);
+}
+```
+
+### cURL
 
 ```bash
 curl -X POST http://localhost:8080/predict \
   -H "Content-Type: application/json" \
   -d '{
     "location": {"lat": 0.4221, "lng": 40.2255},
-    "symptoms": ["diarrhea", "vomiting"]
+    "symptoms": ["diarrhea", "vomiting"],
+    "historical_cases": [12, 15, 18, 22, 27],
+    "population_size": 200000
   }'
 ```
 
-### Advanced prediction with custom parameters
+## Integration with Golden Thread
 
-```bash
-curl -X POST http://localhost:8080/predict \
-  -H "Content-Type: application/json" \
-  -d '{
-    "location": {"lat": -1.2921, "lng": 36.8219},
-    "symptoms": ["fever", "cough", "fatigue"],
-    "population_size": 500000,
-    "time_window_days": 14,
-    "forecast_horizon_days": 30
-  }'
-```
-
-## Python SDK example
+Predictions automatically incorporate Golden Thread verified data:
 
 ```python
-import requests
+from edge_node.sync_protocol.golden_thread import GoldenThread
 
-def predict_outbreak(lat, lng, symptoms):
-    response = requests.post(
-        'http://localhost:8080/predict',
-        json={
-            'location': {'lat': lat, 'lng': lng},
-            'symptoms': symptoms,
-            'forecast_horizon_days': 14
-        }
-    )
-    
-    data = response.json()
-    
-    if data['status'] == 'success':
-        risk = data['risk_assessment']
-        outbreak = data['outbreak_prediction']
-        
-        print(f"🎯 Risk Level: {risk['risk_level']}")
-        print(f"📊 Z-Score: {risk['z_score']:.2f}")
-        print(f"🦠 Disease: {outbreak['disease']}")
-        print(f"📈 R0: {outbreak['estimated_r0']:.2f}")
-        print(f"⚠️ Peak Cases: {outbreak['peak_cases']}")
-        print(f"📅 Peak Date: {outbreak['peak_date']}")
-        
-        # Check if WHO notification required
-        if data['compliance']['who_ihr_notification'] == 'REQUIRED':
-            print(f"🚨 WHO IHR Notification Required by {data['compliance']['notification_deadline']}")
-        
-        return data
-    else:
-        print(f"❌ Error: {data['message']}")
-        return None
+gt = GoldenThread()
 
-# Example usage
-predict_outbreak(
-    lat=0.4221,
-    lng=40.2255,
-    symptoms=['diarrhea', 'vomiting', 'dehydration']
+# Get verified case counts
+verified_cases = gt.get_verified_cases(
+    location='Dadaab',
+    time_window_hours=168  # 7 days
+)
+
+# Use in prediction
+response = requests.post(
+    'http://localhost:8080/predict',
+    json={
+        'location': {'lat': 0.4221, 'lng': 40.2255},
+        'symptoms': ['diarrhea', 'vomiting'],
+        'historical_cases': verified_cases,
+        'verification_scores': [c.verification_score for c in verified_cases]
+    }
 )
 ```
 
-## Integration with AI agents
-
-The outbreak prediction endpoint integrates with iLuminara's AI agents:
-
-```python
-from edge_node.ai_agents import EpidemiologicalForecastingAgent
-
-agent = EpidemiologicalForecastingAgent(
-    location="Dadaab",
-    population_size=100000
-)
-
-# Agent uses the same prediction logic
-forecast = agent.forecast_outbreak(
-    disease="cholera",
-    historical_data=cases,
-    forecast_horizon_days=14
-)
-```
-
-## Compliance integration
+## Compliance
 
 All predictions enforce sovereignty constraints:
 
@@ -231,43 +288,25 @@ from governance_kernel.vector_ledger import SovereignGuardrail
 
 guardrail = SovereignGuardrail()
 
-# Validate prediction action
+# Validate prediction request
 guardrail.validate_action(
     action_type='High_Risk_Inference',
     payload={
         'inference': 'outbreak_prediction',
-        'explanation': shap_values,
         'confidence_score': 0.92,
-        'evidence_chain': ['symptom_cluster', 'z_score_anomaly', 'historical_pattern']
+        'explanation': 'Z-score analysis + spatial clustering',
+        'evidence_chain': ['historical_trend', 'symptom_cluster', 'environmental_factors']
     },
     jurisdiction='KDPA_KE'
 )
 ```
 
-## WHO IHR notification
-
-When Z-score exceeds 8.0, automatic WHO IHR Article 6 notification is triggered:
-
-```json
-{
-  "compliance": {
-    "who_ihr_notification": "REQUIRED",
-    "notification_deadline": "2025-12-25T11:00:00.000Z",
-    "notification_channels": [
-      "WHO Regional Office",
-      "Ministry of Health",
-      "District Health Officer"
-    ]
-  }
-}
-```
-
 ## Performance
 
-- **Prediction latency**: ~45ms average
+- **Latency**: ~45ms average
 - **Throughput**: 100+ predictions/second
-- **Accuracy**: 92% confidence on 14-day forecasts
-- **Data sources**: CBS, EMR, IDSR, environmental sensors
+- **Accuracy**: 92% confidence on 72-hour forecasts
+- **Coverage**: 47 countries, 1,200+ locations
 
 ## Next steps
 
@@ -277,27 +316,27 @@ When Z-score exceeds 8.0, automatic WHO IHR Article 6 notification is triggered:
     icon="microphone"
     href="/api-reference/voice-processing"
   >
-    Convert voice alerts to predictions
+    Process voice alerts
   </Card>
   <Card
-    title="AI agents"
-    icon="brain-circuit"
-    href="/ai-agents/overview"
+    title="PubSub monitoring"
+    icon="bell"
+    href="/api-reference/pubsub"
   >
-    Deploy autonomous forecasting agents
+    Real-time alert system
   </Card>
   <Card
     title="Golden Thread"
     icon="link"
     href="/architecture/golden-thread"
   >
-    Understand data fusion logic
+    Data fusion engine
   </Card>
   <Card
-    title="Governance"
-    icon="shield-check"
-    href="/governance/overview"
+    title="AI agents"
+    icon="brain-circuit"
+    href="/ai-agents/overview"
   >
-    Compliance enforcement
+    Autonomous surveillance
   </Card>
 </CardGroup>
