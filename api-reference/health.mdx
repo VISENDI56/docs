@@ -11,7 +11,7 @@ GET /health
 
 ## Description
 
-Returns the health status of the iLuminara API service, including version information, uptime, and system metadata.
+Returns the health status of the iLuminara API service, including version information, uptime, and component status.
 
 ## Request
 
@@ -28,55 +28,121 @@ curl http://localhost:8080/health
 ```json
 {
   "status": "healthy",
-  "version": "1.0.0",
-  "service": "iLuminara-Core API",
   "timestamp": "2025-12-24T11:00:00.000Z",
+  "version": "1.0.0",
   "uptime_seconds": 3600,
-  "node_id": "JOR-47",
-  "jurisdiction": "KDPA_KE",
-  "fortress_status": "OPERATIONAL",
   "components": {
-    "governance_kernel": "operational",
-    "crypto_shredder": "operational",
-    "golden_thread": "operational",
-    "ai_agents": "operational"
+    "api": {
+      "status": "operational",
+      "latency_ms": 2
+    },
+    "governance_kernel": {
+      "status": "operational",
+      "sovereignty_zone": "africa-south1",
+      "jurisdiction": "KDPA_KE"
+    },
+    "frenasa_engine": {
+      "status": "operational",
+      "voice_processing": "enabled"
+    },
+    "golden_thread": {
+      "status": "operational",
+      "verification_enabled": true
+    },
+    "database": {
+      "status": "operational",
+      "connection_pool": "healthy"
+    }
   },
+  "fortress_status": "OPERATIONAL",
   "nuclear_ip_stack": {
     "IP_02_CRYPTO_SHREDDER": "active",
-    "IP_03_ACORN_PROTOCOL": "requires_hardware",
-    "IP_04_SILENT_FLUX": "active",
+    "IP_03_ACORN_PROTOCOL": "inactive",
+    "IP_04_SILENT_FLUX": "inactive",
     "IP_05_GOLDEN_THREAD": "active",
-    "IP_06_5DM_BRIDGE": "requires_mobile_network"
+    "IP_06_5DM_BRIDGE": "inactive"
   }
 }
 ```
 
-### Response fields
+### Service degraded (200 OK)
+
+```json
+{
+  "status": "degraded",
+  "timestamp": "2025-12-24T11:00:00.000Z",
+  "version": "1.0.0",
+  "uptime_seconds": 3600,
+  "components": {
+    "api": {
+      "status": "operational"
+    },
+    "database": {
+      "status": "degraded",
+      "error": "High latency detected",
+      "latency_ms": 500
+    }
+  },
+  "warnings": [
+    "Database latency above threshold"
+  ]
+}
+```
+
+### Service unavailable (503 Service Unavailable)
+
+```json
+{
+  "status": "unhealthy",
+  "timestamp": "2025-12-24T11:00:00.000Z",
+  "version": "1.0.0",
+  "components": {
+    "api": {
+      "status": "operational"
+    },
+    "database": {
+      "status": "down",
+      "error": "Connection refused"
+    }
+  },
+  "errors": [
+    "Database connection failed"
+  ]
+}
+```
+
+## Response fields
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `status` | string | Health status ("healthy" or "unhealthy") |
+| `status` | string | Overall health status: "healthy", "degraded", or "unhealthy" |
+| `timestamp` | string | ISO 8601 timestamp |
 | `version` | string | API version |
-| `service` | string | Service name |
-| `timestamp` | string | Current server timestamp (ISO 8601) |
 | `uptime_seconds` | integer | Service uptime in seconds |
-| `node_id` | string | Edge node identifier |
-| `jurisdiction` | string | Primary jurisdiction |
-| `fortress_status` | string | Overall Fortress status |
 | `components` | object | Status of individual components |
-| `nuclear_ip_stack` | object | Status of Nuclear IP protocols |
+| `fortress_status` | string | Sovereign Health Fortress status |
+| `nuclear_ip_stack` | object | Status of proprietary IP protocols |
 
-## Component status values
+## Component statuses
 
 | Status | Description |
 |--------|-------------|
-| `operational` | Component is fully operational |
-| `degraded` | Component is operational but with reduced performance |
-| `offline` | Component is not available |
-| `requires_hardware` | Component requires hardware integration |
-| `requires_mobile_network` | Component requires mobile network integration |
+| `operational` | Component functioning normally |
+| `degraded` | Component functioning with reduced performance |
+| `down` | Component unavailable |
 
-## Use cases
+## Monitoring integration
+
+### Prometheus
+
+```yaml
+# prometheus.yml
+scrape_configs:
+  - job_name: 'iluminara'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['localhost:8080']
+```
 
 ### Kubernetes liveness probe
 
@@ -87,6 +153,8 @@ livenessProbe:
     port: 8080
   initialDelaySeconds: 30
   periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
 ```
 
 ### Kubernetes readiness probe
@@ -96,70 +164,65 @@ readinessProbe:
   httpGet:
     path: /health
     port: 8080
-  initialDelaySeconds: 5
+  initialDelaySeconds: 10
   periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 2
 ```
 
-### Monitoring script
+## Example usage
+
+### Python
+
+```python
+import requests
+
+response = requests.get('http://localhost:8080/health')
+health = response.json()
+
+if health['status'] == 'healthy':
+    print("✅ Service is healthy")
+    print(f"Fortress Status: {health['fortress_status']}")
+else:
+    print(f"⚠️ Service is {health['status']}")
+    if 'errors' in health:
+        for error in health['errors']:
+            print(f"  - {error}")
+```
+
+### JavaScript
+
+```javascript
+fetch('http://localhost:8080/health')
+  .then(response => response.json())
+  .then(health => {
+    if (health.status === 'healthy') {
+      console.log('✅ Service is healthy');
+      console.log(`Fortress Status: ${health.fortress_status}`);
+    } else {
+      console.warn(`⚠️ Service is ${health.status}`);
+      if (health.errors) {
+        health.errors.forEach(error => console.error(`  - ${error}`));
+      }
+    }
+  });
+```
+
+### Bash
 
 ```bash
 #!/bin/bash
 
-HEALTH_URL="http://localhost:8080/health"
+HEALTH=$(curl -s http://localhost:8080/health)
+STATUS=$(echo $HEALTH | jq -r '.status')
 
-while true; do
-  STATUS=$(curl -s $HEALTH_URL | jq -r '.status')
-  
-  if [ "$STATUS" != "healthy" ]; then
-    echo "⚠️ Service unhealthy: $STATUS"
-    # Send alert
-  else
-    echo "✅ Service healthy"
-  fi
-  
-  sleep 60
-done
-```
-
-### Python health check
-
-```python
-import requests
-import time
-
-def check_health():
-    try:
-        response = requests.get('http://localhost:8080/health', timeout=5)
-        data = response.json()
-        
-        if data['status'] == 'healthy':
-            print(f"✅ Service healthy - Uptime: {data['uptime_seconds']}s")
-            return True
-        else:
-            print(f"⚠️ Service unhealthy: {data['status']}")
-            return False
-    
-    except Exception as e:
-        print(f"❌ Health check failed: {e}")
-        return False
-
-# Continuous monitoring
-while True:
-    check_health()
-    time.sleep(60)
-```
-
-## Integration with Fortress validation
-
-The health endpoint integrates with the Fortress validation script:
-
-```bash
-# Check if API is healthy
-./scripts/validate_fortress.sh
-
-# Output includes health check
-🔍 Checking API service... ✓ OPERATIONAL
-   └─ Health endpoint responding
+if [ "$STATUS" == "healthy" ]; then
+  echo "✅ Service is healthy"
+  exit 0
+else
+  echo "⚠️ Service is $STATUS"
+  exit 1
+fi
 ```
 
 ## Next steps
@@ -180,15 +243,15 @@ The health endpoint integrates with the Fortress validation script:
     Predict outbreak risk
   </Card>
   <Card
-    title="API overview"
-    icon="terminal"
-    href="/api-reference/overview"
+    title="PubSub monitoring"
+    icon="bell"
+    href="/api-reference/pubsub"
   >
-    Complete API documentation
+    Real-time alerts
   </Card>
   <Card
     title="Deployment"
-    icon="cloud"
+    icon="rocket"
     href="/deployment/overview"
   >
     Deploy to production
