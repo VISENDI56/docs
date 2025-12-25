@@ -1,0 +1,344 @@
+---
+title: CCPA/CPRA compliance
+description: California Consumer Privacy Act and California Privacy Rights Act implementation
+---
+
+## Overview
+
+iLuminara-Core implements comprehensive CCPA (California Consumer Privacy Act) and CPRA (California Privacy Rights Act) compliance for California operations.
+
+<Card
+  title="Jurisdiction"
+  icon="flag-usa"
+>
+  🇺🇸 California, USA - State consumer privacy law
+</Card>
+
+## Key consumer rights
+
+### Right to know (§1798.100)
+
+Consumers have the right to know what personal information is collected, used, shared, or sold.
+
+**iLuminara Implementation:**
+```python
+# API endpoint for data access requests
+@app.route('/api/v1/ccpa/data-access', methods=['POST'])
+def handle_data_access_request():
+    consumer_id = request.json['consumer_id']
+    verification_token = request.json['verification_token']
+    
+    # Verify consumer identity
+    if not verify_consumer(consumer_id, verification_token):
+        return {'error': 'verification_failed'}, 403
+    
+    # Return all personal information
+    return {
+        'categories_collected': get_categories_collected(consumer_id),
+        'sources': get_data_sources(consumer_id),
+        'business_purposes': get_business_purposes(consumer_id),
+        'third_parties': get_third_party_disclosures(consumer_id),
+        'personal_information': get_consumer_data(consumer_id)
+    }
+```
+
+### Right to delete (§1798.105)
+
+Consumers have the right to request deletion of personal information.
+
+**iLuminara Implementation:**
+```python
+from governance_kernel.crypto_shredder import CryptoShredder
+
+# CCPA deletion via Crypto Shredder
+@app.route('/api/v1/ccpa/delete', methods=['POST'])
+def handle_deletion_request():
+    consumer_id = request.json['consumer_id']
+    verification_token = request.json['verification_token']
+    
+    # Verify consumer identity
+    if not verify_consumer(consumer_id, verification_token):
+        return {'error': 'verification_failed'}, 403
+    
+    # Find all keys for consumer
+    keys = find_consumer_keys(consumer_id)
+    
+    # Shred all keys (data becomes irrecoverable)
+    shredder = CryptoShredder()
+    for key_id in keys:
+        shredder.shred_key(key_id)
+    
+    # Audit trail
+    log_deletion(consumer_id, 'CCPA_RIGHT_TO_DELETE')
+    
+    return {'status': 'deleted', 'consumer_id': consumer_id}
+```
+
+### Right to opt-out of sale (§1798.120)
+
+Consumers have the right to opt-out of the sale of their personal information.
+
+**iLuminara Implementation:**
+```python
+# iLuminara does NOT sell personal information
+# This right is automatically satisfied
+
+# Opt-out preference stored
+consumer_preferences = {
+    'opt_out_sale': True,  # Default: True
+    'opt_out_sharing': True,
+    'limit_sensitive_data': True
+}
+```
+
+### Right to correct (§1798.106) - CPRA
+
+Consumers have the right to correct inaccurate personal information.
+
+**iLuminara Implementation:**
+```python
+# API endpoint for correction requests
+@app.route('/api/v1/ccpa/correct', methods=['POST'])
+def handle_correction_request():
+    consumer_id = request.json['consumer_id']
+    corrections = request.json['corrections']
+    verification_token = request.json['verification_token']
+    
+    # Verify consumer identity
+    if not verify_consumer(consumer_id, verification_token):
+        return {'error': 'verification_failed'}, 403
+    
+    # Apply corrections
+    update_consumer_record(consumer_id, corrections)
+    
+    # Audit trail
+    log_correction(consumer_id, corrections)
+    
+    return {'status': 'corrected', 'consumer_id': consumer_id}
+```
+
+### Right to limit use of sensitive personal information (§1798.121) - CPRA
+
+Consumers can limit use of sensitive personal information (including health data).
+
+**iLuminara Implementation:**
+```python
+# Sensitive personal information categories
+SENSITIVE_CATEGORIES = [
+    'health_data',
+    'genetic_data',
+    'biometric_data',
+    'precise_geolocation',
+    'racial_ethnic_origin'
+]
+
+# Limit use to necessary purposes only
+def process_sensitive_data(consumer_id, data_category):
+    preferences = get_consumer_preferences(consumer_id)
+    
+    if preferences['limit_sensitive_data']:
+        # Only use for necessary purposes
+        allowed_purposes = ['service_delivery', 'security', 'legal_compliance']
+        if current_purpose not in allowed_purposes:
+            raise SensitiveDataLimitationError()
+```
+
+## Categories of personal information
+
+CCPA defines 11 categories of personal information:
+
+| Category | Examples | iLuminara Collection |
+|----------|----------|---------------------|
+| A. Identifiers | Name, email, IP address | ✅ Yes |
+| B. Personal records | Medical records, health insurance | ✅ Yes |
+| C. Protected classifications | Race, ethnicity, health conditions | ✅ Yes (health only) |
+| D. Commercial information | Purchase history | ❌ No |
+| E. Biometric information | Fingerprints, voice recordings | ✅ Yes (voice only) |
+| F. Internet activity | Browsing history | ❌ No |
+| G. Geolocation data | Precise location | ✅ Yes |
+| H. Sensory data | Audio recordings | ✅ Yes |
+| I. Professional information | Employment history | ❌ No |
+| J. Education information | Student records | ❌ No |
+| K. Inferences | Health predictions | ✅ Yes |
+
+## Business purposes for collection
+
+iLuminara collects personal information for these business purposes:
+
+1. **Public health surveillance** - Outbreak detection and response
+2. **Healthcare services** - Diagnosis and treatment support
+3. **Research** - Epidemiological studies (with consent)
+4. **Legal compliance** - Regulatory reporting (WHO IHR, etc.)
+5. **Security** - Fraud prevention and system security
+
+```python
+# Business purpose specification
+collection_metadata = {
+    'business_purpose': 'public_health_surveillance',
+    'legal_basis': 'public_health_emergency',
+    'retention_period': '180_days',
+    'third_party_sharing': ['Department_of_Health']
+}
+```
+
+## Third-party disclosures
+
+iLuminara may disclose personal information to:
+
+- **Government health authorities** - For outbreak reporting (WHO IHR, IDSR)
+- **Healthcare providers** - For treatment coordination
+- **Cloud service providers** - For infrastructure (Google Cloud Platform with BAA)
+
+**No sale of personal information** - iLuminara does NOT sell consumer data.
+
+## Consumer request verification
+
+CCPA requires reasonable verification of consumer identity.
+
+**iLuminara verification process:**
+<Steps>
+  <Step title="Request submission">
+    Consumer submits request via web form or API
+  </Step>
+  <Step title="Identity verification">
+    Two-factor authentication or government ID verification
+  </Step>
+  <Step title="Request processing">
+    Process request within 45 days (extendable to 90 days)
+  </Step>
+  <Step title="Response delivery">
+    Deliver response via secure portal or encrypted email
+  </Step>
+</Steps>
+
+```python
+def verify_consumer(consumer_id, verification_token):
+    # Two-factor authentication
+    if not validate_2fa_token(verification_token):
+        return False
+    
+    # Match consumer ID with account
+    if not consumer_exists(consumer_id):
+        return False
+    
+    return True
+```
+
+## Privacy notice requirements
+
+CCPA requires a privacy notice at or before collection.
+
+**iLuminara privacy notice:**
+```python
+privacy_notice = {
+    'categories_collected': [
+        'identifiers',
+        'health_information',
+        'geolocation_data',
+        'audio_recordings'
+    ],
+    'purposes': [
+        'public_health_surveillance',
+        'outbreak_detection',
+        'healthcare_services'
+    ],
+    'third_parties': [
+        'government_health_authorities',
+        'healthcare_providers',
+        'cloud_service_providers'
+    ],
+    'retention_period': '180_days_to_5_years',
+    'consumer_rights': [
+        'right_to_know',
+        'right_to_delete',
+        'right_to_correct',
+        'right_to_opt_out',
+        'right_to_limit_sensitive_data'
+    ],
+    'contact': 'privacy@iluminara.health'
+}
+```
+
+## CPRA enhancements (effective 2023)
+
+CPRA adds new requirements:
+
+1. **California Privacy Protection Agency (CPPA)** - New enforcement authority
+2. **Sensitive personal information** - Heightened protections for health data
+3. **Right to correct** - New consumer right
+4. **Automated decision-making** - Opt-out right for profiling
+5. **Risk assessments** - Required for high-risk processing
+
+**iLuminara CPRA compliance:**
+```yaml
+# config/sovereign_guardrail.yaml
+frameworks:
+  CCPA:
+    enabled: true
+    version: "CPRA_2023"
+    sections:
+      - "§1798.100 (Right to Know)"
+      - "§1798.105 (Right to Delete)"
+      - "§1798.106 (Right to Correct)"
+      - "§1798.121 (Limit Sensitive Data)"
+    
+    sensitive_data_categories:
+      - "health_data"
+      - "genetic_data"
+      - "biometric_data"
+      - "precise_geolocation"
+    
+    automated_decision_making:
+      enabled: true
+      opt_out_available: true
+      human_review_required: true
+```
+
+## Compliance validation
+
+```bash
+# Validate CCPA/CPRA compliance
+python governance_kernel/compliance_validator.py --framework CCPA_US
+
+# Check consumer rights implementation
+python governance_kernel/consumer_rights_validator.py --jurisdiction CCPA
+```
+
+## Penalties and enforcement
+
+- **CCPA violations:** Up to $7,500 per intentional violation
+- **Data breach:** $100-$750 per consumer per incident
+- **CPPA enforcement:** California Privacy Protection Agency
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Privacy notice"
+    icon="file-contract"
+    href="/compliance/privacy-notice"
+  >
+    Generate CCPA-compliant privacy notice
+  </Card>
+  <Card
+    title="Consumer rights portal"
+    icon="user-shield"
+    href="/governance/consumer-rights"
+  >
+    Configure data access and deletion
+  </Card>
+  <Card
+    title="Crypto Shredder"
+    icon="fire"
+    href="/security/crypto-shredder"
+  >
+    CCPA-compliant data deletion
+  </Card>
+  <Card
+    title="Compliance matrix"
+    icon="table"
+    href="/compliance/matrix"
+  >
+    View all framework mappings
+  </Card>
+</CardGroup>

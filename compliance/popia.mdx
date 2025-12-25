@@ -1,0 +1,386 @@
+---
+title: POPIA compliance
+description: Protection of Personal Information Act implementation for South Africa
+---
+
+## Overview
+
+iLuminara-Core implements comprehensive POPIA (Protection of Personal Information Act, 2013) compliance for South African healthcare operations.
+
+<Card
+  title="Jurisdiction"
+  icon="flag"
+>
+  🇿🇦 South Africa - National data protection law
+</Card>
+
+## Eight conditions for lawful processing
+
+### Condition 1: Accountability (§8)
+
+Responsible party must ensure compliance with all conditions.
+
+**iLuminara Implementation:**
+```python
+from governance_kernel.vector_ledger import SovereignGuardrail
+
+# Information Officer designation
+INFORMATION_OFFICER = "io@iluminara.health"
+
+# Accountability enforcement
+guardrail = SovereignGuardrail(
+    jurisdiction='POPIA_ZA',
+    enable_tamper_proof_audit=True
+)
+```
+
+### Condition 2: Processing limitation (§9-12)
+
+Process personal information lawfully, reasonably, and with consent.
+
+**§11 - Consent:**
+```python
+# Explicit consent required for special personal information (health data)
+guardrail.validate_action(
+    action_type='Consent_Validation',
+    payload={
+        'consent_token': 'VALID_TOKEN',
+        'consent_scope': 'treatment',
+        'data_type': 'special_personal_information',  # Health data
+        'consent_explicit': True
+    },
+    jurisdiction='POPIA_ZA'
+)
+```
+
+**§12 - Justification:**
+Processing without consent only if:
+- Consent unreasonably difficult to obtain
+- Used for historical, statistical, or research purposes
+- Public body performing lawful function
+
+### Condition 3: Purpose specification (§13-14)
+
+Collect personal information for specific, explicitly defined, and lawful purpose.
+
+**iLuminara Implementation:**
+```python
+# Purpose specification at collection
+collection_metadata = {
+    'purpose': 'outbreak_surveillance',
+    'legal_basis': 'public_health_emergency',
+    'retention_period': '180_days',
+    'jurisdiction': 'POPIA_ZA',
+    'data_subject_informed': True
+}
+```
+
+### Condition 4: Further processing limitation (§15)
+
+Further processing must be compatible with original purpose.
+
+**iLuminara Implementation:**
+```python
+# Validate purpose compatibility
+original_purpose = 'diagnosis'
+new_purpose = 'research'
+
+if not purposes_compatible(original_purpose, new_purpose):
+    # Requires new consent
+    obtain_consent(new_purpose)
+```
+
+### Condition 5: Information quality (§16-17)
+
+Ensure personal information is complete, accurate, not misleading, and updated.
+
+**iLuminara Implementation:**
+```python
+# Golden Thread ensures data quality
+from edge_node.sync_protocol.golden_thread import GoldenThread
+
+gt = GoldenThread()
+
+# Cross-verify from multiple sources
+fused = gt.fuse_data_streams(
+    cbs_signal=community_report,
+    emr_record=hospital_record,
+    patient_id='PAT_ZA_001'
+)
+
+# Verification score indicates quality
+if fused.verification_score < 0.8:
+    flag_for_manual_review()
+```
+
+### Condition 6: Openness (§18)
+
+Take reasonable steps to ensure data subject is aware of information being collected.
+
+**iLuminara Implementation:**
+```python
+# Privacy notice at collection
+privacy_notice = {
+    'information_collected': ['symptoms', 'location', 'contact_info'],
+    'purpose': 'outbreak_detection',
+    'retention_period': '180_days',
+    'third_parties': ['Department_of_Health'],
+    'data_subject_rights': ['access', 'correction', 'deletion'],
+    'information_officer': 'io@iluminara.health'
+}
+```
+
+### Condition 7: Security safeguards (§19)
+
+Secure integrity and confidentiality of personal information.
+
+**iLuminara Implementation:**
+- **Encryption:** AES-256-GCM (Crypto Shredder)
+- **Access control:** Role-based with unique user IDs
+- **Audit:** Tamper-proof trail with Cloud Spanner
+- **Transmission:** TLS 1.3 encryption
+
+```python
+from governance_kernel.crypto_shredder import CryptoShredder, SovereigntyZone
+
+shredder = CryptoShredder(
+    sovereignty_zone=SovereigntyZone.SOUTH_AFRICA,
+    enable_audit=True
+)
+
+# Encrypt with ephemeral key
+encrypted_data, key_id = shredder.encrypt_with_ephemeral_key(
+    data=patient_record,
+    retention_policy=RetentionPolicy.HOT,
+    metadata={'jurisdiction': 'POPIA_ZA'}
+)
+```
+
+### Condition 8: Data subject participation (§20-25)
+
+Data subjects have rights to access, correct, and delete their information.
+
+**§23 - Correction:**
+```python
+# API endpoint for correction requests
+@app.route('/api/v1/correction-request', methods=['POST'])
+def handle_correction_request():
+    patient_id = request.json['patient_id']
+    corrections = request.json['corrections']
+    
+    # Validate and apply corrections
+    update_patient_record(patient_id, corrections)
+    
+    # Audit trail
+    log_correction(patient_id, corrections)
+```
+
+**§24 - Deletion:**
+```python
+# Right to erasure via Crypto Shredder
+def handle_deletion_request(patient_id):
+    # Find all keys for patient
+    keys = find_patient_keys(patient_id)
+    
+    # Shred all keys (data becomes irrecoverable)
+    for key_id in keys:
+        shredder.shred_key(key_id)
+    
+    # Audit trail
+    log_deletion(patient_id)
+```
+
+## Cross-border information transfers (§72)
+
+Transfer to third country only if:
+1. Recipient country has adequate protection
+2. Data subject consents
+3. Transfer necessary for contract performance
+4. Transfer in data subject's interest
+
+**iLuminara enforcement:**
+```yaml
+# config/sovereign_guardrail.yaml
+sovereignty:
+  data_residency:
+    allowed_zones:
+      - "africa-south1"  # South Africa
+    
+    blocked_zones:
+      - "us-*"           # Requires explicit consent
+      - "asia-*"         # Sovereignty violation
+  
+  cross_border_transfers:
+    popia_approved:
+      - "EU"             # GDPR adequacy
+      - "UK"             # UK GDPR
+```
+
+```python
+# Block unauthorized transfers
+guardrail.validate_action(
+    action_type='Data_Transfer',
+    payload={
+        'data_type': 'special_personal_information',
+        'destination': 'US_Cloud',
+        'consent_token': None
+    },
+    jurisdiction='POPIA_ZA'
+)
+# Raises: SovereigntyViolationError (§72 violation)
+```
+
+## Information Regulator
+
+POPIA establishes the Information Regulator to enforce compliance.
+
+**Contact:**
+- Website: https://inforegulator.org.za
+- Email: inforeg@justice.gov.za
+
+**iLuminara compliance reporting:**
+```python
+# Annual compliance report
+def generate_popia_compliance_report():
+    return {
+        'information_officer': INFORMATION_OFFICER,
+        'processing_activities': get_processing_activities(),
+        'data_breaches': get_breach_records(),
+        'data_subject_requests': get_dsr_statistics(),
+        'security_measures': get_security_controls(),
+        'cross_border_transfers': get_transfer_records()
+    }
+```
+
+## Special personal information (health data)
+
+Health data is "special personal information" requiring heightened protection.
+
+**§26 - Prohibition:**
+Processing prohibited unless:
+- Consent of data subject
+- Necessary for establishing, exercising, or defending a right
+- Necessary for compliance with legal obligation
+- Necessary to protect legitimate interest of data subject
+- Public body performing lawful function
+
+**iLuminara implementation:**
+```python
+# Health data requires explicit consent
+guardrail.validate_action(
+    action_type='Data_Processing',
+    payload={
+        'data_type': 'special_personal_information',
+        'data_category': 'health',
+        'consent_token': 'EXPLICIT_CONSENT_TOKEN',
+        'legal_basis': 'consent'
+    },
+    jurisdiction='POPIA_ZA'
+)
+```
+
+## Breach notification
+
+POPIA requires notification of breaches to Information Regulator and affected data subjects.
+
+**iLuminara breach workflow:**
+<Steps>
+  <Step title="Detection">
+    Security workflows detect unauthorized access
+  </Step>
+  <Step title="Assessment">
+    Determine if breach affects special personal information
+  </Step>
+  <Step title="Notification">
+    Notify Information Regulator and affected data subjects
+  </Step>
+  <Step title="Remediation">
+    Crypto Shredder dissolves compromised data
+  </Step>
+  <Step title="Documentation">
+    Maintain breach records for audit
+  </Step>
+</Steps>
+
+```python
+# Automatic breach notification
+if breach_detected:
+    notify_information_regulator()
+    notify_affected_data_subjects()
+    log_breach_record()
+    
+    # Dissolve compromised data
+    shredder.shred_key(compromised_key_id)
+```
+
+## Compliance validation
+
+```bash
+# Validate POPIA compliance
+python governance_kernel/compliance_validator.py --framework POPIA_ZA
+
+# Check data subject rights
+python governance_kernel/dsr_validator.py --jurisdiction POPIA_ZA
+```
+
+## POPIA-specific configurations
+
+```yaml
+# config/sovereign_guardrail.yaml
+frameworks:
+  POPIA:
+    enabled: true
+    sections:
+      - "§11 (Lawfulness)"
+      - "§14 (Cross-border Transfers)"
+      - "§26 (Special Personal Information)"
+    
+    consent:
+      require_explicit_consent: true
+      valid_scopes:
+        - "treatment"
+        - "research"
+        - "public_health"
+    
+    information_officer:
+      name: "Chief Compliance Officer"
+      email: "io@iluminara.health"
+    
+    breach_notification:
+      enabled: true
+      notify_regulator: true
+      notify_data_subjects: true
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Information Regulator"
+    icon="landmark"
+    href="https://inforegulator.org.za"
+  >
+    South African data protection authority
+  </Card>
+  <Card
+    title="Data subject rights"
+    icon="user-shield"
+    href="/governance/data-subject-rights"
+  >
+    Configure access, correction, deletion
+  </Card>
+  <Card
+    title="Crypto Shredder"
+    icon="fire"
+    href="/security/crypto-shredder"
+  >
+    POPIA-compliant data disposal
+  </Card>
+  <Card
+    title="Compliance matrix"
+    icon="table"
+    href="/compliance/matrix"
+  >
+    View all framework mappings
+  </Card>
+</CardGroup>
