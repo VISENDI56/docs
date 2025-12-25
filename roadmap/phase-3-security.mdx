@@ -1,469 +1,479 @@
 ---
 title: 'Phase 3: Security Fortification'
-description: 'Quantum-hardened and biometric defense'
+description: 'Quantum-hardened & biometric defense'
 icon: 'shield-halved'
 ---
 
 ## Objective
 
-Protect sovereign data against 2030-era threats, including quantum decryption and sophisticated identity theft.
+Protect sovereign data against 2030-era threats, including quantum decryption, sophisticated identity theft, and state-level attacks.
 
 <Card
-  title="Strategic goal"
-  icon="bullseye"
+  title="Strategic imperative"
+  icon="atom"
 >
-  **Future-proof security** - Defend against quantum computing attacks and advanced persistent threats for 50+ years
+  "Today's encryption is tomorrow's plaintext. The Fortress must be quantum-hardened before quantum computers arrive."
 </Card>
 
-## Current state
+## Threat landscape (2025-2030)
 
-### Cryptographic vulnerability
+| Threat | Current Risk | Impact | Mitigation |
+|--------|--------------|--------|------------|
+| **Quantum decryption** | 🟡 Medium (2028+) | 🔴 Critical | Post-quantum crypto |
+| **Deepfake biometrics** | 🟡 Medium | 🟡 High | Liveness detection |
+| **Supply chain attacks** | 🔴 High | 🔴 Critical | Hardware attestation |
+| **Insider threats** | 🟡 Medium | 🟡 High | Zero-trust architecture |
+| **State-level surveillance** | 🟡 Medium | 🔴 Critical | Sovereign encryption |
 
+## Architecture upgrades
+
+### 1. Post-quantum cryptography
+
+Upgrading the **Crypto Shredder (IP-02)** to use **Kyber-1024** for key encapsulation. This renders current and future brute-force attacks useless.
+
+**Current (RSA-2048):**
 ```python
-# Current: RSA-2048 (vulnerable to quantum attacks by 2030)
 from cryptography.hazmat.primitives.asymmetric import rsa
 
+# Vulnerable to quantum computers
 private_key = rsa.generate_private_key(
     public_exponent=65537,
     key_size=2048
 )
 ```
 
-**Problem:** Shor's algorithm on quantum computers can break RSA-2048 in hours.
-
-### Authentication limitations
-
+**Upgraded (Kyber-1024):**
 ```python
-# Current: Password-based authentication
-def authenticate(username, password):
-    stored_hash = get_password_hash(username)
-    return bcrypt.checkpw(password, stored_hash)
+from pqcrypto.kem.kyber1024 import generate_keypair, encrypt, decrypt
+
+# Quantum-resistant key encapsulation
+public_key, secret_key = generate_keypair()
+
+# Encapsulate shared secret
+ciphertext, shared_secret = encrypt(public_key)
+
+# Decapsulate shared secret
+recovered_secret = decrypt(secret_key, ciphertext)
+
+# Use shared secret for AES-256-GCM encryption
 ```
 
-**Problem:** Vulnerable to phishing, credential stuffing, and social engineering.
-
-## Architecture upgrades
-
-### 1. Post-quantum cryptography
-
-Upgrade **Crypto Shredder (IP-02)** to use **Kyber-1024** for key encapsulation.
-
-#### Kyber-1024 implementation
-
+**Crypto Shredder upgrade:**
 ```python
-# governance_kernel/crypto_shredder_pqc.py
+# governance_kernel/crypto_shredder_v2.py
+
 from pqcrypto.kem.kyber1024 import generate_keypair, encrypt, decrypt
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 import secrets
 
 class QuantumResistantCryptoShredder:
-    """Post-quantum cryptographic data dissolution"""
-    
     def __init__(self):
-        # Generate Kyber-1024 keypair
-        self.public_key, self.private_key = generate_keypair()
+        # Generate quantum-resistant keypair
+        self.public_key, self.secret_key = generate_keypair()
     
-    def encrypt_with_pqc_key(self, data: bytes, retention_policy):
-        """Encrypt data using post-quantum cryptography"""
+    def encrypt_with_ephemeral_key(self, data: bytes) -> tuple:
+        """Encrypt data with quantum-resistant ephemeral key"""
         
-        # Generate ephemeral symmetric key
-        symmetric_key = secrets.token_bytes(32)  # AES-256
+        # Generate ephemeral Kyber keypair
+        ephemeral_public, ephemeral_secret = generate_keypair()
         
-        # Encrypt symmetric key with Kyber-1024
-        ciphertext, shared_secret = encrypt(self.public_key)
+        # Encapsulate shared secret
+        ciphertext, shared_secret = encrypt(ephemeral_public)
         
-        # Encrypt data with AES-256-GCM using shared secret
-        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        # Use shared secret for AES-256-GCM
+        iv = secrets.token_bytes(16)
+        cipher = Cipher(
+            algorithms.AES(shared_secret[:32]),  # 256-bit key
+            modes.GCM(iv)
+        )
+        encryptor = cipher.encryptor()
+        encrypted_data = encryptor.update(data) + encryptor.finalize()
         
-        aesgcm = AESGCM(shared_secret[:32])  # Use first 32 bytes
-        nonce = secrets.token_bytes(12)
-        encrypted_data = aesgcm.encrypt(nonce, data, None)
-        
-        # Store ciphertext (Kyber encapsulation)
-        key_id = self._store_key_material(ciphertext, nonce, retention_policy)
-        
-        return encrypted_data, key_id
+        return {
+            'ciphertext': ciphertext,  # Kyber ciphertext
+            'iv': iv,
+            'tag': encryptor.tag,
+            'encrypted_data': encrypted_data,
+            'ephemeral_secret': ephemeral_secret  # Store for decryption
+        }
     
-    def decrypt_with_pqc_key(self, encrypted_data: bytes, key_id: str):
-        """Decrypt data using post-quantum cryptography"""
-        
-        # Retrieve key material
-        key_material = self._retrieve_key_material(key_id)
-        
-        if key_material['shredded']:
-            return None  # Key has been quantum-shredded
-        
-        # Decrypt Kyber ciphertext to recover shared secret
-        shared_secret = decrypt(
-            key_material['ciphertext'],
-            self.private_key
-        )
-        
-        # Decrypt data with AES-256-GCM
-        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-        
-        aesgcm = AESGCM(shared_secret[:32])
-        decrypted_data = aesgcm.decrypt(
-            key_material['nonce'],
-            encrypted_data,
-            None
-        )
-        
-        return decrypted_data
+    def shred_key(self, key_id: str):
+        """Shred ephemeral secret - data becomes quantum-irrecoverable"""
+        # Overwrite ephemeral_secret with random data
+        # Even quantum computers cannot recover the data
+        pass
 ```
 
-#### Security comparison
-
-| Algorithm | Key Size | Security Level | Quantum Resistant |
-|-----------|----------|----------------|-------------------|
-| **RSA-2048** | 2048 bits | 112 bits | ❌ No (broken by 2030) |
-| **RSA-4096** | 4096 bits | 140 bits | ❌ No (broken by 2035) |
-| **Kyber-512** | 800 bytes | 128 bits | ✅ Yes (NIST Level 1) |
-| **Kyber-768** | 1184 bytes | 192 bits | ✅ Yes (NIST Level 3) |
-| **Kyber-1024** | 1568 bytes | 256 bits | ✅ Yes (NIST Level 5) |
-
-**Choice:** Kyber-1024 provides 256-bit security against quantum attacks.
+**Migration strategy:**
+```python
+# Hybrid mode: Support both RSA and Kyber during transition
+class HybridCryptoShredder:
+    def encrypt(self, data: bytes, mode='hybrid'):
+        if mode == 'hybrid':
+            # Encrypt with both RSA and Kyber
+            rsa_encrypted = self.rsa_encrypt(data)
+            kyber_encrypted = self.kyber_encrypt(data)
+            return {'rsa': rsa_encrypted, 'kyber': kyber_encrypted}
+        elif mode == 'kyber':
+            return self.kyber_encrypt(data)
+```
 
 ### 2. Multi-factor biometrics
 
-Native support for hardware keys and biometric authentication.
+**WebAuthn integration** for hardware keys (YubiKey) and TouchID/FaceID.
 
-#### WebAuthn integration
-
+**Registration flow:**
 ```python
-# auth/webauthn.py
-from webauthn import (
-    generate_registration_options,
-    verify_registration_response,
-    generate_authentication_options,
-    verify_authentication_response,
-)
+from webauthn import generate_registration_options, verify_registration_response
 from webauthn.helpers.structs import (
-    PublicKeyCredentialDescriptor,
+    PublicKeyCredentialCreationOptions,
     AuthenticatorSelectionCriteria,
-    UserVerificationRequirement,
+    UserVerificationRequirement
 )
 
-class BiometricAuthenticator:
-    """WebAuthn-based biometric authentication"""
+def register_biometric(user_id: str, username: str):
+    """Register biometric authenticator"""
     
-    def register_device(self, user_id: str, username: str):
-        """Register a new biometric device (YubiKey, TouchID, FaceID)"""
-        
-        options = generate_registration_options(
-            rp_id="iluminara.health",
-            rp_name="iLuminara Health Fortress",
-            user_id=user_id.encode(),
-            user_name=username,
-            user_display_name=username,
-            authenticator_selection=AuthenticatorSelectionCriteria(
-                user_verification=UserVerificationRequirement.REQUIRED,
-                resident_key="required",
-            ),
-            attestation="direct",
-        )
-        
-        return options
-    
-    def verify_registration(self, credential, challenge):
-        """Verify biometric device registration"""
-        
-        verification = verify_registration_response(
-            credential=credential,
-            expected_challenge=challenge,
-            expected_origin="https://iluminara.health",
-            expected_rp_id="iluminara.health",
-        )
-        
-        # Store credential for future authentication
-        self._store_credential(verification.credential_id, verification.credential_public_key)
-        
-        return verification
-    
-    def authenticate(self, user_id: str):
-        """Authenticate using biometric device"""
-        
-        # Get user's registered credentials
-        credentials = self._get_user_credentials(user_id)
-        
-        options = generate_authentication_options(
-            rp_id="iluminara.health",
-            allow_credentials=[
-                PublicKeyCredentialDescriptor(id=cred['id'])
-                for cred in credentials
-            ],
+    options = generate_registration_options(
+        rp_id='iluminara.health',
+        rp_name='iLuminara Health Fortress',
+        user_id=user_id.encode(),
+        user_name=username,
+        user_display_name=username,
+        authenticator_selection=AuthenticatorSelectionCriteria(
             user_verification=UserVerificationRequirement.REQUIRED,
-        )
-        
-        return options
+            resident_key='required',
+            authenticator_attachment='platform'  # TouchID/FaceID
+        ),
+        attestation='direct'
+    )
+    
+    return options
 ```
 
-#### Supported authenticators
+**Authentication flow:**
+```python
+from webauthn import generate_authentication_options, verify_authentication_response
 
-<CardGroup cols={3}>
-  <Card title="Hardware keys" icon="key">
-    YubiKey, Titan Security Key, Feitian
-  </Card>
-  <Card title="Platform biometrics" icon="fingerprint">
-    TouchID, FaceID, Windows Hello
-  </Card>
-  <Card title="Mobile authenticators" icon="mobile">
-    Android Biometric, iOS Secure Enclave
-  </Card>
-</CardGroup>
+def authenticate_biometric(user_id: str):
+    """Authenticate with biometric"""
+    
+    options = generate_authentication_options(
+        rp_id='iluminara.health',
+        user_verification=UserVerificationRequirement.REQUIRED
+    )
+    
+    # Client performs biometric verification
+    # Server verifies response
+    verification = verify_authentication_response(
+        credential=credential,
+        expected_challenge=options.challenge,
+        expected_rp_id='iluminara.health',
+        expected_origin='https://iluminara.health'
+    )
+    
+    return verification.verified
+```
+
+**Liveness detection (anti-deepfake):**
+```python
+import cv2
+import numpy as np
+
+class LivenessDetector:
+    def __init__(self):
+        self.face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+    
+    def detect_liveness(self, video_frames: list) -> bool:
+        """Detect if face is live (not photo/video)"""
+        
+        # Challenge: Ask user to blink
+        blink_detected = self.detect_blink(video_frames)
+        
+        # Challenge: Ask user to turn head
+        head_movement = self.detect_head_movement(video_frames)
+        
+        # Challenge: Random facial expression
+        expression_match = self.detect_expression(video_frames)
+        
+        return blink_detected and head_movement and expression_match
+    
+    def detect_blink(self, frames: list) -> bool:
+        """Detect eye blink in video frames"""
+        # Use eye aspect ratio (EAR) to detect blinks
+        # Real humans blink 15-20 times per minute
+        # Photos/videos don't blink
+        pass
+```
 
 ### 3. Social recovery protocol
 
-Account restoration via trusted community nodes if user is incapacitated.
+**Crisis fallback:** A "Social Recovery" protocol allowing account restoration via 3 trusted community nodes if the user is incapacitated.
 
-#### Recovery mechanism
-
+**Setup:**
 ```python
-# auth/social_recovery.py
 from typing import List
 import secrets
-import hashlib
 
-class SocialRecoveryProtocol:
-    """Crisis-resilient account recovery using trusted guardians"""
+class SocialRecovery:
+    def __init__(self, user_id: str):
+        self.user_id = user_id
+        self.guardians: List[str] = []
+        self.threshold = 3  # Require 3 of 5 guardians
     
-    def setup_recovery(self, user_id: str, guardians: List[str], threshold: int = 3):
-        """
-        Setup social recovery with Shamir's Secret Sharing
+    def add_guardian(self, guardian_id: str):
+        """Add trusted guardian"""
+        if len(self.guardians) >= 5:
+            raise ValueError("Maximum 5 guardians allowed")
         
-        Args:
-            user_id: User to protect
-            guardians: List of trusted guardian user IDs
-            threshold: Minimum guardians needed for recovery (default: 3)
-        """
+        self.guardians.append(guardian_id)
+    
+    def generate_recovery_shares(self, master_key: bytes) -> dict:
+        """Split master key using Shamir's Secret Sharing"""
+        from secretsharing import PlaintextToHexSecretSharer
         
-        # Generate recovery secret
-        recovery_secret = secrets.token_bytes(32)
-        
-        # Split secret using Shamir's Secret Sharing
-        shares = self._split_secret(recovery_secret, len(guardians), threshold)
+        # Split key into 5 shares, require 3 to recover
+        shares = PlaintextToHexSecretSharer.split_secret(
+            master_key.hex(),
+            threshold=3,
+            num_shares=5
+        )
         
         # Distribute shares to guardians
-        for guardian_id, share in zip(guardians, shares):
-            self._send_recovery_share(guardian_id, user_id, share)
+        guardian_shares = {}
+        for guardian, share in zip(self.guardians, shares):
+            guardian_shares[guardian] = share
         
-        # Store encrypted recovery data
-        self._store_recovery_config(user_id, {
-            'guardians': guardians,
-            'threshold': threshold,
-            'recovery_secret_hash': hashlib.sha256(recovery_secret).hexdigest()
-        })
+        return guardian_shares
     
-    def initiate_recovery(self, user_id: str, initiator_id: str):
-        """Initiate account recovery process"""
+    def recover_account(self, shares: List[str]) -> bytes:
+        """Recover account using guardian shares"""
+        from secretsharing import PlaintextToHexSecretSharer
         
-        config = self._get_recovery_config(user_id)
+        if len(shares) < self.threshold:
+            raise ValueError(f"Need {self.threshold} shares, got {len(shares)}")
         
-        # Verify initiator is a guardian
-        if initiator_id not in config['guardians']:
-            raise PermissionError("Only guardians can initiate recovery")
+        # Reconstruct master key
+        master_key_hex = PlaintextToHexSecretSharer.recover_secret(shares[:3])
+        master_key = bytes.fromhex(master_key_hex)
         
-        # Create recovery request
-        recovery_id = secrets.token_hex(16)
-        self._create_recovery_request(recovery_id, user_id, initiator_id)
-        
-        # Notify all guardians
-        for guardian_id in config['guardians']:
-            self._notify_guardian(guardian_id, recovery_id, user_id)
-        
-        return recovery_id
-    
-    def submit_recovery_share(self, recovery_id: str, guardian_id: str, share: bytes):
-        """Guardian submits their recovery share"""
-        
-        request = self._get_recovery_request(recovery_id)
-        config = self._get_recovery_config(request['user_id'])
-        
-        # Verify guardian
-        if guardian_id not in config['guardians']:
-            raise PermissionError("Invalid guardian")
-        
-        # Store share
-        self._store_recovery_share(recovery_id, guardian_id, share)
-        
-        # Check if threshold reached
-        submitted_shares = self._get_submitted_shares(recovery_id)
-        
-        if len(submitted_shares) >= config['threshold']:
-            # Reconstruct secret
-            recovery_secret = self._reconstruct_secret(submitted_shares)
-            
-            # Verify secret
-            secret_hash = hashlib.sha256(recovery_secret).hexdigest()
-            if secret_hash == config['recovery_secret_hash']:
-                # Grant access
-                self._grant_recovery_access(request['user_id'], recovery_id)
-                return True
-        
-        return False
+        return master_key
 ```
 
-#### Recovery flow
+**Recovery flow:**
+```
+1. User is incapacitated (lost device, medical emergency)
+2. User contacts 3 of 5 guardians
+3. Each guardian provides their recovery share
+4. System reconstructs master key
+5. User regains access to account
+```
 
-<Steps>
-  <Step title="Setup">
-    User designates 5 trusted guardians (e.g., family, colleagues, community leaders)
-  </Step>
-  <Step title="Crisis">
-    User is incapacitated or loses access to all authentication methods
-  </Step>
-  <Step title="Initiation">
-    Any guardian initiates recovery process
-  </Step>
-  <Step title="Verification">
-    3 of 5 guardians must approve recovery (threshold)
-  </Step>
-  <Step title="Restoration">
-    Account access is restored with temporary credentials
-  </Step>
-</Steps>
+**Guardian selection criteria:**
+- ✅ Trusted community member (CHV, clinic staff)
+- ✅ Different geographic location (prevent collusion)
+- ✅ Active iLuminara user (verified identity)
+- ✅ Passed background check
 
-### 4. Hardware security module (HSM)
+### 4. Hardware attestation (TPM)
 
-Integration with cloud HSMs for key management.
+**Trusted Platform Module** integration for hardware-rooted security.
+
+**TPM initialization:**
+```python
+from tpm2_pytss import ESAPI, TPM2_ALG
+
+class HardwareAttestation:
+    def __init__(self):
+        self.esapi = ESAPI()
+    
+    def create_attestation_key(self):
+        """Create TPM-backed attestation key"""
+        
+        # Create primary key in TPM
+        primary_handle = self.esapi.create_primary(
+            in_sensitive=None,
+            in_public={
+                'type': TPM2_ALG.RSA,
+                'nameAlg': TPM2_ALG.SHA256,
+                'objectAttributes': {
+                    'fixedTPM': True,
+                    'fixedParent': True,
+                    'sensitiveDataOrigin': True,
+                    'userWithAuth': True,
+                    'restricted': True,
+                    'decrypt': True
+                }
+            }
+        )
+        
+        return primary_handle
+    
+    def attest_boot_integrity(self) -> dict:
+        """Attest that system booted securely"""
+        
+        # Read PCR values (Platform Configuration Registers)
+        pcr_values = {}
+        for pcr in range(24):
+            pcr_values[pcr] = self.esapi.pcr_read(pcr)
+        
+        # Sign PCR values with attestation key
+        signature = self.esapi.sign(
+            key_handle=self.attestation_key,
+            digest=hash(str(pcr_values))
+        )
+        
+        return {
+            'pcr_values': pcr_values,
+            'signature': signature,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+```
+
+**Remote attestation:**
+```python
+def verify_remote_attestation(attestation: dict) -> bool:
+    """Verify that remote edge node is running trusted software"""
+    
+    # Check PCR values against known-good values
+    expected_pcrs = load_expected_pcrs()
+    
+    for pcr, value in attestation['pcr_values'].items():
+        if value != expected_pcrs.get(pcr):
+            return False
+    
+    # Verify signature
+    if not verify_signature(attestation['signature'], attestation['pcr_values']):
+        return False
+    
+    return True
+```
+
+### 5. Zero-trust architecture
+
+**Never trust, always verify** - even internal services must authenticate.
+
+**Service mesh with mutual TLS:**
+```yaml
+# istio/mtls-policy.yaml
+
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: iluminara
+spec:
+  mtls:
+    mode: STRICT  # Require mTLS for all services
+
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: frenasa-policy
+  namespace: iluminara
+spec:
+  selector:
+    matchLabels:
+      app: frenasa-engine
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/iluminara/sa/api-service"]
+    to:
+    - operation:
+        methods: ["POST"]
+        paths: ["/process-voice"]
+```
+
+**Identity-based access control:**
+```python
+from functools import wraps
+from flask import request, abort
+
+def require_identity(allowed_services: List[str]):
+    """Decorator to enforce identity-based access control"""
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            # Extract service identity from mTLS certificate
+            client_cert = request.environ.get('SSL_CLIENT_CERT')
+            service_identity = extract_identity(client_cert)
+            
+            if service_identity not in allowed_services:
+                abort(403, f"Service {service_identity} not authorized")
+            
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+@app.route('/process-voice', methods=['POST'])
+@require_identity(['api-service', 'edge-node'])
+def process_voice():
+    # Only api-service and edge-node can call this endpoint
+    pass
+```
+
+## Security monitoring
+
+### Real-time threat detection
 
 ```python
-# governance_kernel/hsm_integration.py
-from google.cloud import kms
+from prometheus_client import Counter, Histogram
 
-class HSMKeyManager:
-    """Hardware Security Module integration for key management"""
+# Metrics
+failed_auth_attempts = Counter('failed_auth_attempts_total', 'Failed authentication attempts')
+quantum_attack_detected = Counter('quantum_attack_detected_total', 'Quantum attack attempts')
+biometric_liveness_failed = Counter('biometric_liveness_failed_total', 'Liveness detection failures')
+
+class ThreatDetector:
+    def __init__(self):
+        self.failed_attempts = {}
     
-    def __init__(self, project_id: str, location: str, key_ring: str):
-        self.client = kms.KeyManagementServiceClient()
-        self.key_ring_path = self.client.key_ring_path(
-            project_id, location, key_ring
-        )
+    def detect_brute_force(self, user_id: str):
+        """Detect brute force attacks"""
+        self.failed_attempts[user_id] = self.failed_attempts.get(user_id, 0) + 1
+        
+        if self.failed_attempts[user_id] > 5:
+            # Lock account and alert
+            self.lock_account(user_id)
+            self.send_alert(f'🚨 Brute force attack on {user_id}')
+            failed_auth_attempts.inc()
     
-    def create_hsm_key(self, key_id: str):
-        """Create a key in Cloud HSM"""
-        
-        crypto_key = {
-            'purpose': kms.CryptoKey.CryptoKeyPurpose.ENCRYPT_DECRYPT,
-            'version_template': {
-                'protection_level': kms.ProtectionLevel.HSM,
-                'algorithm': kms.CryptoKeyVersion.CryptoKeyVersionAlgorithm.GOOGLE_SYMMETRIC_ENCRYPTION,
-            },
-        }
-        
-        created_key = self.client.create_crypto_key(
-            request={
-                'parent': self.key_ring_path,
-                'crypto_key_id': key_id,
-                'crypto_key': crypto_key,
-            }
-        )
-        
-        return created_key
-    
-    def encrypt_with_hsm(self, key_name: str, plaintext: bytes):
-        """Encrypt data using HSM-backed key"""
-        
-        response = self.client.encrypt(
-            request={
-                'name': key_name,
-                'plaintext': plaintext,
-            }
-        )
-        
-        return response.ciphertext
-    
-    def decrypt_with_hsm(self, key_name: str, ciphertext: bytes):
-        """Decrypt data using HSM-backed key"""
-        
-        response = self.client.decrypt(
-            request={
-                'name': key_name,
-                'ciphertext': ciphertext,
-            }
-        )
-        
-        return response.plaintext
+    def detect_quantum_attack(self, ciphertext: bytes):
+        """Detect quantum computer attack patterns"""
+        # Analyze ciphertext for quantum attack signatures
+        # (e.g., Shor's algorithm patterns)
+        if self.is_quantum_attack(ciphertext):
+            quantum_attack_detected.inc()
+            self.send_alert('🚨 QUANTUM ATTACK DETECTED')
 ```
-
-## Implementation timeline
-
-| Week | Milestone | Deliverable |
-|------|-----------|-------------|
-| **1-2** | PQC library integration | Kyber-1024 implementation |
-| **3-4** | Crypto Shredder upgrade | Post-quantum key encapsulation |
-| **5-6** | WebAuthn setup | Biometric authentication endpoints |
-| **7-8** | Social recovery | Shamir's Secret Sharing implementation |
-| **9-10** | HSM integration | Cloud KMS with HSM protection |
-| **11-12** | Security audit | Third-party penetration testing |
-| **13-14** | Migration | Gradual rollout to production |
-| **15-16** | Monitoring | Security metrics and alerting |
 
 ## Success metrics
 
-| Metric | Current | Target | Measurement |
-|--------|---------|--------|-------------|
-| **Quantum resistance** | 0 years | 50+ years | Cryptographic analysis |
-| **Authentication factors** | 1 (password) | 3+ (biometric + hardware + knowledge) | MFA adoption rate |
-| **Account recovery time** | Manual (days) | Automated (hours) | Social recovery SLA |
-| **Key security** | Software | Hardware (HSM) | Key protection level |
-
-## Threat mitigation
-
 <AccordionGroup>
-  <Accordion title="Quantum computing attacks">
-    **Threat:** Shor's algorithm breaks RSA/ECC by 2030
-    **Mitigation:** Kyber-1024 post-quantum cryptography (NIST approved)
+  <Accordion title="Quantum resistance">
+    - ✅ 100% of data encrypted with Kyber-1024
+    - ✅ Zero successful quantum decryption attempts
+    - ✅ <10ms performance overhead
   </Accordion>
-  <Accordion title="Credential theft">
-    **Threat:** Phishing, keyloggers, social engineering
-    **Mitigation:** WebAuthn biometric authentication (phishing-resistant)
+  <Accordion title="Biometric security">
+    - ✅ WebAuthn support (YubiKey, TouchID, FaceID)
+    - ✅ 99.9% liveness detection accuracy
+    - ✅ <5% false rejection rate
   </Accordion>
-  <Accordion title="Account lockout">
-    **Threat:** User loses all authentication methods during crisis
-    **Mitigation:** Social recovery protocol with trusted guardians
+  <Accordion title="Social recovery">
+    - ✅ 3-of-5 guardian threshold
+    - ✅ <24 hour recovery time
+    - ✅ Zero unauthorized recoveries
   </Accordion>
-  <Accordion title="Key extraction">
-    **Threat:** Malware extracts encryption keys from memory
-    **Mitigation:** HSM-backed keys never leave hardware boundary
+  <Accordion title="Hardware attestation">
+    - ✅ TPM-backed keys for all edge nodes
+    - ✅ Remote attestation every 5 minutes
+    - ✅ Zero compromised nodes
   </Accordion>
 </AccordionGroup>
-
-## Compliance impact
-
-### Enhanced compliance
-
-| Framework | Requirement | Phase 3 Enhancement |
-|-----------|-------------|---------------------|
-| **NIST SP 800-208** | Post-quantum cryptography | ✅ Kyber-1024 implementation |
-| **FIDO2** | Phishing-resistant authentication | ✅ WebAuthn biometric auth |
-| **GDPR Art. 32** | State-of-the-art security | ✅ Quantum-resistant encryption |
-| **HIPAA §164.312** | Technical safeguards | ✅ HSM-backed key management |
-
-## Cost analysis
-
-### Current
-
-```
-Cloud KMS:        $50/month
-Password auth:    $0/month
-─────────────────────────────
-TOTAL:            $50/month
-```
-
-### Target (Post-quantum + Biometric)
-
-```
-Cloud HSM:        $1,200/month
-WebAuthn service: $200/month
-PQC library:      $0/month (open source)
-Security audit:   $5,000 (one-time)
-─────────────────────────────
-TOTAL:            $1,400/month + $5,000 one-time
-```
-
-**Increase:** $1,350/month (2700% increase)
-
-**ROI:** Protection against quantum attacks = invaluable for 50-year data retention
 
 ## Next steps
 
@@ -473,27 +483,27 @@ TOTAL:            $1,400/month + $5,000 one-time
     icon="scale-balanced"
     href="/roadmap/phase-4-compliance"
   >
-    Policy-as-Code for 45+ frameworks
+    Policy-as-Code for 45+ global frameworks
   </Card>
   <Card
-    title="PQC implementation"
+    title="Crypto Shredder v2"
     icon="atom"
-    href="/security/post-quantum"
+    href="/security/crypto-shredder-v2"
   >
-    Deploy Kyber-1024 cryptography
+    Quantum-resistant implementation
   </Card>
   <Card
     title="WebAuthn setup"
     icon="fingerprint"
     href="/security/webauthn"
   >
-    Configure biometric authentication
+    Biometric authentication guide
   </Card>
   <Card
-    title="Social recovery"
-    icon="users"
-    href="/security/social-recovery"
+    title="TPM integration"
+    icon="microchip"
+    href="/security/tpm"
   >
-    Set up guardian network
+    Hardware attestation setup
   </Card>
 </CardGroup>
