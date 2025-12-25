@@ -1,0 +1,337 @@
+---
+title: PIPEDA compliance
+description: Personal Information Protection and Electronic Documents Act implementation for Canada
+---
+
+## Overview
+
+iLuminara-Core implements comprehensive PIPEDA (Personal Information Protection and Electronic Documents Act) compliance for Canadian healthcare operations.
+
+<Card
+  title="Jurisdiction"
+  icon="flag"
+>
+  🇨🇦 Canada - Federal privacy law for private sector
+</Card>
+
+## Ten fair information principles
+
+### Principle 1: Accountability
+
+Organizations are responsible for personal information under their control.
+
+**iLuminara Implementation:**
+```python
+# Data Protection Officer designation
+DPO_CONTACT = "dpo@iluminara.health"
+
+# Accountability tracking
+guardrail = SovereignGuardrail(
+    jurisdiction='PIPEDA_CA',
+    enable_tamper_proof_audit=True
+)
+```
+
+### Principle 2: Identifying purposes
+
+Identify purposes for collecting personal information before or at collection time.
+
+**iLuminara Implementation:**
+```python
+# Purpose specification
+consent_metadata = {
+    'purpose': 'public_health_surveillance',
+    'collection_reason': 'outbreak_detection',
+    'retention_period': '365_days',
+    'jurisdiction': 'PIPEDA_CA'
+}
+```
+
+### Principle 3: Consent
+
+Knowledge and consent required for collection, use, or disclosure.
+
+**iLuminara Implementation:**
+```python
+from governance_kernel.vector_ledger import SovereignGuardrail
+
+guardrail = SovereignGuardrail()
+
+# Validate consent before processing
+guardrail.validate_action(
+    action_type='Consent_Validation',
+    payload={
+        'consent_token': 'VALID_CONSENT_TOKEN',
+        'consent_scope': 'diagnosis',
+        'data_type': 'PHI',
+        'purpose': 'treatment'
+    },
+    jurisdiction='PIPEDA_CA'
+)
+```
+
+### Principle 4: Limiting collection
+
+Collect only information necessary for identified purposes.
+
+**iLuminara Implementation:**
+```python
+# Minimum necessary data collection
+def collect_patient_data(purpose):
+    if purpose == 'diagnosis':
+        return ['symptoms', 'vital_signs', 'medical_history']
+    elif purpose == 'billing':
+        return ['patient_id', 'service_codes', 'insurance_info']
+    # Only collect what's needed
+```
+
+### Principle 5: Limiting use, disclosure, and retention
+
+Use or disclose personal information only for purposes consented to, unless required by law.
+
+**iLuminara Implementation:**
+```python
+from governance_kernel.crypto_shredder import RetentionPolicy
+
+# PIPEDA-compliant retention
+shredder.encrypt_with_ephemeral_key(
+    data=patient_record,
+    retention_policy=RetentionPolicy.WARM,  # 1 year
+    metadata={
+        'jurisdiction': 'PIPEDA_CA',
+        'purpose': 'treatment',
+        'consent_expiry': '2026-01-01'
+    }
+)
+
+# Auto-shred after retention period
+shredder.auto_shred_expired_keys()
+```
+
+### Principle 6: Accuracy
+
+Keep personal information accurate, complete, and up-to-date.
+
+**iLuminara Implementation:**
+```python
+# Golden Thread data fusion ensures accuracy
+from edge_node.sync_protocol.golden_thread import GoldenThread
+
+gt = GoldenThread()
+
+# Cross-verify data from multiple sources
+fused = gt.fuse_data_streams(
+    cbs_signal=community_report,
+    emr_record=hospital_record,
+    patient_id='PAT_001'
+)
+
+# Verification score indicates accuracy
+print(f"Data accuracy: {fused.verification_score}")
+```
+
+### Principle 7: Safeguards
+
+Protect personal information with security safeguards.
+
+**iLuminara Implementation:**
+- **Encryption:** AES-256-GCM for data at rest
+- **Transmission:** TLS 1.3 for data in transit
+- **Access control:** Role-based access with unique user IDs
+- **Audit:** Tamper-proof audit trail with Cloud Spanner
+
+```python
+# Crypto Shredder provides safeguards
+shredder = CryptoShredder(
+    sovereignty_zone=SovereigntyZone.CANADA,
+    enable_audit=True
+)
+```
+
+### Principle 8: Openness
+
+Make information about policies and practices readily available.
+
+**iLuminara Implementation:**
+- Public documentation at docs.iluminara.health
+- Privacy policy accessible via API
+- Transparency dashboard for data processing
+
+### Principle 9: Individual access
+
+Provide individuals with access to their personal information.
+
+**iLuminara Implementation:**
+```python
+# API endpoint for data access requests
+@app.route('/api/v1/data-access-request', methods=['POST'])
+def handle_data_access_request():
+    patient_id = request.json['patient_id']
+    consent_token = request.json['consent_token']
+    
+    # Validate consent
+    guardrail.validate_action(
+        action_type='Data_Access',
+        payload={'patient_id': patient_id, 'consent_token': consent_token},
+        jurisdiction='PIPEDA_CA'
+    )
+    
+    # Return patient data
+    return get_patient_data(patient_id)
+```
+
+### Principle 10: Challenging compliance
+
+Individuals can challenge compliance with these principles.
+
+**iLuminara Implementation:**
+- Complaint mechanism via DPO contact
+- Tamper-proof audit trail for investigation
+- Escalation to Privacy Commissioner of Canada
+
+## Cross-border data transfers
+
+PIPEDA allows transfers to countries with "substantially similar" privacy protections.
+
+**Approved jurisdictions:**
+```yaml
+# config/sovereign_guardrail.yaml
+sovereignty:
+  cross_border_transfers:
+    pipeda_approved:
+      - "EU"           # GDPR adequacy
+      - "UK"           # UK GDPR
+      - "Switzerland"  # Federal Act on Data Protection
+```
+
+**iLuminara enforcement:**
+```python
+# Block transfers to non-approved jurisdictions
+guardrail.validate_action(
+    action_type='Data_Transfer',
+    payload={
+        'data_type': 'PHI',
+        'destination': 'US_Cloud',  # Blocked without consent
+        'consent_token': None
+    },
+    jurisdiction='PIPEDA_CA'
+)
+# Raises: SovereigntyViolationError
+```
+
+## Health sector considerations
+
+PIPEDA applies to health information custodians in provinces without substantially similar legislation.
+
+**Provincial health privacy laws:**
+- Alberta: Health Information Act (HIA)
+- British Columbia: Personal Information Protection Act (PIPA)
+- Ontario: Personal Health Information Protection Act (PHIPA)
+- Quebec: Act respecting the Protection of Personal Information in the Private Sector
+
+**iLuminara configuration:**
+```yaml
+jurisdiction:
+  primary: "PIPEDA_CA"
+  provincial_overrides:
+    - province: "Ontario"
+      framework: "PHIPA"
+    - province: "Quebec"
+      framework: "Quebec_Privacy_Act"
+```
+
+## Breach notification
+
+PIPEDA requires notification of breaches that pose "real risk of significant harm."
+
+**iLuminara breach workflow:**
+<Steps>
+  <Step title="Detection">
+    Security workflows detect unauthorized access
+  </Step>
+  <Step title="Assessment">
+    Determine if breach poses real risk of significant harm
+  </Step>
+  <Step title="Notification">
+    Notify affected individuals, Privacy Commissioner, and organizations
+  </Step>
+  <Step title="Record keeping">
+    Maintain breach records for 24 months
+  </Step>
+</Steps>
+
+```python
+# Automatic breach notification
+if breach_detected and real_risk_of_significant_harm:
+    notify_affected_individuals()
+    notify_privacy_commissioner()
+    log_breach_record(retention_days=730)  # 24 months
+```
+
+## Compliance validation
+
+```bash
+# Validate PIPEDA compliance
+python governance_kernel/compliance_validator.py --framework PIPEDA_CA
+
+# Check consent management
+python governance_kernel/consent_validator.py --jurisdiction PIPEDA_CA
+```
+
+## PIPEDA-specific configurations
+
+```yaml
+# config/sovereign_guardrail.yaml
+frameworks:
+  PIPEDA:
+    enabled: true
+    sections:
+      - "§5 (Principles)"
+      - "§6 (Accountability)"
+      - "§7 (Consent)"
+    
+    consent:
+      require_explicit_consent: true
+      valid_scopes:
+        - "treatment"
+        - "research"
+        - "public_health"
+    
+    breach_notification:
+      enabled: true
+      threshold: "real_risk_of_significant_harm"
+      record_retention_days: 730
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="PHIPA (Ontario)"
+    icon="hospital"
+    href="/compliance/phipa"
+  >
+    Ontario health privacy law
+  </Card>
+  <Card
+    title="Consent management"
+    icon="handshake"
+    href="/governance/consent"
+  >
+    Configure consent workflows
+  </Card>
+  <Card
+    title="Breach notification"
+    icon="triangle-exclamation"
+    href="/security/breach-notification"
+  >
+    Emergency response procedures
+  </Card>
+  <Card
+    title="Compliance matrix"
+    icon="table"
+    href="/compliance/matrix"
+  >
+    View all framework mappings
+  </Card>
+</CardGroup>
