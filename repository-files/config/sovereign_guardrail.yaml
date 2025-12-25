@@ -1,25 +1,72 @@
 # iLuminara-Core SovereignGuardrail Configuration
-# Quantum-Law Nexus: 50 Global Legal Frameworks for Sovereign Health Intelligence
+# Enforces 47 global legal frameworks for health data sovereignty
 
-version: "2.0.0"
-fortress_name: "iLuminara Sovereign Health Fortress - Quantum-Law Nexus"
-nexus_version: "quantum-1.0"
+version: "1.0.0"
+fortress_name: "iLuminara Sovereign Health Fortress"
 
 # Jurisdiction Configuration
 jurisdiction:
   primary: "KDPA_KE"  # Kenya Data Protection Act
   secondary:
-    - "GDPR_EU"      # European Union
-    - "POPIA_ZA"     # South Africa
-    - "HIPAA_US"     # United States
-    - "PIPEDA_CA"    # Canada
-    - "MALABO_CONVENTION"  # African Union
-  
-  # Dynamic jurisdiction adapter
-  dynamic_adapter:
-    enabled: true
-    auto_detect: true
-    fallback: "GLOBAL_DEFAULT"
+    # Core Privacy & Data Protection (14 frameworks)
+    - "GDPR_EU"           # General Data Protection Regulation
+    - "PIPEDA_CA"         # Personal Information Protection & Electronic Documents Act
+    - "POPIA_ZA"          # Protection of Personal Information Act
+    - "HIPAA_US"          # Health Insurance Portability & Accountability Act
+    - "HITECH_US"         # Health Information Technology for Economic & Clinical Health
+    - "CCPA_US"           # California Consumer Privacy Act
+    - "CPRA_US"           # California Privacy Rights Act
+    - "LGPD_BR"           # Lei Geral de Proteção de Dados (Brazil)
+    - "PDPA_SG"           # Personal Data Protection Act (Singapore)
+    - "APPI_JP"           # Act on the Protection of Personal Information (Japan)
+    - "PIPL_CN"           # Personal Information Protection Law (China)
+    - "PDPA_MY"           # Personal Data Protection Act (Malaysia)
+    - "DPD_UK"            # Data Protection Act 2018 (UK)
+    
+    # Cybersecurity & Information Security (8 frameworks)
+    - "NIST_CSF"          # Cybersecurity Framework
+    - "ISO_27001"         # Information Security Management
+    - "SOC_2"             # Service Organization Control 2
+    - "CIS_CONTROLS"      # Center for Internet Security
+    - "MITRE_ATTACK"      # Adversarial Tactics, Techniques & Common Knowledge
+    - "ISO_22301"         # Business Continuity Management
+    - "NIST_800_53"       # Security and Privacy Controls
+    - "COBIT"             # Control Objectives for Information Technology
+    
+    # AI Ethics & Governance (6 frameworks)
+    - "EU_AI_ACT"         # Artificial Intelligence Act
+    - "IEEE_ETHICS"       # Ethically Aligned Design
+    - "UNESCO_AI"         # Recommendation on the Ethics of Artificial Intelligence
+    - "OECD_AI"           # AI Principles
+    - "ISO_IEC_42001"     # AI Management Systems
+    - "NIST_AI_RMF"       # AI Risk Management Framework
+    
+    # Healthcare-Specific (5 frameworks)
+    - "GDPR_ART9"         # GDPR Article 9 (Special Categories)
+    - "FDA_21_CFR_PART_11" # Electronic Records & Signatures
+    - "GxP_COMPLIANCE"    # Good Practice Guidelines
+    - "HIPAA_SECURITY_RULE" # Technical Safeguards
+    - "ISO_27799"         # Health Informatics Security
+    
+    # International Standards (4 frameworks)
+    - "ISO_9001"          # Quality Management Systems
+    - "ISO_14001"         # Environmental Management
+    - "ISO_45001"         # Occupational Health & Safety
+    - "ISO_31000"         # Risk Management
+    
+    # Regional & Sector-Specific (8 frameworks)
+    - "AFRICAN_UNION_DATA_POLICY"  # Continental Data Governance
+    - "ASEAN_DATA_PRIVACY"         # Association of Southeast Asian Nations
+    - "CARICOM_DATA_PROTECTION"    # Caribbean Community
+    - "MERCOSUR_DATA_PROTECTION"   # Southern Common Market
+    - "EFTA_DATA_PROTECTION"       # European Free Trade Association
+    - "APEC_PRIVACY_FRAMEWORK"     # Asia-Pacific Economic Cooperation
+    - "FTC_ACT"                    # Federal Trade Commission Act
+    - "CAN_SPAM"                   # Controlling Assault of Non-Solicited Pornography
+    
+    # Humanitarian & Ethical (2 frameworks)
+    - "GENEVA_CONVENTION"  # International Humanitarian Law
+    - "IHR_2005"           # International Health Regulations
 
 # Data Sovereignty Rules
 sovereignty:
@@ -54,11 +101,8 @@ sovereignty:
       - "UK"
       - "Switzerland"
       - "Canada"
-    
-    # Malabo Convention cross-border safeguards
-    malabo_safeguards:
-      enabled: true
-      require_dpa_coordination: true
+      - "Japan"
+      - "South Korea"
 
 # Right to Explanation (EU AI Act §6, GDPR Art. 22)
 explainability:
@@ -72,6 +116,7 @@ explainability:
     - "SHAP"           # SHapley Additive exPlanations
     - "LIME"           # Local Interpretable Model-agnostic Explanations
     - "Feature_Importance"
+    - "Attention_Weights"
     - "Counterfactual_Explanations"
   
   # Minimum explanation requirements
@@ -80,8 +125,7 @@ explainability:
     - "evidence_chain"
     - "feature_contributions"
     - "decision_rationale"
-    - "bias_assessment"
-    - "post_market_monitoring"
+    - "alternative_outcomes"
 
 # Consent Management (GDPR Art. 6, POPIA §11, CCPA §1798.100)
 consent:
@@ -97,26 +141,21 @@ consent:
     - "research"
     - "public_health_surveillance"
     - "emergency_response"
-    - "ai_training"
-    - "federated_learning"
+    - "quality_improvement"
+    - "billing"
   
   # Consent expiration
   expiration_days: 365
   
-  # Emergency override (WHO IHR Article 6, 2025 amendments)
+  # Emergency override (WHO IHR Article 6)
   emergency_override:
     enabled: true
     conditions:
       - "public_health_emergency"
-      - "pandemic_emergency"
       - "outbreak_response"
       - "life_threatening_situation"
-    
-    # Pandemic emergency framework (WHO IHR 2025)
-    pandemic_emergency:
-      enabled: true
-      auto_escalate: true
-      equity_protocols: true
+      - "natural_disaster"
+      - "humanitarian_crisis"
 
 # Data Retention (GDPR Art. 17, HIPAA §164.530(j))
 retention:
@@ -176,9 +215,9 @@ audit:
     - "Key_Shred"
     - "Sovereignty_Violation"
     - "Emergency_Override"
-    - "AI_Conformity_Assessment"
-    - "Pandemic_Emergency_Escalation"
-    - "Cybersecurity_Incident"
+    - "Access_Control"
+    - "Configuration_Change"
+    - "Security_Incident"
 
 # Humanitarian Constraints (Geneva Convention, WHO IHR)
 humanitarian:
@@ -191,6 +230,8 @@ humanitarian:
     - "Data_Protection"
     - "Population_Protection"
     - "Emergency_Response"
+    - "Non_Discrimination"
+    - "Proportionality"
   
   # Margin calculation
   margin_threshold: 0.15  # 15% humanitarian margin
@@ -198,22 +239,17 @@ humanitarian:
   # Emergency protocols
   emergency_protocols:
     - "WHO_IHR_Article_6"
-    - "WHO_IHR_2025_Pandemic_Emergency"
     - "Geneva_Convention_Article_3"
     - "UN_Humanitarian_Principles"
+    - "Sphere_Standards"
+    - "Core_Humanitarian_Standard"
 
-# ═══════════════════════════════════════════════════════════
-# QUANTUM-LAW NEXUS: 50 FRAMEWORK CONFIGURATION
-# ═══════════════════════════════════════════════════════════
-
+# Compliance Frameworks (47 Total)
 frameworks:
-  # ─────────────────────────────────────────────────────────
-  # I. CORE DATA PROTECTION (14 Frameworks)
-  # ─────────────────────────────────────────────────────────
-  
+  # Core Privacy & Data Protection (14 frameworks)
   GDPR_EU:
     enabled: true
-    enforcement_level: "STRICT"
+    region: "European Union"
     articles:
       - "Art. 6 (Lawfulness of Processing)"
       - "Art. 9 (Special Categories)"
@@ -224,59 +260,114 @@ frameworks:
       - "Art. 45 (Adequacy Decisions)"
       - "Art. 46 (Standard Contractual Clauses)"
   
-  GDPR_ART9:
-    enabled: true
-    enforcement_level: "STRICT"
-    description: "Special categories of personal data (health)"
-    requirements:
-      - "Explicit consent or legal basis"
-      - "Enhanced security measures"
-      - "Data minimization"
-  
   KDPA_KE:
     enabled: true
-    enforcement_level: "STRICT"
+    region: "Kenya"
     sections:
       - "§37 (Transfer Restrictions)"
       - "§42 (Data Subject Rights)"
+      - "§43 (Right to Access)"
+      - "§44 (Right to Correction)"
   
   PIPEDA_CA:
     enabled: true
-    enforcement_level: "MODERATE"
+    region: "Canada"
     sections:
-      - "§5-7 (Lawfulness of Processing)"
+      - "§5 (Consent)"
+      - "§6 (Limiting Collection)"
+      - "§7 (Limiting Use, Disclosure, Retention)"
   
   POPIA_ZA:
     enabled: true
-    enforcement_level: "STRICT"
+    region: "South Africa"
     sections:
       - "§11 (Lawfulness)"
       - "§14 (Cross-border Transfers)"
+      - "§23 (Data Subject Rights)"
   
   HIPAA_US:
     enabled: true
-    enforcement_level: "STRICT"
+    region: "United States"
     sections:
-      - "§164.308 (Administrative Safeguards)"
-      - "§164.310 (Physical Safeguards)"
-      - "§164.312 (Technical Safeguards)"
+      - "§164.312 (Physical/Technical Safeguards)"
       - "§164.530(j) (Documentation)"
+      - "§164.404 (Breach Notification)"
   
   HITECH_US:
     enabled: true
-    enforcement_level: "STRICT"
+    region: "United States"
     sections:
       - "§13410 (Notification of Breach)"
+      - "§13402 (Notification Requirements)"
   
   CCPA_US:
     enabled: true
-    enforcement_level: "MODERATE"
+    region: "California, USA"
     sections:
       - "§1798.100 (Right to Know)"
+      - "§1798.105 (Right to Delete)"
+      - "§1798.110 (Right to Access)"
   
+  CPRA_US:
+    enabled: true
+    region: "California, USA"
+    sections:
+      - "Right to Correct"
+      - "Right to Limit Use"
+      - "Sensitive Personal Information"
+  
+  LGPD_BR:
+    enabled: true
+    region: "Brazil"
+    sections:
+      - "Art. 7 (Lawful Basis)"
+      - "Art. 11 (Sensitive Data)"
+      - "Art. 18 (Data Subject Rights)"
+  
+  PDPA_SG:
+    enabled: true
+    region: "Singapore"
+    sections:
+      - "Consent Obligation"
+      - "Purpose Limitation"
+      - "Notification Obligation"
+  
+  APPI_JP:
+    enabled: true
+    region: "Japan"
+    sections:
+      - "Art. 16 (Purpose of Use)"
+      - "Art. 17 (Proper Acquisition)"
+      - "Art. 23 (Provision to Third Parties)"
+  
+  PIPL_CN:
+    enabled: true
+    region: "China"
+    sections:
+      - "Art. 13 (Consent)"
+      - "Art. 38 (Cross-border Transfer)"
+      - "Art. 44 (Data Subject Rights)"
+  
+  PDPA_MY:
+    enabled: true
+    region: "Malaysia"
+    sections:
+      - "General Principle"
+      - "Notice and Choice"
+      - "Disclosure Principle"
+  
+  DPD_UK:
+    enabled: true
+    region: "United Kingdom"
+    sections:
+      - "Lawfulness, Fairness, Transparency"
+      - "Purpose Limitation"
+      - "Data Minimization"
+  
+  # Cybersecurity & Information Security (8 frameworks)
   NIST_CSF:
     enabled: true
-    enforcement_level: "MODERATE"
+    region: "United States"
     functions:
       - "Identify"
       - "Protect"
@@ -286,364 +377,277 @@ frameworks:
   
   ISO_27001:
     enabled: true
-    enforcement_level: "MODERATE"
+    region: "Global"
     controls:
       - "A.8.3.2 (Disposal of Media)"
       - "A.12.4 (Logging)"
       - "A.12.6 (Technical Vulnerability Management)"
+      - "A.18.1 (Compliance with Legal Requirements)"
   
   SOC_2:
     enabled: true
-    enforcement_level: "MODERATE"
+    region: "United States"
     criteria:
       - "Security"
       - "Availability"
       - "Processing Integrity"
+      - "Confidentiality"
+      - "Privacy"
   
-  WHO_IHR:
+  CIS_CONTROLS:
     enabled: true
-    enforcement_level: "MODERATE"
-    articles:
-      - "Art. 6 (Notification)"
-      - "Art. 7 (Information Sharing)"
+    region: "Global"
+    controls:
+      - "Inventory and Control of Assets"
+      - "Data Protection"
+      - "Secure Configuration"
+      - "Continuous Vulnerability Management"
   
-  # ─────────────────────────────────────────────────────────
-  # II. SUPPLY CHAIN & PROCUREMENT ETHICS (5 Frameworks)
-  # ─────────────────────────────────────────────────────────
-  
-  EU_CSDDD:
+  MITRE_ATTACK:
     enabled: true
-    enforcement_level: "STRICT"
-    description: "Corporate Sustainability Due Diligence Directive"
+    region: "Global"
+    tactics:
+      - "Initial Access"
+      - "Execution"
+      - "Persistence"
+      - "Defense Evasion"
+  
+  ISO_22301:
+    enabled: true
+    region: "Global"
     requirements:
-      - "Human rights due diligence"
-      - "Environmental due diligence"
-      - "Supply chain transparency"
+      - "Business Continuity Planning"
+      - "Incident Response"
+      - "Recovery Procedures"
   
-  OECD_DUE_DILIGENCE:
+  NIST_800_53:
     enabled: true
-    enforcement_level: "MODERATE"
-    description: "OECD Due Diligence Guidance for Responsible Business Conduct"
+    region: "United States"
+    controls:
+      - "AC (Access Control)"
+      - "AU (Audit and Accountability)"
+      - "IA (Identification and Authentication)"
+      - "SC (System and Communications Protection)"
   
-  UN_GUIDING_PRINCIPLES:
+  COBIT:
     enabled: true
-    enforcement_level: "MODERATE"
-    description: "UN Guiding Principles on Business and Human Rights"
+    region: "Global"
+    domains:
+      - "Evaluate, Direct and Monitor"
+      - "Align, Plan and Organize"
+      - "Build, Acquire and Implement"
+      - "Deliver, Service and Support"
   
-  ILO_CONVENTIONS:
+  # AI Ethics & Governance (6 frameworks)
+  EU_AI_ACT:
     enabled: true
-    enforcement_level: "STRICT"
-    conventions:
-      - "C029 (Forced Labor)"
-      - "C138 (Minimum Age)"
-      - "C182 (Worst Forms of Child Labor)"
-  
-  IASC_GUIDELINES:
-    enabled: true
-    enforcement_level: "STRICT"
-    description: "IASC Guidelines for Humanitarian Data Protection"
-  
-  # ─────────────────────────────────────────────────────────
-  # III. ENVIRONMENTAL & CARBON STANDARDS (4 Frameworks)
-  # ─────────────────────────────────────────────────────────
-  
-  EU_CBAM:
-    enabled: true
-    enforcement_level: "STRICT"
-    description: "Carbon Border Adjustment Mechanism"
-    requirements:
-      - "Embedded emissions calculation"
-      - "CBAM certificate purchase"
-  
-  ICVCM_STANDARDS:
-    enabled: true
-    enforcement_level: "MODERATE"
-    description: "Integrity Council for Voluntary Carbon Market"
-  
-  TCFD:
-    enabled: true
-    enforcement_level: "MODERATE"
-    description: "Task Force on Climate-related Financial Disclosures"
-    pillars:
-      - "Governance"
-      - "Strategy"
-      - "Risk Management"
-      - "Metrics and Targets"
-  
-  GHG_PROTOCOL:
-    enabled: true
-    enforcement_level: "MODERATE"
-    description: "Corporate Accounting and Reporting Standard"
-    scopes:
-      - "Scope 1 (Direct emissions)"
-      - "Scope 2 (Indirect emissions)"
-      - "Scope 3 (Value chain emissions)"
-  
-  # ─────────────────────────────────────────────────────────
-  # IV. FINANCIAL INTEGRITY & ANTI-CORRUPTION (4 Frameworks)
-  # ─────────────────────────────────────────────────────────
-  
-  EU_TAXONOMY:
-    enabled: true
-    enforcement_level: "STRICT"
-    description: "Sustainable Finance Regulation"
-  
-  SFDR:
-    enabled: true
-    enforcement_level: "STRICT"
-    description: "Sustainable Finance Disclosure Regulation"
-  
-  FCPA_US:
-    enabled: true
-    enforcement_level: "STRICT"
-    description: "Foreign Corrupt Practices Act"
-  
-  UK_BRIBERY_ACT:
-    enabled: true
-    enforcement_level: "STRICT"
-    description: "UK Bribery Act 2010"
-  
-  # ─────────────────────────────────────────────────────────
-  # V. CLINICAL & PHARMACEUTICAL INTEGRITY (4 Frameworks)
-  # ─────────────────────────────────────────────────────────
-  
-  EU_MDR:
-    enabled: true
-    enforcement_level: "STRICT"
-    description: "Medical Device Regulation 2017/745"
-    classes:
-      - "Class I"
-      - "Class IIa"
-      - "Class IIb"
-      - "Class III"
-  
-  FDA_21_CFR_PART_11:
-    enabled: true
-    enforcement_level: "STRICT"
-    description: "Electronic Records and Signatures"
-  
-  ICH_GCP:
-    enabled: true
-    enforcement_level: "STRICT"
-    description: "Good Clinical Practice"
-  
-  WHO_GMP:
-    enabled: true
-    enforcement_level: "MODERATE"
-    description: "Good Manufacturing Practices"
-  
-  # ─────────────────────────────────────────────────────────
-  # VI. AI & DIGITAL HEALTH GOVERNANCE (8 Frameworks)
-  # ─────────────────────────────────────────────────────────
-  
-  EU_AI_ACT_2024:
-    enabled: true
-    enforcement_level: "STRICT"
-    description: "EU AI Act (Regulation 2024/1689)"
+    region: "European Union"
     articles:
-      - "§6 (High-Risk AI Classification)"
-      - "§8 (Transparency Obligations)"
+      - "§6 (High-Risk AI)"
+      - "§8 (Transparency)"
       - "§12 (Record Keeping)"
       - "§13 (Transparency for Users)"
-      - "§14 (Human Oversight)"
-      - "§15 (Accuracy and Robustness)"
-      - "§43 (Conformity Assessment)"
-      - "§61 (Post-Market Monitoring)"
-    penalties: "Up to €35M or 7% of global turnover"
   
-  FDA_CDS_SOFTWARE:
+  IEEE_ETHICS:
     enabled: true
-    enforcement_level: "STRICT"
-    description: "FDA Clinical Decision Support Software Guidance (2025)"
-    requirements:
-      - "SaMD classification"
-      - "Post-market performance monitoring"
-      - "Real-world data validation"
-      - "Bias assessment"
+    region: "Global"
+    principles:
+      - "Human Rights"
+      - "Well-being"
+      - "Data Agency"
+      - "Effectiveness"
+      - "Transparency"
   
-  IMDRF_AI_PRINCIPLES:
+  UNESCO_AI:
     enabled: true
-    enforcement_level: "MODERATE"
-    description: "International Medical Device Regulators Forum AI Principles"
+    region: "Global"
+    values:
+      - "Human Dignity"
+      - "Living in Peaceful Societies"
+      - "Environmental Sustainability"
+      - "Cultural Diversity"
+  
+  OECD_AI:
+    enabled: true
+    region: "Global"
+    principles:
+      - "Inclusive Growth"
+      - "Sustainable Development"
+      - "Human-Centered Values"
+      - "Transparency"
+      - "Robustness"
   
   ISO_IEC_42001:
     enabled: true
-    enforcement_level: "MODERATE"
-    description: "AI Management Systems"
+    region: "Global"
     requirements:
-      - "AI risk management"
-      - "Ethical AI deployment"
-      - "Transparency reporting"
-      - "Continuous monitoring"
+      - "AI Management System"
+      - "Risk Management"
+      - "Performance Evaluation"
   
-  SPIRIT_AI:
+  NIST_AI_RMF:
     enabled: true
-    enforcement_level: "MODERATE"
-    description: "SPIRIT-AI Guidelines - Clinical Trial Reporting for AI"
+    region: "United States"
+    functions:
+      - "Govern"
+      - "Map"
+      - "Measure"
+      - "Manage"
   
-  CONSORT_AI:
+  # Healthcare-Specific (5 frameworks)
+  GDPR_ART9:
     enabled: true
-    enforcement_level: "MODERATE"
-    description: "CONSORT-AI Guidelines - Reporting Standards for AI Interventions"
+    region: "European Union"
+    description: "Special Categories of Personal Data (Health)"
+    prohibitions:
+      - "Foreign Transfer Without Adequacy"
+      - "Processing Without Explicit Consent"
   
-  US_HEALTHCARE_CYBER_ACT:
+  FDA_21_CFR_PART_11:
     enabled: true
-    enforcement_level: "STRICT"
-    description: "US Healthcare Cybersecurity and Resiliency Act (2025)"
+    region: "United States"
     requirements:
-      - "HHS-CISA coordination"
-      - "24-hour incident reporting"
-      - "Minimum cybersecurity standards"
-      - "Vulnerability disclosure program"
-      - "Annual security assessments"
-    penalties: "Civil penalties up to $1M per violation"
+      - "Electronic Records"
+      - "Electronic Signatures"
+      - "Audit Trails"
   
-  HIPAA_SECURITY_RULE_2025:
+  GxP_COMPLIANCE:
     enabled: true
-    enforcement_level: "STRICT"
-    description: "HIPAA Security Rule (2025 updates) - Vulnerability Management"
+    region: "Global"
+    standards:
+      - "Good Clinical Practice (GCP)"
+      - "Good Laboratory Practice (GLP)"
+      - "Good Manufacturing Practice (GMP)"
   
-  # ─────────────────────────────────────────────────────────
-  # VII. GLOBAL HEALTH SECURITY & OUTBREAK REPORTING (4 Frameworks)
-  # ─────────────────────────────────────────────────────────
-  
-  WHO_IHR_2025:
+  HIPAA_SECURITY_RULE:
     enabled: true
-    enforcement_level: "STRICT"
-    description: "WHO IHR 2025 Amendments - Pandemic Emergency Framework"
+    region: "United States"
+    safeguards:
+      - "Administrative Safeguards"
+      - "Physical Safeguards"
+      - "Technical Safeguards"
+  
+  ISO_27799:
+    enabled: true
+    region: "Global"
+    controls:
+      - "Health Information Security"
+      - "Clinical Information Systems"
+      - "Personal Health Information"
+  
+  # International Standards (4 frameworks)
+  ISO_9001:
+    enabled: true
+    region: "Global"
+    principles:
+      - "Customer Focus"
+      - "Leadership"
+      - "Process Approach"
+      - "Continuous Improvement"
+  
+  ISO_14001:
+    enabled: true
+    region: "Global"
+    requirements:
+      - "Environmental Policy"
+      - "Planning"
+      - "Implementation"
+  
+  ISO_45001:
+    enabled: true
+    region: "Global"
+    requirements:
+      - "Occupational Health and Safety"
+      - "Hazard Identification"
+      - "Risk Assessment"
+  
+  ISO_31000:
+    enabled: true
+    region: "Global"
+    principles:
+      - "Risk Identification"
+      - "Risk Analysis"
+      - "Risk Evaluation"
+      - "Risk Treatment"
+  
+  # Regional & Sector-Specific (8 frameworks)
+  AFRICAN_UNION_DATA_POLICY:
+    enabled: true
+    region: "Africa"
+    objectives:
+      - "Continental Data Governance"
+      - "Digital Sovereignty"
+      - "Cross-border Data Flows"
+  
+  ASEAN_DATA_PRIVACY:
+    enabled: true
+    region: "Southeast Asia"
+    principles:
+      - "Consent"
+      - "Purpose Limitation"
+      - "Data Security"
+  
+  CARICOM_DATA_PROTECTION:
+    enabled: true
+    region: "Caribbean"
+    requirements:
+      - "Data Protection Principles"
+      - "Cross-border Transfer Rules"
+  
+  MERCOSUR_DATA_PROTECTION:
+    enabled: true
+    region: "South America"
+    principles:
+      - "Data Protection"
+      - "Privacy Rights"
+  
+  EFTA_DATA_PROTECTION:
+    enabled: true
+    region: "European Free Trade Association"
+    requirements:
+      - "GDPR Alignment"
+      - "Data Protection Standards"
+  
+  APEC_PRIVACY_FRAMEWORK:
+    enabled: true
+    region: "Asia-Pacific"
+    principles:
+      - "Preventing Harm"
+      - "Notice"
+      - "Collection Limitation"
+      - "Uses of Personal Information"
+  
+  FTC_ACT:
+    enabled: true
+    region: "United States"
+    sections:
+      - "§5 (Unfair or Deceptive Practices)"
+      - "Consumer Protection"
+  
+  CAN_SPAM:
+    enabled: true
+    region: "United States"
+    requirements:
+      - "Opt-out Mechanism"
+      - "Accurate Header Information"
+      - "Identification as Advertisement"
+  
+  # Humanitarian & Ethical (2 frameworks)
+  GENEVA_CONVENTION:
+    enabled: true
+    region: "Global"
     articles:
-      - "Art. 6 (Notification)"
-      - "Art. 7 (Information Sharing)"
-      - "Art. 12 (Pandemic Emergency)"
-      - "Art. 13 (Public Health Response)"
-    requirements:
-      - "Core surveillance capacities"
-      - "Pandemic emergency notification"
-      - "Real-time data sharing"
-      - "Equity in medical access"
-      - "National focal point coordination"
+      - "Article 3 (Common Article 3)"
+      - "Protection of Civilians"
+      - "Medical Ethics"
   
-  GHSA:
+  IHR_2005:
     enabled: true
-    enforcement_level: "MODERATE"
-    description: "Global Health Security Agenda"
-    action_packages:
-      - "Prevent"
-      - "Detect"
-      - "Respond"
-  
-  JEE_STANDARDS:
-    enabled: true
-    enforcement_level: "MODERATE"
-    description: "Joint External Evaluation Standards"
-    indicators:
-      - "Real-time data exchange"
-      - "Laboratory capacity"
-      - "Emergency response"
-  
-  ONE_HEALTH:
-    enabled: true
-    enforcement_level: "MODERATE"
-    description: "One Health Framework - Zoonotic Disease Surveillance"
-  
-  # ─────────────────────────────────────────────────────────
-  # VIII. AFRICAN DATA SOVEREIGNTY & INTEROPERABILITY (5 Frameworks)
-  # ─────────────────────────────────────────────────────────
-  
-  MALABO_CONVENTION:
-    enabled: true
-    enforcement_level: "STRICT"
-    description: "African Union Cyber Security and Data Protection"
+    region: "Global"
     articles:
-      - "Art. 8 (Data Protection Principles)"
-      - "Art. 12 (Data Localization)"
-      - "Art. 14 (Cross-border Transfers)"
-      - "Art. 22 (Cybersecurity Standards)"
-    requirements:
-      - "Data localization for sensitive data"
-      - "Cross-border transfer safeguards"
-      - "National DPA coordination"
-  
-  NIGERIA_NDPR:
-    enabled: true
-    enforcement_level: "STRICT"
-    description: "Nigeria Data Protection Regulation"
-  
-  KENYA_DPA_2025:
-    enabled: true
-    enforcement_level: "STRICT"
-    description: "Kenya DPA (2025 interoperability guidelines)"
-    requirements:
-      - "Cross-border data flow checks"
-      - "Federated learning enablement"
-      - "Vulnerable population data redaction"
-  
-  SOUTH_AFRICA_POPIA_2025:
-    enabled: true
-    enforcement_level: "STRICT"
-    description: "South Africa POPIA (2025 cross-border guidelines)"
-  
-  AU_DIGITAL_TRANSFORMATION:
-    enabled: true
-    enforcement_level: "MODERATE"
-    description: "African Union Digital Transformation Strategy"
-  
-  # ─────────────────────────────────────────────────────────
-  # IX. SUSTAINABLE HUMANITARIAN LOGISTICS (4 Frameworks)
-  # ─────────────────────────────────────────────────────────
-  
-  EU_ESPR:
-    enabled: true
-    enforcement_level: "STRICT"
-    description: "Ecodesign for Sustainable Products Regulation"
-  
-  DIGITAL_PRODUCT_PASSPORT:
-    enabled: true
-    enforcement_level: "STRICT"
-    description: "Digital Product Passport (DPP) - EU Traceability"
-    requirements:
-      - "Product lifecycle data"
-      - "Sustainability metrics"
-      - "Circular economy compliance"
-  
-  HUMANITARIAN_LOGISTICS_CARBON:
-    enabled: true
-    enforcement_level: "MODERATE"
-    description: "Humanitarian Logistics Carbon Footprint Framework (2025)"
-  
-  WFP_GREEN_SUPPLY_CHAIN:
-    enabled: true
-    enforcement_level: "MODERATE"
-    description: "WFP Green Supply Chain Standards"
-  
-  # ─────────────────────────────────────────────────────────
-  # X. INTERNATIONAL ESG & REPORTING STANDARDS (4 Frameworks)
-  # ─────────────────────────────────────────────────────────
-  
-  IFRS_S1:
-    enabled: true
-    enforcement_level: "MODERATE"
-    description: "IFRS S1 - General Sustainability Disclosure (ISSB)"
-  
-  IFRS_S2:
-    enabled: true
-    enforcement_level: "MODERATE"
-    description: "IFRS S2 - Climate-Related Disclosures (ISSB)"
-    requirements:
-      - "Scope 1, 2, 3 emissions disclosure"
-      - "Climate risk assessment"
-      - "Transition planning"
-      - "Scenario analysis"
-  
-  GRI_STANDARDS:
-    enabled: true
-    enforcement_level: "MODERATE"
-    description: "GRI Standards - Global Reporting Initiative"
-  
-  SASB_STANDARDS:
-    enabled: true
-    enforcement_level: "MODERATE"
-    description: "SASB Standards - Sustainability Accounting Standards Board"
+      - "Article 6 (Notification)"
+      - "Article 7 (Information Sharing)"
+      - "Article 12 (Public Health Response)"
 
 # Enforcement Actions
 enforcement:
@@ -674,54 +678,40 @@ enforcement:
     escalate_to:
       - "Chief Compliance Officer"
       - "Data Protection Officer"
+      - "Chief Information Security Officer"
 
 # Integration with Nuclear IP Stack
 nuclear_ip:
   IP_02_CRYPTO_SHREDDER:
     enabled: true
     auto_shred: true
+    retention_policies:
+      - "HOT"
+      - "WARM"
+      - "COLD"
   
   IP_03_ACORN_PROTOCOL:
     enabled: false  # Requires hardware attestation
+    somatic_factors:
+      - "posture"
+      - "location"
+      - "stillness"
   
   IP_04_SILENT_FLUX:
     enabled: false  # Requires anxiety monitoring
+    anxiety_threshold: 0.7
   
   IP_05_GOLDEN_THREAD:
     enabled: true
     verification_threshold: 0.8
+    data_streams:
+      - "CBS"
+      - "EMR"
+      - "IDSR"
   
   IP_06_5DM_BRIDGE:
     enabled: false  # Requires mobile network integration
-
-# Quantum-Law Nexus Configuration
-quantum_law_nexus:
-  enabled: true
-  
-  # AI-triggered harmonization
-  ai_harmonization:
-    enabled: true
-    auto_resolve_conflicts: true
-  
-  # Retroactive alignment engine
-  retroactive_alignment:
-    enabled: true
-    check_interval: "0 3 * * *"  # Daily at 3 AM UTC
-  
-  # Context-aware activation
-  context_aware:
-    enabled: true
-    triggers:
-      - "data_transfer"
-      - "high_risk_ai"
-      - "cross_border"
-      - "outbreak_detection"
-      - "supply_chain"
-      - "carbon_emission"
-      - "financial_transaction"
-      - "clinical_trial"
-      - "esg_reporting"
-      - "cybersecurity_incident"
+    target_nodes: 14000000
 
 # Monitoring & Alerting
 monitoring:
@@ -734,9 +724,8 @@ monitoring:
     - "high_risk_inferences_total"
     - "consent_validations_total"
     - "keys_shredded_total"
-    - "ai_conformity_assessments_total"
-    - "pandemic_emergency_escalations_total"
-    - "cybersecurity_incidents_total"
+    - "audit_events_total"
+    - "framework_checks_total"
   
   # Prometheus integration
   prometheus:
@@ -748,12 +737,11 @@ monitoring:
   grafana:
     enabled: true
     dashboards:
-      - "Sovereignty Compliance"
+      - "Sovereignty Compliance (47 Frameworks)"
       - "Audit Trail"
       - "Data Retention"
-      - "AI Governance"
-      - "Health Security"
-      - "ESG Reporting"
+      - "AI Explainability"
+      - "Humanitarian Constraints"
 
 # Development & Testing
 development:
@@ -766,3 +754,6 @@ development:
   
   # Test jurisdiction
   test_jurisdiction: "GLOBAL_DEFAULT"
+  
+  # Framework testing
+  test_all_frameworks: true
