@@ -5,12 +5,12 @@
 
 set -e
 
-# Colors
+# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m'
+NC='\033[0m' # No Color
 
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║     iLuminara-Core Branch Protection Setup                 ║${NC}"
@@ -19,59 +19,49 @@ echo ""
 
 # Check if gh CLI is installed
 if ! command -v gh &> /dev/null; then
-    echo -e "${RED}✗ GitHub CLI (gh) not found${NC}"
-    echo "Install: https://cli.github.com/"
+    echo -e "${RED}❌ GitHub CLI (gh) is not installed${NC}"
+    echo "Install it from: https://cli.github.com/"
     exit 1
 fi
 
-echo -e "${GREEN}✓ GitHub CLI found${NC}"
-
-# Check authentication
-echo -n "🔐 Checking GitHub authentication... "
+# Check if authenticated
 if ! gh auth status &> /dev/null; then
-    echo -e "${RED}✗ NOT AUTHENTICATED${NC}"
-    echo ""
+    echo -e "${YELLOW}⚠️  Not authenticated with GitHub${NC}"
     echo "Run: gh auth login"
-    echo "Or: gh auth refresh -s workflow,repo,write:packages,admin:repo_hook"
     exit 1
 fi
-echo -e "${GREEN}✓ AUTHENTICATED${NC}"
 
 # Get repository info
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
-echo -e "${BLUE}📦 Repository: ${REPO}${NC}"
-echo ""
 
-# Confirm setup
-echo -e "${YELLOW}This will configure branch protection for 'main' branch:${NC}"
-echo "  • Require pull request reviews (1 approval)"
-echo "  • Require status checks (CodeQL, Gitleaks)"
-echo "  • Require branches to be up to date"
-echo "  • Enforce for administrators"
-echo "  • Restrict push access"
-echo ""
-read -p "Continue? (y/N) " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Aborted."
-    exit 0
+if [ -z "$REPO" ]; then
+    echo -e "${RED}❌ Could not determine repository${NC}"
+    echo "Make sure you're in a git repository"
+    exit 1
 fi
 
+echo -e "${GREEN}📦 Repository: $REPO${NC}"
+echo ""
+
+# Refresh auth with required scopes
+echo -e "${YELLOW}🔐 Refreshing GitHub authentication with required scopes...${NC}"
+gh auth refresh -s workflow,repo,write:packages,admin:repo_hook
+
 echo ""
 echo -e "${YELLOW}═══════════════════════════════════════════════════════════${NC}"
-echo -e "${YELLOW}Configuring Branch Protection${NC}"
+echo -e "${YELLOW}Configuring Branch Protection for 'main'${NC}"
 echo -e "${YELLOW}═══════════════════════════════════════════════════════════${NC}"
 echo ""
 
-# Enable branch protection
-echo "🛡️  Enabling branch protection for 'main'..."
+# Enable branch protection for main
+echo -e "${BLUE}🛡️  Enabling branch protection...${NC}"
 
-# Create branch protection rule using GitHub API
+# Create branch protection rule
 gh api \
   --method PUT \
   -H "Accept: application/vnd.github+json" \
   -H "X-GitHub-Api-Version: 2022-11-28" \
-  "/repos/${REPO}/branches/main/protection" \
+  "/repos/$REPO/branches/main/protection" \
   -f required_status_checks[strict]=true \
   -f required_status_checks[contexts][]=CodeQL \
   -f required_status_checks[contexts][]=Gitleaks \
@@ -89,13 +79,24 @@ gh api \
   -f lock_branch=false \
   -f allow_fork_syncing=true
 
-if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✓ Branch protection enabled${NC}"
-else
-    echo -e "${RED}✗ Failed to enable branch protection${NC}"
-    echo "You may need additional permissions. Contact repository admin."
-    exit 1
-fi
+echo -e "${GREEN}✅ Branch protection enabled for 'main'${NC}"
+echo ""
+
+echo -e "${YELLOW}═══════════════════════════════════════════════════════════${NC}"
+echo -e "${YELLOW}Branch Protection Rules Summary${NC}"
+echo -e "${YELLOW}═══════════════════════════════════════════════════════════${NC}"
+echo ""
+
+echo -e "${GREEN}✓${NC} Require pull request before merging"
+echo -e "${GREEN}✓${NC} Require 1 approval"
+echo -e "${GREEN}✓${NC} Dismiss stale reviews"
+echo -e "${GREEN}✓${NC} Require status checks to pass:"
+echo "  - CodeQL (SAST security scanning)"
+echo "  - Gitleaks (Secret detection)"
+echo -e "${GREEN}✓${NC} Require conversation resolution"
+echo -e "${GREEN}✓${NC} Enforce for administrators"
+echo -e "${GREEN}✓${NC} Block force pushes"
+echo -e "${GREEN}✓${NC} Block deletions"
 
 echo ""
 echo -e "${YELLOW}═══════════════════════════════════════════════════════════${NC}"
@@ -103,86 +104,65 @@ echo -e "${YELLOW}Enabling Security Features${NC}"
 echo -e "${YELLOW}═══════════════════════════════════════════════════════════${NC}"
 echo ""
 
-# Enable vulnerability alerts
-echo "🔒 Enabling vulnerability alerts..."
+# Enable Dependabot security updates
+echo -e "${BLUE}🤖 Enabling Dependabot security updates...${NC}"
 gh api \
   --method PUT \
   -H "Accept: application/vnd.github+json" \
-  "/repos/${REPO}/vulnerability-alerts" \
-  && echo -e "${GREEN}✓ Vulnerability alerts enabled${NC}" \
-  || echo -e "${YELLOW}⚠ Already enabled or insufficient permissions${NC}"
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  "/repos/$REPO/automated-security-fixes"
 
-# Enable automated security fixes (Dependabot)
-echo "🤖 Enabling automated security fixes..."
+echo -e "${GREEN}✅ Dependabot security updates enabled${NC}"
+
+# Enable Dependabot alerts
+echo -e "${BLUE}🔔 Enabling Dependabot alerts...${NC}"
 gh api \
   --method PUT \
   -H "Accept: application/vnd.github+json" \
-  "/repos/${REPO}/automated-security-fixes" \
-  && echo -e "${GREEN}✓ Automated security fixes enabled${NC}" \
-  || echo -e "${YELLOW}⚠ Already enabled or insufficient permissions${NC}"
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  "/repos/$REPO/vulnerability-alerts"
+
+echo -e "${GREEN}✅ Dependabot alerts enabled${NC}"
 
 # Enable secret scanning
-echo "🔐 Enabling secret scanning..."
+echo -e "${BLUE}🔐 Enabling secret scanning...${NC}"
 gh api \
   --method PUT \
   -H "Accept: application/vnd.github+json" \
-  "/repos/${REPO}/secret-scanning" \
-  && echo -e "${GREEN}✓ Secret scanning enabled${NC}" \
-  || echo -e "${YELLOW}⚠ Requires GitHub Advanced Security${NC}"
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  "/repos/$REPO/secret-scanning"
 
-# Enable push protection
-echo "🛡️  Enabling secret scanning push protection..."
+echo -e "${GREEN}✅ Secret scanning enabled${NC}"
+
+# Enable secret scanning push protection
+echo -e "${BLUE}🛡️  Enabling secret scanning push protection...${NC}"
 gh api \
   --method PUT \
   -H "Accept: application/vnd.github+json" \
-  "/repos/${REPO}/secret-scanning/push-protection" \
-  && echo -e "${GREEN}✓ Push protection enabled${NC}" \
-  || echo -e "${YELLOW}⚠ Requires GitHub Advanced Security${NC}"
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  "/repos/$REPO/secret-scanning/push-protection"
 
-echo ""
-echo -e "${YELLOW}═══════════════════════════════════════════════════════════${NC}"
-echo -e "${YELLOW}Configuring Code Scanning${NC}"
-echo -e "${YELLOW}═══════════════════════════════════════════════════════════${NC}"
-echo ""
-
-# Enable code scanning (CodeQL)
-echo "🔍 Enabling code scanning..."
-gh api \
-  --method PUT \
-  -H "Accept: application/vnd.github+json" \
-  "/repos/${REPO}/code-scanning/default-setup" \
-  -f state=configured \
-  -f languages[]=python \
-  -f languages[]=javascript \
-  && echo -e "${GREEN}✓ Code scanning enabled${NC}" \
-  || echo -e "${YELLOW}⚠ CodeQL workflow may need manual setup${NC}"
+echo -e "${GREEN}✅ Secret scanning push protection enabled${NC}"
 
 echo ""
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║                    SETUP COMPLETE                          ║${NC}"
+echo -e "${BLUE}║                    FORTRESS SECURED                        ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
-echo -e "${GREEN}🛡️  Fortress Status: PROTECTED${NC}"
+echo -e "${GREEN}🛡️  The Sovereign Health Fortress is now protected:${NC}"
 echo ""
-echo "Branch protection configured:"
-echo "  ✓ Require pull request reviews (1 approval)"
-echo "  ✓ Require status checks (CodeQL, Gitleaks)"
-echo "  ✓ Require branches to be up to date"
-echo "  ✓ Enforce for administrators"
-echo "  ✓ Require conversation resolution"
-echo ""
-echo "Security features enabled:"
-echo "  ✓ Vulnerability alerts"
-echo "  ✓ Automated security fixes (Dependabot)"
-echo "  ✓ Secret scanning (if available)"
-echo "  ✓ Push protection (if available)"
-echo "  ✓ Code scanning (CodeQL)"
+echo "✓ Branch protection active on 'main'"
+echo "✓ Required status checks: CodeQL, Gitleaks"
+echo "✓ Pull request reviews required"
+echo "✓ Dependabot security updates enabled"
+echo "✓ Secret scanning enabled"
+echo "✓ Push protection enabled"
 echo ""
 echo -e "${YELLOW}Next steps:${NC}"
-echo "1. Verify workflows are running: gh workflow list"
-echo "2. Check security alerts: gh api /repos/${REPO}/vulnerability-alerts"
-echo "3. Review branch protection: gh api /repos/${REPO}/branches/main/protection"
-echo "4. Run fortress validation: ./scripts/validate_fortress.sh"
+echo "1. Ensure .github/workflows/codeql.yml exists"
+echo "2. Ensure .github/workflows/gitleaks.yml exists"
+echo "3. Ensure .github/dependabot.yml exists"
+echo "4. Create a pull request to test the protection"
 echo ""
-echo -e "${GREEN}The Sovereign Health Fortress is now protected.${NC}"
+echo -e "${GREEN}The Fortress is operational.${NC}"
