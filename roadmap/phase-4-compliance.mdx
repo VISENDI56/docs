@@ -1,0 +1,595 @@
+---
+title: 'Phase 4: Compliance Expansion'
+description: 'Policy-as-Code for 45+ global legal frameworks'
+icon: 'scale-balanced'
+---
+
+## Objective
+
+Automate the enforcement of 45+ global frameworks (GDPR, LGPD, HIPAA, etc.) using dynamic Policy-as-Code.
+
+<Card
+  title="Strategic goal"
+  icon="bullseye"
+>
+  **Instant compliance** - Update legal frameworks in minutes without code changes or redeployment
+</Card>
+
+## Current state
+
+### Hardcoded compliance logic
+
+```python
+# Current: Compliance rules embedded in application code
+def validate_data_transfer(data_type, destination, jurisdiction):
+    if jurisdiction == "GDPR_EU":
+        if data_type == "PHI" and destination not in ["EU", "UK", "Switzerland"]:
+            raise SovereigntyViolationError("GDPR Art. 9 violation")
+    elif jurisdiction == "KDPA_KE":
+        if data_type == "PHI" and destination != "Kenya":
+            raise SovereigntyViolationError("KDPA §37 violation")
+    # ... 12 more frameworks hardcoded
+```
+
+**Problem:** Adding new regulations requires code changes, testing, and deployment (weeks).
+
+### Limited framework coverage
+
+Currently supports 14 frameworks:
+- GDPR, KDPA, HIPAA, POPIA, PIPEDA, CCPA, HITECH, NIST CSF, ISO 27001, SOC 2, EU AI Act, GDPR Art. 9, Data Sovereignty, Right to Explanation
+
+**Gap:** Missing 31+ frameworks needed for global expansion.
+
+## Architecture upgrades
+
+### 1. Open Policy Agent (OPA)
+
+Integration of **OPA** to externalize decision logic.
+
+#### OPA architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    APPLICATION LAYER                        │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
+│  │ API Service  │  │  Dashboard   │  │ Edge Nodes   │    │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘    │
+│         │                  │                  │             │
+│         └──────────────────┼──────────────────┘             │
+│                            │                                │
+│                            ▼                                │
+│  ┌─────────────────────────────────────────────────────┐  │
+│  │           OPA POLICY ENGINE (REST API)              │  │
+│  │  - Rego policy evaluation                           │  │
+│  │  - Decision caching                                 │  │
+│  │  - Audit logging                                    │  │
+│  └─────────────────────────────────────────────────────┘  │
+│                            │                                │
+│                            ▼                                │
+│  ┌─────────────────────────────────────────────────────┐  │
+│  │           POLICY REPOSITORY (Git)                   │  │
+│  │  - 45+ framework policies (Rego)                    │  │
+│  │  - Version control                                  │  │
+│  │  - CI/CD pipeline                                   │  │
+│  └─────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Rego policy example
+
+```rego
+# policies/gdpr.rego
+package iluminara.compliance.gdpr
+
+# GDPR Article 9: Processing of special categories of personal data
+deny[msg] {
+    input.action == "data_transfer"
+    input.data_type == "PHI"
+    input.jurisdiction == "GDPR_EU"
+    not is_adequate_country(input.destination)
+    
+    msg := sprintf(
+        "GDPR Art. 9 violation: PHI transfer to %v requires adequacy decision or SCC",
+        [input.destination]
+    )
+}
+
+# Adequacy decisions (GDPR Art. 45)
+is_adequate_country(country) {
+    adequate_countries := ["EU", "UK", "Switzerland", "Canada", "Japan", "South Korea"]
+    country == adequate_countries[_]
+}
+
+# GDPR Article 17: Right to erasure
+allow_erasure {
+    input.action == "data_deletion"
+    input.jurisdiction == "GDPR_EU"
+    input.retention_period_expired == true
+}
+
+# GDPR Article 22: Right to explanation
+deny[msg] {
+    input.action == "high_risk_inference"
+    input.jurisdiction == "GDPR_EU"
+    not has_explanation(input)
+    
+    msg := "GDPR Art. 22 violation: High-risk AI decision requires explanation"
+}
+
+has_explanation(input) {
+    input.explanation != null
+    input.confidence_score != null
+    input.evidence_chain != null
+}
+```
+
+#### OPA client integration
+
+```python
+# governance_kernel/opa_client.py
+import requests
+import json
+from typing import Dict, List
+
+class OPAPolicyEngine:
+    """Open Policy Agent client for dynamic compliance"""
+    
+    def __init__(self, opa_url: str = "http://localhost:8181"):
+        self.opa_url = opa_url
+        self.cache = {}  # Decision cache
+    
+    def evaluate_policy(
+        self,
+        policy_path: str,
+        input_data: Dict
+    ) -> Dict:
+        """
+        Evaluate policy against input data
+        
+        Args:
+            policy_path: OPA policy path (e.g., "iluminara/compliance/gdpr")
+            input_data: Input data for policy evaluation
+        
+        Returns:
+            Policy decision with violations and allowed actions
+        """
+        
+        # Check cache
+        cache_key = self._cache_key(policy_path, input_data)
+        if cache_key in self.cache:
+            return self.cache[cache_key]
+        
+        # Query OPA
+        response = requests.post(
+            f"{self.opa_url}/v1/data/{policy_path}",
+            json={"input": input_data},
+            headers={"Content-Type": "application/json"}
+        )
+        
+        if response.status_code != 200:
+            raise Exception(f"OPA query failed: {response.text}")
+        
+        result = response.json()
+        
+        # Cache decision
+        self.cache[cache_key] = result
+        
+        return result
+    
+    def validate_action(
+        self,
+        action_type: str,
+        payload: Dict,
+        jurisdiction: str
+    ) -> bool:
+        """
+        Validate action against all applicable policies
+        
+        Args:
+            action_type: Type of action (e.g., "data_transfer")
+            payload: Action payload
+            jurisdiction: Legal jurisdiction
+        
+        Returns:
+            True if allowed, raises exception if denied
+        """
+        
+        input_data = {
+            "action": action_type,
+            "jurisdiction": jurisdiction,
+            **payload
+        }
+        
+        # Evaluate all applicable policies
+        policies = self._get_applicable_policies(jurisdiction)
+        
+        violations = []
+        for policy in policies:
+            result = self.evaluate_policy(policy, input_data)
+            
+            # Check for denials
+            if "deny" in result.get("result", {}):
+                violations.extend(result["result"]["deny"])
+        
+        if violations:
+            raise SovereigntyViolationError(
+                f"Policy violations: {', '.join(violations)}"
+            )
+        
+        return True
+    
+    def _get_applicable_policies(self, jurisdiction: str) -> List[str]:
+        """Get list of policies applicable to jurisdiction"""
+        
+        policy_map = {
+            "GDPR_EU": [
+                "iluminara/compliance/gdpr",
+                "iluminara/compliance/eu_ai_act",
+            ],
+            "KDPA_KE": [
+                "iluminara/compliance/kdpa",
+                "iluminara/compliance/african_union",
+            ],
+            "HIPAA_US": [
+                "iluminara/compliance/hipaa",
+                "iluminara/compliance/hitech",
+            ],
+            "LGPD_BR": [
+                "iluminara/compliance/lgpd",
+            ],
+            # ... 41 more frameworks
+        }
+        
+        return policy_map.get(jurisdiction, [])
+```
+
+### 2. Dynamic policy engine
+
+The Sovereign Guardrail now queries OPA for every transaction.
+
+#### Updated SovereignGuardrail
+
+```python
+# governance_kernel/vector_ledger.py (updated)
+from governance_kernel.opa_client import OPAPolicyEngine
+
+class SovereignGuardrail:
+    """Dynamic compliance enforcement with OPA"""
+    
+    def __init__(self, enable_opa: bool = True):
+        self.enable_opa = enable_opa
+        
+        if enable_opa:
+            self.opa = OPAPolicyEngine()
+        else:
+            # Fallback to hardcoded rules
+            self.opa = None
+    
+    def validate_action(
+        self,
+        action_type: str,
+        payload: Dict,
+        jurisdiction: str
+    ) -> bool:
+        """Validate action using OPA or fallback rules"""
+        
+        if self.opa:
+            # Dynamic policy evaluation
+            return self.opa.validate_action(action_type, payload, jurisdiction)
+        else:
+            # Fallback to hardcoded rules
+            return self._validate_hardcoded(action_type, payload, jurisdiction)
+```
+
+### 3. Policy repository
+
+Git-based policy management with CI/CD.
+
+#### Repository structure
+
+```
+policies/
+├── README.md
+├── .github/
+│   └── workflows/
+│       └── policy-ci.yml
+├── frameworks/
+│   ├── gdpr.rego
+│   ├── kdpa.rego
+│   ├── hipaa.rego
+│   ├── lgpd.rego
+│   ├── pipeda.rego
+│   ├── popia.rego
+│   ├── ccpa.rego
+│   ├── appi.rego (Japan)
+│   ├── pdpa_sg.rego (Singapore)
+│   ├── pdpa_th.rego (Thailand)
+│   ├── pdpl_sa.rego (Saudi Arabia)
+│   ├── dpa_uae.rego (UAE)
+│   └── ... (33 more)
+├── tests/
+│   ├── gdpr_test.rego
+│   ├── kdpa_test.rego
+│   └── ...
+└── data/
+    ├── adequacy_decisions.json
+    ├── country_mappings.json
+    └── framework_metadata.json
+```
+
+#### CI/CD pipeline
+
+```yaml
+# .github/workflows/policy-ci.yml
+name: Policy CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install OPA
+        run: |
+          curl -L -o opa https://openpolicyagent.org/downloads/latest/opa_linux_amd64
+          chmod +x opa
+          sudo mv opa /usr/local/bin/
+      
+      - name: Run policy tests
+        run: |
+          opa test policies/ --verbose
+      
+      - name: Validate policy syntax
+        run: |
+          opa check policies/frameworks/
+  
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Deploy to OPA servers
+        run: |
+          # Bundle policies
+          opa build policies/ -o bundle.tar.gz
+          
+          # Deploy to production OPA instances
+          for server in $OPA_SERVERS; do
+            curl -X PUT \
+              --data-binary @bundle.tar.gz \
+              http://$server:8181/v1/policies/iluminara
+          done
+        env:
+          OPA_SERVERS: ${{ secrets.OPA_SERVERS }}
+```
+
+## 45+ framework coverage
+
+### Regional frameworks
+
+<Tabs>
+  <Tab title="Europe">
+    - GDPR (EU)
+    - EU AI Act
+    - ePrivacy Directive
+    - NIS2 Directive
+    - DORA (Digital Operational Resilience Act)
+    - UK GDPR
+    - Swiss FADP
+  </Tab>
+  
+  <Tab title="Africa">
+    - KDPA (Kenya)
+    - POPIA (South Africa)
+    - DPA (Nigeria)
+    - DPA (Ghana)
+    - DPA (Mauritius)
+    - African Union Convention on Cyber Security
+  </Tab>
+  
+  <Tab title="Americas">
+    - HIPAA (USA)
+    - HITECH (USA)
+    - CCPA (California)
+    - CPRA (California)
+    - VCDPA (Virginia)
+    - CPA (Colorado)
+    - PIPEDA (Canada)
+    - LGPD (Brazil)
+  </Tab>
+  
+  <Tab title="Asia-Pacific">
+    - APPI (Japan)
+    - PDPA (Singapore)
+    - PDPA (Thailand)
+    - PDPA (Malaysia)
+    - Privacy Act (Australia)
+    - PIPL (China)
+    - PDPB (India - proposed)
+  </Tab>
+  
+  <Tab title="Middle East">
+    - PDPL (Saudi Arabia)
+    - DPA (UAE)
+    - DPA (Qatar)
+    - DPA (Bahrain)
+  </Tab>
+</Tabs>
+
+### Industry standards
+
+- ISO 27001 (Information Security)
+- ISO 27701 (Privacy)
+- SOC 2 (Service Organization Control)
+- NIST CSF (Cybersecurity Framework)
+- NIST SP 800-53 (Security Controls)
+- PCI DSS (Payment Card Industry)
+- HITRUST CSF (Healthcare)
+
+## Implementation timeline
+
+| Week | Milestone | Deliverable |
+|------|-----------|-------------|
+| **1-2** | OPA setup | Deploy OPA cluster (3 nodes) |
+| **3-6** | Policy migration | Convert 14 existing frameworks to Rego |
+| **7-10** | New frameworks | Add 31 new framework policies |
+| **11-12** | Testing | Comprehensive policy test suite |
+| **13-14** | Integration | Update SovereignGuardrail to use OPA |
+| **15-16** | Production | Gradual rollout with monitoring |
+
+## Success metrics
+
+| Metric | Current | Target | Measurement |
+|--------|---------|--------|-------------|
+| **Framework coverage** | 14 | 45+ | Policy count |
+| **Policy update time** | Weeks (code change) | Minutes (policy push) | Deployment time |
+| **Compliance accuracy** | 95% | 99.9% | Audit results |
+| **Policy evaluation latency** | N/A | <10ms | P95 latency |
+
+## Example: Adding LGPD (Brazil)
+
+### 1. Create policy file
+
+```rego
+# policies/frameworks/lgpd.rego
+package iluminara.compliance.lgpd
+
+# LGPD Article 7: Conditions for data processing
+deny[msg] {
+    input.action == "data_processing"
+    input.jurisdiction == "LGPD_BR"
+    not has_valid_consent(input)
+    not has_legal_basis(input)
+    
+    msg := "LGPD Art. 7 violation: Data processing requires consent or legal basis"
+}
+
+has_valid_consent(input) {
+    input.consent_token != null
+    input.consent_scope == input.processing_purpose
+}
+
+has_legal_basis(input) {
+    legal_bases := [
+        "legal_obligation",
+        "public_interest",
+        "vital_interests",
+        "legitimate_interests"
+    ]
+    input.legal_basis == legal_bases[_]
+}
+
+# LGPD Article 16: Right to data portability
+allow_data_export {
+    input.action == "data_export"
+    input.jurisdiction == "LGPD_BR"
+    input.format in ["JSON", "CSV", "XML"]
+}
+```
+
+### 2. Add tests
+
+```rego
+# policies/tests/lgpd_test.rego
+package iluminara.compliance.lgpd
+
+test_lgpd_requires_consent {
+    deny["LGPD Art. 7 violation: Data processing requires consent or legal basis"] with input as {
+        "action": "data_processing",
+        "jurisdiction": "LGPD_BR",
+        "consent_token": null,
+        "legal_basis": null
+    }
+}
+
+test_lgpd_allows_with_consent {
+    not deny[_] with input as {
+        "action": "data_processing",
+        "jurisdiction": "LGPD_BR",
+        "consent_token": "valid_token",
+        "consent_scope": "health_surveillance",
+        "processing_purpose": "health_surveillance"
+    }
+}
+```
+
+### 3. Deploy
+
+```bash
+# Run tests
+opa test policies/
+
+# Commit and push
+git add policies/frameworks/lgpd.rego
+git commit -m "feat: add LGPD (Brazil) compliance policy"
+git push
+
+# CI/CD automatically deploys to OPA servers
+# No application code changes required!
+```
+
+## Cost analysis
+
+### Current (Hardcoded)
+
+```
+Development time:  40 hours/framework
+Testing:           20 hours/framework
+Deployment:        4 hours
+─────────────────────────────────────
+TOTAL per framework: 64 hours (~$6,400)
+```
+
+### Target (Policy-as-Code)
+
+```
+OPA cluster:       $300/month (3 nodes)
+Policy development: 8 hours/framework
+Testing:           4 hours/framework
+Deployment:        5 minutes (automated)
+─────────────────────────────────────
+TOTAL per framework: 12 hours (~$1,200)
+```
+
+**Savings:** 81% reduction in time/cost per framework
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Phase 5: Deployment"
+    icon="rocket"
+    href="/roadmap/phase-5-deployment"
+  >
+    One-click global release pipelines
+  </Card>
+  <Card
+    title="OPA setup"
+    icon="server"
+    href="/deployment/opa"
+  >
+    Deploy Open Policy Agent cluster
+  </Card>
+  <Card
+    title="Policy repository"
+    icon="code-branch"
+    href="https://github.com/VISENDI56/iLuminara-Policies"
+  >
+    View policy repository
+  </Card>
+  <Card
+    title="Rego tutorial"
+    icon="book"
+    href="/governance/rego-guide"
+  >
+    Learn policy language
+  </Card>
+</CardGroup>
