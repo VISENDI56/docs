@@ -1,0 +1,542 @@
+---
+title: KDPA compliance
+description: Kenya Data Protection Act 2019 implementation in iLuminara-Core
+---
+
+## Overview
+
+iLuminara-Core implements comprehensive KDPA compliance through **offline edge localization protocols** that ensure data processing occurs within Kenyan territory, with Swahili-language consent interfaces and explanation pipelines meeting Section 25(b) transparency requirements.
+
+<Card
+  title="African Data Sovereignty"
+  icon="flag"
+>
+  KDPA positions iLuminara as the leading health data platform for East Africa, harmonizing with the African Union's Malabo Convention
+</Card>
+
+## Section 25: Principles of data protection
+
+### Right to privacy (25(1)(a))
+
+```python
+from governance_kernel.vector_ledger import SovereignGuardrail
+
+guardrail = SovereignGuardrail()
+
+# Privacy-first processing
+guardrail.validate_action(
+    action_type='Data_Processing',
+    payload={
+        'data_type': 'PHI',
+        'privacy_impact': 'assessed',
+        'privacy_safeguards': ['pseudonymization', 'encryption', 'access_control'],
+        'jurisdiction': 'KDPA_KE'
+    },
+    jurisdiction='KDPA_KE'
+)
+```
+
+### Lawfulness, fairness, transparency (25(1)(b))
+
+```python
+# Swahili-language transparency notice
+transparency_notice = {
+    'language': 'sw',  # Swahili
+    'notice': '''
+    Taarifa ya Faragha - iLuminara
+    
+    Tunakusanya data yako ya afya kwa madhumuni ya:
+    - Ufuatiliaji wa magonjwa
+    - Utabiri wa milipuko
+    - Huduma za afya ya umma
+    
+    Data yako itahifadhiwa ndani ya Kenya na haitasafirishwa nje ya nchi bila idhini yako.
+    ''',
+    'lawful_basis': 'Section_25_1_b_transparency'
+}
+```
+
+**Implementation:**
+- Swahili consent interfaces for local communities
+- Transparency notices at point of collection
+- Plain language explanations of data use
+
+### Purpose limitation (25(1)(c))
+
+```python
+# Purpose tags prevent incompatible processing
+guardrail.validate_action(
+    action_type='Data_Processing',
+    payload={
+        'original_purpose': 'cholera_surveillance',
+        'new_purpose': 'commercial_research',  # Incompatible
+        'data_type': 'PHI'
+    },
+    jurisdiction='KDPA_KE'
+)
+# Raises: SovereigntyViolationError - Purpose incompatible with original consent
+```
+
+### Data minimization (25(1)(d))
+
+```python
+from edge_node.frenasa_engine.voice_processor import VoiceProcessor
+
+# Extract only necessary fields
+processor = VoiceProcessor(
+    data_minimization=True,
+    jurisdiction='KDPA_KE'
+)
+
+result = processor.process_voice(
+    audio_data,
+    extract_fields=['symptoms', 'location', 'timestamp'],
+    exclude_fields=['name', 'id_number', 'phone', 'tribe']  # Sensitive PII excluded
+)
+```
+
+### Valid explanation for family/private affairs (25(1)(e))
+
+```python
+# Justification required for sensitive inquiries
+guardrail.validate_action(
+    action_type='Data_Collection',
+    payload={
+        'data_category': 'family_health_history',
+        'justification': 'Genetic disease risk assessment for cholera susceptibility',
+        'necessity': 'Required for accurate outbreak prediction',
+        'alternatives_considered': ['Individual history only - insufficient for genetic factors']
+    },
+    jurisdiction='KDPA_KE'
+)
+```
+
+### Accuracy (25(1)(f))
+
+```python
+from edge_node.sync_protocol.golden_thread import GoldenThread
+
+gt = GoldenThread()
+
+# Cross-source verification ensures accuracy
+fused = gt.fuse_data_streams(
+    cbs_signal={'symptom': 'diarrhea', 'location': 'Dadaab', 'timestamp': '2025-01-15T08:00Z'},
+    emr_record={'diagnosis': 'cholera', 'location': 'Dadaab', 'timestamp': '2025-01-15T08:30Z'},
+    patient_id='PAT_KE_001'
+)
+
+# Verification score: 1.0 (CONFIRMED) - Data accurate across sources
+# Inaccurate data automatically flagged for rectification
+```
+
+### Storage limitation (25(1)(g))
+
+```python
+from governance_kernel.crypto_shredder import CryptoShredder, RetentionPolicy
+
+shredder = CryptoShredder(sovereignty_zone=SovereigntyZone.KENYA)
+
+# KDPA-compliant retention
+encrypted_data, key_id = shredder.encrypt_with_ephemeral_key(
+    data=patient_record,
+    retention_policy=RetentionPolicy.HOT,  # 180 days
+    metadata={
+        'jurisdiction': 'KDPA_KE',
+        'data_category': 'health_surveillance',
+        'retention_justification': 'Active outbreak monitoring'
+    }
+)
+
+# Auto-shred after retention period
+shredder.auto_shred_expired_keys()
+```
+
+### No transfer outside Kenya (25(1)(h))
+
+```python
+# Strict data residency enforcement
+guardrail.validate_action(
+    action_type='Data_Transfer',
+    payload={
+        'data_type': 'PHI',
+        'source_location': 'africa-south1',  # Kenya
+        'destination_location': 'us-central1',  # USA - BLOCKED
+        'consent_provided': False
+    },
+    jurisdiction='KDPA_KE'
+)
+# Raises: SovereigntyViolationError - Transfer outside Kenya without consent (Section 25(1)(h))
+```
+
+## Section 29: Processing of sensitive personal data
+
+### Consent for health data (29(1)(a))
+
+```python
+# Explicit consent required for health data processing
+guardrail.validate_action(
+    action_type='Consent_Validation',
+    payload={
+        'data_type': 'sensitive_health_data',
+        'consent_token': 'KDPA_CONSENT_12345',
+        'consent_scope': 'cholera_surveillance',
+        'consent_method': 'explicit_written',  # Required for sensitive data
+        'language': 'sw',  # Swahili
+        'data_subject_id': 'PAT_KE_001'
+    },
+    jurisdiction='KDPA_KE'
+)
+```
+
+### Vital interests (29(1)(c))
+
+```python
+# Emergency processing without consent
+guardrail.validate_action(
+    action_type='Emergency_Override',
+    payload={
+        'data_type': 'sensitive_health_data',
+        'emergency_type': 'cholera_outbreak',
+        'vital_interests': 'life_threatening_dehydration',
+        'consent_impossible': 'patient_unconscious',
+        'lawful_basis': 'Section_29_1_c_vital_interests'
+    },
+    jurisdiction='KDPA_KE'
+)
+```
+
+### Public health (29(1)(h))
+
+```python
+# Primary lawful basis for iLuminara operations
+guardrail.validate_action(
+    action_type='Data_Processing',
+    payload={
+        'data_type': 'sensitive_health_data',
+        'processing_purpose': 'preventive_medicine',
+        'public_health_objective': 'cholera_outbreak_prevention',
+        'lawful_basis': 'Section_29_1_h_public_health',
+        'professional_secrecy': True,  # Healthcare workers bound
+        'safeguards': ['encryption', 'access_control', 'audit_trail']
+    },
+    jurisdiction='KDPA_KE'
+)
+```
+
+### Professional secrecy (29(2)(a))
+
+All healthcare workers in iLuminara are bound by professional secrecy obligations:
+
+```python
+# Role-based access with professional secrecy
+access_control = {
+    'user_id': 'CHV_AMINA_HASSAN',
+    'role': 'Community_Health_Volunteer',
+    'professional_secrecy_oath': 'signed_2025_01_01',
+    'access_level': 'community_data_only',
+    'audit_all_access': True
+}
+```
+
+## Section 42: Transfer of personal data outside Kenya
+
+### Proof of appropriate safeguards (42(1)(a))
+
+```python
+# Cross-border transfer with safeguards
+guardrail.validate_action(
+    action_type='Data_Transfer',
+    payload={
+        'data_type': 'PHI',
+        'source_jurisdiction': 'KDPA_KE',
+        'destination_jurisdiction': 'GDPR_EU',
+        'transfer_mechanism': 'Standard_Contractual_Clauses',
+        'scc_approved_by': 'Office_of_Data_Protection_Commissioner_Kenya',
+        'additional_safeguards': [
+            'encryption_AES_256',
+            'pseudonymization',
+            'access_control_RBAC',
+            'audit_trail_tamper_proof'
+        ],
+        'adequacy_assessment': 'EU_adequate_under_GDPR'
+    },
+    jurisdiction='KDPA_KE'
+)
+```
+
+### Consent after risk disclosure (42(1)(b))
+
+```python
+# Informed consent for cross-border transfer
+consent_payload = {
+    'data_subject_id': 'PAT_KE_001',
+    'transfer_destination': 'South_Africa',
+    'risks_disclosed': [
+        'Data will be processed outside Kenya',
+        'Different data protection laws apply',
+        'Enforcement of rights may be more difficult',
+        'Data may be subject to foreign government access'
+    ],
+    'consent_provided': True,
+    'consent_date': '2025-01-15',
+    'consent_language': 'sw'  # Swahili
+}
+```
+
+### Standard Contractual Clauses (42(2)(c))
+
+iLuminara implements KDPA-specific SCCs approved by the Office of the Data Protection Commissioner:
+
+```yaml
+# config/kdpa_scc.yaml
+scc_version: "ODPC_KE_2023_v1"
+parties:
+  data_exporter:
+    name: "iLuminara Kenya Operations"
+    jurisdiction: "Kenya"
+    dpo_contact: "dpo@iluminara.ke"
+  
+  data_importer:
+    name: "iLuminara Cloud Services"
+    jurisdiction: "EU"
+    dpo_contact: "dpo@iluminara.eu"
+
+clauses:
+  - clause_1: "Purpose limitation"
+  - clause_2: "Data minimization"
+  - clause_3: "Storage limitation"
+  - clause_4: "Security measures"
+  - clause_5: "Sub-processor obligations"
+  - clause_6: "Data subject rights"
+  - clause_7: "Liability and indemnification"
+  - clause_8: "Dispute resolution"
+
+additional_safeguards:
+  - "Encryption at rest and in transit"
+  - "Pseudonymization of identifiers"
+  - "Access controls with MFA"
+  - "Tamper-proof audit trail"
+  - "Annual security audits"
+```
+
+## Offline edge localization
+
+iLuminara's edge-first architecture ensures KDPA compliance through local processing:
+
+```python
+from edge_node.ai_agents import OfflineAgent, AgentCapability
+
+# Edge agent processes data locally in Kenya
+agent = OfflineAgent(
+    name="Dadaab Edge Node",
+    location="Dadaab, Kenya",
+    sovereignty_zone=SovereigntyZone.KENYA,
+    capabilities=[
+        AgentCapability.OFFLINE_OPERATION,
+        AgentCapability.LOCAL_STORAGE,
+        AgentCapability.AUTONOMOUS_INFERENCE
+    ]
+)
+
+# All processing occurs within Kenyan territory
+agent.queue_operation("inference", {
+    "patient_data": encrypted_phi,
+    "processing_location": "kenya_edge_node",
+    "data_residency": "compliant_KDPA_Section_25_1_h"
+})
+```
+
+## Swahili language support
+
+### Consent interfaces
+
+```python
+# Swahili consent form
+consent_form_sw = {
+    'title': 'Fomu ya Idhini ya Uchakataji wa Data',
+    'purpose': '''
+    iLuminara inakusanya na kuchakata data yako ya afya kwa madhumuni ya:
+    
+    1. Ufuatiliaji wa magonjwa ya mlipuko (kama vile kipindupindu)
+    2. Utabiri wa milipuko ya magonjwa
+    3. Huduma za afya ya umma
+    
+    Data yako itahifadhiwa salama na haitasafirishwa nje ya Kenya bila idhini yako.
+    ''',
+    'rights': '''
+    Una haki za:
+    - Kufikia data yako
+    - Kurekebisha data isiyo sahihi
+    - Kufuta data yako
+    - Kupinga uchakataji
+    - Kuondoa idhini wakati wowote
+    ''',
+    'consent_question': 'Je, unakubali iLuminara ichakata data yako ya afya?',
+    'accept_button': 'Nakubali',
+    'decline_button': 'Sijakubali'
+}
+```
+
+### Explanation pipelines
+
+```python
+# SHAP explanations in Swahili
+explanation_sw = {
+    'model_decision': 'Utabiri wa mlipuko wa kipindupindu',
+    'confidence': '95%',
+    'explanation': '''
+    Mfumo umetabiri mlipuko wa kipindupindu kwa sababu za:
+    
+    1. Ongezeko la haraka la visa vya kuhara (70% ya ushawishi)
+    2. Uchafuzi wa maji (20% ya ushawishi)
+    3. Mkusanyiko wa visa katika eneo moja (10% ya ushawishi)
+    
+    Hatua za haraka zinahitajika kuzuia kuenea zaidi.
+    ''',
+    'human_review': 'Daktari atakagua utabiri huu'
+}
+```
+
+## Data subject rights under KDPA
+
+<Tabs>
+  <Tab title="Right of access (Section 38)">
+    ```python
+    # Data subject access request
+    access_request = guardrail.process_dsar(
+        data_subject_id='PAT_KE_001',
+        request_type='access',
+        jurisdiction='KDPA_KE',
+        language='sw'  # Swahili response
+    )
+    
+    # Returns:
+    # - Copy of personal data
+    # - Processing purposes
+    # - Categories of data
+    # - Recipients
+    # - Retention period
+    # - Rights information (in Swahili)
+    ```
+  </Tab>
+  
+  <Tab title="Right to rectification (Section 39)">
+    ```python
+    # Correct inaccurate data
+    guardrail.process_dsar(
+        data_subject_id='PAT_KE_001',
+        request_type='rectification',
+        corrections={'location': 'Dadaab_Camp_2_Block_A'},
+        jurisdiction='KDPA_KE'
+    )
+    ```
+  </Tab>
+  
+  <Tab title="Right to erasure (Section 40)">
+    ```python
+    # Right to deletion (Crypto Shredder)
+    shredder.shred_key(key_id)
+    
+    # Data becomes cryptographically irrecoverable
+    # Audit trail maintained for KDPA Section 41 compliance
+    ```
+  </Tab>
+  
+  <Tab title="Right to object (Section 29(2)(b))">
+    ```python
+    # Object to processing
+    guardrail.process_dsar(
+        data_subject_id='PAT_KE_001',
+        request_type='object',
+        objection_grounds='No longer necessary for public health',
+        jurisdiction='KDPA_KE'
+    )
+    ```
+  </Tab>
+</Tabs>
+
+## Section 41: Accountability
+
+### Records of processing activities
+
+```python
+# Golden Thread maintains comprehensive records
+processing_records = gt.get_processing_records(
+    start_date='2025-01-01',
+    end_date='2025-12-31',
+    jurisdiction='KDPA_KE'
+)
+
+# Records include (Section 41(1)):
+# (a) Name and contact details of data controller
+# (b) Purposes of processing
+# (c) Description of data subjects and personal data
+# (d) Recipients of personal data
+# (e) Transfers to third countries
+# (f) Retention periods
+# (g) Security measures
+```
+
+## Integration with Malabo Convention
+
+KDPA compliance enables harmonization with the African Union's Malabo Convention on Cybersecurity and Personal Data Protection:
+
+```python
+# Malabo Convention alignment
+malabo_compliance = {
+    'article_13_data_protection': 'Aligned with KDPA Section 25',
+    'article_14_cross_border_flows': 'Aligned with KDPA Section 42',
+    'article_15_data_controller_obligations': 'Aligned with KDPA Section 41',
+    'article_16_data_subject_rights': 'Aligned with KDPA Sections 38-40',
+    'regional_cooperation': 'East African Community data sharing protocols'
+}
+```
+
+## Compliance validation
+
+```bash
+# Validate KDPA compliance
+./scripts/validate_fortress.sh --framework KDPA
+
+# Output:
+# ✓ Section 25 principles enforced
+# ✓ Section 29 health data safeguards active
+# ✓ Section 42 cross-border transfer controls configured
+# ✓ Section 41 processing records maintained
+# ✓ Swahili language support enabled
+# ✓ Offline edge localization operational
+# ✓ Data residency in Kenya enforced
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="GDPR compliance"
+    icon="european-union"
+    href="/governance/compliance/gdpr"
+  >
+    EU data protection regulation
+  </Card>
+  <Card
+    title="POPIA compliance"
+    icon="flag"
+    href="/governance/compliance/popia"
+  >
+    South Africa data protection
+  </Card>
+  <Card
+    title="Malabo Convention"
+    icon="globe-africa"
+    href="/governance/compliance/malabo"
+  >
+    African Union cybersecurity framework
+  </Card>
+  <Card
+    title="SovereignGuardrail"
+    icon="shield-check"
+    href="/governance/overview"
+  >
+    Configure enforcement engine
+  </Card>
+</CardGroup>
