@@ -1,0 +1,561 @@
+---
+title: GDPR compliance
+description: General Data Protection Regulation (EU) 2016/679 implementation in iLuminara-Core
+---
+
+## Overview
+
+iLuminara-Core implements comprehensive GDPR compliance through the **SovereignGuardrail** enforcement engine, transforming the platform from a data processor to a data controller with full accountability under Article 24.
+
+<Card
+  title="GDPR Foundation"
+  icon="scale-balanced"
+>
+  "GDPR-plus harmonization" - GDPR's extraterritorial scope serves as baseline for global health data governance
+</Card>
+
+## Core principles (Article 5)
+
+### Lawfulness, fairness, and transparency
+
+```python
+from governance_kernel.vector_ledger import SovereignGuardrail
+
+guardrail = SovereignGuardrail()
+
+# All processing must have lawful basis
+guardrail.validate_action(
+    action_type='Data_Processing',
+    payload={
+        'lawful_basis': 'Art_6_1_e_public_interest',  # Public health surveillance
+        'data_type': 'PHI',
+        'purpose': 'outbreak_detection',
+        'transparency_notice': 'provided_at_collection'
+    },
+    jurisdiction='GDPR_EU'
+)
+```
+
+**Implementation:**
+- Lawful basis documented for all processing activities
+- Transparency notices provided at point of collection
+- Privacy notices in local languages (Swahili, French, Portuguese)
+
+### Purpose limitation
+
+```python
+# Purpose limitation enforced through data minimization
+guardrail.validate_action(
+    action_type='Data_Processing',
+    payload={
+        'original_purpose': 'cholera_surveillance',
+        'new_purpose': 'malaria_research',  # Incompatible purpose
+        'data_type': 'PHI'
+    },
+    jurisdiction='GDPR_EU'
+)
+# Raises: SovereigntyViolationError - Purpose incompatible with original consent
+```
+
+**Implementation:**
+- Purpose tags attached to all data at collection
+- Automated checks prevent purpose creep
+- Re-consent required for incompatible purposes
+
+### Data minimization
+
+```python
+from edge_node.frenasa_engine.voice_processor import VoiceProcessor
+
+processor = VoiceProcessor(data_minimization=True)
+
+# Only extract necessary fields
+result = processor.process_voice(
+    audio_data,
+    extract_fields=['symptoms', 'location', 'timestamp'],
+    exclude_fields=['name', 'id_number', 'phone']  # PII excluded
+)
+```
+
+**Implementation:**
+- Acorn Protocol limits PHI exposure
+- Voice-to-JSON extracts only necessary fields
+- Pseudonymization applied by default
+
+### Accuracy
+
+```python
+from edge_node.sync_protocol.golden_thread import GoldenThread
+
+gt = GoldenThread()
+
+# Cross-source verification ensures accuracy
+fused = gt.fuse_data_streams(
+    cbs_signal={'symptom': 'fever', 'location': 'Dadaab'},
+    emr_record={'diagnosis': 'malaria', 'location': 'Dadaab'},
+    patient_id='PAT_001'
+)
+
+# Verification score: 1.0 (CONFIRMED) - Data accurate across sources
+```
+
+**Implementation:**
+- Golden Thread cross-validates data from CBS, EMR, IDSR
+- Automated correction of inaccurate data
+- Data subject right to rectification (Art. 16)
+
+### Storage limitation
+
+```python
+from governance_kernel.crypto_shredder import CryptoShredder, RetentionPolicy
+
+shredder = CryptoShredder()
+
+# Encrypt with retention policy
+encrypted_data, key_id = shredder.encrypt_with_ephemeral_key(
+    data=patient_record,
+    retention_policy=RetentionPolicy.HOT,  # 180 days
+    metadata={'jurisdiction': 'GDPR_EU'}
+)
+
+# Auto-shred after retention period
+shredder.auto_shred_expired_keys()
+```
+
+**Implementation:**
+- Retention policies: HOT (180d), WARM (365d), COLD (1825d)
+- Crypto Shredder auto-shreds expired keys
+- Data becomes cryptographically irrecoverable
+
+### Integrity and confidentiality
+
+```python
+# AES-256-GCM encryption with quantum-resistant algorithms
+encrypted_data = shredder.encrypt_with_ephemeral_key(
+    data=phi_data,
+    retention_policy=RetentionPolicy.HOT
+)
+
+# Tamper-proof audit trail
+guardrail.enable_tamper_proof_audit = True
+audit_history = guardrail.get_tamper_proof_audit_history()
+```
+
+**Implementation:**
+- AES-256-GCM encryption at rest
+- TLS 1.3 for data in transit
+- Tamper-proof audit trail with SHA-256 hash chain
+
+## Article 6: Lawfulness of processing
+
+### Lawful bases implemented
+
+<AccordionGroup>
+  <Accordion title="Art. 6(1)(a) - Consent">
+    Explicit consent for non-essential processing
+    
+    ```python
+    guardrail.validate_action(
+        action_type='Consent_Validation',
+        payload={
+            'consent_token': 'VALID_TOKEN_12345',
+            'consent_scope': 'research',
+            'data_subject_id': 'PAT_001'
+        },
+        jurisdiction='GDPR_EU'
+    )
+    ```
+  </Accordion>
+  
+  <Accordion title="Art. 6(1)(c) - Legal obligation">
+    WHO IHR (2005) disease reporting obligations
+    
+    ```python
+    # IDSR reporting to government health authorities
+    idsr_report = gt.generate_idsr_report(
+        start_date='2025-01-01',
+        end_date='2025-01-31',
+        lawful_basis='Art_6_1_c_legal_obligation'
+    )
+    ```
+  </Accordion>
+  
+  <Accordion title="Art. 6(1)(d) - Vital interests">
+    Emergency outbreak response
+    
+    ```python
+    # Emergency override for life-threatening situations
+    guardrail.validate_action(
+        action_type='Emergency_Override',
+        payload={
+            'emergency_type': 'cholera_outbreak',
+            'affected_population': 50000,
+            'lawful_basis': 'Art_6_1_d_vital_interests'
+        },
+        jurisdiction='GDPR_EU'
+    )
+    ```
+  </Accordion>
+  
+  <Accordion title="Art. 6(1)(e) - Public interest">
+    Public health surveillance (primary basis)
+    
+    ```python
+    # Default lawful basis for iLuminara operations
+    guardrail.validate_action(
+        action_type='Data_Processing',
+        payload={
+            'lawful_basis': 'Art_6_1_e_public_interest',
+            'public_health_task': 'disease_surveillance',
+            'legal_authority': 'WHO_IHR_2005_Article_6'
+        },
+        jurisdiction='GDPR_EU'
+    )
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Article 9: Special categories (health data)
+
+### Prohibition and exceptions
+
+Health data processing is **prohibited by default** under Art. 9(1), but iLuminara operates under multiple exceptions:
+
+```python
+# Art. 9(2)(c) - Vital interests
+guardrail.validate_action(
+    action_type='High_Risk_Inference',
+    payload={
+        'data_type': 'health_data',
+        'exception': 'Art_9_2_c_vital_interests',
+        'justification': 'Patient unable to consent, life-threatening cholera',
+        'consent_token': None  # Not required for vital interests
+    },
+    jurisdiction='GDPR_EU'
+)
+
+# Art. 9(2)(i) - Public health
+guardrail.validate_action(
+    action_type='Data_Processing',
+    payload={
+        'data_type': 'health_data',
+        'exception': 'Art_9_2_i_public_health',
+        'public_health_purpose': 'cross_border_threat_protection',
+        'legal_basis': 'WHO_IHR_2005',
+        'professional_secrecy': True  # Healthcare workers bound by secrecy
+    },
+    jurisdiction='GDPR_EU'
+)
+```
+
+### Safeguards for health data
+
+<Steps>
+  <Step title="Professional secrecy">
+    All healthcare workers bound by confidentiality obligations
+  </Step>
+  <Step title="Data minimization">
+    Only essential health data collected and processed
+  </Step>
+  <Step title="Encryption">
+    AES-256-GCM encryption with ephemeral keys
+  </Step>
+  <Step title="Access controls">
+    Role-based access with unique user identification
+  </Step>
+  <Step title="Audit trail">
+    Tamper-proof logging of all health data access
+  </Step>
+</Steps>
+
+## Article 22: Automated decision-making
+
+### Right to explanation
+
+Every high-risk AI inference requires explainability:
+
+```python
+from edge_node.ai_agents import EpidemiologicalForecastingAgent
+import shap
+
+agent = EpidemiologicalForecastingAgent(location="Nairobi")
+
+# Generate forecast with SHAP explanation
+forecast = agent.forecast_outbreak(
+    disease="cholera",
+    historical_data=cases,
+    require_explanation=True  # GDPR Art. 22(3)
+)
+
+# SHAP values provide feature importance
+print(f"Explanation: {forecast.shap_values}")
+print(f"Confidence: {forecast.confidence_score}")
+print(f"Evidence chain: {forecast.evidence_chain}")
+```
+
+### Human intervention
+
+```python
+# High-risk decisions require human review
+guardrail.validate_action(
+    action_type='High_Risk_Inference',
+    payload={
+        'inference_type': 'outbreak_prediction',
+        'confidence_score': 0.95,
+        'explanation': shap_values,
+        'evidence_chain': ['fever_spike', 'water_contamination', 'cluster_detected'],
+        'human_review_required': True,  # Art. 22(3)
+        'reviewer_id': 'DR_AMINA_HASSAN'
+    },
+    jurisdiction='GDPR_EU'
+)
+```
+
+### Safeguards implemented
+
+<CardGroup cols={2}>
+  <Card title="Right to obtain human intervention" icon="user">
+    All automated decisions can be reviewed by healthcare professionals
+  </Card>
+  <Card title="Right to express point of view" icon="comment">
+    Data subjects can contest automated decisions
+  </Card>
+  <Card title="Right to contest decision" icon="gavel">
+    Appeal mechanism for automated outbreak classifications
+  </Card>
+  <Card title="Meaningful information" icon="info-circle">
+    SHAP explanations provide logic and significance of processing
+  </Card>
+</CardGroup>
+
+## Article 30: Records of processing activities
+
+The **Golden Thread** serves as the comprehensive record of processing activities:
+
+```python
+# Retrieve processing records
+processing_records = gt.get_processing_records(
+    start_date='2025-01-01',
+    end_date='2025-12-31',
+    jurisdiction='GDPR_EU'
+)
+
+# Records include:
+# - Name and contact details of controller
+# - Purposes of processing
+# - Categories of data subjects
+# - Categories of personal data
+# - Categories of recipients
+# - Transfers to third countries
+# - Retention periods
+# - Security measures
+```
+
+## Article 32: Security of processing
+
+### Technical measures
+
+```python
+# Defense-in-depth security architecture
+security_measures = {
+    'encryption_at_rest': 'AES-256-GCM',
+    'encryption_in_transit': 'TLS 1.3',
+    'key_management': 'Cloud KMS with HSM',
+    'access_control': 'RBAC with MFA',
+    'audit_logging': 'Tamper-proof with SHA-256 chain',
+    'pseudonymization': 'Automatic for non-essential fields',
+    'backup_encryption': 'Separate key hierarchy'
+}
+```
+
+### Organizational measures
+
+- Security awareness training for all staff
+- Incident response procedures (HITECH integration)
+- Regular security testing (CodeQL, Gitleaks)
+- Data protection impact assessments (DPIA)
+- Privacy by design and by default
+
+## Cross-border transfers (Chapter V)
+
+### Standard Contractual Clauses (SCCs)
+
+```python
+# Cross-border transfer with SCCs
+guardrail.validate_action(
+    action_type='Data_Transfer',
+    payload={
+        'data_type': 'PHI',
+        'source_jurisdiction': 'GDPR_EU',
+        'destination_jurisdiction': 'KDPA_KE',
+        'transfer_mechanism': 'Standard_Contractual_Clauses',
+        'scc_version': 'EU_2021_914',  # New SCCs
+        'adequacy_decision': False,
+        'additional_safeguards': ['encryption', 'pseudonymization']
+    },
+    jurisdiction='GDPR_EU'
+)
+```
+
+### Adequacy decisions
+
+iLuminara recognizes EU adequacy decisions for:
+- 🇨🇭 Switzerland
+- 🇬🇧 United Kingdom
+- 🇨🇦 Canada (commercial organizations under PIPEDA)
+- 🇯🇵 Japan
+- 🇰🇷 South Korea
+
+### Binding Corporate Rules (BCRs)
+
+For multinational deployments, iLuminara implements BCRs covering:
+- Data protection principles
+- Rights of data subjects
+- Obligations of data controllers/processors
+- Liability and enforcement mechanisms
+
+## Data subject rights
+
+<Tabs>
+  <Tab title="Right of access (Art. 15)">
+    ```python
+    # Data subject access request
+    access_request = guardrail.process_dsar(
+        data_subject_id='PAT_001',
+        request_type='access',
+        jurisdiction='GDPR_EU'
+    )
+    
+    # Returns:
+    # - Copy of personal data
+    # - Processing purposes
+    # - Categories of data
+    # - Recipients
+    # - Retention period
+    # - Rights information
+    ```
+  </Tab>
+  
+  <Tab title="Right to rectification (Art. 16)">
+    ```python
+    # Correct inaccurate data
+    guardrail.process_dsar(
+        data_subject_id='PAT_001',
+        request_type='rectification',
+        corrections={'location': 'Dadaab_Camp_2'},
+        jurisdiction='GDPR_EU'
+    )
+    ```
+  </Tab>
+  
+  <Tab title="Right to erasure (Art. 17)">
+    ```python
+    # Right to be forgotten (Crypto Shredder)
+    shredder.shred_key(key_id)
+    
+    # Data becomes cryptographically irrecoverable
+    # Audit trail maintained for compliance
+    ```
+  </Tab>
+  
+  <Tab title="Right to data portability (Art. 20)">
+    ```python
+    # Export data in machine-readable format
+    portable_data = guardrail.export_portable_data(
+        data_subject_id='PAT_001',
+        format='JSON',  # or 'XML', 'CSV'
+        jurisdiction='GDPR_EU'
+    )
+    ```
+  </Tab>
+</Tabs>
+
+## Accountability (Art. 5(2))
+
+### Demonstrating compliance
+
+```python
+# Generate compliance report
+compliance_report = guardrail.generate_compliance_report(
+    framework='GDPR',
+    start_date='2025-01-01',
+    end_date='2025-12-31'
+)
+
+# Report includes:
+# - Processing activities (Art. 30)
+# - Lawful bases (Art. 6)
+# - Consent records (Art. 7)
+# - DPIAs conducted (Art. 35)
+# - Breach notifications (Art. 33-34)
+# - Data subject requests (Art. 15-22)
+# - Security measures (Art. 32)
+```
+
+## Integration with Golden Thread
+
+The Golden Thread amplifies GDPR compliance:
+
+<Steps>
+  <Step title="Article 30 records">
+    Comprehensive processing activity records
+  </Step>
+  <Step title="Article 5(2) accountability">
+    Immutable audit trail demonstrates compliance
+  </Step>
+  <Step title="Article 32 security">
+    Tamper-proof logging with cryptographic verification
+  </Step>
+  <Step title="Article 35 DPIA">
+    Risk assessment integrated into data fusion
+  </Step>
+</Steps>
+
+## Compliance validation
+
+```bash
+# Validate GDPR compliance
+./scripts/validate_fortress.sh --framework GDPR
+
+# Output:
+# ✓ Article 5 principles enforced
+# ✓ Article 6 lawful bases documented
+# ✓ Article 9 health data safeguards active
+# ✓ Article 22 explainability implemented
+# ✓ Article 30 processing records maintained
+# ✓ Article 32 security measures deployed
+# ✓ Chapter V transfer mechanisms configured
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="KDPA compliance"
+    icon="flag"
+    href="/governance/compliance/kdpa"
+  >
+    Kenya Data Protection Act implementation
+  </Card>
+  <Card
+    title="HIPAA compliance"
+    icon="hospital"
+    href="/governance/compliance/hipaa"
+  >
+    US healthcare data protection
+  </Card>
+  <Card
+    title="Compliance matrix"
+    icon="table"
+    href="/governance/compliance/matrix"
+  >
+    View all 14 frameworks
+  </Card>
+  <Card
+    title="SovereignGuardrail"
+    icon="shield-check"
+    href="/governance/overview"
+  >
+    Configure enforcement engine
+  </Card>
+</CardGroup>

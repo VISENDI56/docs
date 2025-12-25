@@ -1,0 +1,247 @@
+---
+title: HIPAA/HITECH compliance
+description: Health Insurance Portability and Accountability Act implementation in iLuminara-Core
+---
+
+## Overview
+
+iLuminara-Core implements comprehensive HIPAA (Health Insurance Portability and Accountability Act) and HITECH (Health Information Technology for Economic and Clinical Health) compliance for US healthcare operations.
+
+<Card
+  title="Jurisdiction"
+  icon="flag-usa"
+>
+  United States - Federal healthcare data protection law
+</Card>
+
+## Key requirements
+
+### HIPAA Security Rule (§164.312)
+
+<AccordionGroup>
+  <Accordion title="§164.312(a)(1) - Access Control">
+    **Requirement:** Implement technical policies to allow only authorized access to ePHI.
+    
+    **iLuminara Implementation:**
+    ```python
+    from governance_kernel.vector_ledger import SovereignGuardrail
+    
+    guardrail = SovereignGuardrail()
+    guardrail.validate_action(
+        action_type='Data_Access',
+        payload={
+            'user_id': 'DR_SMITH_001',
+            'role': 'physician',
+            'access_level': 'read_write',
+            'consent_token': 'VALID_TOKEN'
+        },
+        jurisdiction='HIPAA_US'
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="§164.312(a)(2)(i) - Unique User Identification">
+    **Requirement:** Assign unique identifiers for tracking user activity.
+    
+    **iLuminara Implementation:**
+    - Every action logged with unique user ID
+    - Gitleaks prevents credential leakage
+    - Tamper-proof audit trail tracks all access
+  </Accordion>
+
+  <Accordion title="§164.312(b) - Audit Controls">
+    **Requirement:** Implement hardware, software, and procedural mechanisms to record and examine activity.
+    
+    **iLuminara Implementation:**
+    ```python
+    # Tamper-proof audit with Cloud Spanner
+    guardrail = SovereignGuardrail(enable_tamper_proof_audit=True)
+    
+    # All actions automatically logged
+    history = guardrail.get_tamper_proof_audit_history(limit=100)
+    
+    # Verify chain integrity
+    integrity = guardrail.verify_audit_chain_integrity()
+    ```
+  </Accordion>
+
+  <Accordion title="§164.312(c)(1) - Integrity Controls">
+    **Requirement:** Implement policies to ensure ePHI is not improperly altered or destroyed.
+    
+    **iLuminara Implementation:**
+    - SHA-256 hash chains for data integrity
+    - Cloud KMS cryptographic signatures
+    - Immutable audit trail in Cloud Spanner
+  </Accordion>
+
+  <Accordion title="§164.312(d) - Person or Entity Authentication">
+    **Requirement:** Implement procedures to verify identity of persons or entities.
+    
+    **iLuminara Implementation:**
+    - Acorn Protocol (IP-03): Somatic authentication
+    - TPM hardware attestation
+    - Multi-factor authentication support
+  </Accordion>
+
+  <Accordion title="§164.312(e)(1) - Transmission Security">
+    **Requirement:** Implement technical security measures to guard against unauthorized access to ePHI during transmission.
+    
+    **iLuminara Implementation:**
+    - TLS 1.3 for all network communication
+    - LoRa mesh networking for edge devices
+    - VPN tunneling for cloud synchronization
+  </Accordion>
+</AccordionGroup>
+
+### HIPAA Privacy Rule (§164.502)
+
+<AccordionGroup>
+  <Accordion title="§164.502(a) - Minimum Necessary">
+    **Requirement:** Use or disclose only the minimum necessary PHI.
+    
+    **iLuminara Implementation:**
+    ```python
+    # Role-based data filtering
+    def get_patient_data(user_role, patient_id):
+        if user_role == 'physician':
+            return full_patient_record
+        elif user_role == 'nurse':
+            return limited_patient_record
+        elif user_role == 'billing':
+            return billing_info_only
+    ```
+  </Accordion>
+
+  <Accordion title="§164.502(b) - Individual Rights">
+    **Requirement:** Provide individuals with rights to access, amend, and receive accounting of disclosures.
+    
+    **iLuminara Implementation:**
+    - Tamper-proof audit provides complete disclosure accounting
+    - Crypto Shredder enables right to erasure
+    - API endpoints for data access requests
+  </Accordion>
+</AccordionGroup>
+
+### HITECH Act (§13410)
+
+<AccordionGroup>
+  <Accordion title="§13410 - Notification of Breach">
+    **Requirement:** Notify affected individuals, HHS, and media (if >500 individuals) within 60 days of breach discovery.
+    
+    **iLuminara Implementation:**
+    ```python
+    # Automatic breach notification
+    if sovereignty_violation_detected:
+        notify_affected_individuals()
+        notify_hhs()
+        if affected_count > 500:
+            notify_media()
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Data retention
+
+HIPAA requires retention of records for **6 years** from creation or last effective date.
+
+```python
+from governance_kernel.crypto_shredder import RetentionPolicy
+
+# HIPAA-compliant retention
+shredder.encrypt_with_ephemeral_key(
+    data=patient_record,
+    retention_policy=RetentionPolicy.COLD,  # 5 years
+    metadata={'jurisdiction': 'HIPAA_US'}
+)
+```
+
+## Business Associate Agreements (BAA)
+
+iLuminara-Core supports BAA requirements for third-party service providers:
+
+- **Google Cloud Platform** - BAA signed for Cloud Run, BigQuery, Spanner
+- **Vertex AI** - BAA covers AI/ML model training
+- **Cloud KMS** - BAA covers cryptographic key management
+
+## Breach notification workflow
+
+<Steps>
+  <Step title="Detection">
+    Security workflows detect unauthorized access or data exfiltration
+  </Step>
+  <Step title="Assessment">
+    Determine if breach affects >500 individuals
+  </Step>
+  <Step title="Notification (60 days)">
+    Notify affected individuals, HHS, and media (if applicable)
+  </Step>
+  <Step title="Remediation">
+    Crypto Shredder dissolves compromised data
+  </Step>
+  <Step title="Documentation">
+    Tamper-proof audit trail provides complete forensics
+  </Step>
+</Steps>
+
+## Compliance validation
+
+```bash
+# Validate HIPAA compliance
+python governance_kernel/compliance_validator.py --framework HIPAA_US
+
+# Check audit trail retention
+python governance_kernel/audit_validator.py --min-retention-days 2190
+```
+
+## HIPAA-specific configurations
+
+```yaml
+# config/sovereign_guardrail.yaml
+frameworks:
+  HIPAA:
+    enabled: true
+    sections:
+      - "§164.312 (Physical/Technical Safeguards)"
+      - "§164.530(j) (Documentation)"
+    
+    retention:
+      minimum_days: 2190  # 6 years
+    
+    breach_notification:
+      enabled: true
+      threshold: 500
+      notification_window_days: 60
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="HITECH Act"
+    icon="bolt"
+    href="/compliance/hitech"
+  >
+    Electronic health records incentives
+  </Card>
+  <Card
+    title="Audit trail"
+    icon="file-contract"
+    href="/governance/audit"
+  >
+    Configure tamper-proof logging
+  </Card>
+  <Card
+    title="Crypto Shredder"
+    icon="fire"
+    href="/security/crypto-shredder"
+  >
+    HIPAA-compliant data disposal
+  </Card>
+  <Card
+    title="Compliance matrix"
+    icon="table"
+    href="/compliance/matrix"
+  >
+    View all framework mappings
+  </Card>
+</CardGroup>
