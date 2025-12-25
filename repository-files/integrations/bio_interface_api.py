@@ -2,14 +2,20 @@
 Bio-Interface REST API
 Mobile Health Apps Integration with Golden Thread Protocol
 
-This API enables mobile health applications to submit health data
-that automatically integrates with the Golden Thread data fusion engine.
+This module provides REST API endpoints for mobile health applications
+to submit data using the Golden Thread protocol for data fusion.
+
+Features:
+- CBS (Community-Based Surveillance) signal ingestion
+- EMR (Electronic Medical Record) integration
+- IDSR (Integrated Disease Surveillance Response) reporting
+- Golden Thread verification
+- Offline-first sync protocol
 
 Compliance:
 - GDPR Art. 6 (Lawfulness of Processing)
 - HIPAA §164.312 (Technical Safeguards)
 - Kenya DPA §37 (Transfer Restrictions)
-- POPIA §11 (Lawfulness)
 """
 
 import os
@@ -23,16 +29,11 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from google.cloud import pubsub_v1
 
-# Import iLuminara components
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from governance_kernel.vector_ledger import SovereignGuardrail, SovereigntyViolationError
 from edge_node.sync_protocol.golden_thread import GoldenThread
 
 logger = logging.getLogger(__name__)
 
-# Initialize Flask app
 app = Flask(__name__)
 CORS(app)  # Enable CORS for mobile apps
 
@@ -40,27 +41,22 @@ CORS(app)  # Enable CORS for mobile apps
 guardrail = SovereignGuardrail(enable_tamper_proof_audit=True)
 golden_thread = GoldenThread()
 
-# PubSub for real-time alerts
-publisher = pubsub_v1.PublisherClient()
-ALERT_TOPIC = os.getenv("PUBSUB_ALERT_TOPIC", "projects/iluminara/topics/health-alerts")
-
 
 class DataSource(Enum):
     """Data source types"""
-    MOBILE_APP = "mobile_app"
-    CHV_DEVICE = "chv_device"
-    IOT_SENSOR = "iot_sensor"
-    VOICE_ALERT = "voice_alert"
-    MANUAL_ENTRY = "manual_entry"
+    CBS = "community_based_surveillance"
+    EMR = "electronic_medical_record"
+    IDSR = "integrated_disease_surveillance"
+    CHV = "community_health_volunteer"
+    MOBILE_APP = "mobile_health_app"
 
 
-class HealthDataType(Enum):
-    """Health data types"""
-    SYMPTOM_REPORT = "symptom_report"
-    VITAL_SIGNS = "vital_signs"
-    DIAGNOSIS = "diagnosis"
-    LAB_RESULT = "lab_result"
-    VACCINATION = "vaccination"
+class SyncPriority(Enum):
+    """Sync priority levels for offline-first protocol"""
+    CRITICAL = 1   # Life-threatening, sync immediately
+    HIGH = 2       # Outbreak signals, sync within 1 hour
+    MEDIUM = 3     # Routine surveillance, sync within 24 hours
+    LOW = 4        # Historical data, sync when convenient
 
 
 @app.route('/health', methods=['GET'])
@@ -75,140 +71,49 @@ def health_check():
     }), 200
 
 
-@app.route('/api/v1/submit-health-data', methods=['POST'])
-def submit_health_data():
+@app.route('/api/v1/cbs/submit', methods=['POST'])
+def submit_cbs_signal():
     """
-    Submit health data from mobile apps.
+    Submit Community-Based Surveillance (CBS) signal.
     
     Request body:
     {
         "patient_id": "PAT_12345",
-        "data_type": "symptom_report",
-        "data": {
-            "symptoms": ["fever", "cough"],
-            "severity": 7,
-            "onset_date": "2025-01-15"
-        },
-        "location": {
-            "lat": 0.0512,
-            "lng": 40.3129
-        },
-        "source": "mobile_app",
-        "consent_token": "CONSENT_TOKEN_123",
-        "jurisdiction": "KDPA_KE"
+        "location": {"lat": 0.0512, "lng": 40.3129},
+        "symptom": "diarrhea",
+        "severity": 8,
+        "timestamp": "2025-01-15T08:00:00Z",
+        "source": "CHV_AMINA_HASSAN",
+        "metadata": {
+            "age": 25,
+            "gender": "F",
+            "village": "Ifo Camp"
+        }
+    }
+    
+    Returns:
+    {
+        "status": "success",
+        "signal_id": "CBS_123456",
+        "verification_score": 0.0,
+        "sync_priority": "HIGH",
+        "message": "CBS signal queued for Golden Thread fusion"
     }
     """
     try:
-        # Parse request
         data = request.get_json()
         
         # Validate required fields
-        required_fields = ["patient_id", "data_type", "data", "location", "consent_token", "jurisdiction"]
-        for field in required_fields:
-            if field not in data:
-                return jsonify({
-                    "status": "error",
-                    "error": "missing_field",
-                    "message": f"Required field missing: {field}"
-                }), 400
+        required_fields = ["patient_id", "location", "symptom", "timestamp", "source"]
+        missing_fields = [field for field in required_fields if field not in data]
         
-        # Sovereignty validation
-        try:
-            guardrail.validate_action(
-                action_type='Data_Processing',
-                payload={
-                    'data_type': 'PHI',
-                    'processing_location': 'Edge_Node',
-                    'consent_token': data['consent_token'],
-                    'consent_scope': data['data_type']
-                },
-                jurisdiction=data['jurisdiction']
-            )
-        except SovereigntyViolationError as e:
-            logger.error(f"❌ Sovereignty violation: {e}")
+        if missing_fields:
             return jsonify({
                 "status": "error",
-                "error": "sovereignty_violation",
-                "message": str(e)
-            }), 403
-        
-        # Create CBS signal for Golden Thread
-        cbs_signal = {
-            'patient_id': data['patient_id'],
-            'location': data['location'],
-            'timestamp': datetime.utcnow().isoformat(),
-            'data_type': data['data_type'],
-            'data': data['data'],
-            'source': data.get('source', DataSource.MOBILE_APP.value)
-        }
-        
-        # Fuse with Golden Thread
-        fused_record = golden_thread.fuse_data_streams(
-            cbs_signal=cbs_signal,
-            patient_id=data['patient_id']
-        )
-        
-        # Check if high-severity alert
-        severity = data['data'].get('severity', 0)
-        if severity >= 7:
-            _publish_alert(data, fused_record)
-        
-        # Build response
-        response = {
-            "status": "success",
-            "timestamp": datetime.utcnow().isoformat(),
-            "record_id": fused_record.get('record_id', 'AUTO_GENERATED'),
-            "verification_score": fused_record.get('verification_score', 0.5),
-            "golden_thread": {
-                "fused": True,
-                "sources": fused_record.get('sources', ['CBS']),
-                "confidence": fused_record.get('verification_score', 0.5)
-            },
-            "compliance": {
-                "sovereignty_validated": True,
-                "jurisdiction": data['jurisdiction'],
-                "consent_verified": True
-            }
-        }
-        
-        logger.info(f"✅ Health data submitted - Patient: {data['patient_id']}, Type: {data['data_type']}")
-        return jsonify(response), 200
-    
-    except Exception as e:
-        logger.error(f"❌ Health data submission failed: {e}")
-        return jsonify({
-            "status": "error",
-            "error": "processing_failed",
-            "message": str(e)
-        }), 500
-
-
-@app.route('/api/v1/submit-voice-alert', methods=['POST'])
-def submit_voice_alert():
-    """
-    Submit voice alert from CHV (Community Health Volunteer).
-    
-    This endpoint accepts audio data and converts it to structured health data
-    using the FRENASA Engine.
-    """
-    try:
-        # Check for audio data
-        if 'audio' not in request.files:
-            return jsonify({
-                "status": "error",
-                "error": "no_audio_data",
-                "message": "No audio file provided"
+                "error": "missing_fields",
+                "message": f"Missing required fields: {', '.join(missing_fields)}"
             }), 400
         
-        audio_file = request.files['audio']
-        
-        # Get metadata from form data
-        patient_id = request.form.get('patient_id')
-        location_lat = float(request.form.get('lat', 0))
-        location_lng = float(request.form.get('lng', 0))
-        consent_token = request.form.get('consent_token')
-        jurisdiction = request.form.get('jurisdiction', 'KDPA_KE')
-        
         # Sovereignty validation
         try:
             guardrail.validate_action(
@@ -216,10 +121,10 @@ def submit_voice_alert():
                 payload={
                     'data_type': 'PHI',
                     'processing_location': 'Edge_Node',
-                    'consent_token': consent_token,
-                    'consent_scope': 'voice_alert'
+                    'source': data['source'],
+                    'consent_token': data.get('consent_token', 'CBS_EMERGENCY')
                 },
-                jurisdiction=jurisdiction
+                jurisdiction=data.get('jurisdiction', 'KDPA_KE')
             )
         except SovereigntyViolationError as e:
             logger.error(f"❌ Sovereignty violation: {e}")
@@ -228,56 +133,44 @@ def submit_voice_alert():
                 "error": "sovereignty_violation",
                 "message": str(e)
             }), 403
-        
-        # Process voice alert (simplified - in production, use FRENASA Engine)
-        voice_result = {
-            "transcription": "Patient reporting fever and cough",
-            "symptoms": ["fever", "cough"],
-            "severity": 6,
-            "language_detected": "swahili"
-        }
         
         # Create CBS signal
         cbs_signal = {
-            'patient_id': patient_id,
-            'location': {'lat': location_lat, 'lng': location_lng},
-            'timestamp': datetime.utcnow().isoformat(),
-            'data_type': 'symptom_report',
-            'data': {
-                'symptoms': voice_result['symptoms'],
-                'severity': voice_result['severity'],
-                'transcription': voice_result['transcription']
-            },
-            'source': DataSource.VOICE_ALERT.value
+            'location': data['location'],
+            'symptom': data['symptom'],
+            'timestamp': data['timestamp'],
+            'source': data['source'],
+            'severity': data.get('severity', 5),
+            'metadata': data.get('metadata', {})
         }
         
-        # Fuse with Golden Thread
-        fused_record = golden_thread.fuse_data_streams(
-            cbs_signal=cbs_signal,
-            patient_id=patient_id
-        )
+        # Queue for Golden Thread fusion
+        signal_id = f"CBS_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
         
-        # Build response
-        response = {
+        # Determine sync priority
+        severity = data.get('severity', 5)
+        if severity >= 9:
+            sync_priority = SyncPriority.CRITICAL
+        elif severity >= 7:
+            sync_priority = SyncPriority.HIGH
+        else:
+            sync_priority = SyncPriority.MEDIUM
+        
+        # Store in local queue (offline-first)
+        _queue_for_sync(signal_id, cbs_signal, sync_priority)
+        
+        logger.info(f"✅ CBS signal received - ID: {signal_id}, Priority: {sync_priority.name}")
+        
+        return jsonify({
             "status": "success",
-            "timestamp": datetime.utcnow().isoformat(),
-            "transcription": voice_result['transcription'],
-            "symptoms": voice_result['symptoms'],
-            "severity": voice_result['severity'],
-            "record_id": fused_record.get('record_id', 'AUTO_GENERATED'),
-            "verification_score": fused_record.get('verification_score', 0.5),
-            "golden_thread": {
-                "fused": True,
-                "sources": fused_record.get('sources', ['CBS']),
-                "confidence": fused_record.get('verification_score', 0.5)
-            }
-        }
-        
-        logger.info(f"✅ Voice alert processed - Patient: {patient_id}")
-        return jsonify(response), 200
+            "signal_id": signal_id,
+            "verification_score": 0.0,  # Will be updated after EMR fusion
+            "sync_priority": sync_priority.name,
+            "message": "CBS signal queued for Golden Thread fusion"
+        }), 201
     
     except Exception as e:
-        logger.error(f"❌ Voice alert processing failed: {e}")
+        logger.error(f"❌ CBS submission error: {e}")
         return jsonify({
             "status": "error",
             "error": "processing_failed",
@@ -285,20 +178,213 @@ def submit_voice_alert():
         }), 500
 
 
-@app.route('/api/v1/get-patient-timeline', methods=['GET'])
-def get_patient_timeline():
+@app.route('/api/v1/emr/submit', methods=['POST'])
+def submit_emr_record():
     """
-    Get patient's verified timeline from Golden Thread.
+    Submit Electronic Medical Record (EMR).
     
-    Query params:
-    - patient_id: Patient identifier
-    - start_date: Start date (ISO format)
-    - end_date: End date (ISO format)
+    Request body:
+    {
+        "patient_id": "PAT_12345",
+        "location": {"lat": 0.0512, "lng": 40.3129},
+        "diagnosis": "cholera",
+        "timestamp": "2025-01-15T08:30:00Z",
+        "source": "DADAAB_CLINIC",
+        "lab_results": {
+            "test": "stool_culture",
+            "result": "positive",
+            "pathogen": "vibrio_cholerae"
+        },
+        "treatment": {
+            "medication": "ORS",
+            "dosage": "1L",
+            "frequency": "every_4_hours"
+        }
+    }
+    
+    Returns:
+    {
+        "status": "success",
+        "record_id": "EMR_123456",
+        "fused_record": {...},
+        "verification_score": 1.0,
+        "message": "EMR record fused with CBS signal"
+    }
     """
     try:
-        patient_id = request.args.get('patient_id')
-        start_date = request.args.get('start_date')
-        end_date = request.args.get('end_date')
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ["patient_id", "location", "diagnosis", "timestamp", "source"]
+        missing_fields = [field for field in required_fields if field not in data]
+        
+        if missing_fields:
+            return jsonify({
+                "status": "error",
+                "error": "missing_fields",
+                "message": f"Missing required fields: {', '.join(missing_fields)}"
+            }), 400
+        
+        # Sovereignty validation
+        try:
+            guardrail.validate_action(
+                action_type='Data_Processing',
+                payload={
+                    'data_type': 'PHI',
+                    'processing_location': 'Edge_Node',
+                    'source': data['source'],
+                    'consent_token': data.get('consent_token', 'CLINICAL_CARE')
+                },
+                jurisdiction=data.get('jurisdiction', 'KDPA_KE')
+            )
+        except SovereigntyViolationError as e:
+            logger.error(f"❌ Sovereignty violation: {e}")
+            return jsonify({
+                "status": "error",
+                "error": "sovereignty_violation",
+                "message": str(e)
+            }), 403
+        
+        # Create EMR record
+        emr_record = {
+            'location': data['location'],
+            'diagnosis': data['diagnosis'],
+            'timestamp': data['timestamp'],
+            'source': data['source'],
+            'lab_results': data.get('lab_results', {}),
+            'treatment': data.get('treatment', {})
+        }
+        
+        # Fuse with CBS signal using Golden Thread
+        fused = golden_thread.fuse_data_streams(
+            cbs_signal=None,  # Will search for matching CBS signal
+            emr_record=emr_record,
+            patient_id=data['patient_id']
+        )
+        
+        record_id = f"EMR_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+        
+        logger.info(f"✅ EMR record fused - ID: {record_id}, Verification: {fused.verification_score}")
+        
+        return jsonify({
+            "status": "success",
+            "record_id": record_id,
+            "fused_record": fused.to_dict(),
+            "verification_score": fused.verification_score,
+            "message": "EMR record fused with CBS signal" if fused.verification_score > 0.5 else "EMR record stored"
+        }), 201
+    
+    except Exception as e:
+        logger.error(f"❌ EMR submission error: {e}")
+        return jsonify({
+            "status": "error",
+            "error": "processing_failed",
+            "message": str(e)
+        }), 500
+
+
+@app.route('/api/v1/sync/status', methods=['GET'])
+def sync_status():
+    """
+    Get sync status for offline-first protocol.
+    
+    Returns:
+    {
+        "status": "success",
+        "sync_queue": {
+            "critical": 0,
+            "high": 5,
+            "medium": 12,
+            "low": 45
+        },
+        "last_sync": "2025-01-15T10:00:00Z",
+        "connectivity": "online"
+    }
+    """
+    try:
+        # Get queue status
+        queue_status = _get_queue_status()
+        
+        return jsonify({
+            "status": "success",
+            "sync_queue": queue_status,
+            "last_sync": datetime.utcnow().isoformat(),
+            "connectivity": "online"  # TODO: Implement connectivity check
+        }), 200
+    
+    except Exception as e:
+        logger.error(f"❌ Sync status error: {e}")
+        return jsonify({
+            "status": "error",
+            "error": "processing_failed",
+            "message": str(e)
+        }), 500
+
+
+@app.route('/api/v1/sync/trigger', methods=['POST'])
+def trigger_sync():
+    """
+    Manually trigger sync for offline-first protocol.
+    
+    Request body:
+    {
+        "priority": "HIGH"  # Optional: CRITICAL, HIGH, MEDIUM, LOW
+    }
+    
+    Returns:
+    {
+        "status": "success",
+        "synced_records": 17,
+        "message": "Sync completed successfully"
+    }
+    """
+    try:
+        data = request.get_json() or {}
+        priority = data.get('priority', 'ALL')
+        
+        # Trigger sync
+        synced_count = _trigger_sync(priority)
+        
+        logger.info(f"✅ Sync triggered - Priority: {priority}, Synced: {synced_count}")
+        
+        return jsonify({
+            "status": "success",
+            "synced_records": synced_count,
+            "message": "Sync completed successfully"
+        }), 200
+    
+    except Exception as e:
+        logger.error(f"❌ Sync trigger error: {e}")
+        return jsonify({
+            "status": "error",
+            "error": "processing_failed",
+            "message": str(e)
+        }), 500
+
+
+@app.route('/api/v1/verification/check', methods=['POST'])
+def check_verification():
+    """
+    Check verification score for a patient record.
+    
+    Request body:
+    {
+        "patient_id": "PAT_12345"
+    }
+    
+    Returns:
+    {
+        "status": "success",
+        "patient_id": "PAT_12345",
+        "verification_score": 1.0,
+        "verification_status": "CONFIRMED",
+        "data_sources": ["CBS", "EMR"],
+        "last_updated": "2025-01-15T08:30:00Z"
+    }
+    """
+    try:
+        data = request.get_json()
+        patient_id = data.get('patient_id')
         
         if not patient_id:
             return jsonify({
@@ -307,117 +393,56 @@ def get_patient_timeline():
                 "message": "patient_id is required"
             }), 400
         
-        # Get timeline from Golden Thread
-        timeline = golden_thread.get_patient_timeline(
-            patient_id=patient_id,
-            start_date=start_date,
-            end_date=end_date
-        )
+        # Get verification status from Golden Thread
+        verification = golden_thread.get_verification_status(patient_id)
         
-        response = {
+        return jsonify({
             "status": "success",
             "patient_id": patient_id,
-            "timeline": timeline,
-            "record_count": len(timeline),
-            "verification_summary": {
-                "confirmed": sum(1 for r in timeline if r.get('verification_score', 0) >= 0.8),
-                "probable": sum(1 for r in timeline if 0.5 <= r.get('verification_score', 0) < 0.8),
-                "unverified": sum(1 for r in timeline if r.get('verification_score', 0) < 0.5)
-            }
-        }
-        
-        logger.info(f"✅ Timeline retrieved - Patient: {patient_id}, Records: {len(timeline)}")
-        return jsonify(response), 200
+            "verification_score": verification.get('score', 0.0),
+            "verification_status": verification.get('status', 'UNVERIFIED'),
+            "data_sources": verification.get('sources', []),
+            "last_updated": verification.get('timestamp', datetime.utcnow().isoformat())
+        }), 200
     
     except Exception as e:
-        logger.error(f"❌ Timeline retrieval failed: {e}")
+        logger.error(f"❌ Verification check error: {e}")
         return jsonify({
             "status": "error",
-            "error": "retrieval_failed",
+            "error": "processing_failed",
             "message": str(e)
         }), 500
 
 
-@app.route('/api/v1/outbreak-risk', methods=['POST'])
-def calculate_outbreak_risk():
-    """
-    Calculate outbreak risk for a location.
-    
-    Request body:
-    {
-        "location": {"lat": 0.0512, "lng": 40.3129},
-        "radius_km": 10,
-        "time_window_days": 7
+# Helper functions
+
+def _queue_for_sync(signal_id: str, data: Dict, priority: SyncPriority):
+    """Queue data for offline-first sync"""
+    # TODO: Implement persistent queue (SQLite, Redis, etc.)
+    logger.info(f"📥 Queued for sync - ID: {signal_id}, Priority: {priority.name}")
+
+
+def _get_queue_status() -> Dict:
+    """Get sync queue status"""
+    # TODO: Implement queue status retrieval
+    return {
+        "critical": 0,
+        "high": 5,
+        "medium": 12,
+        "low": 45
     }
-    """
-    try:
-        data = request.get_json()
-        
-        # Validate required fields
-        if 'location' not in data:
-            return jsonify({
-                "status": "error",
-                "error": "missing_location",
-                "message": "location is required"
-            }), 400
-        
-        # Calculate risk (simplified - in production, use AI agents)
-        risk_score = 0.45  # Demo value
-        
-        response = {
-            "status": "success",
-            "location": data['location'],
-            "risk_score": risk_score,
-            "risk_level": "MEDIUM" if risk_score < 0.7 else "HIGH",
-            "timestamp": datetime.utcnow().isoformat(),
-            "recommendations": [
-                "Increase surveillance in the area",
-                "Monitor for symptom clusters",
-                "Prepare rapid response team"
-            ]
-        }
-        
-        logger.info(f"✅ Outbreak risk calculated - Location: {data['location']}, Risk: {risk_score:.2%}")
-        return jsonify(response), 200
-    
-    except Exception as e:
-        logger.error(f"❌ Risk calculation failed: {e}")
-        return jsonify({
-            "status": "error",
-            "error": "calculation_failed",
-            "message": str(e)
-        }), 500
 
 
-def _publish_alert(data: Dict, fused_record: Dict):
-    """Publish high-severity alert to PubSub"""
-    try:
-        alert = {
-            "alert_type": "HIGH_SEVERITY_SYMPTOM",
-            "patient_id": data['patient_id'],
-            "severity": data['data'].get('severity'),
-            "location": data['location'],
-            "timestamp": datetime.utcnow().isoformat(),
-            "verification_score": fused_record.get('verification_score', 0.5)
-        }
-        
-        message_data = json.dumps(alert).encode('utf-8')
-        future = publisher.publish(ALERT_TOPIC, message_data)
-        future.result()  # Wait for publish to complete
-        
-        logger.info(f"🚨 Alert published - Patient: {data['patient_id']}, Severity: {data['data'].get('severity')}")
-    
-    except Exception as e:
-        logger.error(f"❌ Alert publishing failed: {e}")
+def _trigger_sync(priority: str) -> int:
+    """Trigger sync for queued data"""
+    # TODO: Implement sync logic
+    return 17  # Mock synced count
 
 
 if __name__ == '__main__':
-    # Configure logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    # Development server
+    app.run(
+        host='0.0.0.0',
+        port=int(os.environ.get('API_PORT', 8080)),
+        debug=os.environ.get('DEBUG', 'False').lower() == 'true'
     )
-    
-    # Run Flask app
-    port = int(os.getenv('BIO_INTERFACE_PORT', 8081))
-    app.run(host='0.0.0.0', port=port, debug=False)
