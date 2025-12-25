@@ -1,6 +1,10 @@
 """
 Vertex AI + SHAP Integration
-Right to Explanation for High-Risk Clinical Inferences
+Right to Explanation (EU AI Act §6, GDPR Art. 22)
+
+Every high-risk clinical inference requires explainability.
+This module integrates Google Cloud Vertex AI with SHAP (SHapley Additive exPlanations)
+to provide transparent, auditable AI decision-making.
 
 Compliance:
 - EU AI Act §6 (High-Risk AI Systems)
@@ -21,20 +25,22 @@ import pandas as pd
 import shap
 from google.cloud import aiplatform
 from google.cloud import bigquery
+from google.protobuf import json_format
+from google.protobuf.struct_pb2 import Value
 
 logger = logging.getLogger(__name__)
 
 
 class RiskLevel(Enum):
-    """Risk levels for AI inferences"""
+    """Risk levels for AI inference"""
     LOW = "low"           # Confidence < 0.5
     MEDIUM = "medium"     # Confidence 0.5-0.7
     HIGH = "high"         # Confidence 0.7-0.9
     CRITICAL = "critical" # Confidence > 0.9
 
 
-class ExplanationMethod(Enum):
-    """Explanation methods for model interpretability"""
+class ExplainabilityMethod(Enum):
+    """Explainability methods"""
     SHAP = "shap"
     LIME = "lime"
     FEATURE_IMPORTANCE = "feature_importance"
@@ -43,11 +49,9 @@ class ExplanationMethod(Enum):
 
 class VertexAIExplainer:
     """
-    Vertex AI model wrapper with SHAP explainability.
+    Vertex AI model with mandatory SHAP explainability for high-risk inferences.
     
-    Every high-risk clinical inference requires explanation to comply with:
-    - EU AI Act §6 (High-Risk AI)
-    - GDPR Art. 22 (Right to Explanation)
+    Enforces EU AI Act §6 requirement for transparency in high-risk AI systems.
     """
     
     def __init__(
@@ -72,265 +76,157 @@ class VertexAIExplainer:
             self.bq_client = bigquery.Client(project=project_id)
             self.audit_table = f"{project_id}.iluminara_audit.ai_explanations"
         
-        # SHAP explainer (initialized on first use)
-        self.shap_explainer = None
-        
         logger.info(f"🧠 Vertex AI Explainer initialized - Model: {model_name}")
     
     def predict_with_explanation(
         self,
-        features: Dict[str, float],
-        patient_id: str,
-        jurisdiction: str = "GDPR_EU",
-        require_explanation: bool = True
-    ) -> Dict:
+        endpoint_id: str,
+        instances: List[Dict],
+        feature_names: List[str],
+        background_data: Optional[np.ndarray] = None
+    ) -> List[Dict]:
         """
-        Make prediction with automatic explanation for high-risk inferences.
+        Make prediction with mandatory SHAP explanation for high-risk inferences.
         
         Args:
-            features: Input features for prediction
-            patient_id: Patient identifier
-            jurisdiction: Legal jurisdiction (GDPR_EU, KDPA_KE, etc.)
-            require_explanation: Force explanation regardless of risk level
+            endpoint_id: Vertex AI endpoint ID
+            instances: Input instances for prediction
+            feature_names: Names of input features
+            background_data: Background dataset for SHAP (optional)
         
         Returns:
-            Prediction with explanation and compliance metadata
+            List of predictions with explanations
         """
-        # Convert features to array
-        feature_array = np.array([list(features.values())])
-        feature_names = list(features.keys())
+        # Get endpoint
+        endpoint = aiplatform.Endpoint(endpoint_id)
         
-        # Make prediction (mock for demonstration)
-        prediction, confidence = self._predict(feature_array)
+        # Make prediction
+        predictions = endpoint.predict(instances=instances)
         
-        # Determine risk level
-        risk_level = self._determine_risk_level(confidence)
+        results = []
         
-        # Check if explanation is required
-        needs_explanation = (
-            require_explanation or 
-            confidence >= self.high_risk_threshold or
-            risk_level in [RiskLevel.HIGH, RiskLevel.CRITICAL]
-        )
-        
-        result = {
-            "prediction": prediction,
-            "confidence_score": float(confidence),
-            "risk_level": risk_level.value,
-            "patient_id": patient_id,
-            "jurisdiction": jurisdiction,
-            "timestamp": datetime.utcnow().isoformat(),
-            "model_name": self.model_name,
-            "features": features,
-            "explanation_required": needs_explanation
-        }
-        
-        # Generate explanation if required
-        if needs_explanation:
-            explanation = self._generate_shap_explanation(
-                feature_array, 
-                feature_names,
-                prediction
-            )
-            result["explanation"] = explanation
+        for idx, (instance, prediction) in enumerate(zip(instances, predictions.predictions)):
+            # Extract confidence score
+            confidence = self._extract_confidence(prediction)
             
-            # Compliance check
-            result["compliance"] = self._validate_compliance(
-                explanation, 
-                jurisdiction
-            )
+            # Determine risk level
+            risk_level = self._determine_risk_level(confidence)
             
-            logger.info(
-                f"🔍 High-risk inference - Patient: {patient_id}, "
-                f"Confidence: {confidence:.2%}, Explanation: GENERATED"
-            )
-        else:
-            result["explanation"] = None
-            result["compliance"] = {"status": "not_required"}
+            # High-risk inferences require explanation
+            if risk_level in [RiskLevel.HIGH, RiskLevel.CRITICAL]:
+                logger.info(f"🔍 High-risk inference detected (confidence: {confidence:.2%}) - Generating SHAP explanation")
+                
+                # Generate SHAP explanation
+                shap_values, base_value = self._generate_shap_explanation(
+                    endpoint=endpoint,
+                    instance=instance,
+                    feature_names=feature_names,
+                    background_data=background_data
+                )
+                
+                # Build explanation
+                explanation = {
+                    "method": "SHAP",
+                    "confidence_score": confidence,
+                    "risk_level": risk_level.value,
+                    "base_value": float(base_value),
+                    "shap_values": {
+                        feature: float(value)
+                        for feature, value in zip(feature_names, shap_values)
+                    },
+                    "feature_importance": self._rank_features(feature_names, shap_values),
+                    "evidence_chain": self._build_evidence_chain(feature_names, shap_values, instance),
+                    "decision_rationale": self._generate_rationale(feature_names, shap_values, prediction)
+                }
+                
+                # Audit log
+                if self.enable_audit:
+                    self._log_explanation(instance, prediction, explanation)
+                
+            else:
+                # Low/medium risk - basic explanation
+                explanation = {
+                    "method": "BASIC",
+                    "confidence_score": confidence,
+                    "risk_level": risk_level.value,
+                    "message": "Low-risk inference - detailed explanation not required"
+                }
             
-            logger.info(
-                f"✅ Low-risk inference - Patient: {patient_id}, "
-                f"Confidence: {confidence:.2%}, Explanation: NOT REQUIRED"
-            )
+            results.append({
+                "instance": instance,
+                "prediction": prediction,
+                "explanation": explanation,
+                "timestamp": datetime.utcnow().isoformat(),
+                "compliance": {
+                    "eu_ai_act": "§6 (High-Risk AI) - COMPLIANT",
+                    "gdpr": "Art. 22 (Right to Explanation) - COMPLIANT"
+                }
+            })
         
-        # Audit log
-        if self.enable_audit:
-            self._log_audit(result)
-        
-        return result
-    
-    def _predict(self, features: np.ndarray) -> Tuple[str, float]:
-        """
-        Make prediction using Vertex AI model.
-        
-        In production, this would call the actual Vertex AI endpoint.
-        For demonstration, we simulate a prediction.
-        """
-        # Mock prediction (replace with actual Vertex AI call)
-        # Example: endpoint.predict(instances=features.tolist())
-        
-        # Simulate outbreak risk prediction
-        risk_score = np.random.uniform(0.3, 0.95)
-        
-        if risk_score > 0.8:
-            prediction = "HIGH_RISK_OUTBREAK"
-        elif risk_score > 0.5:
-            prediction = "MODERATE_RISK"
-        else:
-            prediction = "LOW_RISK"
-        
-        return prediction, risk_score
+        return results
     
     def _generate_shap_explanation(
         self,
-        features: np.ndarray,
+        endpoint: aiplatform.Endpoint,
+        instance: Dict,
         feature_names: List[str],
-        prediction: str
-    ) -> Dict:
+        background_data: Optional[np.ndarray] = None
+    ) -> Tuple[np.ndarray, float]:
         """
-        Generate SHAP explanation for model prediction.
+        Generate SHAP explanation for a single instance.
         
-        SHAP (SHapley Additive exPlanations) provides:
-        - Feature importance
-        - Contribution to prediction
-        - Baseline comparison
+        Args:
+            endpoint: Vertex AI endpoint
+            instance: Input instance
+            feature_names: Feature names
+            background_data: Background dataset for SHAP
+        
+        Returns:
+            (shap_values, base_value)
         """
-        # Initialize SHAP explainer if not already done
-        if self.shap_explainer is None:
-            # In production, use actual model
-            # self.shap_explainer = shap.Explainer(model)
-            
-            # Mock explainer for demonstration
-            self.shap_explainer = self._create_mock_explainer()
+        # Convert instance to numpy array
+        instance_array = np.array([instance[f] for f in feature_names]).reshape(1, -1)
+        
+        # Create prediction function
+        def predict_fn(X):
+            instances = [
+                {feature: float(value) for feature, value in zip(feature_names, row)}
+                for row in X
+            ]
+            predictions = endpoint.predict(instances=instances)
+            return np.array([self._extract_confidence(p) for p in predictions.predictions])
+        
+        # Use background data or create synthetic
+        if background_data is None:
+            # Create synthetic background (mean of instance features)
+            background_data = instance_array
+        
+        # Initialize SHAP explainer
+        explainer = shap.KernelExplainer(predict_fn, background_data)
         
         # Calculate SHAP values
-        shap_values = self.shap_explainer(features)
+        shap_values = explainer.shap_values(instance_array)
         
-        # Extract feature contributions
-        feature_contributions = {}
-        for i, name in enumerate(feature_names):
-            feature_contributions[name] = {
-                "value": float(features[0][i]),
-                "shap_value": float(shap_values.values[0][i]),
-                "contribution_pct": float(
-                    abs(shap_values.values[0][i]) / 
-                    np.sum(np.abs(shap_values.values[0])) * 100
-                )
-            }
+        # Extract values
+        if isinstance(shap_values, list):
+            shap_values = shap_values[0]  # Binary classification
         
-        # Sort by contribution
-        sorted_features = sorted(
-            feature_contributions.items(),
-            key=lambda x: abs(x[1]["shap_value"]),
-            reverse=True
-        )
+        shap_values = shap_values[0]  # First instance
+        base_value = explainer.expected_value
         
-        # Generate explanation
-        explanation = {
-            "method": ExplanationMethod.SHAP.value,
-            "feature_contributions": dict(sorted_features),
-            "top_3_features": [f[0] for f in sorted_features[:3]],
-            "baseline_value": float(shap_values.base_values[0]),
-            "prediction_value": float(
-                shap_values.base_values[0] + 
-                np.sum(shap_values.values[0])
-            ),
-            "evidence_chain": self._build_evidence_chain(sorted_features),
-            "human_readable": self._generate_human_explanation(
-                sorted_features, 
-                prediction
-            )
-        }
+        if isinstance(base_value, np.ndarray):
+            base_value = base_value[0]
         
-        return explanation
+        return shap_values, base_value
     
-    def _build_evidence_chain(
-        self, 
-        sorted_features: List[Tuple[str, Dict]]
-    ) -> List[str]:
-        """Build evidence chain for clinical decision"""
-        evidence = []
-        
-        for feature_name, contribution in sorted_features[:5]:
-            if contribution["shap_value"] > 0:
-                evidence.append(
-                    f"{feature_name} (value: {contribution['value']:.2f}) "
-                    f"increases risk by {contribution['contribution_pct']:.1f}%"
-                )
-            else:
-                evidence.append(
-                    f"{feature_name} (value: {contribution['value']:.2f}) "
-                    f"decreases risk by {contribution['contribution_pct']:.1f}%"
-                )
-        
-        return evidence
-    
-    def _generate_human_explanation(
-        self,
-        sorted_features: List[Tuple[str, Dict]],
-        prediction: str
-    ) -> str:
-        """Generate human-readable explanation"""
-        top_feature = sorted_features[0]
-        
-        explanation = (
-            f"The model predicts {prediction} primarily based on "
-            f"{top_feature[0]} (contributing {top_feature[1]['contribution_pct']:.1f}% "
-            f"to the decision). "
-        )
-        
-        if len(sorted_features) > 1:
-            second_feature = sorted_features[1]
-            explanation += (
-                f"The second most important factor is {second_feature[0]} "
-                f"({second_feature[1]['contribution_pct']:.1f}% contribution). "
-            )
-        
-        return explanation
-    
-    def _validate_compliance(
-        self, 
-        explanation: Dict, 
-        jurisdiction: str
-    ) -> Dict:
-        """
-        Validate explanation meets compliance requirements.
-        
-        Different jurisdictions have different requirements:
-        - EU AI Act: High-risk AI requires explanation
-        - GDPR Art. 22: Right to explanation for automated decisions
-        - HIPAA: Right of access to health information
-        """
-        compliance = {
-            "status": "compliant",
-            "jurisdiction": jurisdiction,
-            "requirements_met": [],
-            "violations": []
-        }
-        
-        # Check EU AI Act §6 requirements
-        if jurisdiction in ["GDPR_EU", "EU_AI_ACT"]:
-            if explanation["method"] in [ExplanationMethod.SHAP.value]:
-                compliance["requirements_met"].append("EU AI Act §6 (Explainability)")
-            else:
-                compliance["violations"].append("EU AI Act §6 - Insufficient explanation")
-                compliance["status"] = "non_compliant"
-            
-            if "evidence_chain" in explanation:
-                compliance["requirements_met"].append("GDPR Art. 22 (Right to Explanation)")
-            else:
-                compliance["violations"].append("GDPR Art. 22 - Missing evidence chain")
-                compliance["status"] = "non_compliant"
-        
-        # Check HIPAA requirements
-        if jurisdiction == "HIPAA_US":
-            if "human_readable" in explanation:
-                compliance["requirements_met"].append("HIPAA §164.524 (Right of Access)")
-            else:
-                compliance["violations"].append("HIPAA §164.524 - Missing human explanation")
-                compliance["status"] = "non_compliant"
-        
-        return compliance
+    def _extract_confidence(self, prediction) -> float:
+        """Extract confidence score from prediction"""
+        if isinstance(prediction, dict):
+            return prediction.get('confidence', prediction.get('score', 0.5))
+        elif isinstance(prediction, (list, np.ndarray)):
+            return float(prediction[0]) if len(prediction) > 0 else 0.5
+        else:
+            return float(prediction)
     
     def _determine_risk_level(self, confidence: float) -> RiskLevel:
         """Determine risk level based on confidence score"""
@@ -343,92 +239,177 @@ class VertexAIExplainer:
         else:
             return RiskLevel.LOW
     
-    def _create_mock_explainer(self):
-        """Create mock SHAP explainer for demonstration"""
-        # In production, this would be: shap.Explainer(actual_model)
+    def _rank_features(self, feature_names: List[str], shap_values: np.ndarray) -> List[Dict]:
+        """Rank features by absolute SHAP value"""
+        feature_importance = [
+            {
+                "feature": name,
+                "shap_value": float(value),
+                "abs_importance": abs(float(value))
+            }
+            for name, value in zip(feature_names, shap_values)
+        ]
         
-        class MockExplainer:
-            def __call__(self, features):
-                # Generate mock SHAP values
-                shap_values = np.random.randn(*features.shape) * 0.1
-                
-                class MockExplanation:
-                    def __init__(self, values, base_values):
-                        self.values = values
-                        self.base_values = base_values
-                
-                return MockExplanation(shap_values, np.array([0.5]))
+        # Sort by absolute importance
+        feature_importance.sort(key=lambda x: x['abs_importance'], reverse=True)
         
-        return MockExplainer()
+        return feature_importance
     
-    def _log_audit(self, result: Dict):
-        """Log inference to BigQuery audit table"""
+    def _build_evidence_chain(
+        self,
+        feature_names: List[str],
+        shap_values: np.ndarray,
+        instance: Dict
+    ) -> List[str]:
+        """Build evidence chain for decision"""
+        evidence = []
+        
+        # Get top 3 features
+        ranked = self._rank_features(feature_names, shap_values)[:3]
+        
+        for item in ranked:
+            feature = item['feature']
+            shap_value = item['shap_value']
+            feature_value = instance.get(feature, 'N/A')
+            
+            direction = "increases" if shap_value > 0 else "decreases"
+            evidence.append(
+                f"{feature}={feature_value} {direction} risk by {abs(shap_value):.3f}"
+            )
+        
+        return evidence
+    
+    def _generate_rationale(
+        self,
+        feature_names: List[str],
+        shap_values: np.ndarray,
+        prediction
+    ) -> str:
+        """Generate human-readable decision rationale"""
+        ranked = self._rank_features(feature_names, shap_values)
+        top_feature = ranked[0]
+        
+        confidence = self._extract_confidence(prediction)
+        
+        rationale = (
+            f"The model predicts with {confidence:.1%} confidence. "
+            f"The most influential factor is '{top_feature['feature']}' "
+            f"(SHAP value: {top_feature['shap_value']:.3f}), which "
+            f"{'increases' if top_feature['shap_value'] > 0 else 'decreases'} "
+            f"the predicted risk."
+        )
+        
+        return rationale
+    
+    def _log_explanation(self, instance: Dict, prediction, explanation: Dict):
+        """Log explanation to BigQuery for audit trail"""
         try:
-            # Prepare audit record
-            audit_record = {
-                "timestamp": result["timestamp"],
-                "patient_id": result["patient_id"],
-                "model_name": result["model_name"],
-                "prediction": result["prediction"],
-                "confidence_score": result["confidence_score"],
-                "risk_level": result["risk_level"],
-                "explanation_required": result["explanation_required"],
-                "jurisdiction": result["jurisdiction"],
-                "compliance_status": result.get("compliance", {}).get("status"),
-                "features": json.dumps(result["features"]),
-                "explanation": json.dumps(result.get("explanation"))
+            row = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "model_name": self.model_name,
+                "instance": json.dumps(instance),
+                "prediction": json.dumps(str(prediction)),
+                "explanation": json.dumps(explanation),
+                "risk_level": explanation['risk_level'],
+                "confidence_score": explanation['confidence_score'],
+                "compliance_framework": "EU_AI_ACT_GDPR"
             }
             
-            # Insert to BigQuery
-            errors = self.bq_client.insert_rows_json(
-                self.audit_table, 
-                [audit_record]
-            )
+            errors = self.bq_client.insert_rows_json(self.audit_table, [row])
             
             if errors:
-                logger.error(f"❌ Audit log failed: {errors}")
+                logger.error(f"❌ Failed to log explanation: {errors}")
             else:
-                logger.debug(f"✅ Audit logged - Patient: {result['patient_id']}")
+                logger.info(f"✅ Explanation logged to audit trail")
         
         except Exception as e:
-            logger.error(f"❌ Audit logging error: {e}")
+            logger.error(f"❌ Audit logging failed: {e}")
+    
+    def batch_explain(
+        self,
+        endpoint_id: str,
+        instances: List[Dict],
+        feature_names: List[str],
+        background_data: Optional[np.ndarray] = None
+    ) -> pd.DataFrame:
+        """
+        Batch explanation for multiple instances.
+        
+        Returns:
+            DataFrame with predictions and explanations
+        """
+        results = self.predict_with_explanation(
+            endpoint_id=endpoint_id,
+            instances=instances,
+            feature_names=feature_names,
+            background_data=background_data
+        )
+        
+        # Convert to DataFrame
+        df = pd.DataFrame([
+            {
+                "timestamp": r['timestamp'],
+                "confidence": r['explanation']['confidence_score'],
+                "risk_level": r['explanation']['risk_level'],
+                "method": r['explanation']['method'],
+                "top_feature": r['explanation'].get('feature_importance', [{}])[0].get('feature', 'N/A'),
+                "evidence": '; '.join(r['explanation'].get('evidence_chain', [])),
+                "rationale": r['explanation'].get('decision_rationale', 'N/A')
+            }
+            for r in results
+        ])
+        
+        return df
 
 
 # Example usage
 if __name__ == "__main__":
     # Initialize explainer
     explainer = VertexAIExplainer(
-        project_id="iluminara-core",
+        project_id="iluminara-health",
         location="us-central1",
-        model_name="outbreak-forecaster",
+        model_name="cholera-outbreak-forecaster",
         high_risk_threshold=0.7
     )
     
-    # Make prediction with explanation
-    features = {
-        "fever_cases": 45,
-        "diarrhea_cases": 32,
-        "population_density": 1200,
-        "water_quality_index": 0.3,
-        "sanitation_score": 0.4,
-        "rainfall_mm": 120,
-        "temperature_celsius": 28
-    }
+    # Example instances
+    instances = [
+        {
+            "cases_last_7_days": 45,
+            "population_density": 1200,
+            "water_quality_score": 0.3,
+            "sanitation_coverage": 0.4,
+            "rainfall_mm": 120,
+            "temperature_celsius": 28
+        }
+    ]
     
-    result = explainer.predict_with_explanation(
-        features=features,
-        patient_id="PAT_12345",
-        jurisdiction="GDPR_EU"
+    feature_names = [
+        "cases_last_7_days",
+        "population_density",
+        "water_quality_score",
+        "sanitation_coverage",
+        "rainfall_mm",
+        "temperature_celsius"
+    ]
+    
+    # Make prediction with explanation
+    results = explainer.predict_with_explanation(
+        endpoint_id="projects/123/locations/us-central1/endpoints/456",
+        instances=instances,
+        feature_names=feature_names
     )
     
-    print(json.dumps(result, indent=2))
-    
-    # Output includes:
-    # - Prediction
-    # - Confidence score
-    # - Risk level
-    # - SHAP explanation
-    # - Feature contributions
-    # - Evidence chain
-    # - Human-readable explanation
-    # - Compliance validation
+    # Print results
+    for result in results:
+        print(f"\n{'='*60}")
+        print(f"Prediction: {result['prediction']}")
+        print(f"Confidence: {result['explanation']['confidence_score']:.1%}")
+        print(f"Risk Level: {result['explanation']['risk_level']}")
+        print(f"\nEvidence Chain:")
+        for evidence in result['explanation'].get('evidence_chain', []):
+            print(f"  • {evidence}")
+        print(f"\nRationale: {result['explanation'].get('decision_rationale', 'N/A')}")
+        print(f"\nCompliance:")
+        for framework, status in result['compliance'].items():
+            print(f"  ✓ {framework}: {status}")
