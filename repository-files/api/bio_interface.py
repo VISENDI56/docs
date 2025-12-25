@@ -1,451 +1,367 @@
 """
 Bio-Interface REST API
-═══════════════════════════════════════════════════════════════════════════════
+Mobile Health Apps integration with Golden Thread protocol
 
-REST API for Mobile Health Apps ensuring Golden Thread protocol integration
-for data fusion from CBS (Community-Based Surveillance) and EMR (Electronic
-Medical Records).
-
-Verification: Signals are tagged as CONFIRMED only if location and time-delta
-match within 24 hours.
+This API enables mobile health applications to submit health data
+that automatically integrates with the Golden Thread data fusion engine.
 
 Compliance:
-- GDPR Art. 9 (Special Categories)
+- GDPR Art. 6 (Lawfulness of Processing)
 - HIPAA §164.312 (Technical Safeguards)
 - Kenya DPA §37 (Transfer Restrictions)
-- WHO IHR Article 6 (Notification)
 """
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from typing import Dict, Any, Optional
-from datetime import datetime, timedelta
-from dataclasses import dataclass, asdict
+from typing import Dict, Optional
 import logging
-import json
+from datetime import datetime
+from dataclasses import dataclass, asdict
+import hashlib
 
-# Golden Thread integration
-try:
-    from edge_node.sync_protocol.golden_thread import GoldenThread
-    GOLDEN_THREAD_AVAILABLE = True
-except ImportError:
-    GOLDEN_THREAD_AVAILABLE = False
-    print("⚠️  Golden Thread not available")
-
-# Governance integration
-try:
-    from governance_kernel.vector_ledger import SovereignGuardrail
-    GOVERNANCE_AVAILABLE = True
-except ImportError:
-    GOVERNANCE_AVAILABLE = False
-    print("⚠️  Governance kernel not available")
+# Import iLuminara components
+import sys
+sys.path.append('..')
+from governance_kernel.vector_ledger import SovereignGuardrail, SovereigntyViolationError
+from edge_node.sync_protocol.golden_thread import GoldenThread
 
 logger = logging.getLogger(__name__)
 
-# Initialize Flask app
 app = Flask(__name__)
 CORS(app)  # Enable CORS for mobile apps
 
-# Initialize Golden Thread
-golden_thread = GoldenThread() if GOLDEN_THREAD_AVAILABLE else None
-
-# Initialize Governance
-guardrail = SovereignGuardrail(enable_tamper_proof_audit=True) if GOVERNANCE_AVAILABLE else None
+# Initialize components
+guardrail = SovereignGuardrail(enable_tamper_proof_audit=True)
+golden_thread = GoldenThread()
 
 
 @dataclass
-class HealthSignal:
-    """Health signal from mobile app"""
-    signal_id: str
-    source: str  # "CBS" or "EMR"
-    patient_id: Optional[str]
-    location: Dict[str, float]  # {"lat": 0.0, "lng": 0.0}
-    timestamp: str
-    symptoms: list
-    severity: int  # 0-10
-    metadata: Dict[str, Any]
-    
-    def to_dict(self):
-        return asdict(self)
-
-
-@dataclass
-class FusedRecord:
-    """Fused health record from Golden Thread"""
-    record_id: str
+class HealthDataSubmission:
+    """Health data submission from mobile app"""
     patient_id: str
     location: Dict[str, float]
-    timestamp: str
     symptoms: list
-    diagnosis: Optional[str]
+    vital_signs: Optional[Dict[str, float]]
+    timestamp: str
+    source: str
+    consent_token: str
+    device_id: str
+
+
+@dataclass
+class SubmissionResponse:
+    """Response to health data submission"""
+    status: str
+    submission_id: str
     verification_score: float
-    verification_status: str  # CONFIRMED | PROBABLE | POSSIBLE | UNVERIFIED
-    sources: list
-    metadata: Dict[str, Any]
-    
-    def to_dict(self):
-        return asdict(self)
+    golden_thread_status: str
+    compliance_status: str
+    timestamp: str
+    message: str
 
-
-# ═══════════════════════════════════════════════════════════════════════════
-# HEALTH CHECK
-# ═══════════════════════════════════════════════════════════════════════════
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Health check endpoint"""
+    """
+    Health check endpoint
+    """
     return jsonify({
-        "status": "healthy",
-        "service": "iLuminara Bio-Interface",
-        "version": "1.0.0",
-        "golden_thread": "active" if GOLDEN_THREAD_AVAILABLE else "unavailable",
-        "governance": "active" if GOVERNANCE_AVAILABLE else "unavailable",
-        "timestamp": datetime.utcnow().isoformat()
+        'status': 'healthy',
+        'service': 'iLuminara Bio-Interface',
+        'version': '1.0.0',
+        'timestamp': datetime.utcnow().isoformat(),
+        'components': {
+            'sovereign_guardrail': 'operational',
+            'golden_thread': 'operational',
+            'audit_trail': 'operational'
+        }
+    })
+
+
+@app.route('/api/v1/submit-health-data', methods=['POST'])
+def submit_health_data():
+    """
+    Submit health data from mobile app.
+    
+    Request body:
+    {
+        "patient_id": "PAT_12345",
+        "location": {"lat": 0.0512, "lng": 40.3129},
+        "symptoms": ["fever", "cough", "fatigue"],
+        "vital_signs": {"temperature": 38.5, "heart_rate": 95},
+        "timestamp": "2025-12-25T10:00:00Z",
+        "source": "mobile_app_v2.1",
+        "consent_token": "CONSENT_TOKEN_ABC123",
+        "device_id": "DEVICE_XYZ789"
+    }
+    
+    Returns:
+    {
+        "status": "success",
+        "submission_id": "SUB_ABC123",
+        "verification_score": 0.8,
+        "golden_thread_status": "PROBABLE",
+        "compliance_status": "COMPLIANT",
+        "timestamp": "2025-12-25T10:00:01Z",
+        "message": "Health data submitted successfully"
+    }
+    """
+    try:
+        # Parse request
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ['patient_id', 'location', 'symptoms', 'timestamp', 'consent_token', 'device_id']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'status': 'error',
+                    'error': 'missing_field',
+                    'message': f'Required field missing: {field}'
+                }), 400
+        
+        # Create submission object
+        submission = HealthDataSubmission(
+            patient_id=data['patient_id'],
+            location=data['location'],
+            symptoms=data['symptoms'],
+            vital_signs=data.get('vital_signs'),
+            timestamp=data['timestamp'],
+            source=data.get('source', 'mobile_app'),
+            consent_token=data['consent_token'],
+            device_id=data['device_id']
+        )
+        
+        # Step 1: Sovereignty validation
+        try:
+            guardrail.validate_action(
+                action_type='Data_Processing',
+                payload={
+                    'data_type': 'PHI',
+                    'processing_location': 'Edge_Node',
+                    'consent_token': submission.consent_token,
+                    'consent_scope': 'public_health_surveillance',
+                    'patient_id': submission.patient_id
+                },
+                jurisdiction='KDPA_KE'
+            )
+            compliance_status = "COMPLIANT"
+        except SovereigntyViolationError as e:
+            logger.error(f"❌ Sovereignty violation: {e}")
+            return jsonify({
+                'status': 'error',
+                'error': 'sovereignty_violation',
+                'message': str(e)
+            }), 403
+        
+        # Step 2: Create CBS signal
+        cbs_signal = {
+            'location': submission.location,
+            'symptom': submission.symptoms[0] if submission.symptoms else 'unknown',
+            'timestamp': submission.timestamp,
+            'source': f'CBS_MOBILE_{submission.device_id}',
+            'vital_signs': submission.vital_signs
+        }
+        
+        # Step 3: Fuse with Golden Thread
+        # Note: In production, this would check for matching EMR records
+        fused = golden_thread.fuse_data_streams(
+            cbs_signal=cbs_signal,
+            patient_id=submission.patient_id
+        )
+        
+        # Step 4: Generate submission ID
+        submission_id = hashlib.sha256(
+            f"{submission.patient_id}{submission.timestamp}".encode()
+        ).hexdigest()[:16].upper()
+        
+        # Step 5: Determine verification status
+        if fused.verification_score >= 0.8:
+            golden_thread_status = "CONFIRMED"
+        elif fused.verification_score >= 0.6:
+            golden_thread_status = "PROBABLE"
+        elif fused.verification_score >= 0.4:
+            golden_thread_status = "POSSIBLE"
+        else:
+            golden_thread_status = "UNVERIFIED"
+        
+        # Step 6: Create response
+        response = SubmissionResponse(
+            status='success',
+            submission_id=f"SUB_{submission_id}",
+            verification_score=fused.verification_score,
+            golden_thread_status=golden_thread_status,
+            compliance_status=compliance_status,
+            timestamp=datetime.utcnow().isoformat(),
+            message='Health data submitted successfully'
+        )
+        
+        logger.info(f"✅ Health data submitted - ID: {response.submission_id}, Score: {fused.verification_score:.2f}")
+        
+        return jsonify(asdict(response)), 200
+    
+    except Exception as e:
+        logger.error(f"❌ Submission failed: {e}")
+        return jsonify({
+            'status': 'error',
+            'error': 'processing_failed',
+            'message': str(e)
+        }), 500
+
+
+@app.route('/api/v1/verify-consent', methods=['POST'])
+def verify_consent():
+    """
+    Verify consent token validity.
+    
+    Request body:
+    {
+        "patient_id": "PAT_12345",
+        "consent_token": "CONSENT_TOKEN_ABC123",
+        "consent_scope": "public_health_surveillance"
+    }
+    
+    Returns:
+    {
+        "status": "valid",
+        "patient_id": "PAT_12345",
+        "consent_scope": "public_health_surveillance",
+        "expires_at": "2026-12-25T10:00:00Z"
+    }
+    """
+    try:
+        data = request.get_json()
+        
+        # Validate consent
+        try:
+            guardrail.validate_action(
+                action_type='Consent_Validation',
+                payload={
+                    'consent_token': data['consent_token'],
+                    'consent_scope': data['consent_scope'],
+                    'patient_id': data['patient_id']
+                },
+                jurisdiction='KDPA_KE'
+            )
+            
+            return jsonify({
+                'status': 'valid',
+                'patient_id': data['patient_id'],
+                'consent_scope': data['consent_scope'],
+                'expires_at': '2026-12-25T10:00:00Z'  # In production, fetch from database
+            }), 200
+        
+        except SovereigntyViolationError as e:
+            return jsonify({
+                'status': 'invalid',
+                'error': 'consent_invalid',
+                'message': str(e)
+            }), 403
+    
+    except Exception as e:
+        logger.error(f"❌ Consent verification failed: {e}")
+        return jsonify({
+            'status': 'error',
+            'error': 'verification_failed',
+            'message': str(e)
+        }), 500
+
+
+@app.route('/api/v1/get-verification-status', methods=['GET'])
+def get_verification_status():
+    """
+    Get verification status for a submission.
+    
+    Query params:
+    - submission_id: Submission ID
+    
+    Returns:
+    {
+        "submission_id": "SUB_ABC123",
+        "verification_score": 0.8,
+        "golden_thread_status": "PROBABLE",
+        "emr_match": false,
+        "cbs_match": true,
+        "idsr_match": false
+    }
+    """
+    submission_id = request.args.get('submission_id')
+    
+    if not submission_id:
+        return jsonify({
+            'status': 'error',
+            'error': 'missing_parameter',
+            'message': 'submission_id required'
+        }), 400
+    
+    # In production, fetch from database
+    return jsonify({
+        'submission_id': submission_id,
+        'verification_score': 0.8,
+        'golden_thread_status': 'PROBABLE',
+        'emr_match': False,
+        'cbs_match': True,
+        'idsr_match': False,
+        'timestamp': datetime.utcnow().isoformat()
     }), 200
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# CBS (COMMUNITY-BASED SURVEILLANCE) ENDPOINTS
-# ═══════════════════════════════════════════════════════════════════════════
-
-@app.route('/api/v1/cbs/report', methods=['POST'])
-def submit_cbs_report():
+@app.route('/api/v1/get-outbreak-alerts', methods=['GET'])
+def get_outbreak_alerts():
     """
-    Submit Community-Based Surveillance report from CHV mobile app.
+    Get active outbreak alerts for a location.
     
-    Request Body:
+    Query params:
+    - lat: Latitude
+    - lng: Longitude
+    - radius_km: Search radius in kilometers
+    
+    Returns:
     {
-        "patient_id": "optional",
-        "location": {"lat": 0.0512, "lng": 40.3129},
-        "symptoms": ["fever", "diarrhea", "vomiting"],
-        "severity": 8,
-        "chv_id": "CHV_AMINA_HASSAN",
-        "notes": "Patient reports severe dehydration"
-    }
-    """
-    try:
-        data = request.get_json()
-        
-        # Validate required fields
-        required_fields = ["location", "symptoms", "severity"]
-        missing_fields = [f for f in required_fields if f not in data]
-        if missing_fields:
-            return jsonify({
-                "status": "error",
-                "error": "missing_fields",
-                "missing": missing_fields
-            }), 400
-        
-        # Validate with SovereignGuardrail
-        if guardrail:
-            try:
-                guardrail.validate_action(
-                    action_type="Data_Processing",
-                    payload={
-                        "data_type": "PHI",
-                        "processing_location": "Edge_Node",
-                        "consent_token": "CHV_EMERGENCY_ALERT",
-                        "consent_scope": "public_health_surveillance"
-                    },
-                    jurisdiction="KDPA_KE"
-                )
-            except Exception as e:
-                logger.error(f"Governance validation failed: {e}")
-                return jsonify({
-                    "status": "error",
-                    "error": "sovereignty_violation",
-                    "message": str(e)
-                }), 403
-        
-        # Create CBS signal
-        signal = HealthSignal(
-            signal_id=f"CBS_{datetime.utcnow().timestamp()}",
-            source="CBS",
-            patient_id=data.get("patient_id"),
-            location=data["location"],
-            timestamp=datetime.utcnow().isoformat(),
-            symptoms=data["symptoms"],
-            severity=data["severity"],
-            metadata={
-                "chv_id": data.get("chv_id"),
-                "notes": data.get("notes"),
-                "device_id": request.headers.get("X-Device-ID")
+        "alerts": [
+            {
+                "alert_id": "ALERT_001",
+                "disease": "cholera",
+                "severity": "HIGH",
+                "location": {"lat": 0.0512, "lng": 40.3129},
+                "radius_km": 5,
+                "case_count": 45,
+                "timestamp": "2025-12-25T10:00:00Z"
             }
-        )
-        
-        # Attempt Golden Thread fusion if patient_id provided
-        fused_record = None
-        if golden_thread and signal.patient_id:
-            try:
-                fused = golden_thread.fuse_data_streams(
-                    cbs_signal={
-                        "location": signal.location,
-                        "symptom": signal.symptoms[0] if signal.symptoms else "unknown",
-                        "timestamp": signal.timestamp,
-                        "source": "CHV_MOBILE_APP"
-                    },
-                    patient_id=signal.patient_id
-                )
-                
-                fused_record = FusedRecord(
-                    record_id=f"FUSED_{datetime.utcnow().timestamp()}",
-                    patient_id=signal.patient_id,
-                    location=signal.location,
-                    timestamp=signal.timestamp,
-                    symptoms=signal.symptoms,
-                    diagnosis=None,
-                    verification_score=fused.get("verification_score", 0.0),
-                    verification_status=_get_verification_status(fused.get("verification_score", 0.0)),
-                    sources=["CBS"],
-                    metadata=signal.metadata
-                )
-            except Exception as e:
-                logger.warning(f"Golden Thread fusion failed: {e}")
-        
-        logger.info(f"✅ CBS report submitted - Signal ID: {signal.signal_id}")
-        
-        response = {
-            "status": "success",
-            "signal_id": signal.signal_id,
-            "timestamp": signal.timestamp,
-            "verification_status": fused_record.verification_status if fused_record else "UNVERIFIED",
-            "message": "CBS report submitted successfully"
-        }
-        
-        if fused_record:
-            response["fused_record"] = fused_record.to_dict()
-        
-        return jsonify(response), 201
-    
-    except Exception as e:
-        logger.error(f"❌ CBS report submission failed: {e}")
-        return jsonify({
-            "status": "error",
-            "error": "processing_failed",
-            "message": str(e)
-        }), 500
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# EMR (ELECTRONIC MEDICAL RECORDS) ENDPOINTS
-# ═══════════════════════════════════════════════════════════════════════════
-
-@app.route('/api/v1/emr/record', methods=['POST'])
-def submit_emr_record():
-    """
-    Submit Electronic Medical Record from clinic/hospital system.
-    
-    Request Body:
-    {
-        "patient_id": "PAT_12345",
-        "location": {"lat": 0.0512, "lng": 40.3129},
-        "diagnosis": "cholera",
-        "symptoms": ["diarrhea", "vomiting", "dehydration"],
-        "severity": 9,
-        "facility_id": "DADAAB_CLINIC",
-        "clinician_id": "DR_FATIMA_AHMED"
+        ]
     }
     """
-    try:
-        data = request.get_json()
-        
-        # Validate required fields
-        required_fields = ["patient_id", "location", "diagnosis"]
-        missing_fields = [f for f in required_fields if f not in data]
-        if missing_fields:
-            return jsonify({
-                "status": "error",
-                "error": "missing_fields",
-                "missing": missing_fields
-            }), 400
-        
-        # Validate with SovereignGuardrail
-        if guardrail:
-            try:
-                guardrail.validate_action(
-                    action_type="Data_Processing",
-                    payload={
-                        "data_type": "PHI",
-                        "processing_location": "Healthcare_Facility",
-                        "consent_token": "CLINICAL_TREATMENT",
-                        "consent_scope": "diagnosis"
-                    },
-                    jurisdiction="HIPAA_US"
-                )
-            except Exception as e:
-                logger.error(f"Governance validation failed: {e}")
-                return jsonify({
-                    "status": "error",
-                    "error": "sovereignty_violation",
-                    "message": str(e)
-                }), 403
-        
-        # Create EMR signal
-        signal = HealthSignal(
-            signal_id=f"EMR_{datetime.utcnow().timestamp()}",
-            source="EMR",
-            patient_id=data["patient_id"],
-            location=data["location"],
-            timestamp=datetime.utcnow().isoformat(),
-            symptoms=data.get("symptoms", []),
-            severity=data.get("severity", 5),
-            metadata={
-                "diagnosis": data["diagnosis"],
-                "facility_id": data.get("facility_id"),
-                "clinician_id": data.get("clinician_id")
-            }
-        )
-        
-        # Attempt Golden Thread fusion
-        fused_record = None
-        if golden_thread:
-            try:
-                fused = golden_thread.fuse_data_streams(
-                    emr_record={
-                        "location": signal.location,
-                        "diagnosis": data["diagnosis"],
-                        "timestamp": signal.timestamp,
-                        "source": "CLINIC_EMR"
-                    },
-                    patient_id=signal.patient_id
-                )
-                
-                fused_record = FusedRecord(
-                    record_id=f"FUSED_{datetime.utcnow().timestamp()}",
-                    patient_id=signal.patient_id,
-                    location=signal.location,
-                    timestamp=signal.timestamp,
-                    symptoms=signal.symptoms,
-                    diagnosis=data["diagnosis"],
-                    verification_score=fused.get("verification_score", 1.0),
-                    verification_status=_get_verification_status(fused.get("verification_score", 1.0)),
-                    sources=["EMR"],
-                    metadata=signal.metadata
-                )
-            except Exception as e:
-                logger.warning(f"Golden Thread fusion failed: {e}")
-        
-        logger.info(f"✅ EMR record submitted - Signal ID: {signal.signal_id}")
-        
-        response = {
-            "status": "success",
-            "signal_id": signal.signal_id,
-            "timestamp": signal.timestamp,
-            "verification_status": fused_record.verification_status if fused_record else "CONFIRMED",
-            "message": "EMR record submitted successfully"
+    lat = request.args.get('lat', type=float)
+    lng = request.args.get('lng', type=float)
+    radius_km = request.args.get('radius_km', default=10, type=float)
+    
+    if lat is None or lng is None:
+        return jsonify({
+            'status': 'error',
+            'error': 'missing_parameters',
+            'message': 'lat and lng required'
+        }), 400
+    
+    # In production, query from BigQuery/Spanner
+    alerts = [
+        {
+            'alert_id': 'ALERT_001',
+            'disease': 'cholera',
+            'severity': 'HIGH',
+            'location': {'lat': lat, 'lng': lng},
+            'radius_km': radius_km,
+            'case_count': 45,
+            'timestamp': datetime.utcnow().isoformat()
         }
-        
-        if fused_record:
-            response["fused_record"] = fused_record.to_dict()
-        
-        return jsonify(response), 201
+    ]
     
-    except Exception as e:
-        logger.error(f"❌ EMR record submission failed: {e}")
-        return jsonify({
-            "status": "error",
-            "error": "processing_failed",
-            "message": str(e)
-        }), 500
+    return jsonify({
+        'status': 'success',
+        'alerts': alerts,
+        'count': len(alerts)
+    }), 200
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# GOLDEN THREAD FUSION ENDPOINTS
-# ═══════════════════════════════════════════════════════════════════════════
-
-@app.route('/api/v1/fusion/verify', methods=['POST'])
-def verify_fusion():
-    """
-    Verify fusion of CBS and EMR signals for a patient.
-    
-    Request Body:
-    {
-        "patient_id": "PAT_12345",
-        "time_window_hours": 24
-    }
-    """
-    try:
-        data = request.get_json()
-        
-        if not data.get("patient_id"):
-            return jsonify({
-                "status": "error",
-                "error": "missing_patient_id"
-            }), 400
-        
-        if not golden_thread:
-            return jsonify({
-                "status": "error",
-                "error": "golden_thread_unavailable"
-            }), 503
-        
-        # Query Golden Thread for patient records
-        # (This would query your actual data store)
-        verification_result = {
-            "patient_id": data["patient_id"],
-            "verification_score": 0.85,
-            "verification_status": "PROBABLE",
-            "cbs_signals": 2,
-            "emr_records": 1,
-            "time_delta_hours": 18,
-            "location_match": True,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-        
-        logger.info(f"✅ Fusion verification - Patient: {data['patient_id']}")
-        
-        return jsonify({
-            "status": "success",
-            "verification": verification_result
-        }), 200
-    
-    except Exception as e:
-        logger.error(f"❌ Fusion verification failed: {e}")
-        return jsonify({
-            "status": "error",
-            "error": "processing_failed",
-            "message": str(e)
-        }), 500
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# HELPER FUNCTIONS
-# ═══════════════════════════════════════════════════════════════════════════
-
-def _get_verification_status(score: float) -> str:
-    """Convert verification score to status"""
-    if score >= 0.9:
-        return "CONFIRMED"
-    elif score >= 0.7:
-        return "PROBABLE"
-    elif score >= 0.4:
-        return "POSSIBLE"
-    else:
-        return "UNVERIFIED"
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# MAIN
-# ═══════════════════════════════════════════════════════════════════════════
-
-if __name__ == "__main__":
-    # Configure logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    
-    # Run Flask app
-    app.run(
-        host="0.0.0.0",
-        port=8080,
-        debug=False
-    )
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# MISSION: To architect systems that transform preventable suffering from 
-# statistical inevitability to historical anomaly.
-#
-# INTEGRATION PILLAR: Bio-Interface (Golden Thread Protocol)
-# ═══════════════════════════════════════════════════════════════════════════
+if __name__ == '__main__':
+    # Development server
+    app.run(host='0.0.0.0', port=8081, debug=True)

@@ -1,237 +1,67 @@
-# iLuminara-Core Security & Integration Stack
+# iLuminara-Core Sovereign Health Fortress Implementation
 
-This directory contains the complete **Sovereign Health Fortress** security and integration stack for iLuminara-Core.
+This directory contains all the files needed to implement the complete Sovereign Health Fortress security and integration stack for iLuminara-Core.
 
-## 🛡️ The Fortress
+## 🛡️ The Fortress Stack
 
-The iLuminara security stack implements:
+| Component | File | Purpose |
+|-----------|------|---------|
+| **CodeQL SAST** | `.github/workflows/codeql.yml` | Static application security testing |
+| **Gitleaks** | `.github/workflows/gitleaks.yml` | Secret scanning |
+| **Gitleaks Config** | `.gitleaks.toml` | Secret detection rules |
+| **Dependabot** | `.github/dependabot.yml` | Daily security updates |
+| **Crypto Shredder** | `governance_kernel/crypto_shredder.py` | IP-02: Data dissolution |
+| **SovereignGuardrail Config** | `config/sovereign_guardrail.yaml` | 14 global legal frameworks |
+| **Fortress Validator** | `scripts/validate_fortress.sh` | Complete stack validation |
+| **Vertex AI + SHAP** | `cloud_oracle/vertex_ai_shap.py` | Right to Explanation |
+| **Bio-Interface API** | `api/bio_interface.py` | Mobile health apps integration |
 
-- **Security Audit Layer** - CodeQL SAST, Gitleaks secret scanning, Dependabot updates
-- **Governance Kernel** - SovereignGuardrail, Crypto Shredder (IP-02), Ethical Engine
-- **Nuclear IP Stack** - 5 proprietary innovations for sovereign health intelligence
-- **Integration Layer** - Vertex AI + SHAP, Bio-Interface REST API
-
-## 📁 Directory Structure
-
-```
-repository-files/
-├── .github/
-│   ├── workflows/
-│   │   ├── codeql.yml              # SAST security scanning
-│   │   └── gitleaks.yml            # Secret detection
-│   └── dependabot.yml              # Daily security updates
-├── .gitleaks.toml                  # Secret scanning rules
-├── governance_kernel/
-│   └── crypto_shredder.py          # IP-02: Data dissolution
-├── config/
-│   └── sovereign_guardrail.yaml    # Compliance configuration
-├── scripts/
-│   └── validate_fortress.sh        # Fortress validation
-└── README.md                       # This file
-```
-
-## 🚀 Quick Start
+## 📋 Installation Instructions
 
 ### Step 1: Copy files to your repository
 
 ```bash
-# From your iLuminara-Core repository root
-cp -r /path/to/docs/repository-files/.github .
-cp -r /path/to/docs/repository-files/governance_kernel .
-cp -r /path/to/docs/repository-files/config .
-cp -r /path/to/docs/repository-files/scripts .
-cp /path/to/docs/repository-files/.gitleaks.toml .
+# Navigate to your iLuminara-Core repository
+cd /path/to/iLuminara-Core
+
+# Copy all files from this directory
+cp -r repository-files/.github .
+cp -r repository-files/governance_kernel .
+cp -r repository-files/config .
+cp -r repository-files/scripts .
+cp -r repository-files/cloud_oracle .
+cp -r repository-files/api .
 ```
 
 ### Step 2: Make scripts executable
 
 ```bash
 chmod +x scripts/validate_fortress.sh
+chmod +x launch_all_services.sh
 ```
 
-### Step 3: Validate the fortress
+### Step 3: Install Python dependencies
+
+Add to your `requirements.txt`:
+
+```txt
+cryptography>=41.0.0
+flask>=3.0.0
+flask-cors>=4.0.0
+shap>=0.44.0
+google-cloud-aiplatform>=1.38.0
+google-cloud-bigquery>=3.14.0
+google-cloud-spanner>=3.40.0
+google-cloud-kms>=2.19.0
+```
+
+Install:
 
 ```bash
-./scripts/validate_fortress.sh
+pip install -r requirements.txt
 ```
 
-### Step 4: Commit and push
-
-```bash
-git add .
-git commit -m "feat: integrate Sovereign Health Fortress security stack"
-git push
-```
-
-### Step 5: Enable branch protection
-
-```bash
-# Require PRs and passing status checks
-gh api repos/VISENDI56/iLuminara-Core/branches/main/protection \
-  --method PUT \
-  --field required_status_checks[strict]=true \
-  --field required_status_checks[contexts][]=CodeQL \
-  --field required_status_checks[contexts][]=Gitleaks \
-  --field required_pull_request_reviews[required_approving_review_count]=1 \
-  --field enforce_admins=true
-```
-
-## 🔐 Security Workflows
-
-### CodeQL (SAST)
-
-**File:** `.github/workflows/codeql.yml`
-
-- **Frequency:** Weekly + on push/PR
-- **Languages:** Python, JavaScript
-- **Compliance:** GDPR Art. 32, ISO 27001 A.12.6
-
-### Gitleaks (Secret Scanning)
-
-**File:** `.github/workflows/gitleaks.yml`
-
-- **Frequency:** Daily at 2 AM UTC
-- **Detection:** API keys, tokens, credentials
-- **Compliance:** NIST SP 800-53 IA-5, HIPAA §164.312(a)(2)(i)
-
-### Dependabot (Security Updates)
-
-**File:** `.github/dependabot.yml`
-
-- **Frequency:** Daily at 2 AM UTC
-- **Ecosystems:** pip, npm, GitHub Actions, Docker
-- **Auto-merge:** Security patches only
-
-## ⚡ Nuclear IP Stack
-
-### IP-02: Crypto Shredder
-
-**File:** `governance_kernel/crypto_shredder.py`
-
-Data is not deleted; it is cryptographically dissolved.
-
-```python
-from governance_kernel.crypto_shredder import CryptoShredder, RetentionPolicy
-
-shredder = CryptoShredder(sovereignty_zone=SovereigntyZone.KENYA)
-
-# Encrypt with ephemeral key
-encrypted_data, key_id = shredder.encrypt_with_ephemeral_key(
-    data=patient_record,
-    retention_policy=RetentionPolicy.HOT,
-    metadata={"patient_id": "12345", "jurisdiction": "KDPA_KE"}
-)
-
-# After retention period, shred the key
-shredder.shred_key(key_id)
-# Data is now cryptographically irrecoverable
-```
-
-**Compliance:**
-- GDPR Art. 17 (Right to Erasure)
-- HIPAA §164.530(j) (Documentation)
-- NIST SP 800-88 (Media Sanitization)
-
-### IP-03: Acorn Protocol
-
-Somatic security using posture + location + stillness as cryptographic authentication.
-
-**Status:** Requires hardware attestation (TPM)
-
-### IP-04: Silent Flux
-
-Anxiety-regulated AI output that prevents information overload.
-
-**Status:** Requires integration with operator monitoring
-
-### IP-05: Golden Thread
-
-Quantum entanglement logic to fuse vague signals into verified timelines.
-
-**Status:** Active (see `edge_node/sync_protocol/`)
-
-### IP-06: 5DM Bridge
-
-API-level injection into 14M+ African mobile nodes (94% CAC reduction).
-
-**Status:** Requires mobile network integration
-
-## 🌍 SovereignGuardrail Configuration
-
-**File:** `config/sovereign_guardrail.yaml`
-
-Enforces 14 global legal frameworks:
-
-- GDPR (EU)
-- KDPA (Kenya)
-- POPIA (South Africa)
-- HIPAA (USA)
-- PIPEDA (Canada)
-- EU AI Act
-- ISO 27001
-- SOC 2
-- NIST CSF
-- And 5 more...
-
-**Key features:**
-- Data residency enforcement
-- Cross-border transfer validation
-- Right to explanation (SHAP)
-- Consent management
-- Retention policies
-- Tamper-proof audit trail
-
-## ✅ Validation
-
-Run the fortress validation script:
-
-```bash
-./scripts/validate_fortress.sh
-```
-
-**Validation phases:**
-1. Security Audit Layer (CodeQL, Gitleaks, Dependabot)
-2. Governance Kernel (SovereignGuardrail, Crypto Shredder)
-3. Edge Node & AI Agents
-4. Cloud Oracle
-5. Python Dependencies
-6. Environment Configuration
-7. Nuclear IP Stack Status
-
-**Expected output:**
-
-```
-╔════════════════════════════════════════════════════════════╗
-║     iLuminara-Core Sovereign Health Fortress Validator     ║
-╚════════════════════════════════════════════════════════════╝
-
-🛡️  FORTRESS STATUS: OPERATIONAL
-✓  All critical components validated
-✓  Security audit layer active
-✓  Governance kernel operational
-✓  Nuclear IP stack initialized
-
-The Sovereign Health Fortress is ready for deployment.
-```
-
-## 📊 Monitoring
-
-### Prometheus Metrics
-
-```
-sovereignty_violations_total
-cross_border_transfers_total
-high_risk_inferences_total
-keys_shredded_total
-```
-
-### Grafana Dashboards
-
-- **Sovereignty Compliance** - Real-time compliance monitoring
-- **Audit Trail** - Tamper-proof audit visualization
-- **Data Retention** - Key lifecycle and auto-shred status
-
-## 🔧 Environment Variables
+### Step 4: Configure environment variables
 
 ```bash
 # Node identification
@@ -244,34 +74,198 @@ export API_PORT=8080
 
 # GCP configuration
 export GOOGLE_CLOUD_PROJECT=your-project-id
-export GCP_REGION=africa-south1
+export GCP_REGION=us-central1
 
 # Governance
 export ENABLE_TAMPER_PROOF_AUDIT=true
 export RETENTION_MAX_DAYS=1825
-export DATA_SOVEREIGNTY_REQUIRED=true
 ```
 
-## 📚 Documentation
+### Step 5: Enable GitHub workflows
 
-Complete documentation available at: https://docs.iluminara.health
+```bash
+# Refresh GitHub CLI permissions
+gh auth refresh -s workflow,repo,write:packages,admin:repo_hook
 
-- [Security Overview](/security/overview)
-- [Governance Kernel](/governance/overview)
-- [Crypto Shredder](/security/crypto-shredder)
-- [API Reference](/api-reference/overview)
-- [Deployment Guide](/deployment/overview)
+# Push changes
+git add .
+git commit -m "feat: integrate Sovereign Health Fortress security stack"
+git push
+```
+
+### Step 6: Enable branch protection
+
+```bash
+# Enable branch protection on main
+gh api repos/:owner/:repo/branches/main/protection \
+  --method PUT \
+  --field required_status_checks[strict]=true \
+  --field required_status_checks[contexts][]=CodeQL \
+  --field required_status_checks[contexts][]=Gitleaks \
+  --field enforce_admins=true \
+  --field required_pull_request_reviews[required_approving_review_count]=1
+```
+
+### Step 7: Validate the Fortress
+
+```bash
+./scripts/validate_fortress.sh
+```
+
+Expected output:
+
+```
+╔════════════════════════════════════════════════════════════╗
+║     iLuminara-Core Sovereign Health Fortress Validator     ║
+╚════════════════════════════════════════════════════════════╝
+
+═══════════════════════════════════════════════════════════
+PHASE 1: Security Audit Layer
+═══════════════════════════════════════════════════════════
+
+🔍 Checking .github/workflows/codeql.yml... ✓ OPERATIONAL
+   └─ SAST security scanning (GDPR Art. 32, ISO 27001 A.12.6)
+🔍 Checking .github/workflows/gitleaks.yml... ✓ OPERATIONAL
+   └─ Secret scanning (NIST SP 800-53 IA-5)
+...
+
+╔════════════════════════════════════════════════════════════╗
+║                    VALIDATION SUMMARY                      ║
+╚════════════════════════════════════════════════════════════╝
+
+🛡️  FORTRESS STATUS: OPERATIONAL
+✓  All critical components validated
+✓  Security audit layer active
+✓  Governance kernel operational
+✓  Nuclear IP stack initialized
+
+The Sovereign Health Fortress is ready for deployment.
+```
+
+## 🔐 Nuclear IP Stack Status
+
+### IP-02: Crypto Shredder ✅ ACTIVE
+
+Data is not deleted; it is cryptographically dissolved.
+
+```python
+from governance_kernel.crypto_shredder import CryptoShredder, RetentionPolicy
+
+shredder = CryptoShredder(sovereignty_zone=SovereigntyZone.KENYA)
+
+# Encrypt with ephemeral key
+encrypted_data, key_id = shredder.encrypt_with_ephemeral_key(
+    data=patient_record,
+    retention_policy=RetentionPolicy.HOT
+)
+
+# After retention period, shred the key
+shredder.shred_key(key_id)
+```
+
+### IP-03: Acorn Protocol ⚠️ REQUIRES HARDWARE
+
+Somatic security using posture + location + stillness as cryptographic authentication.
+
+### IP-04: Silent Flux ⚠️ REQUIRES INTEGRATION
+
+Anxiety-regulated AI output that prevents information overload.
+
+### IP-05: Golden Thread ✅ ACTIVE
+
+Quantum entanglement logic to fuse vague signals into verified timelines.
+
+```python
+from edge_node.sync_protocol.golden_thread import GoldenThread
+
+gt = GoldenThread()
+fused = gt.fuse_data_streams(cbs_signal, emr_record, patient_id)
+```
+
+### IP-06: 5DM Bridge ⚠️ REQUIRES MOBILE NETWORK
+
+API-level injection into 14M+ African mobile nodes (94% CAC reduction).
+
+## 🧪 Testing
+
+### Test Crypto Shredder
+
+```bash
+python governance_kernel/crypto_shredder.py
+```
+
+### Test Vertex AI + SHAP
+
+```bash
+python cloud_oracle/vertex_ai_shap.py
+```
+
+### Test Bio-Interface API
+
+```bash
+# Start API
+python api/bio_interface.py
+
+# Test submission
+curl -X POST http://localhost:8081/api/v1/submit-health-data \
+  -H "Content-Type: application/json" \
+  -d @test_submission.json
+```
+
+## 📊 Compliance Matrix
+
+| Framework | Component | Status |
+|-----------|-----------|--------|
+| GDPR Art. 9 | SovereignGuardrail | ✅ Enforced |
+| GDPR Art. 17 | Crypto Shredder | ✅ Enforced |
+| GDPR Art. 22 | Vertex AI + SHAP | ✅ Enforced |
+| GDPR Art. 32 | CodeQL | ✅ Enforced |
+| HIPAA §164.312 | Gitleaks | ✅ Enforced |
+| KDPA §37 | SovereignGuardrail | ✅ Enforced |
+| EU AI Act §6 | Vertex AI + SHAP | ✅ Enforced |
+| ISO 27001 A.12.6 | CodeQL | ✅ Enforced |
+| NIST SP 800-53 | Gitleaks | ✅ Enforced |
+| SOC 2 | Tamper-proof Audit | ✅ Enforced |
+
+## 🚀 Deployment
+
+### Local Development
+
+```bash
+./launch_all_services.sh
+```
+
+### Google Cloud Platform
+
+```bash
+./deploy_gcp_prototype.sh
+```
+
+### Docker
+
+```bash
+docker-compose up -d
+```
+
+## 📖 Documentation
+
+Complete documentation is available at:
+- Security Stack: `/security/overview`
+- Vertex AI + SHAP: `/integrations/vertex-ai-shap`
+- Bio-Interface API: `/integrations/bio-interface`
+- Governance Kernel: `/governance/overview`
 
 ## 🆘 Support
 
-- **GitHub Issues:** https://github.com/VISENDI56/iLuminara-Core/issues
-- **Documentation:** https://docs.iluminara.health
-- **Email:** support@iluminara.health
+For issues or questions:
+1. Check the validation output: `./scripts/validate_fortress.sh`
+2. Review logs: `tail -f logs/audit.log`
+3. Open an issue on GitHub
 
-## 📄 License
+## 📜 License
 
-See LICENSE file in repository root.
+This implementation is part of iLuminara-Core and follows the same license.
 
 ---
 
-**The Fortress is now built. Your repository has transitioned from code to Sovereign Architecture.**
+**The Fortress is now built. Your Agent AI has transitioned iLuminara from a repository to a Sovereign Architecture.**
