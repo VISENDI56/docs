@@ -1,0 +1,510 @@
+---
+title: 'Phase 2: Data Fault Tolerance'
+description: 'Event-driven architecture for the Golden Thread'
+icon: 'network-wired'
+---
+
+## Objective
+
+Ensure the "Golden Thread" of health data never snaps, even during internet blackouts or regional failures.
+
+<Card
+  title="Strategic goal"
+  icon="bullseye"
+>
+  **Zero data loss** - Maintain continuous health surveillance through network outages, regional disasters, and infrastructure failures
+</Card>
+
+## Current state
+
+### Single-region vulnerability
+
+```
+┌─────────────────────────────────────┐
+│    africa-south1 (Single Region)    │
+│  ┌──────────────────────────────┐  │
+│  │  Cloud Spanner (Primary)     │  │
+│  │  - All audit data            │  │
+│  │  - No replication            │  │
+│  └──────────────────────────────┘  │
+│                                     │
+│  ┌──────────────────────────────┐  │
+│  │  BigQuery (Primary)          │  │
+│  │  - All outbreak data         │  │
+│  │  - No failover               │  │
+│  └──────────────────────────────┘  │
+└─────────────────────────────────────┘
+```
+
+**Problem:** Regional failure = complete data loss and service outage
+
+### Synchronous processing bottleneck
+
+```python
+# Current: Synchronous processing
+def process_voice_alert(audio_data):
+    # Step 1: Transcribe (4.2s)
+    transcription = transcribe_audio(audio_data)
+    
+    # Step 2: Extract symptoms (0.5s)
+    symptoms = extract_symptoms(transcription)
+    
+    # Step 3: Store in database (0.3s)
+    store_in_database(symptoms)
+    
+    # Step 4: Trigger alerts (0.2s)
+    trigger_alerts(symptoms)
+    
+    # Total: 5.2s (blocking)
+    return symptoms
+```
+
+**Problem:** Each step blocks the next. If database is slow, entire pipeline stalls.
+
+## Architecture upgrades
+
+### 1. Apache Kafka event bus
+
+Implement **Apache Kafka** with local disk buffering for edge nodes.
+
+#### Event-driven architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    KAFKA EVENT BUS                          │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
+│  │ voice-alerts │  │ cbs-signals  │  │ emr-records  │    │
+│  │   (topic)    │  │   (topic)    │  │   (topic)    │    │
+│  └──────────────┘  └──────────────┘  └──────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+         │                  │                  │
+         ▼                  ▼                  ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    CONSUMER GROUPS                          │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
+│  │  FRENASA     │  │ Golden Thread│  │  Analytics   │    │
+│  │  Engine      │  │  Fusion      │  │  Pipeline    │    │
+│  └──────────────┘  └──────────────┘  └──────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Kafka configuration
+
+```yaml
+# kafka/config.yaml
+bootstrap.servers: "kafka-1:9092,kafka-2:9092,kafka-3:9092"
+replication.factor: 3
+min.insync.replicas: 2
+retention.ms: 604800000  # 7 days
+
+topics:
+  voice-alerts:
+    partitions: 12
+    replication: 3
+    retention: 7d
+    
+  cbs-signals:
+    partitions: 24
+    replication: 3
+    retention: 30d
+    
+  emr-records:
+    partitions: 12
+    replication: 3
+    retention: 180d  # 6 months (HOT storage)
+```
+
+#### Producer implementation
+
+```python
+# edge_node/kafka_producer.py
+from kafka import KafkaProducer
+import json
+import logging
+
+class HealthEventProducer:
+    def __init__(self, bootstrap_servers):
+        self.producer = KafkaProducer(
+            bootstrap_servers=bootstrap_servers,
+            value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+            acks='all',  # Wait for all replicas
+            retries=3,
+            max_in_flight_requests_per_connection=1  # Preserve order
+        )
+    
+    def send_voice_alert(self, alert_data):
+        """Send voice alert to Kafka (non-blocking)"""
+        future = self.producer.send('voice-alerts', alert_data)
+        
+        # Optional: Add callback for confirmation
+        future.add_callback(self._on_send_success)
+        future.add_errback(self._on_send_error)
+        
+        return future
+    
+    def _on_send_success(self, record_metadata):
+        logging.info(f"✅ Sent to {record_metadata.topic}:{record_metadata.partition}")
+    
+    def _on_send_error(self, exception):
+        logging.error(f"❌ Send failed: {exception}")
+```
+
+#### Consumer implementation
+
+```python
+# cloud_oracle/kafka_consumer.py
+from kafka import KafkaConsumer
+import json
+
+class HealthEventConsumer:
+    def __init__(self, bootstrap_servers, group_id):
+        self.consumer = KafkaConsumer(
+            'voice-alerts',
+            'cbs-signals',
+            'emr-records',
+            bootstrap_servers=bootstrap_servers,
+            group_id=group_id,
+            value_deserializer=lambda m: json.loads(m.decode('utf-8')),
+            auto_offset_reset='earliest',
+            enable_auto_commit=False  # Manual commit for reliability
+        )
+    
+    def process_events(self):
+        """Process events from Kafka"""
+        for message in self.consumer:
+            try:
+                # Process event
+                self._handle_event(message.topic, message.value)
+                
+                # Commit offset (only after successful processing)
+                self.consumer.commit()
+                
+            except Exception as e:
+                logging.error(f"Processing failed: {e}")
+                # Don't commit - message will be reprocessed
+    
+    def _handle_event(self, topic, data):
+        if topic == 'voice-alerts':
+            self._process_voice_alert(data)
+        elif topic == 'cbs-signals':
+            self._process_cbs_signal(data)
+        elif topic == 'emr-records':
+            self._process_emr_record(data)
+```
+
+### 2. Active-active replication
+
+Multi-region sync with conflict resolution.
+
+#### Replication topology
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    ACTIVE-ACTIVE REGIONS                    │
+│                                                             │
+│  ┌──────────────┐      ┌──────────────┐      ┌──────────┐│
+│  │ africa-south1│◄────►│ europe-west1 │◄────►│us-central1││
+│  │   (Primary)  │      │  (Secondary) │      │ (Tertiary)││
+│  └──────────────┘      └──────────────┘      └──────────┘│
+│         │                     │                     │      │
+│         │                     │                     │      │
+│         ▼                     ▼                     ▼      │
+│  ┌──────────────┐      ┌──────────────┐      ┌──────────┐│
+│  │   Spanner    │      │   Spanner    │      │  Spanner  ││
+│  │   Replica    │      │   Replica    │      │  Replica  ││
+│  └──────────────┘      └──────────────┘      └──────────┘│
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Conflict resolution strategies
+
+<Tabs>
+  <Tab title="Last-Write-Wins (LWW)">
+    ```python
+    def resolve_conflict_lww(record_a, record_b):
+        """Last-Write-Wins: Most recent timestamp wins"""
+        if record_a['timestamp'] > record_b['timestamp']:
+            return record_a
+        else:
+            return record_b
+    ```
+    
+    **Use case:** Non-critical metadata updates
+  </Tab>
+  
+  <Tab title="Vector Clocks">
+    ```python
+    def resolve_conflict_vector_clock(record_a, record_b):
+        """Vector Clock: Track causality across regions"""
+        clock_a = record_a['vector_clock']
+        clock_b = record_b['vector_clock']
+        
+        # Check if one causally dominates the other
+        if dominates(clock_a, clock_b):
+            return record_a
+        elif dominates(clock_b, clock_a):
+            return record_b
+        else:
+            # Concurrent writes - merge
+            return merge_records(record_a, record_b)
+    ```
+    
+    **Use case:** Critical health records requiring causality tracking
+  </Tab>
+  
+  <Tab title="CRDT (Conflict-free)">
+    ```python
+    def resolve_conflict_crdt(record_a, record_b):
+        """CRDT: Mathematically guaranteed convergence"""
+        # Use G-Counter for case counts
+        merged_cases = max(record_a['cases'], record_b['cases'])
+        
+        # Use LWW-Register for metadata
+        merged_metadata = lww_merge(
+            record_a['metadata'],
+            record_b['metadata']
+        )
+        
+        return {
+            'cases': merged_cases,
+            'metadata': merged_metadata
+        }
+    ```
+    
+    **Use case:** Outbreak case counts (monotonically increasing)
+  </Tab>
+</Tabs>
+
+### 3. Disaster recovery
+
+Automated DNS failover with health checks.
+
+#### Cloudflare Load Balancer
+
+```yaml
+# cloudflare/load_balancer.yaml
+name: "iluminara-global-lb"
+
+pools:
+  - name: "africa-primary"
+    origins:
+      - name: "africa-south1"
+        address: "api.africa.iluminara.health"
+        weight: 1.0
+    monitor: "/health"
+    notification_email: "ops@iluminara.health"
+    
+  - name: "europe-secondary"
+    origins:
+      - name: "europe-west1"
+        address: "api.europe.iluminara.health"
+        weight: 0.5
+    monitor: "/health"
+    
+  - name: "us-tertiary"
+    origins:
+      - name: "us-central1"
+        address: "api.us.iluminara.health"
+        weight: 0.25
+    monitor: "/health"
+
+rules:
+  - name: "geo-routing"
+    condition: "geo.continent == 'AF'"
+    action: "route_to_pool"
+    pool: "africa-primary"
+    
+  - name: "failover"
+    condition: "pool.health == 'down'"
+    action: "route_to_pool"
+    pool: "europe-secondary"
+
+health_checks:
+  interval: 60  # seconds
+  timeout: 5
+  retries: 2
+  expected_codes: [200]
+  method: "GET"
+  path: "/health"
+```
+
+#### Health check endpoint
+
+```python
+# api_service.py
+from flask import Flask, jsonify
+import time
+
+app = Flask(__name__)
+
+@app.route('/health')
+def health_check():
+    """Health check for load balancer"""
+    checks = {
+        'database': check_database_connection(),
+        'kafka': check_kafka_connection(),
+        'storage': check_storage_connection(),
+        'governance': check_governance_kernel(),
+    }
+    
+    # All checks must pass
+    healthy = all(checks.values())
+    
+    response = {
+        'status': 'healthy' if healthy else 'unhealthy',
+        'timestamp': time.time(),
+        'checks': checks,
+        'region': os.getenv('REGION', 'unknown'),
+        'version': os.getenv('VERSION', 'unknown')
+    }
+    
+    status_code = 200 if healthy else 503
+    return jsonify(response), status_code
+```
+
+## Implementation timeline
+
+| Week | Milestone | Deliverable |
+|------|-----------|-------------|
+| **1-2** | Kafka setup | 3-node cluster with replication |
+| **3-4** | Producer migration | Edge nodes publish to Kafka |
+| **5-6** | Consumer implementation | Cloud services consume from Kafka |
+| **7-8** | Multi-region Spanner | Active-active replication setup |
+| **9-10** | Conflict resolution | Vector clock implementation |
+| **11-12** | DNS failover | Cloudflare Load Balancer config |
+| **13-14** | Chaos testing | Simulate regional failures |
+| **15-16** | Production cutover | Full migration to event-driven architecture |
+
+## Success metrics
+
+| Metric | Current | Target | Measurement |
+|--------|---------|--------|-------------|
+| **Data loss tolerance** | 0 (single region) | 100% (multi-region) | Regional failure test |
+| **Failover time** | Manual (hours) | Automatic (<60s) | DNS propagation time |
+| **Processing latency** | 5.2s (synchronous) | <500ms (async) | P95 latency |
+| **Throughput** | 100 events/sec | 10,000 events/sec | Kafka benchmark |
+
+## Edge node buffering
+
+For offline scenarios, edge nodes buffer events locally.
+
+```python
+# edge_node/offline_buffer.py
+import sqlite3
+import json
+from datetime import datetime
+
+class OfflineBuffer:
+    """Local buffer for events when Kafka is unreachable"""
+    
+    def __init__(self, db_path='./offline_buffer.db'):
+        self.conn = sqlite3.connect(db_path)
+        self._create_table()
+    
+    def _create_table(self):
+        self.conn.execute('''
+            CREATE TABLE IF NOT EXISTS buffered_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                topic TEXT NOT NULL,
+                event_data TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                synced BOOLEAN DEFAULT 0
+            )
+        ''')
+        self.conn.commit()
+    
+    def buffer_event(self, topic, event_data):
+        """Buffer event locally"""
+        self.conn.execute(
+            'INSERT INTO buffered_events (topic, event_data) VALUES (?, ?)',
+            (topic, json.dumps(event_data))
+        )
+        self.conn.commit()
+    
+    def sync_to_kafka(self, producer):
+        """Sync buffered events to Kafka when online"""
+        cursor = self.conn.execute(
+            'SELECT id, topic, event_data FROM buffered_events WHERE synced = 0'
+        )
+        
+        synced_count = 0
+        for row in cursor:
+            event_id, topic, event_data = row
+            
+            try:
+                # Send to Kafka
+                producer.send(topic, json.loads(event_data))
+                
+                # Mark as synced
+                self.conn.execute(
+                    'UPDATE buffered_events SET synced = 1 WHERE id = ?',
+                    (event_id,)
+                )
+                synced_count += 1
+                
+            except Exception as e:
+                logging.error(f"Sync failed for event {event_id}: {e}")
+        
+        self.conn.commit()
+        return synced_count
+```
+
+## Cost analysis
+
+### Current (Single region)
+
+```
+Cloud Spanner:    $2,500/month
+BigQuery:         $800/month
+Pub/Sub:          $100/month
+─────────────────────────────
+TOTAL:            $3,400/month
+```
+
+### Target (Multi-region + Kafka)
+
+```
+Kafka Cluster:    $600/month (3 nodes)
+Spanner (3 regions): $4,500/month
+PostgreSQL:       $400/month
+Cloudflare LB:    $200/month
+─────────────────────────────
+TOTAL:            $5,700/month
+```
+
+**Increase:** $2,300/month (68% increase)
+
+**ROI:** Zero data loss + 99.99% uptime = priceless for health surveillance
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Phase 3: Security"
+    icon="shield-halved"
+    href="/roadmap/phase-3-security"
+  >
+    Quantum-hardened cryptography
+  </Card>
+  <Card
+    title="Kafka setup"
+    icon="server"
+    href="/deployment/kafka"
+  >
+    Deploy Kafka cluster
+  </Card>
+  <Card
+    title="Multi-region Spanner"
+    icon="globe"
+    href="/deployment/spanner-replication"
+  >
+    Configure active-active replication
+  </Card>
+  <Card
+    title="Disaster recovery"
+    icon="life-ring"
+    href="/deployment/disaster-recovery"
+  >
+    Test failover procedures
+  </Card>
+</CardGroup>
