@@ -1,0 +1,457 @@
+---
+title: Security workflows
+description: CodeQL SAST scanning and Gitleaks secret detection for continuous fortress attestation
+---
+
+## Overview
+
+The iLuminara-Core security workflows provide **continuous attestation** of the Sovereign Health Fortress through automated SAST scanning and secret detection.
+
+<Card
+  title="Philosophy"
+  icon="workflow"
+>
+  "The Fortress is not built. It is continuously attested."
+</Card>
+
+## CodeQL SAST scanning
+
+Static Application Security Testing (SAST) with GitHub's CodeQL engine, running security-extended queries across Python and JavaScript codebases.
+
+### Workflow configuration
+
+**File:** `.github/workflows/codeql.yml`
+
+```yaml
+name: "CodeQL Security Analysis"
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday at midnight UTC
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'python', 'javascript' ]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+        queries: +security-extended,security-and-quality
+        config: |
+          paths-ignore:
+            - '**/test/**'
+            - '**/tests/**'
+            - '**/node_modules/**'
+            - '**/venv/**'
+
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v3
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:${{matrix.language}}"
+        upload: true
+
+    - name: iLuminara Sovereignty Check
+      if: always()
+      run: |
+        echo "🛡️ FORTRESS STATUS: CodeQL scan complete"
+        echo "📊 Compliance: GDPR Art. 32 (Security of Processing)"
+        echo "🔒 Framework: ISO 27001 A.12.6 (Technical Vulnerability Management)"
+```
+
+### Trigger conditions
+
+<Tabs>
+  <Tab title="Push events">
+    Runs on every push to `main` or `develop` branches
+  </Tab>
+  <Tab title="Pull requests">
+    Runs on all pull requests targeting `main`
+  </Tab>
+  <Tab title="Scheduled">
+    Weekly scan every Sunday at midnight UTC
+  </Tab>
+</Tabs>
+
+### Query suites
+
+CodeQL runs two query suites:
+
+1. **security-extended** - Extended security queries including:
+   - SQL injection
+   - Cross-site scripting (XSS)
+   - Command injection
+   - Path traversal
+   - Insecure deserialization
+
+2. **security-and-quality** - Security + code quality queries:
+   - Unused variables
+   - Dead code
+   - Type errors
+   - Performance issues
+
+### Compliance mapping
+
+| Framework | Article/Section | Requirement | CodeQL Coverage |
+|-----------|----------------|-------------|-----------------|
+| **GDPR** | Art. 32 | Security of Processing | ✅ Vulnerability detection |
+| **ISO 27001** | A.12.6 | Technical Vulnerability Management | ✅ SAST scanning |
+| **SOC 2** | CC6.1 | Security Monitoring | ✅ Continuous scanning |
+| **NIST CSF** | DE.CM-4 | Malicious Code Detection | ✅ Code analysis |
+| **HIPAA** | §164.308(a)(8) | Evaluation | ✅ Security assessment |
+
+## Gitleaks secret scanning
+
+Detects hardcoded secrets, API keys, credentials, and tokens in code and commit history.
+
+### Workflow configuration
+
+**File:** `.github/workflows/gitleaks.yml`
+
+```yaml
+name: "Gitleaks Secret Scanning"
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 2 AM UTC
+
+jobs:
+  scan:
+    name: Gitleaks Secret Detection
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for comprehensive scanning
+
+    - name: Run Gitleaks
+      uses: gitleaks/gitleaks-action@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+      with:
+        config-path: .gitleaks.toml
+
+    - name: Upload SARIF results
+      if: always()
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: results.sarif
+
+    - name: iLuminara Crypto Attestation
+      if: always()
+      run: |
+        echo "🔐 CRYPTO SHREDDER STATUS: Secret scan complete"
+        echo "📊 Compliance: NIST SP 800-53 (IA-5 Authenticator Management)"
+        echo "🛡️ Framework: HIPAA §164.312(a)(2)(i) (Unique User Identification)"
+        echo "⚡ IP-02: Ephemeral key validation active"
+```
+
+### Gitleaks configuration
+
+**File:** `.gitleaks.toml`
+
+```toml
+# iLuminara-Core Gitleaks Configuration
+# Sovereign Health Fortress - Secret Detection Rules
+
+title = "iLuminara Gitleaks Config"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "gcp-api-key"
+description = "Google Cloud Platform API Key"
+regex = '''AIza[0-9A-Za-z\\-_]{35}'''
+tags = ["key", "GCP", "sovereignty-critical"]
+
+[[rules]]
+id = "gcp-service-account"
+description = "Google Cloud Service Account JSON"
+regex = '''"type":\s*"service_account"'''
+tags = ["key", "GCP", "sovereignty-critical"]
+
+[[rules]]
+id = "aws-access-key"
+description = "AWS Access Key (BLOCKED - Sovereignty Violation)"
+regex = '''AKIA[0-9A-Z]{16}'''
+tags = ["key", "AWS", "sovereignty-violation"]
+
+[[rules]]
+id = "private-key"
+description = "Private Key"
+regex = '''-----BEGIN (RSA|EC|OPENSSH|PGP) PRIVATE KEY-----'''
+tags = ["key", "crypto-shredder"]
+
+[[rules]]
+id = "slack-token"
+description = "Slack Token"
+regex = '''xox[baprs]-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24,32}'''
+tags = ["token", "slack"]
+
+[[rules]]
+id = "github-token"
+description = "GitHub Personal Access Token"
+regex = '''ghp_[0-9a-zA-Z]{36}'''
+tags = ["token", "github"]
+
+[[rules]]
+id = "jwt-token"
+description = "JWT Token"
+regex = '''eyJ[A-Za-z0-9-_=]+\.eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_.+/=]*'''
+tags = ["token", "jwt"]
+
+[allowlist]
+description = "Allowlist for test files and documentation"
+paths = [
+  '''.*_test\.py''',
+  '''.*_test\.go''',
+  '''.*/tests/.*''',
+  '''.*/test/.*''',
+  '''.*\.md''',
+  '''.*\.example''',
+]
+
+regexes = [
+  '''example\.com''',
+  '''localhost''',
+  '''127\.0\.0\.1''',
+  '''0\.0\.0\.0''',
+  '''EXAMPLE_KEY''',
+  '''YOUR_API_KEY''',
+  '''<YOUR_.*>''',
+]
+```
+
+### Detection rules
+
+<AccordionGroup>
+  <Accordion title="GCP credentials">
+    Detects Google Cloud Platform API keys and service account JSON files. Tagged as **sovereignty-critical** for data residency enforcement.
+  </Accordion>
+  <Accordion title="AWS credentials (BLOCKED)">
+    Detects AWS access keys and flags as **sovereignty-violation** since iLuminara enforces African/EU data residency.
+  </Accordion>
+  <Accordion title="Private keys">
+    Detects RSA, EC, OpenSSH, and PGP private keys. Tagged for **crypto-shredder** integration.
+  </Accordion>
+  <Accordion title="API tokens">
+    Detects Slack, GitHub, and JWT tokens to prevent credential leakage.
+  </Accordion>
+</AccordionGroup>
+
+### Compliance mapping
+
+| Framework | Section | Requirement | Gitleaks Coverage |
+|-----------|---------|-------------|-------------------|
+| **NIST SP 800-53** | IA-5 | Authenticator Management | ✅ Secret detection |
+| **HIPAA** | §164.312(a)(2)(i) | Unique User Identification | ✅ Credential scanning |
+| **ISO 27001** | A.9.4.3 | Password Management System | ✅ Token detection |
+| **SOC 2** | CC6.1 | Logical Access Controls | ✅ Secret scanning |
+| **GDPR** | Art. 32(1)(b) | Confidentiality | ✅ Credential protection |
+
+## SARIF integration
+
+Both workflows upload results in SARIF (Static Analysis Results Interchange Format) for unified security dashboard.
+
+```yaml
+- name: Upload SARIF results
+  uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: results.sarif
+```
+
+View results in **GitHub Security** → **Code scanning alerts**
+
+## Automated remediation
+
+### Dependabot integration
+
+**File:** `.github/dependabot.yml`
+
+```yaml
+version: 2
+
+updates:
+  # Python dependencies
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "daily"
+      time: "02:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "VISENDI56"
+    labels:
+      - "dependencies"
+      - "security"
+      - "fortress-maintenance"
+    
+    groups:
+      security:
+        patterns:
+          - "cryptography"
+          - "pyjwt"
+          - "requests"
+        update-types:
+          - "security"
+```
+
+### Auto-merge security patches
+
+Enable auto-merge for critical security updates:
+
+```bash
+gh pr merge --auto --squash <PR_NUMBER>
+```
+
+## Monitoring and alerts
+
+### Slack notifications
+
+Configure Slack webhook for security alerts:
+
+```yaml
+- name: Notify Slack
+  if: failure()
+  uses: slackapi/slack-github-action@v1
+  with:
+    webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+    payload: |
+      {
+        "text": "🚨 Security scan failed in iLuminara-Core",
+        "blocks": [
+          {
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "*Fortress Status:* COMPROMISED\n*Workflow:* ${{ github.workflow }}\n*Branch:* ${{ github.ref }}"
+            }
+          }
+        ]
+      }
+```
+
+### Email notifications
+
+GitHub automatically sends email notifications to repository admins on security findings.
+
+## Fortress validation
+
+Validate security workflows are active:
+
+```bash
+# Check workflow status
+gh workflow list
+
+# View recent runs
+gh run list --workflow=codeql.yml
+gh run list --workflow=gitleaks.yml
+
+# View specific run
+gh run view <RUN_ID>
+```
+
+## Best practices
+
+<Steps>
+  <Step title="Enable branch protection">
+    Require CodeQL and Gitleaks to pass before merging
+  </Step>
+  <Step title="Review alerts weekly">
+    Triage security findings in GitHub Security dashboard
+  </Step>
+  <Step title="Rotate secrets immediately">
+    Use Crypto Shredder to dissolve compromised credentials
+  </Step>
+  <Step title="Update dependencies daily">
+    Enable Dependabot auto-merge for security patches
+  </Step>
+  <Step title="Audit scan coverage">
+    Ensure all critical paths are scanned
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="CodeQL timeout">
+    Increase `timeout-minutes` in workflow or optimize build process
+  </Accordion>
+  <Accordion title="Gitleaks false positives">
+    Add patterns to `[allowlist]` in `.gitleaks.toml`
+  </Accordion>
+  <Accordion title="SARIF upload failed">
+    Check `security-events: write` permission is granted
+  </Accordion>
+  <Accordion title="Workflow not triggering">
+    Verify branch names match trigger conditions
+  </Accordion>
+</AccordionGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Crypto Shredder"
+    icon="fire"
+    href="/security/crypto-shredder"
+  >
+    Implement IP-02 data dissolution
+  </Card>
+  <Card
+    title="SovereignGuardrail"
+    icon="shield-check"
+    href="/security/sovereign-guardrail"
+  >
+    Configure 14-framework enforcement
+  </Card>
+  <Card
+    title="Security overview"
+    icon="shield-halved"
+    href="/security/overview"
+  >
+    Complete security architecture
+  </Card>
+  <Card
+    title="Deployment"
+    icon="rocket"
+    href="/deployment/overview"
+  >
+    Deploy with security enabled
+  </Card>
+</CardGroup>
