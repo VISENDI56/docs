@@ -1,0 +1,267 @@
+---
+title: Compliance matrix
+description: Complete mapping of iLuminara-Core compliance across 14 global frameworks
+---
+
+## Overview
+
+iLuminara-Core enforces 14 global legal frameworks through the SovereignGuardrail. This matrix shows how each framework requirement maps to iLuminara implementation.
+
+## Framework coverage
+
+| Framework | Region | Status | Key Articles | Implementation |
+|-----------|--------|--------|--------------|----------------|
+| **GDPR** | 🇪🇺 EU | ✅ Enforced | Art. 6, 9, 17, 22, 30, 32 | [View](/compliance/gdpr) |
+| **KDPA** | 🇰🇪 Kenya | ✅ Enforced | §37, §42 | [View](/compliance/kdpa) |
+| **HIPAA** | 🇺🇸 USA | ✅ Enforced | §164.312, §164.530(j) | [View](/compliance/hipaa) |
+| **HITECH** | 🇺🇸 USA | ✅ Enforced | §13410 | [View](/compliance/hipaa) |
+| **PIPEDA** | 🇨🇦 Canada | ✅ Enforced | §5-7 | [View](/compliance/pipeda) |
+| **POPIA** | 🇿🇦 South Africa | ✅ Enforced | §11, §14, §26 | [View](/compliance/popia) |
+| **CCPA/CPRA** | 🇺🇸 California | ✅ Enforced | §1798.100-121 | [View](/compliance/ccpa) |
+| **NIST CSF** | 🇺🇸 USA | ✅ Enforced | 5 Functions | [View](/compliance/nist) |
+| **ISO 27001** | 🌐 Global | ✅ Enforced | Annex A | [View](/compliance/iso27001) |
+| **SOC 2** | 🇺🇸 USA | ✅ Enforced | Trust Services | [View](/compliance/soc2) |
+| **EU AI Act** | 🇪🇺 EU | ✅ Enforced | §6, §8, §12 | [View](/compliance/eu-ai-act) |
+| **WHO IHR** | 🌐 Global | ✅ Enforced | Article 6 | [View](/compliance/who-ihr) |
+| **Geneva Convention** | 🌐 Global | ✅ Enforced | Article 3 | [View](/governance/humanitarian) |
+| **Data Sovereignty** | 🌐 Global | ✅ Enforced | Custom | [View](/governance/overview) |
+
+## Cross-framework mapping
+
+### Data protection principles
+
+| Principle | GDPR | KDPA | HIPAA | PIPEDA | POPIA | CCPA | iLuminara |
+|-----------|------|------|-------|--------|-------|------|-----------|
+| **Lawfulness** | Art. 6 | §37 | §164.502 | §5 | §11 | §1798.100 | SovereignGuardrail |
+| **Purpose limitation** | Art. 5(1)(b) | §38 | §164.502(b) | §5(2) | §13 | §1798.100(b) | Purpose specification |
+| **Data minimization** | Art. 5(1)(c) | §39 | §164.502(b) | §5(3) | §10 | - | Minimum necessary |
+| **Accuracy** | Art. 5(1)(d) | §40 | - | §5(6) | §16 | §1798.106 | Golden Thread |
+| **Storage limitation** | Art. 5(1)(e) | §41 | §164.530(j) | §5(5) | §14 | - | Crypto Shredder |
+| **Integrity** | Art. 5(1)(f) | §42 | §164.312(c) | §5(7) | §19 | - | Tamper-proof audit |
+| **Accountability** | Art. 5(2) | §43 | §164.530 | §5(1) | §8 | - | Audit trail |
+
+### Data subject rights
+
+| Right | GDPR | KDPA | HIPAA | PIPEDA | POPIA | CCPA | iLuminara |
+|-------|------|------|-------|--------|-------|------|-----------|
+| **Access** | Art. 15 | §42(1) | §164.524 | §5(8) | §23 | §1798.100 | API endpoint |
+| **Rectification** | Art. 16 | §42(2) | §164.526 | §5(9) | §24 | §1798.106 | Correction API |
+| **Erasure** | Art. 17 | §42(3) | - | - | §25 | §1798.105 | Crypto Shredder |
+| **Portability** | Art. 20 | - | - | - | - | - | Export API |
+| **Objection** | Art. 21 | §42(4) | - | - | - | §1798.120 | Opt-out |
+| **Explanation** | Art. 22 | - | - | - | - | - | SHAP values |
+
+### Security requirements
+
+| Requirement | GDPR | KDPA | HIPAA | PIPEDA | POPIA | ISO 27001 | SOC 2 | iLuminara |
+|-------------|------|------|-------|--------|-------|-----------|-------|-----------|
+| **Encryption** | Art. 32 | §44 | §164.312(a)(2)(iv) | §5(7) | §19 | A.10.1 | CC6.1 | AES-256-GCM |
+| **Access control** | Art. 32 | §45 | §164.312(a)(1) | §5(7) | §19 | A.9.1 | CC6.2 | RBAC + IAM |
+| **Audit logging** | Art. 30 | §46 | §164.312(b) | - | §19 | A.12.4 | CC7.2 | Tamper-proof |
+| **Breach notification** | Art. 33 | §47 | §13410 | - | - | A.16.1 | CC7.3 | Auto-notify |
+| **Risk assessment** | Art. 32 | §48 | §164.308(a)(1) | - | §19 | A.12.6 | CC3.2 | Continuous |
+
+### Cross-border transfers
+
+| Framework | Restriction | Mechanism | iLuminara Enforcement |
+|-----------|-------------|-----------|----------------------|
+| **GDPR** | Art. 44-50 | Adequacy, SCCs, BCRs | Block non-EU transfers |
+| **KDPA** | §37 | Commissioner approval | Block non-Kenya transfers |
+| **HIPAA** | §164.312(e) | BAA required | Encrypted transmission |
+| **PIPEDA** | - | Substantially similar | Approved jurisdictions |
+| **POPIA** | §72 | Adequate protection | Block non-SA transfers |
+| **CCPA** | - | No restriction | - |
+
+```python
+# Cross-border transfer enforcement
+guardrail.validate_action(
+    action_type='Data_Transfer',
+    payload={
+        'data_type': 'PHI',
+        'source_jurisdiction': 'KDPA_KE',
+        'destination': 'US_Cloud'
+    },
+    jurisdiction='KDPA_KE'
+)
+# Raises: SovereigntyViolationError
+```
+
+## Retention requirements
+
+| Framework | Minimum | Maximum | iLuminara Policy |
+|-----------|---------|---------|------------------|
+| **GDPR** | - | Necessary period | 180 days (HOT) |
+| **KDPA** | - | Necessary period | 180 days (HOT) |
+| **HIPAA** | 6 years | - | 1825 days (COLD) |
+| **PIPEDA** | - | Necessary period | 365 days (WARM) |
+| **POPIA** | - | Necessary period | 180 days (HOT) |
+| **CCPA** | - | Necessary period | 180 days (HOT) |
+
+```python
+from governance_kernel.crypto_shredder import RetentionPolicy
+
+# Framework-specific retention
+retention_map = {
+    'GDPR_EU': RetentionPolicy.HOT,      # 180 days
+    'KDPA_KE': RetentionPolicy.HOT,      # 180 days
+    'HIPAA_US': RetentionPolicy.COLD,    # 1825 days (5 years)
+    'PIPEDA_CA': RetentionPolicy.WARM,   # 365 days
+    'POPIA_ZA': RetentionPolicy.HOT,     # 180 days
+    'CCPA_US': RetentionPolicy.HOT,      # 180 days
+}
+```
+
+## Consent requirements
+
+| Framework | Explicit Required | Withdrawal | iLuminara |
+|-----------|------------------|------------|-----------|
+| **GDPR** | Yes (Art. 9) | Yes (Art. 7(3)) | ✅ Implemented |
+| **KDPA** | Yes (§42) | Yes (§42) | ✅ Implemented |
+| **HIPAA** | Yes (§164.508) | Yes | ✅ Implemented |
+| **PIPEDA** | Yes (§5(3)) | Yes | ✅ Implemented |
+| **POPIA** | Yes (§11) | Yes (§11) | ✅ Implemented |
+| **CCPA** | No (opt-out) | N/A | ✅ Implemented |
+
+```python
+# Consent validation across frameworks
+guardrail.validate_action(
+    action_type='Consent_Validation',
+    payload={
+        'consent_token': 'VALID_TOKEN',
+        'consent_scope': 'treatment',
+        'consent_explicit': True,
+        'withdrawal_available': True
+    },
+    jurisdiction='GDPR_EU'  # Works for all frameworks
+)
+```
+
+## AI/ML specific requirements
+
+| Framework | Requirement | iLuminara Implementation |
+|-----------|-------------|-------------------------|
+| **EU AI Act §6** | High-risk AI systems | Risk classification |
+| **EU AI Act §8** | Transparency | SHAP explainability |
+| **EU AI Act §12** | Record keeping | Tamper-proof audit |
+| **GDPR Art. 22** | Right to explanation | SHAP + feature importance |
+| **CCPA §1798.185** | Automated decision-making | Opt-out available |
+
+```python
+# High-risk AI inference with explanation
+guardrail.validate_action(
+    action_type='High_Risk_Inference',
+    payload={
+        'inference': 'cholera_diagnosis',
+        'confidence_score': 0.92,
+        'explanation': shap_values,
+        'evidence_chain': ['fever', 'diarrhea', 'dehydration'],
+        'consent_token': 'VALID_TOKEN'
+    },
+    jurisdiction='EU_AI_ACT'
+)
+```
+
+## Compliance validation
+
+### Automated validation
+
+```bash
+# Validate all frameworks
+python governance_kernel/compliance_validator.py --all
+
+# Validate specific framework
+python governance_kernel/compliance_validator.py --framework GDPR_EU
+
+# Generate compliance report
+python governance_kernel/compliance_reporter.py --output report.pdf
+```
+
+### Manual audit checklist
+
+<Steps>
+  <Step title="Data inventory">
+    Document all personal information collected, processed, and stored
+  </Step>
+  <Step title="Legal basis">
+    Verify legal basis for processing under each applicable framework
+  </Step>
+  <Step title="Consent management">
+    Audit consent records and withdrawal mechanisms
+  </Step>
+  <Step title="Security controls">
+    Review encryption, access control, and audit logging
+  </Step>
+  <Step title="Data subject rights">
+    Test access, correction, and deletion workflows
+  </Step>
+  <Step title="Cross-border transfers">
+    Verify all transfers comply with sovereignty rules
+  </Step>
+  <Step title="Breach response">
+    Test breach notification procedures
+  </Step>
+  <Step title="Retention policies">
+    Verify auto-shred and retention enforcement
+  </Step>
+</Steps>
+
+## Compliance dashboard
+
+iLuminara provides real-time compliance monitoring via Grafana:
+
+**Metrics tracked:**
+- Sovereignty violations (should be 0)
+- Cross-border transfers (with approval status)
+- High-risk inferences (with explanation rate)
+- Consent validations (success rate)
+- Keys shredded (retention compliance)
+- Data subject requests (response time)
+
+```bash
+# Launch compliance dashboard
+streamlit run dashboards/compliance_dashboard.py
+```
+
+## Regulatory contacts
+
+| Framework | Authority | Contact |
+|-----------|-----------|---------|
+| **GDPR** | National DPAs | https://edpb.europa.eu |
+| **KDPA** | Data Commissioner (Kenya) | https://www.odpc.go.ke |
+| **HIPAA** | HHS OCR | https://www.hhs.gov/ocr |
+| **PIPEDA** | Privacy Commissioner (Canada) | https://www.priv.gc.ca |
+| **POPIA** | Information Regulator (SA) | https://inforegulator.org.za |
+| **CCPA** | California AG / CPPA | https://oag.ca.gov |
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="GDPR compliance"
+    icon="scale-balanced"
+    href="/compliance/gdpr"
+  >
+    European Union data protection
+  </Card>
+  <Card
+    title="HIPAA compliance"
+    icon="hospital"
+    href="/compliance/hipaa"
+  >
+    US healthcare data protection
+  </Card>
+  <Card
+    title="SovereignGuardrail"
+    icon="shield-check"
+    href="/governance/overview"
+  >
+    Configure compliance enforcement
+  </Card>
+  <Card
+    title="Compliance validation"
+    icon="check-double"
+    href="/compliance/validation"
+  >
+    Automated compliance testing
+  </Card>
+</CardGroup>
