@@ -1,0 +1,354 @@
+---
+title: FDA 21 CFR Part 11
+description: Electronic records and electronic signatures with quantum-resistant audit trails
+---
+
+## Overview
+
+FDA 21 CFR Part 11 establishes criteria for electronic records and signatures to be equivalent to paper records and handwritten signatures. iLuminara implements **quantum-resistant timestamped audit trails (IP-09)** with FIPS 140-2 compliance, unique biometric signatures through Acorn Protocol, and immutable linkage between signatures and records.
+
+<Card
+  title="Golden Thread integration"
+  icon="link"
+>
+  "iLuminara implements quantum-resistant timestamped audit trails (IP-09) with FIPS 140-2 compliance, unique biometric signatures through Acorn Protocol, and immutable linkage between signatures and records."
+</Card>
+
+## Key requirements
+
+### §11.10: Controls for closed systems
+
+<AccordionGroup>
+  <Accordion title="(a) System validation">
+    Validation ensuring accuracy, reliability, consistent intended performance, and ability to discern invalid or altered records
+  </Accordion>
+  <Accordion title="(e) Audit trails">
+    Secure, computer-generated, time-stamped audit trails independently recording date/time of operator entries and actions
+  </Accordion>
+  <Accordion title="(g) Authority checks">
+    Ensuring only authorized individuals can use system, sign records, access devices, alter records, or perform operations
+  </Accordion>
+</AccordionGroup>
+
+## iLuminara implementation
+
+### Quantum-resistant audit trails (IP-09)
+
+```python
+from governance_kernel.audit_trail import QuantumResistantAuditTrail
+
+audit = QuantumResistantAuditTrail(
+    algorithm="CRYSTALS-Dilithium",  # Post-quantum signature
+    timestamp_authority="NIST",
+    fips_140_2_level=3
+)
+
+# Record FRENASA diagnostic output
+audit.record_action(
+    actor="ml_system_frenasa_v2.1",
+    action="HIGH_RISK_INFERENCE",
+    resource="patient_diagnosis_cholera",
+    timestamp=datetime.utcnow(),
+    evidence={
+        "symptoms": ["diarrhea", "vomiting", "dehydration"],
+        "confidence_score": 0.95,
+        "shap_values": [0.8, 0.1, 0.1],
+        "training_data_version": "2024-Q4"
+    }
+)
+
+# Signature cannot be excised, copied, or transferred
+audit.link_signature_to_record(
+    signature_id="ACORN_BIOMETRIC_12345",
+    record_id="DIAG_2025_001"
+)
+```
+
+### Acorn Protocol biometric signatures
+
+```python
+from governance_kernel.acorn_protocol import AcornBiometric
+
+acorn = AcornBiometric()
+
+# Somatic authentication: posture + location + stillness
+signature = acorn.generate_signature(
+    user_id="DR_AMINA_HASSAN",
+    posture="seated_upright",
+    location_gps=(0.0512, 40.3129),
+    stillness_duration_seconds=3.2,
+    action="APPROVE_CHOLERA_DIAGNOSIS"
+)
+
+# Unique to one individual, not reusable or reassignable (§11.100(a))
+assert signature.is_unique()
+assert not signature.is_reusable()
+
+# Requires collaboration of at least two individuals for unauthorized use (§11.200(a)(3))
+assert signature.requires_multi_party_compromise()
+```
+
+### Validation of AI systems
+
+```python
+from governance_kernel.validation import AISystemValidator
+
+validator = AISystemValidator()
+
+# Validate FRENASA against §11.10(a) requirements
+validation_report = validator.validate_system(
+    system="FRENASA_v2.1",
+    requirements=[
+        "accuracy",
+        "reliability",
+        "consistent_intended_performance",
+        "discern_invalid_records"
+    ]
+)
+
+# Generate accurate and complete copies (§11.10(b))
+human_readable = validator.generate_human_readable_copy(
+    record_id="DIAG_2025_001",
+    format="PDF"
+)
+
+electronic_form = validator.generate_electronic_copy(
+    record_id="DIAG_2025_001",
+    format="HL7_FHIR"
+)
+```
+
+## Compliance with MDR
+
+FDA 21 CFR Part 11 compliance enables the Golden Thread to serve as **certified electronic record system for EU MDR 2017/745 post-market surveillance**, creating transatlantic regulatory bridge for AI/ML medical devices.
+
+### Cross-regulatory alignment
+
+```python
+from governance_kernel.cross_regulatory import TransatlanticBridge
+
+bridge = TransatlanticBridge()
+
+# FRENASA inference becomes non-repudiable evidentiary artifact
+artifact = bridge.create_evidentiary_artifact(
+    fda_21_cfr_11_record="DIAG_2025_001",
+    eu_mdr_pms_requirement="Article 83",
+    admissibility_jurisdictions=["FDA", "EU_NOTIFIED_BODIES"]
+)
+
+# Admissible across FDA/EU regulatory proceedings
+assert artifact.is_admissible("FDA_PREMARKET_SUBMISSION")
+assert artifact.is_admissible("EU_MDR_CLINICAL_EVALUATION")
+```
+
+## Signature manifestations (§11.50)
+
+Signed electronic records clearly indicate:
+
+1. **Printed name of signer**: `DR_AMINA_HASSAN`
+2. **Date and time**: `2025-12-25T17:00:00Z`
+3. **Meaning**: `CLINICAL_APPROVAL_CHOLERA_DIAGNOSIS`
+
+```python
+# Generate signature manifestation
+manifestation = audit.generate_signature_manifestation(
+    signer="DR_AMINA_HASSAN",
+    timestamp="2025-12-25T17:00:00Z",
+    meaning="CLINICAL_APPROVAL_CHOLERA_DIAGNOSIS",
+    record_id="DIAG_2025_001"
+)
+
+# Include in human-readable form
+human_readable_with_signature = validator.generate_human_readable_copy(
+    record_id="DIAG_2025_001",
+    include_signature_manifestation=True
+)
+```
+
+## Audit trail integrity
+
+### Tamper-proof logging
+
+```python
+from governance_kernel.audit_trail import TamperProofAudit
+
+audit = TamperProofAudit(
+    backend="Cloud_Spanner",
+    region="us-central1",
+    kms_key="projects/iluminara/locations/us/keyRings/audit/cryptoKeys/sign"
+)
+
+# Record with cryptographic signature
+audit.record_with_signature(
+    action="MODIFY_PATIENT_RECORD",
+    actor="DR_AMINA_HASSAN",
+    resource="PATIENT_12345",
+    changes={
+        "diagnosis": {"old": "suspected_cholera", "new": "confirmed_cholera"},
+        "treatment": {"old": null, "new": "ORS_immediate"}
+    }
+)
+
+# Verify chain integrity
+integrity = audit.verify_chain_integrity()
+assert integrity["chain_valid"] == True
+assert integrity["tampering_detected"] == False
+```
+
+## Operational system checks (§11.10(f))
+
+```python
+from governance_kernel.operational_checks import SequenceEnforcer
+
+enforcer = SequenceEnforcer()
+
+# Define permitted sequence
+enforcer.define_sequence(
+    workflow="CHOLERA_DIAGNOSIS",
+    steps=[
+        "SYMPTOM_COLLECTION",
+        "FRENASA_INFERENCE",
+        "CLINICAL_REVIEW",
+        "TREATMENT_APPROVAL",
+        "MEDICATION_DISPENSING"
+    ]
+)
+
+# Enforce sequencing
+try:
+    enforcer.execute_step(
+        workflow="CHOLERA_DIAGNOSIS",
+        step="MEDICATION_DISPENSING",
+        current_state="SYMPTOM_COLLECTION"
+    )
+except SequenceViolationError as e:
+    print(f"❌ Sequence violation: {e}")
+    # Cannot dispense medication before clinical review
+```
+
+## Device checks (§11.10(h))
+
+```python
+from governance_kernel.device_checks import DataSourceValidator
+
+validator = DataSourceValidator()
+
+# Validate data input source
+validation = validator.validate_source(
+    data_source="ACORN_SENSOR_JOR-47",
+    expected_device_id="JOR-47",
+    expected_location=(0.0512, 40.3129),
+    expected_tpm_attestation="VALID"
+)
+
+if not validation.is_valid:
+    raise InvalidDataSourceError(
+        f"Data source validation failed: {validation.failure_reason}"
+    )
+```
+
+## Training and accountability (§11.10(i)(j))
+
+```python
+from governance_kernel.training import PersonnelTraining
+
+training = PersonnelTraining()
+
+# Record training completion
+training.record_completion(
+    personnel_id="DR_AMINA_HASSAN",
+    course="FDA_21_CFR_11_COMPLIANCE",
+    completion_date="2025-01-15",
+    score=95,
+    certificate_id="CERT_2025_001"
+)
+
+# Enforce accountability policy
+training.enforce_accountability_policy(
+    personnel_id="DR_AMINA_HASSAN",
+    action="ELECTRONIC_SIGNATURE",
+    policy="INDIVIDUAL_ACCOUNTABILITY_FOR_ACTIONS"
+)
+```
+
+## Open systems controls (§11.30)
+
+For systems accessible through public networks:
+
+```python
+from governance_kernel.open_systems import OpenSystemControls
+
+controls = OpenSystemControls()
+
+# Encryption (§11.30(a))
+controls.enable_encryption(
+    algorithm="AES-256-GCM",
+    key_management="Cloud_KMS"
+)
+
+# Digital signature standards (§11.30(b))
+controls.enable_digital_signatures(
+    standard="FIPS_186-4",
+    algorithm="ECDSA_P-256"
+)
+
+# Additional procedural controls (§11.30(c))
+controls.enable_procedural_controls([
+    "MULTI_FACTOR_AUTHENTICATION",
+    "SESSION_TIMEOUT_15_MINUTES",
+    "IP_WHITELISTING",
+    "INTRUSION_DETECTION"
+])
+```
+
+## Certification to FDA (§11.100(c))
+
+```python
+from governance_kernel.certification import FDACertification
+
+cert = FDACertification()
+
+# Certify electronic signatures are legally binding
+certification = cert.generate_certification(
+    organization="iLuminara Health Systems",
+    statement="Electronic signatures executed to electronic records are legally binding equivalent of handwritten signatures",
+    authorized_signatory="CEO_JOHN_DOE",
+    submission_office="Office of Regional Operations"
+)
+
+# Submit to FDA
+cert.submit_certification(certification)
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="EU Clinical Trials Regulation"
+    icon="flask"
+    href="/compliance/eu-ctr"
+  >
+    Cryptographic separation for clinical trials
+  </Card>
+  <Card
+    title="Audit trail"
+    icon="file-contract"
+    href="/governance/audit"
+  >
+    Configure tamper-proof logging
+  </Card>
+  <Card
+    title="Acorn Protocol"
+    icon="fingerprint"
+    href="/security/acorn-protocol"
+  >
+    Somatic biometric authentication
+  </Card>
+  <Card
+    title="Legal singularity"
+    icon="infinity"
+    href="/compliance/legal-singularity"
+  >
+    Explore all 50 frameworks
+  </Card>
+</CardGroup>
