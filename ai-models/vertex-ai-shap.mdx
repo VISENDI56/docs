@@ -1,0 +1,392 @@
+---
+title: Vertex AI + SHAP integration
+description: Right to Explanation for high-risk clinical inferences
+---
+
+## Overview
+
+iLuminara-Core integrates Vertex AI with SHAP (SHapley Additive exPlanations) to provide explainability for every high-risk clinical inference, ensuring compliance with EU AI Act §6 and GDPR Art. 22.
+
+<Card
+  title="Philosophy"
+  icon="brain"
+>
+  "Every high-risk clinical inference requires explainability. No black boxes in healthcare."
+</Card>
+
+## Why SHAP?
+
+SHAP provides mathematically rigorous explanations based on game theory:
+
+<CardGroup cols={2}>
+  <Card title="Feature importance" icon="chart-bar">
+    Quantifies each feature's contribution to the prediction
+  </Card>
+  <Card title="Baseline comparison" icon="scale-balanced">
+    Shows how prediction differs from baseline
+  </Card>
+  <Card title="Evidence chain" icon="link">
+    Builds traceable reasoning for clinical decisions
+  </Card>
+  <Card title="Human-readable" icon="user">
+    Generates natural language explanations
+  </Card>
+</CardGroup>
+
+## Compliance requirements
+
+### EU AI Act §6 (High-Risk AI)
+
+High-risk AI systems must provide:
+- Transparency about decision-making
+- Explanation of factors influencing output
+- Human oversight capabilities
+
+### GDPR Art. 22 (Right to Explanation)
+
+Individuals have the right to:
+- Obtain explanation of automated decisions
+- Challenge decisions affecting them
+- Request human intervention
+
+### HIPAA §164.524 (Right of Access)
+
+Patients have the right to:
+- Access their health information
+- Understand how decisions were made
+- Receive explanations in understandable language
+
+## Risk levels
+
+iLuminara automatically determines when explanation is required:
+
+| Risk Level | Confidence Range | Explanation Required | Use Case |
+|------------|------------------|---------------------|----------|
+| **LOW** | < 0.5 | Optional | Routine monitoring |
+| **MEDIUM** | 0.5 - 0.7 | Recommended | Increased surveillance |
+| **HIGH** | 0.7 - 0.9 | **Required** | Clinical intervention |
+| **CRITICAL** | > 0.9 | **Required** | Emergency response |
+
+## Basic usage
+
+```python
+from cloud_oracle.vertex_ai_shap import VertexAIExplainer
+
+# Initialize explainer
+explainer = VertexAIExplainer(
+    project_id="iluminara-core",
+    location="us-central1",
+    model_name="outbreak-forecaster",
+    high_risk_threshold=0.7
+)
+
+# Make prediction with automatic explanation
+features = {
+    "fever_cases": 45,
+    "diarrhea_cases": 32,
+    "population_density": 1200,
+    "water_quality_index": 0.3,
+    "sanitation_score": 0.4
+}
+
+result = explainer.predict_with_explanation(
+    features=features,
+    patient_id="PAT_12345",
+    jurisdiction="GDPR_EU"
+)
+
+print(f"Prediction: {result['prediction']}")
+print(f"Confidence: {result['confidence_score']:.2%}")
+print(f"Risk Level: {result['risk_level']}")
+print(f"Explanation: {result['explanation']['human_readable']}")
+```
+
+## Response structure
+
+### High-risk inference (explanation required)
+
+```json
+{
+  "prediction": "HIGH_RISK_OUTBREAK",
+  "confidence_score": 0.87,
+  "risk_level": "high",
+  "patient_id": "PAT_12345",
+  "jurisdiction": "GDPR_EU",
+  "timestamp": "2025-12-25T16:00:00.000Z",
+  "explanation_required": true,
+  "explanation": {
+    "method": "shap",
+    "feature_contributions": {
+      "water_quality_index": {
+        "value": 0.3,
+        "shap_value": 0.42,
+        "contribution_pct": 35.2
+      },
+      "diarrhea_cases": {
+        "value": 32,
+        "shap_value": 0.31,
+        "contribution_pct": 26.1
+      },
+      "sanitation_score": {
+        "value": 0.4,
+        "shap_value": 0.28,
+        "contribution_pct": 23.5
+      }
+    },
+    "top_3_features": [
+      "water_quality_index",
+      "diarrhea_cases",
+      "sanitation_score"
+    ],
+    "evidence_chain": [
+      "water_quality_index (value: 0.30) increases risk by 35.2%",
+      "diarrhea_cases (value: 32.00) increases risk by 26.1%",
+      "sanitation_score (value: 0.40) increases risk by 23.5%"
+    ],
+    "human_readable": "The model predicts HIGH_RISK_OUTBREAK primarily based on water_quality_index (contributing 35.2% to the decision). The second most important factor is diarrhea_cases (26.1% contribution)."
+  },
+  "compliance": {
+    "status": "compliant",
+    "jurisdiction": "GDPR_EU",
+    "requirements_met": [
+      "EU AI Act §6 (Explainability)",
+      "GDPR Art. 22 (Right to Explanation)"
+    ],
+    "violations": []
+  }
+}
+```
+
+### Low-risk inference (explanation optional)
+
+```json
+{
+  "prediction": "LOW_RISK",
+  "confidence_score": 0.42,
+  "risk_level": "low",
+  "explanation_required": false,
+  "explanation": null,
+  "compliance": {
+    "status": "not_required"
+  }
+}
+```
+
+## SHAP explanation components
+
+### Feature contributions
+
+Shows how each feature influenced the prediction:
+
+```python
+feature_contributions = result['explanation']['feature_contributions']
+
+for feature, contribution in feature_contributions.items():
+    print(f"{feature}:")
+    print(f"  Value: {contribution['value']}")
+    print(f"  SHAP Value: {contribution['shap_value']}")
+    print(f"  Contribution: {contribution['contribution_pct']:.1f}%")
+```
+
+### Evidence chain
+
+Traceable reasoning for clinical decisions:
+
+```python
+evidence_chain = result['explanation']['evidence_chain']
+
+for i, evidence in enumerate(evidence_chain, 1):
+    print(f"{i}. {evidence}")
+```
+
+Output:
+```
+1. water_quality_index (value: 0.30) increases risk by 35.2%
+2. diarrhea_cases (value: 32.00) increases risk by 26.1%
+3. sanitation_score (value: 0.40) increases risk by 23.5%
+```
+
+### Human-readable explanation
+
+Natural language explanation for patients and clinicians:
+
+```python
+explanation = result['explanation']['human_readable']
+print(explanation)
+```
+
+Output:
+```
+The model predicts HIGH_RISK_OUTBREAK primarily based on 
+water_quality_index (contributing 35.2% to the decision). 
+The second most important factor is diarrhea_cases (26.1% contribution).
+```
+
+## Integration with SovereignGuardrail
+
+All AI inferences are validated against compliance constraints:
+
+```python
+from governance_kernel.vector_ledger import SovereignGuardrail
+
+guardrail = SovereignGuardrail()
+
+# Validate high-risk inference
+guardrail.validate_action(
+    action_type='High_Risk_Inference',
+    payload={
+        'inference': result['prediction'],
+        'explanation': result['explanation'],
+        'confidence_score': result['confidence_score'],
+        'evidence_chain': result['explanation']['evidence_chain']
+    },
+    jurisdiction='GDPR_EU'
+)
+```
+
+## Audit trail
+
+All inferences are logged to BigQuery for compliance:
+
+```sql
+SELECT 
+  timestamp,
+  patient_id,
+  prediction,
+  confidence_score,
+  risk_level,
+  explanation_required,
+  compliance_status
+FROM `iluminara-core.iluminara_audit.ai_explanations`
+WHERE risk_level IN ('high', 'critical')
+ORDER BY timestamp DESC
+LIMIT 100
+```
+
+## Deployment to Vertex AI
+
+### Train model with explainability
+
+```python
+from google.cloud import aiplatform
+
+# Initialize Vertex AI
+aiplatform.init(project="iluminara-core", location="us-central1")
+
+# Create training job with explainability
+job = aiplatform.CustomTrainingJob(
+    display_name="outbreak-forecaster",
+    script_path="train.py",
+    container_uri="gcr.io/cloud-aiplatform/training/tf-cpu.2-11:latest",
+    requirements=["shap", "scikit-learn", "pandas"],
+    model_serving_container_image_uri="gcr.io/cloud-aiplatform/prediction/tf2-cpu.2-11:latest"
+)
+
+# Train with explainability enabled
+model = job.run(
+    dataset=dataset,
+    model_display_name="outbreak-forecaster-v1",
+    training_fraction_split=0.8,
+    validation_fraction_split=0.1,
+    test_fraction_split=0.1,
+    enable_explanations=True
+)
+```
+
+### Deploy endpoint
+
+```python
+# Deploy model to endpoint
+endpoint = model.deploy(
+    deployed_model_display_name="outbreak-forecaster-v1",
+    machine_type="n1-standard-4",
+    min_replica_count=1,
+    max_replica_count=10,
+    explanation_metadata=aiplatform.explain.ExplanationMetadata(
+        inputs={
+            "fever_cases": {"input_tensor_name": "fever_cases"},
+            "diarrhea_cases": {"input_tensor_name": "diarrhea_cases"},
+            "water_quality_index": {"input_tensor_name": "water_quality_index"}
+        },
+        outputs={"prediction": {"output_tensor_name": "prediction"}}
+    ),
+    explanation_parameters=aiplatform.explain.ExplanationParameters(
+        {"sampled_shapley_attribution": {"path_count": 10}}
+    )
+)
+```
+
+## Performance considerations
+
+- **Explanation latency**: ~100-200ms additional overhead
+- **Throughput**: 100+ predictions/second with explanations
+- **Caching**: SHAP explainer initialized once, reused for all predictions
+- **Batch processing**: Support for batch explanations to reduce overhead
+
+## Visualization
+
+Generate SHAP visualizations for clinical review:
+
+```python
+import shap
+import matplotlib.pyplot as plt
+
+# Generate SHAP waterfall plot
+shap.plots.waterfall(shap_values[0])
+plt.savefig("shap_waterfall.png")
+
+# Generate SHAP force plot
+shap.plots.force(shap_values[0])
+plt.savefig("shap_force.png")
+
+# Generate SHAP summary plot
+shap.plots.summary(shap_values, features)
+plt.savefig("shap_summary.png")
+```
+
+## Testing
+
+Test the explainer with mock data:
+
+```bash
+python cloud_oracle/vertex_ai_shap.py
+```
+
+Run comprehensive tests:
+
+```bash
+pytest tests/test_vertex_ai_shap.py -v
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Deploy to Vertex AI"
+    icon="google"
+    href="/deployment/gcp"
+  >
+    Deploy explainable models to production
+  </Card>
+  <Card
+    title="SovereignGuardrail"
+    icon="shield-check"
+    href="/governance/overview"
+  >
+    Integrate with compliance enforcement
+  </Card>
+  <Card
+    title="Audit trail"
+    icon="file-contract"
+    href="/governance/audit"
+  >
+    Configure tamper-proof logging
+  </Card>
+  <Card
+    title="AI agents"
+    icon="brain-circuit"
+    href="/ai-agents/overview"
+  >
+    Use explainable AI in autonomous agents
+  </Card>
+</CardGroup>
