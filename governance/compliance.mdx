@@ -1,123 +1,319 @@
 ---
 title: Compliance matrix
-description: Complete mapping of 50 global legal frameworks enforced by iLuminara-Core
+description: Complete mapping of 14 global legal frameworks enforced by iLuminara-Core
 ---
 
 ## Overview
 
-iLuminara-Core enforces **50 global legal frameworks** across 8 tiers, providing the most comprehensive compliance stack in global health technology.
+iLuminara-Core enforces 14 global legal frameworks through the SovereignGuardrail, providing native compliance across jurisdictions without code changes.
 
-## The 50 frameworks
+<Card
+  title="Philosophy"
+  icon="scale-balanced"
+>
+  "Deploy in Toronto, Cape Town, or California without changing a single line of code"
+</Card>
 
-### TIER 1: Data Protection & Privacy (15 frameworks)
+## Compliance frameworks
 
-| Framework | Region | Status | Key Articles |
-|-----------|--------|--------|--------------|
-| **GDPR** | 🇪🇺 EU | ✅ Enforced | Art. 9 (Special Categories), Art. 22 (Right to Explanation) |
-| **KDPA** | 🇰🇪 Kenya | ✅ Enforced | §37 (Transfer Restrictions), §42 (Data Subject Rights) |
-| **POPIA** | 🇿🇦 South Africa | ✅ Enforced | §11 (Lawfulness), §14 (Cross-border Transfers) |
-| **PIPEDA** | 🇨🇦 Canada | ✅ Enforced | §5-7 (Lawfulness of Processing) |
-| **LGPD** | 🇧🇷 Brazil | ✅ Enforced | Art. 11 (Sensitive Personal Data) |
-| **PDPA** | 🇸🇬 Singapore | ✅ Enforced | §13 (Consent), §24 (Cross-border Transfers) |
-| **PDPA** | 🇹🇭 Thailand | ✅ Enforced | §26 (Sensitive Data) |
-| **APPI** | 🇯🇵 Japan | ✅ Enforced | Art. 23 (Third-party Provision) |
-| **PIPL** | 🇨🇳 China | ✅ Enforced | Art. 28 (Sensitive Personal Information) |
-| **DPA** | 🇦🇪 UAE | ✅ Enforced | Art. 6 (Processing Principles) |
-| **NDPR** | 🇳🇬 Nigeria | ✅ Enforced | §2.3 (Lawful Processing) |
-| **DPA** | 🇬🇭 Ghana | ✅ Enforced | §14 (Data Protection Principles) |
-| **DPA** | 🇺🇬 Uganda | ✅ Enforced | §7 (Data Protection Principles) |
-| **DPA** | 🇷🇼 Rwanda | ✅ Enforced | Art. 8 (Processing Principles) |
-| **DPA** | 🇲🇺 Mauritius | ✅ Enforced | §9 (Data Protection Principles) |
+### GDPR (European Union)
 
-### TIER 2: Healthcare & Medical (12 frameworks)
+**General Data Protection Regulation**
 
-| Framework | Region | Status | Key Articles |
-|-----------|--------|--------|--------------|
-| **HIPAA** | 🇺🇸 USA | ✅ Enforced | §164.312 (Physical/Technical Safeguards) |
-| **HITECH** | 🇺🇸 USA | ✅ Enforced | §13410 (Notification of Breach) |
-| **21 CFR Part 11** | 🇺🇸 USA | ✅ Enforced | Electronic Records & Signatures |
-| **MDR** | 🇪🇺 EU | ✅ Enforced | Medical Device Regulation |
-| **IVDR** | 🇪🇺 EU | ✅ Enforced | In Vitro Diagnostic Regulation |
-| **NHS DSP Toolkit** | 🇬🇧 UK | ✅ Enforced | Data Security & Protection |
-| **PHIPA** | 🇨🇦 Ontario | ✅ Enforced | Personal Health Information Protection |
-| **HIPA** | 🇨🇦 Saskatchewan | ✅ Enforced | Health Information Protection |
-| **HIA** | 🇦🇺 Australia | ✅ Enforced | Health Insurance Act |
-| **PDPA (Health)** | 🇸🇬 Singapore | ✅ Enforced | Healthcare Data Protection |
-| **HPCSA** | 🇿🇦 South Africa | ✅ Enforced | Health Professions Council |
-| **WHO IHR** | 🌐 Global | ✅ Enforced | Article 6 (Notification) |
+| Article | Requirement | iLuminara Implementation |
+|---------|-------------|--------------------------|
+| Art. 6 | Lawfulness of Processing | Consent validation via SovereignGuardrail |
+| Art. 9 | Special Categories (Health Data) | PHI blocked from foreign transfers |
+| Art. 17 | Right to Erasure | Crypto Shredder (IP-02) dissolution |
+| Art. 22 | Right to Explanation | SHAP explainability for high-risk AI |
+| Art. 30 | Records of Processing | Tamper-proof audit trail |
+| Art. 32 | Security of Processing | CodeQL SAST, Gitleaks secret scanning |
 
-### TIER 3: Security & Standards (10 frameworks)
+**Enforcement:**
+```python
+guardrail.validate_action(
+    action_type='Data_Transfer',
+    payload={'data_type': 'PHI', 'destination': 'Foreign_Cloud'},
+    jurisdiction='GDPR_EU'
+)
+# Raises: SovereigntyViolationError
+```
 
-| Framework | Region | Status | Key Articles |
-|-----------|--------|--------|--------------|
-| **ISO 27001** | 🌐 Global | ✅ Enforced | Annex A (Information Security) |
-| **ISO 27701** | 🌐 Global | ✅ Enforced | Privacy Information Management |
-| **ISO 13485** | 🌐 Global | ✅ Enforced | Medical Devices Quality Management |
-| **SOC 2** | 🇺🇸 USA | ✅ Enforced | Security, Availability, Processing Integrity |
-| **SOC 3** | 🇺🇸 USA | ✅ Enforced | Public Trust Services Report |
-| **NIST CSF** | 🇺🇸 USA | ✅ Enforced | Identify, Protect, Detect, Respond, Recover |
-| **NIST 800-53** | 🇺🇸 USA | ✅ Enforced | Security & Privacy Controls |
-| **PCI DSS** | 🌐 Global | ✅ Enforced | Payment Card Industry Data Security |
-| **FedRAMP** | 🇺🇸 USA | ✅ Enforced | Federal Risk Authorization Management |
-| **CIS Controls** | 🌐 Global | ✅ Enforced | Center for Internet Security |
+### KDPA (Kenya)
 
-### TIER 4: AI & Emerging Tech (5 frameworks)
+**Kenya Data Protection Act**
 
-| Framework | Region | Status | Key Articles |
-|-----------|--------|--------|--------------|
-| **EU AI Act** | 🇪🇺 EU | ✅ Enforced | §6 (High-Risk AI), §8 (Transparency) |
-| **NIST AI RMF** | 🇺🇸 USA | ✅ Enforced | AI Risk Management Framework |
-| **IEEE 7000** | 🌐 Global | ✅ Enforced | Systems Design for Ethical Concerns |
-| **ISO 42001** | 🌐 Global | ✅ Enforced | AI Management System |
-| **Singapore AI Governance** | 🇸🇬 Singapore | ✅ Enforced | Model AI Governance Framework |
+| Section | Requirement | iLuminara Implementation |
+|---------|-------------|--------------------------|
+| §37 | Transfer Restrictions | Data residency in africa-south1 |
+| §42 | Data Subject Rights | Consent management + audit trail |
 
-### TIER 5: Humanitarian & Ethics (4 frameworks)
+**Enforcement:**
+```yaml
+sovereignty:
+  data_residency:
+    allowed_zones:
+      - "africa-south1"
+    enforcement_level: "STRICT"
+```
 
-| Framework | Region | Status | Key Articles |
-|-----------|--------|--------|--------------|
-| **Geneva Convention** | 🌐 Global | ✅ Enforced | Article 3 (Protection of Non-Combatants) |
-| **UN Humanitarian Principles** | 🌐 Global | ✅ Enforced | Humanity, Neutrality, Impartiality, Independence |
-| **Sphere Standards** | 🌐 Global | ✅ Enforced | Humanitarian Charter & Minimum Standards |
-| **Core Humanitarian Standard** | 🌐 Global | ✅ Enforced | CHS Alliance |
+### HIPAA (United States)
 
-### TIER 6: Supply Chain & ESG (4 frameworks)
+**Health Insurance Portability and Accountability Act**
 
-| Framework | Region | Status | Key Requirements |
-|-----------|--------|--------|------------------|
-| **CSDDD** | 🇪🇺 EU | ✅ Enforced | Human rights & environmental due diligence |
-| **LkSG** | 🇩🇪 Germany | ✅ Enforced | Grievance mechanism for supply chain |
-| **UFLPA** | 🇺🇸 USA | ✅ Enforced | Forced labor prevention |
-| **Dodd-Frank §1502** | 🇺🇸 USA | ✅ Enforced | Conflict minerals disclosure |
+| Section | Requirement | iLuminara Implementation |
+|---------|-------------|--------------------------|
+| §164.312 | Physical/Technical Safeguards | TPM hardware attestation, encryption |
+| §164.530(j) | Documentation | 7-year audit retention |
+
+**Enforcement:**
+```yaml
+audit:
+  storage:
+    retention_days: 2555  # 7 years
+```
+
+### POPIA (South Africa)
+
+**Protection of Personal Information Act**
+
+| Section | Requirement | iLuminara Implementation |
+|---------|-------------|--------------------------|
+| §11 | Lawfulness | Consent validation |
+| §14 | Cross-border Transfers | SovereignGuardrail blocking |
+
+### PIPEDA (Canada)
+
+**Personal Information Protection and Electronic Documents Act**
+
+| Section | Requirement | iLuminara Implementation |
+|---------|-------------|--------------------------|
+| §5-7 | Lawfulness of Processing | Consent + purpose limitation |
+
+### EU AI Act
+
+**European Union Artificial Intelligence Act**
+
+| Article | Requirement | iLuminara Implementation |
+|---------|-------------|--------------------------|
+| §6 | High-Risk AI Systems | SHAP explainability mandatory |
+| §8 | Transparency | Audit trail for all inferences |
+| §12 | Record Keeping | Tamper-proof audit logs |
+
+**Enforcement:**
+```python
+guardrail.validate_action(
+    action_type='High_Risk_Inference',
+    payload={
+        'explanation': shap_values,
+        'confidence_score': 0.92,
+        'evidence_chain': [...]
+    },
+    jurisdiction='EU_AI_ACT'
+)
+```
+
+### ISO 27001
+
+**Information Security Management**
+
+| Control | Requirement | iLuminara Implementation |
+|---------|-------------|--------------------------|
+| A.8.3.2 | Disposal of Media | Crypto Shredder key dissolution |
+| A.12.4 | Logging | Tamper-proof audit trail |
+| A.12.6 | Technical Vulnerability Management | CodeQL weekly scans |
+
+### SOC 2
+
+**Service Organization Control 2**
+
+| Criterion | Requirement | iLuminara Implementation |
+|-----------|-------------|--------------------------|
+| Security | Access controls, encryption | TPM attestation, AES-256-GCM |
+| Availability | Uptime, disaster recovery | Multi-region replication |
+| Processing Integrity | Data accuracy, completeness | Golden Thread verification |
+
+### NIST CSF
+
+**NIST Cybersecurity Framework**
+
+| Function | Requirement | iLuminara Implementation |
+|----------|-------------|--------------------------|
+| Identify | Asset management | Bill-of-Materials ledger |
+| Protect | Access control | Acorn Protocol (IP-03) |
+| Detect | Anomaly detection | Gitleaks, CodeQL |
+| Respond | Incident response | Auto-shred on breach |
+| Recover | Backup & restore | Multi-region replication |
+
+### CCPA (California)
+
+**California Consumer Privacy Act**
+
+| Section | Requirement | iLuminara Implementation |
+|---------|-------------|--------------------------|
+| §1798.100 | Right to Know | Audit trail query API |
+
+### HITECH (United States)
+
+**Health Information Technology for Economic and Clinical Health Act**
+
+| Section | Requirement | iLuminara Implementation |
+|---------|-------------|--------------------------|
+| §13410 | Notification of Breach | Auto-notification via PubSub |
+
+## Compliance matrix
+
+### Data sovereignty
+
+| Framework | Requirement | Status |
+|-----------|-------------|--------|
+| GDPR Art. 9 | PHI cannot leave EU | ✅ Enforced |
+| KDPA §37 | Data stays in Kenya | ✅ Enforced |
+| POPIA §14 | Data stays in South Africa | ✅ Enforced |
+| HIPAA §164.312 | US data residency | ✅ Enforced |
+
+### Right to explanation
+
+| Framework | Requirement | Status |
+|-----------|-------------|--------|
+| GDPR Art. 22 | Automated decision explanation | ✅ SHAP |
+| EU AI Act §6 | High-risk AI explanation | ✅ SHAP |
+| ISO 27001 A.18.1.4 | Independent review | ✅ Audit trail |
+
+### Data retention
+
+| Framework | Requirement | Status |
+|-----------|-------------|--------|
+| GDPR Art. 17 | Right to erasure | ✅ Crypto Shredder |
+| HIPAA §164.530(j) | 7-year retention | ✅ Audit logs |
+| ISO 27001 A.8.3.2 | Secure disposal | ✅ Key shredding |
+
+### Audit & logging
+
+| Framework | Requirement | Status |
+|-----------|-------------|--------|
+| GDPR Art. 30 | Records of processing | ✅ Tamper-proof |
+| SOC 2 | Security monitoring | ✅ Prometheus |
+| EU AI Act §12 | Record keeping | ✅ Spanner |
+
+## Jurisdiction configuration
+
+Configure your primary jurisdiction in `config/sovereign_guardrail.yaml`:
+
+```yaml
+jurisdiction:
+  primary: "KDPA_KE"  # Kenya
+  secondary:
+    - "GDPR_EU"       # European Union
+    - "POPIA_ZA"      # South Africa
+    - "HIPAA_US"      # United States
+```
+
+## Compliance testing
+
+### Test GDPR compliance
+
+```python
+import unittest
+from governance_kernel.vector_ledger import SovereignGuardrail, SovereigntyViolationError
+
+class TestGDPRCompliance(unittest.TestCase):
+    def test_phi_cannot_leave_eu(self):
+        guardrail = SovereignGuardrail()
+        
+        with self.assertRaises(SovereigntyViolationError):
+            guardrail.validate_action(
+                action_type='Data_Transfer',
+                payload={
+                    'data_type': 'PHI',
+                    'destination': 'AWS_US'
+                },
+                jurisdiction='GDPR_EU'
+            )
+```
+
+### Test HIPAA compliance
+
+```python
+def test_hipaa_audit_retention(self):
+    from governance_kernel.crypto_shredder import CryptoShredder
+    
+    shredder = CryptoShredder()
+    
+    # Audit logs must be retained for 7 years
+    assert shredder.audit_retention_days >= 2555
+```
+
+## Compliance reports
+
+### Generate compliance report
+
+```python
+from governance_kernel.vector_ledger import SovereignGuardrail
+
+guardrail = SovereignGuardrail()
+
+# Generate compliance report
+report = guardrail.generate_compliance_report(
+    start_date='2025-01-01',
+    end_date='2025-01-31',
+    jurisdiction='KDPA_KE'
+)
+
+print(f"Total actions: {report['total_actions']}")
+print(f"Violations: {report['violations']}")
+print(f"Compliance rate: {report['compliance_rate']:.2%}")
+```
+
+### Export audit logs
+
+```bash
+# Export audit logs for regulatory review
+python scripts/export_audit_logs.py \
+  --start-date 2025-01-01 \
+  --end-date 2025-01-31 \
+  --jurisdiction KDPA_KE \
+  --output audit_report.json
+```
+
+## Certification support
+
+iLuminara-Core provides documentation and evidence for:
+
+- **ISO 27001 certification** - Security controls implementation
+- **SOC 2 Type II audit** - Continuous monitoring evidence
+- **HIPAA compliance audit** - 7-year audit trail
+- **GDPR adequacy assessment** - Data protection impact assessment
 
 ## Next steps
 
 <CardGroup cols={2}>
   <Card
-    title=\"Governance kernel\"
-    icon=\"shield-check\"
-    href=\"/governance/overview\"
+    title="SovereignGuardrail"
+    icon="shield-check"
+    href="/governance/overview"
   >
-    Deep dive into enforcement mechanisms
+    Configure compliance enforcement
   </Card>
   <Card
-    title=\"Architecture\"
-    icon=\"sitemap\"
-    href=\"/architecture/overview\"
+    title="Crypto Shredder"
+    icon="fire"
+    href="/security/overview"
   >
-    Understand the four foundational pillars
+    Implement data dissolution
   </Card>
   <Card
-    title=\"Security stack\"
-    icon=\"shield-halved\"
-    href=\"/security/overview\"
+    title="Audit trail"
+    icon="file-contract"
+    href="/governance/audit"
   >
-    Sovereign Health Fortress security
+    Configure tamper-proof logging
   </Card>
   <Card
-    title=\"Deployment\"
-    icon=\"rocket\"
-    href=\"/deployment/overview\"
+    title="Deployment"
+    icon="rocket"
+    href="/deployment/overview"
   >
-    Deploy to production environments
+    Deploy with compliance
   </Card>
 </CardGroup>
