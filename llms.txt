@@ -1,58 +1,28 @@
-# iLuminara-Core: Sovereign Health Fortress
-
+# iLuminara-Core
 > Global sovereign health architecture for disease surveillance and outbreak response
 
 ## Overview
 
-iLuminara-Core is a compliance-first health intelligence platform designed to transform preventable suffering from statistical inevitability to historical anomaly. Built for deployment in Toronto, Cape Town, or California without changing a single line of code, iLuminara enforces 14 global legal frameworks while operating identically across jurisdictions.
+iLuminara-Core is a globally sovereign, compliance-first health intelligence platform designed to transform preventable suffering from statistical inevitability to historical anomaly.
+
+Built for deployment in Toronto, Cape Town, or California without changing a single line of code, iLuminara enforces 14 global legal frameworks while operating identically across jurisdictions.
 
 ## Core Capabilities
 
-### Governance Kernel
-Law-as-code enforcement of 14 global legal frameworks (GDPR, KDPA, HIPAA, POPIA, EU AI Act, ISO 27001, SOC 2, NIST CSF, and 6 others). The SovereignGuardrail validates every action against sovereign dignity constraints.
-
-### AI Agents
-Autonomous disease surveillance with offline operation, intermittent connectivity, and privacy-preserving federated learning. Agents operate independently without network connectivity and sync when online.
-
-### API Endpoints
-- Voice Processing: Convert voice alerts from Community Health Volunteers to structured health data
-- Outbreak Prediction: Predict outbreak risk using Z-score analysis and multi-scale forecasting
-- Real-time Monitoring: PubSub integration for alert systems
-
-### Deployment Options
-- Google Cloud Platform (Cloud Run, Vertex AI, BigQuery)
-- Edge Devices (NVIDIA Jetson Orin, resource-constrained environments)
-- Hybrid Infrastructure (edge-to-cloud synchronization with offline capabilities)
+- **Governance Kernel**: Enforce 14 global legal frameworks with law-as-code
+- **AI Agents**: Autonomous disease surveillance with offline operation
+- **API Reference**: Voice processing and outbreak prediction endpoints
+- **Deployment**: Deploy to GCP, edge devices, or hybrid infrastructure
 
 ## Nuclear IP Stack
 
-### IP-02: Crypto Shredder
-Data is not deleted; it is cryptographically dissolved. Encrypt with ephemeral keys and shred keys after retention period, making data cryptographically irrecoverable.
+iLuminara implements five proprietary innovations:
 
-### IP-03: Acorn Protocol
-Somatic security using posture + location + stillness as cryptographic authentication. Prevents "panic access" during crises.
-
-### IP-04: Silent Flux
-Anxiety-regulated AI output that prevents information overload during emergencies.
-
-### IP-05: Golden Thread
-Quantum entanglement logic to fuse vague signals (CBS, EMR, IDSR) into verified timelines with cross-source verification.
-
-### IP-06: 5DM Bridge
-API-level injection into 14M+ African mobile nodes (94% CAC reduction).
-
-## Compliance Shield
-
-iLuminara is natively compliant across 14 global legal frameworks:
-
-- **GDPR** (EU): Art. 9 (Special Categories), Art. 22 (Right to Explanation)
-- **KDPA** (Kenya): §37 (Transfer Restrictions), §42 (Data Subject Rights)
-- **HIPAA** (USA): §164.312 (Physical/Technical Safeguards)
-- **POPIA** (South Africa): §11 (Lawfulness), §14 (Cross-border Transfers)
-- **EU AI Act**: §6 (High-Risk AI), §8 (Transparency)
-- **ISO 27001**: Annex A (14 control objectives)
-- **SOC 2**: Security, Availability, Processing Integrity
-- **NIST CSF**: Identify, Protect, Detect, Respond, Recover
+1. **IP-02: Crypto Shredder** - Data is not deleted; it is cryptographically dissolved
+2. **IP-03: Acorn Protocol** - Somatic security using posture + location + stillness as cryptographic authentication
+3. **IP-04: Silent Flux** - Anxiety-regulated AI output that prevents information overload
+4. **IP-05: Golden Thread** - Quantum entanglement logic to fuse vague signals into verified timelines
+5. **IP-06: 5DM Bridge** - API-level injection into 14M+ African mobile nodes (94% CAC reduction)
 
 ## Architecture
 
@@ -81,6 +51,19 @@ iLuminara is natively compliant across 14 global legal frameworks:
          └────────────────────────┘
 ```
 
+## Compliance Shield
+
+iLuminara is natively compliant across 14 global legal frameworks:
+
+- GDPR (EU) - Art. 9, Art. 22, Art. 30, Art. 32
+- KDPA (Kenya) - §37, §42
+- HIPAA (USA) - §164.312, §164.530(j)
+- POPIA (South Africa) - §11, §14
+- EU AI Act - §6, §8, §12
+- ISO 27001 - A.8.3.2, A.12.4, A.12.6
+- SOC 2 - Security, Availability, Processing Integrity
+- NIST CSF - Identify, Protect, Detect, Respond, Recover
+
 ## Quick Start
 
 ```bash
@@ -96,58 +79,172 @@ chmod +x scripts/validate_fortress.sh
 ./scripts/validate_fortress.sh
 ```
 
-## Key Concepts
+## API Endpoints
 
-### Data Sovereignty
-Health data (PHI) cannot leave sovereign territory. Enforces GDPR Art. 9, Kenya DPA §37, HIPAA §164.312.
+### Voice Processing
+```bash
+POST /process-voice
+Content-Type: audio/wav
 
-### Right to Explanation
-Every high-risk clinical inference requires explainability (SHAP values, feature importance). Enforces EU AI Act §6, GDPR Art. 22.
+# Convert voice alerts to structured health data
+curl -X POST http://localhost:8080/process-voice \
+  -H "Content-Type: audio/wav" \
+  --data-binary @swahili-symptom.wav
+```
 
-### Consent & Dignity
-No processing without informed consent. Enforces POPIA §11, CCPA §1798.100, GDPR Art. 6.
+### Outbreak Prediction
+```bash
+POST /predict
+Content-Type: application/json
 
-### Retention Windows
-Data expires. Eternal surveillance violates dignity. Records >180 days transition to cold storage.
+# Predict outbreak risk using Z-score analysis
+curl -X POST http://localhost:8080/predict \
+  -H "Content-Type: application/json" \
+  -d '{"location": {"lat": 0.4221, "lng": 40.2255}, "symptoms": ["diarrhea", "vomiting"]}'
+```
+
+## Governance Kernel
+
+```python
+from governance_kernel.vector_ledger import SovereignGuardrail, SovereigntyViolationError
+
+guardrail = SovereignGuardrail()
+
+# Validate action against 14 global frameworks
+try:
+    guardrail.validate_action(
+        action_type='Data_Transfer',
+        payload={'data_type': 'PHI', 'destination': 'Foreign_Cloud'},
+        jurisdiction='GDPR_EU'
+    )
+except SovereigntyViolationError as e:
+    print(f"❌ {e}")
+```
+
+## Crypto Shredder (IP-02)
+
+```python
+from governance_kernel.crypto_shredder import CryptoShredder, RetentionPolicy
+
+shredder = CryptoShredder(sovereignty_zone=SovereigntyZone.KENYA)
+
+# Encrypt with ephemeral key
+encrypted_data, key_id = shredder.encrypt_with_ephemeral_key(
+    data=patient_record,
+    retention_policy=RetentionPolicy.HOT,
+    metadata={"patient_id": "12345", "jurisdiction": "KDPA_KE"}
+)
+
+# After retention period, shred the key
+shredder.shred_key(key_id)
+
+# Data is now cryptographically irrecoverable
+```
+
+## AI Agents
+
+```python
+from edge_node.ai_agents import AgentOrchestrator
+
+orchestrator = AgentOrchestrator(
+    location="Nairobi",
+    population_size=100000,
+    enable_compliance_checking=True
+)
+
+# Ingest data
+orchestrator.ingest_case_data(case_records)
+orchestrator.ingest_cbs_reports(chv_reports)
+
+# Run full analysis
+result = orchestrator.run_full_analysis(
+    diseases=["cholera", "malaria"],
+    forecast_horizon_days=14
+)
+```
+
+## Golden Thread (IP-05)
+
+```python
+from edge_node.sync_protocol.golden_thread import GoldenThread
+
+gt = GoldenThread()
+
+# Merge CBS and EMR signals
+fused = gt.fuse_data_streams(
+    cbs_signal={"location": "Dadaab", "symptom": "fever", "timestamp": "2025-01-10T10:00Z"},
+    emr_record={"location": "Dadaab", "diagnosis": "malaria", "timestamp": "2025-01-10T09:45Z"},
+    patient_id="PATIENT_12345"
+)
+
+# Verification score: 1.0 (CONFIRMED)
+print(f"Verification Score: {fused.verification_score}")
+```
 
 ## Security Stack
 
-- **CodeQL SAST Scanning**: Continuous security analysis (GDPR Art. 32, ISO 27001 A.12.6)
-- **Gitleaks Secret Detection**: Prevents credential leakage (NIST SP 800-53 IA-5)
-- **Dependabot**: Daily security updates
-- **Tamper-proof Audit Trail**: SHA-256 hash chain, Cloud KMS signatures, Bigtable storage
+### CodeQL SAST Scanning
+- Continuous static application security testing
+- Security-extended queries
+- Compliance: GDPR Art. 32, ISO 27001 A.12.6
 
-## Use Cases
+### Gitleaks Secret Scanning
+- Detects hardcoded secrets, API keys, credentials
+- Daily automated scans
+- Compliance: NIST SP 800-53 IA-5, HIPAA §164.312(a)(2)(i)
 
-### Remote Health Surveillance
-Deploy agents in remote areas with unreliable connectivity for autonomous disease surveillance.
+### Dependabot Security Updates
+- Daily automated security updates
+- Grouped by security, google-cloud, ai-ml
+- Version strategy: increase-if-necessary
 
-### Privacy-Preserving Collaborative Learning
-Enable multiple hospitals to collaboratively train models without sharing patient data using federated learning with (ε, δ)-differential privacy.
+## Deployment Options
 
-### Outbreak Response
-Real-time multi-source data fusion with <5 second latency for early warning systems.
+### Google Cloud Platform
+```bash
+chmod +x deploy_gcp_prototype.sh
+./deploy_gcp_prototype.sh
+```
 
-### Regulatory Compliance
-Continuous compliance attestation across 14 global frameworks with tamper-proof audit trails.
+### Edge Devices (NVIDIA Jetson Orin)
+```bash
+# Deploy to edge node
+python edge_node/deploy.py --device jetson-orin
+```
 
-## Documentation Structure
-
-- **Getting Started**: Quick start guide, architecture overview
-- **Governance Kernel**: SovereignGuardrail, Crypto Shredder, compliance enforcement
-- **AI Agents**: Offline operation, federated learning, autonomous surveillance
-- **API Reference**: Voice processing, outbreak prediction, PubSub monitoring
-- **Deployment**: GCP, edge devices, hybrid infrastructure
-- **Security**: Nuclear IP Stack, security workflows, incident response
+### Docker
+```bash
+docker-compose up -d
+```
 
 ## Mission
 
-Transform preventable suffering from statistical inevitability to historical anomaly.
+> Transform preventable suffering from statistical inevitability to historical anomaly.
+
+iLuminara-Core is designed for deployment in resource-constrained environments where lives depend on systems that work offline, respect sovereignty, and enforce dignity.
+
+## Documentation
+
+Full documentation: https://docs.iluminara.health
+
+- Quick Start: /quickstart
+- Architecture: /architecture/overview
+- Governance: /governance/overview
+- AI Agents: /ai-agents/overview
+- API Reference: /api-reference/overview
+- Deployment: /deployment/overview
+- Security: /security/overview
 
 ## Repository
 
-https://github.com/VISENDI56/iLuminara-Core
+GitHub: https://github.com/VISENDI56/iLuminara-Core
 
 ## License
 
-Proprietary - iLuminara Health Intelligence Platform
+Proprietary - Nuclear IP Stack protected
+
+## Contact
+
+- Compliance: compliance@iluminara.health
+- Data Protection Officer: dpo@iluminara.health
+- Security: security@iluminara.health
