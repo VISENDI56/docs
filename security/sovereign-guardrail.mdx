@@ -1,0 +1,634 @@
+---
+title: SovereignGuardrail configuration
+description: 14 global legal frameworks enforced through law-as-code
+---
+
+## Overview
+
+The **SovereignGuardrail** is iLuminara's compliance enforcement engine that encodes 14 global legal frameworks into executable Python logic. Every action is validated against sovereign dignity constraints before execution.
+
+<Card
+  title="Philosophy"
+  icon="scale-balanced"
+>
+  "Does this enhance sovereign dignity?" — Every enforcement decision.
+</Card>
+
+## The 14 frameworks
+
+| Framework | Region | Key Articles | Status |
+|-----------|--------|--------------|--------|
+| **GDPR** | 🇪🇺 EU | Art. 6, 9, 17, 22, 30, 32 | ✅ Enforced |
+| **KDPA** | 🇰🇪 Kenya | §37, §42 | ✅ Enforced |
+| **HIPAA** | 🇺🇸 USA | §164.312, §164.530(j) | ✅ Enforced |
+| **HITECH** | 🇺🇸 USA | §13410 | ✅ Enforced |
+| **PIPEDA** | 🇨🇦 Canada | §5-7 | ✅ Enforced |
+| **POPIA** | 🇿🇦 South Africa | §11, §14 | ✅ Enforced |
+| **CCPA** | 🇺🇸 California | §1798.100 | ✅ Enforced |
+| **NIST CSF** | 🇺🇸 USA | 5 Functions | ✅ Enforced |
+| **ISO 27001** | 🌐 Global | Annex A (14 controls) | ✅ Enforced |
+| **SOC 2** | 🇺🇸 USA | Security, Availability | ✅ Enforced |
+| **EU AI Act** | 🇪🇺 EU | §6, §8, §12 | ✅ Enforced |
+| **GDPR Art. 9** | 🇪🇺 EU | Special Categories | ✅ Enforced |
+| **Data Sovereignty** | 🌐 Global | Territorial Integrity | ✅ Enforced |
+| **Right to Explanation** | 🌐 Global | AI Transparency | ✅ Enforced |
+
+## Configuration file
+
+The SovereignGuardrail is configured via `config/sovereign_guardrail.yaml`:
+
+```yaml
+version: "1.0.0"
+fortress_name: "iLuminara Sovereign Health Fortress"
+
+# Jurisdiction Configuration
+jurisdiction:
+  primary: "KDPA_KE"  # Kenya Data Protection Act
+  secondary:
+    - "GDPR_EU"      # European Union
+    - "POPIA_ZA"     # South Africa
+    - "HIPAA_US"     # United States
+    - "PIPEDA_CA"    # Canada
+
+# Data Sovereignty Rules
+sovereignty:
+  data_residency:
+    enabled: true
+    allowed_zones:
+      - "africa-south1"      # Kenya, South Africa
+      - "europe-west1"       # EU (GDPR)
+      - "northamerica-northeast1"  # Canada (PIPEDA)
+      - "us-central1"        # USA (HIPAA)
+    
+    blocked_zones:
+      - "asia-*"
+      - "australia-*"
+      - "southamerica-*"
+    
+    enforcement_level: "STRICT"  # STRICT | MODERATE | PERMISSIVE
+```
+
+## The four pillars
+
+<Steps>
+  <Step title="Data sovereignty">
+    Health data (PHI) cannot leave sovereign territory. Enforces GDPR Art. 9, Kenya DPA §37, HIPAA §164.312.
+  </Step>
+  <Step title="Right to explanation">
+    Every high-risk clinical inference requires explainability (SHAP values, feature importance). Enforces EU AI Act §6, GDPR Art. 22.
+  </Step>
+  <Step title="Consent & dignity">
+    No processing without informed consent. Enforces POPIA §11, CCPA §1798.100, GDPR Art. 6.
+  </Step>
+  <Step title="Retention windows">
+    Data expires. Eternal surveillance violates dignity. Records >180 days transition to cold storage.
+  </Step>
+</Steps>
+
+## Basic usage
+
+```python
+from governance_kernel.vector_ledger import SovereignGuardrail, SovereigntyViolationError
+
+guardrail = SovereignGuardrail()
+
+# Validate a data transfer action
+try:
+    guardrail.validate_action(
+        action_type='Data_Transfer',
+        payload={
+            'data_type': 'PHI',
+            'destination': 'Foreign_Cloud'
+        },
+        jurisdiction='GDPR_EU'
+    )
+except SovereigntyViolationError as e:
+    print(f"❌ {e}")
+    # Raises: "Violates GDPR Art. 9 (Processing of special categories)"
+```
+
+## Action types
+
+### Data_Transfer
+
+Validates cross-border data transfers:
+
+```python
+guardrail.validate_action(
+    action_type='Data_Transfer',
+    payload={
+        'data_type': 'PHI',
+        'source': 'africa-south1',
+        'destination': 'europe-west1',
+        'authorization': 'SCC_GDPR_ART46'  # Standard Contractual Clauses
+    },
+    jurisdiction='GDPR_EU'
+)
+```
+
+**Required fields:**
+- `data_type` - Type of data (PHI, PII, Anonymous)
+- `destination` - Target location/cloud region
+- `authorization` (optional) - Legal basis for transfer
+
+### High_Risk_Inference
+
+Validates AI/ML clinical decisions:
+
+```python
+guardrail.validate_action(
+    action_type='High_Risk_Inference',
+    payload={
+        'inference': 'diagnosis',
+        'explanation': shap_values,
+        'confidence_score': 0.92,
+        'evidence_chain': ['fever', 'cough', 'positive_test'],
+        'consent_token': 'VALID_TOKEN'
+    },
+    jurisdiction='EU_AI_ACT'
+)
+```
+
+**Required fields:**
+- `explanation` - SHAP values or feature importance
+- `confidence_score` - Model confidence (0-1)
+- `evidence_chain` - Supporting evidence
+- `consent_token` - Patient consent
+
+### Consent_Validation
+
+Validates consent for data processing:
+
+```python
+guardrail.validate_action(
+    action_type='Consent_Validation',
+    payload={
+        'consent_token': 'TOKEN_12345',
+        'consent_scope': 'diagnosis',
+        'patient_id': 'PAT_001',
+        'expiration': '2026-12-31'
+    },
+    jurisdiction='GDPR_EU'
+)
+```
+
+**Required fields:**
+- `consent_token` - Unique consent identifier
+- `consent_scope` - Purpose (diagnosis, treatment, research)
+- `expiration` - Consent expiration date
+
+### Data_Retention
+
+Validates data retention periods:
+
+```python
+guardrail.validate_action(
+    action_type='Data_Retention',
+    payload={
+        'record_date': '2020-01-01',
+        'retention_policy': 'HOT',
+        'data_type': 'PHI'
+    },
+    jurisdiction='HIPAA_US'
+)
+```
+
+**Required fields:**
+- `record_date` - Date of record creation
+- `retention_policy` - HOT, WARM, COLD, ETERNAL
+
+## Jurisdiction frameworks
+
+```python
+from governance_kernel.vector_ledger import JurisdictionFramework
+
+# Available jurisdictions
+class JurisdictionFramework(Enum):
+    GDPR_EU = "GDPR (EU)"
+    KDPA_KE = "KDPA (Kenya)"
+    PIPEDA_CA = "PIPEDA (Canada)"
+    POPIA_ZA = "POPIA (South Africa)"
+    HIPAA_US = "HIPAA (USA)"
+    HITECH_US = "HITECH (USA)"
+    CCPA_US = "CCPA (USA)"
+    NIST_CSF = "NIST CSF (USA)"
+    ISO_27001 = "ISO 27001"
+    SOC_2 = "SOC 2 (USA)"
+    EU_AI_ACT = "EU AI Act"
+    GDPR_ART9 = "GDPR Article 9 (Special Categories)"
+    GLOBAL_DEFAULT = "GLOBAL_DEFAULT"
+```
+
+## Enforcement rules
+
+### Rule 1: Data sovereignty
+
+**Configuration:**
+
+```yaml
+sovereignty:
+  data_residency:
+    enabled: true
+    allowed_zones:
+      - "africa-south1"
+      - "europe-west1"
+    enforcement_level: "STRICT"
+```
+
+**Enforcement:**
+
+```python
+# ✅ ALLOWED: Transfer within allowed zones
+guardrail.validate_action(
+    action_type='Data_Transfer',
+    payload={'destination': 'africa-south1'},
+    jurisdiction='KDPA_KE'
+)
+
+# ❌ BLOCKED: Transfer to blocked zone
+guardrail.validate_action(
+    action_type='Data_Transfer',
+    payload={'destination': 'asia-east1'},
+    jurisdiction='KDPA_KE'
+)
+# Raises: SovereigntyViolationError
+```
+
+### Rule 2: Right to explanation
+
+**Configuration:**
+
+```yaml
+explainability:
+  enabled: true
+  high_risk_threshold: 0.7
+  methods:
+    - "SHAP"
+    - "LIME"
+    - "Feature_Importance"
+  requirements:
+    - "confidence_score"
+    - "evidence_chain"
+    - "feature_contributions"
+```
+
+**Enforcement:**
+
+```python
+# ✅ ALLOWED: High-risk inference with explanation
+guardrail.validate_action(
+    action_type='High_Risk_Inference',
+    payload={
+        'confidence_score': 0.92,
+        'explanation': shap_values,
+        'evidence_chain': ['symptom1', 'symptom2']
+    },
+    jurisdiction='EU_AI_ACT'
+)
+
+# ❌ BLOCKED: High-risk inference without explanation
+guardrail.validate_action(
+    action_type='High_Risk_Inference',
+    payload={'confidence_score': 0.92},
+    jurisdiction='EU_AI_ACT'
+)
+# Raises: SovereigntyViolationError
+```
+
+### Rule 3: Consent & dignity
+
+**Configuration:**
+
+```yaml
+consent:
+  enabled: true
+  require_explicit_consent: true
+  valid_scopes:
+    - "diagnosis"
+    - "treatment"
+    - "research"
+  expiration_days: 365
+```
+
+**Enforcement:**
+
+```python
+# ✅ ALLOWED: Processing with valid consent
+guardrail.validate_action(
+    action_type='Consent_Validation',
+    payload={
+        'consent_token': 'VALID_TOKEN',
+        'consent_scope': 'diagnosis'
+    },
+    jurisdiction='GDPR_EU'
+)
+
+# ❌ BLOCKED: Processing without consent
+guardrail.validate_action(
+    action_type='Data_Processing',
+    payload={'data_type': 'PHI'},
+    jurisdiction='GDPR_EU'
+)
+# Raises: SovereigntyViolationError
+```
+
+### Rule 4: Retention windows
+
+**Configuration:**
+
+```yaml
+retention:
+  enabled: true
+  policies:
+    HOT:
+      days: 180
+      storage_class: "STANDARD"
+    COLD:
+      days: 1825
+      storage_class: "COLDLINE"
+  auto_shred_enabled: true
+```
+
+**Enforcement:**
+
+```python
+# ✅ ALLOWED: Recent data (within retention)
+guardrail.validate_action(
+    action_type='Data_Retention',
+    payload={
+        'record_date': '2025-06-01',
+        'retention_policy': 'HOT'
+    },
+    jurisdiction='GDPR_EU'
+)
+
+# ❌ BLOCKED: Expired data (beyond retention)
+guardrail.validate_action(
+    action_type='Data_Retention',
+    payload={
+        'record_date': '2018-01-01',
+        'retention_policy': 'HOT'
+    },
+    jurisdiction='GDPR_EU'
+)
+# Triggers auto-shred via Crypto Shredder
+```
+
+## Tamper-proof audit
+
+Every sovereignty decision is cryptographically logged:
+
+```yaml
+audit:
+  enabled: true
+  tamper_proof: true
+  storage:
+    backend: "Cloud_Spanner"
+    region: "africa-south1"
+    retention_days: 2555  # 7 years (HIPAA requirement)
+  signing:
+    enabled: true
+    algorithm: "SHA256_RSA"
+    key_management: "Cloud_KMS"
+```
+
+**Enable tamper-proof audit:**
+
+```python
+guardrail = SovereignGuardrail(enable_tamper_proof_audit=True)
+
+# All actions are automatically logged
+guardrail.validate_action(...)
+
+# Retrieve audit history
+history = guardrail.get_tamper_proof_audit_history(limit=10)
+
+# Verify chain integrity
+integrity = guardrail.verify_audit_chain_integrity()
+print(f"Chain valid: {integrity['chain_valid']}")
+```
+
+## Humanitarian constraints
+
+The SovereignGuardrail integrates with the Ethical Engine for humanitarian margin calculations:
+
+```yaml
+humanitarian:
+  enabled: true
+  constraints:
+    - "Medical_Ethics"
+    - "Resource_Allocation"
+    - "Data_Protection"
+    - "Population_Protection"
+    - "Emergency_Response"
+  margin_threshold: 0.15  # 15% humanitarian margin
+```
+
+**Usage:**
+
+```python
+from governance_kernel.ethical_engine import EthicalEngine
+
+engine = EthicalEngine()
+
+result = engine.apply_constraints(
+    action={
+        'type': 'cholera_response',
+        'scope': 'refugee_camp',
+        'estimated_civilian_impact': 0.3,
+        'medical_benefit': 0.85
+    },
+    context={
+        'conflict_zone': False,
+        'outbreak_suspected': True
+    }
+)
+
+print(f"Humanitarian margin: {result['humanitarian_margin']['margin']:.2%}")
+```
+
+## Emergency override
+
+WHO IHR Article 6 emergency protocols:
+
+```yaml
+consent:
+  emergency_override:
+    enabled: true
+    conditions:
+      - "public_health_emergency"
+      - "outbreak_response"
+      - "life_threatening_situation"
+```
+
+**Usage:**
+
+```python
+# Emergency override for outbreak response
+guardrail.validate_action(
+    action_type='Data_Processing',
+    payload={
+        'data_type': 'PHI',
+        'emergency_override': True,
+        'justification': 'WHO_IHR_ARTICLE_6'
+    },
+    jurisdiction='KDPA_KE'
+)
+```
+
+## Monitoring & alerting
+
+**Prometheus metrics:**
+
+```yaml
+monitoring:
+  enabled: true
+  metrics:
+    - "sovereignty_violations_total"
+    - "cross_border_transfers_total"
+    - "high_risk_inferences_total"
+    - "consent_validations_total"
+```
+
+**Grafana dashboards:**
+
+- **Sovereignty Compliance** - Real-time violation monitoring
+- **Audit Trail** - Tamper-proof audit visualization
+- **Data Retention** - Key lifecycle tracking
+
+## Enforcement actions
+
+**On violation:**
+
+```yaml
+enforcement:
+  on_violation:
+    action: "BLOCK"  # BLOCK | WARN | LOG
+    notify: true
+    escalate: true
+  
+  notifications:
+    - type: "Email"
+      recipients:
+        - "compliance@iluminara.health"
+    - type: "PubSub"
+      topic: "projects/iluminara/topics/sovereignty-violations"
+```
+
+## Integration examples
+
+### With Crypto Shredder
+
+```python
+from governance_kernel.vector_ledger import SovereignGuardrail
+from governance_kernel.crypto_shredder import CryptoShredder
+
+guardrail = SovereignGuardrail()
+shredder = CryptoShredder()
+
+# Validate before encryption
+guardrail.validate_action(
+    action_type='Data_Processing',
+    payload={'data_type': 'PHI'},
+    jurisdiction='KDPA_KE'
+)
+
+# Encrypt with validated metadata
+encrypted_data, key_id = shredder.encrypt_with_ephemeral_key(
+    data=patient_data,
+    metadata={'jurisdiction': 'KDPA_KE'}
+)
+```
+
+### With Golden Thread
+
+```python
+from edge_node.sync_protocol.golden_thread import GoldenThread
+
+gt = GoldenThread()
+
+# Validate fusion operation
+guardrail.validate_action(
+    action_type='Data_Fusion',
+    payload={
+        'sources': ['CBS', 'EMR'],
+        'processing_location': 'Edge_Node'
+    },
+    jurisdiction='KDPA_KE'
+)
+
+# Fuse data streams
+fused = gt.fuse_data_streams(cbs_signal, emr_record)
+```
+
+### With AI Agents
+
+```python
+from edge_node.ai_agents import FederatedLearningClient
+
+client = FederatedLearningClient()
+
+# Validate high-risk inference
+guardrail.validate_action(
+    action_type='High_Risk_Inference',
+    payload={
+        'inference': 'diagnosis',
+        'explanation': client.local_model,
+        'confidence_score': 0.92
+    },
+    jurisdiction='EU_AI_ACT'
+)
+```
+
+## Best practices
+
+<Steps>
+  <Step title="Set primary jurisdiction">
+    Configure `jurisdiction.primary` based on deployment location
+  </Step>
+  <Step title="Enable tamper-proof audit">
+    Always enable audit trail for compliance attestation
+  </Step>
+  <Step title="Use STRICT enforcement">
+    Set `enforcement_level: "STRICT"` for production
+  </Step>
+  <Step title="Configure notifications">
+    Set up email/Slack alerts for sovereignty violations
+  </Step>
+  <Step title="Test emergency overrides">
+    Regularly test WHO IHR emergency protocols
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Crypto Shredder"
+    icon="fire"
+    href="/security/crypto-shredder"
+  >
+    Implement IP-02 data dissolution
+  </Card>
+  <Card
+    title="Security workflows"
+    icon="workflow"
+    href="/security/codeql-gitleaks"
+  >
+    Set up CodeQL and Gitleaks
+  </Card>
+  <Card
+    title="Governance kernel"
+    icon="scale-balanced"
+    href="/governance/overview"
+  >
+    Complete governance documentation
+  </Card>
+  <Card
+    title="Deployment"
+    icon="rocket"
+    href="/deployment/overview"
+  >
+    Deploy with SovereignGuardrail
+  </Card>
+</CardGroup>
