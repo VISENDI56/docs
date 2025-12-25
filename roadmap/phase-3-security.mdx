@@ -1,0 +1,509 @@
+---
+title: 'Phase 3: Security Fortification'
+description: 'Quantum-hardened & biometric defense'
+icon: 'shield-halved'
+---
+
+## Objective
+
+Protect sovereign data against 2030-era threats, including quantum decryption, sophisticated identity theft, and state-level attacks.
+
+<Card
+  title="Strategic imperative"
+  icon="atom"
+>
+  "Today's encryption is tomorrow's plaintext. The Fortress must be quantum-hardened before quantum computers arrive."
+</Card>
+
+## Threat landscape (2025-2030)
+
+| Threat | Current Risk | Impact | Mitigation |
+|--------|--------------|--------|------------|
+| **Quantum decryption** | 🟡 Medium (2028+) | 🔴 Critical | Post-quantum crypto |
+| **Deepfake biometrics** | 🟡 Medium | 🟡 High | Liveness detection |
+| **Supply chain attacks** | 🔴 High | 🔴 Critical | Hardware attestation |
+| **Insider threats** | 🟡 Medium | 🟡 High | Zero-trust architecture |
+| **State-level surveillance** | 🟡 Medium | 🔴 Critical | Sovereign encryption |
+
+## Architecture upgrades
+
+### 1. Post-quantum cryptography
+
+Upgrading the **Crypto Shredder (IP-02)** to use **Kyber-1024** for key encapsulation. This renders current and future brute-force attacks useless.
+
+**Current (RSA-2048):**
+```python
+from cryptography.hazmat.primitives.asymmetric import rsa
+
+# Vulnerable to quantum computers
+private_key = rsa.generate_private_key(
+    public_exponent=65537,
+    key_size=2048
+)
+```
+
+**Upgraded (Kyber-1024):**
+```python
+from pqcrypto.kem.kyber1024 import generate_keypair, encrypt, decrypt
+
+# Quantum-resistant key encapsulation
+public_key, secret_key = generate_keypair()
+
+# Encapsulate shared secret
+ciphertext, shared_secret = encrypt(public_key)
+
+# Decapsulate shared secret
+recovered_secret = decrypt(secret_key, ciphertext)
+
+# Use shared secret for AES-256-GCM encryption
+```
+
+**Crypto Shredder upgrade:**
+```python
+# governance_kernel/crypto_shredder_v2.py
+
+from pqcrypto.kem.kyber1024 import generate_keypair, encrypt, decrypt
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+import secrets
+
+class QuantumResistantCryptoShredder:
+    def __init__(self):
+        # Generate quantum-resistant keypair
+        self.public_key, self.secret_key = generate_keypair()
+    
+    def encrypt_with_ephemeral_key(self, data: bytes) -> tuple:
+        """Encrypt data with quantum-resistant ephemeral key"""
+        
+        # Generate ephemeral Kyber keypair
+        ephemeral_public, ephemeral_secret = generate_keypair()
+        
+        # Encapsulate shared secret
+        ciphertext, shared_secret = encrypt(ephemeral_public)
+        
+        # Use shared secret for AES-256-GCM
+        iv = secrets.token_bytes(16)
+        cipher = Cipher(
+            algorithms.AES(shared_secret[:32]),  # 256-bit key
+            modes.GCM(iv)
+        )
+        encryptor = cipher.encryptor()
+        encrypted_data = encryptor.update(data) + encryptor.finalize()
+        
+        return {
+            'ciphertext': ciphertext,  # Kyber ciphertext
+            'iv': iv,
+            'tag': encryptor.tag,
+            'encrypted_data': encrypted_data,
+            'ephemeral_secret': ephemeral_secret  # Store for decryption
+        }
+    
+    def shred_key(self, key_id: str):
+        """Shred ephemeral secret - data becomes quantum-irrecoverable"""
+        # Overwrite ephemeral_secret with random data
+        # Even quantum computers cannot recover the data
+        pass
+```
+
+**Migration strategy:**
+```python
+# Hybrid mode: Support both RSA and Kyber during transition
+class HybridCryptoShredder:
+    def encrypt(self, data: bytes, mode='hybrid'):
+        if mode == 'hybrid':
+            # Encrypt with both RSA and Kyber
+            rsa_encrypted = self.rsa_encrypt(data)
+            kyber_encrypted = self.kyber_encrypt(data)
+            return {'rsa': rsa_encrypted, 'kyber': kyber_encrypted}
+        elif mode == 'kyber':
+            return self.kyber_encrypt(data)
+```
+
+### 2. Multi-factor biometrics
+
+**WebAuthn integration** for hardware keys (YubiKey) and TouchID/FaceID.
+
+**Registration flow:**
+```python
+from webauthn import generate_registration_options, verify_registration_response
+from webauthn.helpers.structs import (
+    PublicKeyCredentialCreationOptions,
+    AuthenticatorSelectionCriteria,
+    UserVerificationRequirement
+)
+
+def register_biometric(user_id: str, username: str):
+    """Register biometric authenticator"""
+    
+    options = generate_registration_options(
+        rp_id='iluminara.health',
+        rp_name='iLuminara Health Fortress',
+        user_id=user_id.encode(),
+        user_name=username,
+        user_display_name=username,
+        authenticator_selection=AuthenticatorSelectionCriteria(
+            user_verification=UserVerificationRequirement.REQUIRED,
+            resident_key='required',
+            authenticator_attachment='platform'  # TouchID/FaceID
+        ),
+        attestation='direct'
+    )
+    
+    return options
+```
+
+**Authentication flow:**
+```python
+from webauthn import generate_authentication_options, verify_authentication_response
+
+def authenticate_biometric(user_id: str):
+    """Authenticate with biometric"""
+    
+    options = generate_authentication_options(
+        rp_id='iluminara.health',
+        user_verification=UserVerificationRequirement.REQUIRED
+    )
+    
+    # Client performs biometric verification
+    # Server verifies response
+    verification = verify_authentication_response(
+        credential=credential,
+        expected_challenge=options.challenge,
+        expected_rp_id='iluminara.health',
+        expected_origin='https://iluminara.health'
+    )
+    
+    return verification.verified
+```
+
+**Liveness detection (anti-deepfake):**
+```python
+import cv2
+import numpy as np
+
+class LivenessDetector:
+    def __init__(self):
+        self.face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+    
+    def detect_liveness(self, video_frames: list) -> bool:
+        """Detect if face is live (not photo/video)"""
+        
+        # Challenge: Ask user to blink
+        blink_detected = self.detect_blink(video_frames)
+        
+        # Challenge: Ask user to turn head
+        head_movement = self.detect_head_movement(video_frames)
+        
+        # Challenge: Random facial expression
+        expression_match = self.detect_expression(video_frames)
+        
+        return blink_detected and head_movement and expression_match
+    
+    def detect_blink(self, frames: list) -> bool:
+        """Detect eye blink in video frames"""
+        # Use eye aspect ratio (EAR) to detect blinks
+        # Real humans blink 15-20 times per minute
+        # Photos/videos don't blink
+        pass
+```
+
+### 3. Social recovery protocol
+
+**Crisis fallback:** A "Social Recovery" protocol allowing account restoration via 3 trusted community nodes if the user is incapacitated.
+
+**Setup:**
+```python
+from typing import List
+import secrets
+
+class SocialRecovery:
+    def __init__(self, user_id: str):
+        self.user_id = user_id
+        self.guardians: List[str] = []
+        self.threshold = 3  # Require 3 of 5 guardians
+    
+    def add_guardian(self, guardian_id: str):
+        """Add trusted guardian"""
+        if len(self.guardians) >= 5:
+            raise ValueError("Maximum 5 guardians allowed")
+        
+        self.guardians.append(guardian_id)
+    
+    def generate_recovery_shares(self, master_key: bytes) -> dict:
+        """Split master key using Shamir's Secret Sharing"""
+        from secretsharing import PlaintextToHexSecretSharer
+        
+        # Split key into 5 shares, require 3 to recover
+        shares = PlaintextToHexSecretSharer.split_secret(
+            master_key.hex(),
+            threshold=3,
+            num_shares=5
+        )
+        
+        # Distribute shares to guardians
+        guardian_shares = {}
+        for guardian, share in zip(self.guardians, shares):
+            guardian_shares[guardian] = share
+        
+        return guardian_shares
+    
+    def recover_account(self, shares: List[str]) -> bytes:
+        """Recover account using guardian shares"""
+        from secretsharing import PlaintextToHexSecretSharer
+        
+        if len(shares) < self.threshold:
+            raise ValueError(f"Need {self.threshold} shares, got {len(shares)}")
+        
+        # Reconstruct master key
+        master_key_hex = PlaintextToHexSecretSharer.recover_secret(shares[:3])
+        master_key = bytes.fromhex(master_key_hex)
+        
+        return master_key
+```
+
+**Recovery flow:**
+```
+1. User is incapacitated (lost device, medical emergency)
+2. User contacts 3 of 5 guardians
+3. Each guardian provides their recovery share
+4. System reconstructs master key
+5. User regains access to account
+```
+
+**Guardian selection criteria:**
+- ✅ Trusted community member (CHV, clinic staff)
+- ✅ Different geographic location (prevent collusion)
+- ✅ Active iLuminara user (verified identity)
+- ✅ Passed background check
+
+### 4. Hardware attestation (TPM)
+
+**Trusted Platform Module** integration for hardware-rooted security.
+
+**TPM initialization:**
+```python
+from tpm2_pytss import ESAPI, TPM2_ALG
+
+class HardwareAttestation:
+    def __init__(self):
+        self.esapi = ESAPI()
+    
+    def create_attestation_key(self):
+        """Create TPM-backed attestation key"""
+        
+        # Create primary key in TPM
+        primary_handle = self.esapi.create_primary(
+            in_sensitive=None,
+            in_public={
+                'type': TPM2_ALG.RSA,
+                'nameAlg': TPM2_ALG.SHA256,
+                'objectAttributes': {
+                    'fixedTPM': True,
+                    'fixedParent': True,
+                    'sensitiveDataOrigin': True,
+                    'userWithAuth': True,
+                    'restricted': True,
+                    'decrypt': True
+                }
+            }
+        )
+        
+        return primary_handle
+    
+    def attest_boot_integrity(self) -> dict:
+        """Attest that system booted securely"""
+        
+        # Read PCR values (Platform Configuration Registers)
+        pcr_values = {}
+        for pcr in range(24):
+            pcr_values[pcr] = self.esapi.pcr_read(pcr)
+        
+        # Sign PCR values with attestation key
+        signature = self.esapi.sign(
+            key_handle=self.attestation_key,
+            digest=hash(str(pcr_values))
+        )
+        
+        return {
+            'pcr_values': pcr_values,
+            'signature': signature,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+```
+
+**Remote attestation:**
+```python
+def verify_remote_attestation(attestation: dict) -> bool:
+    """Verify that remote edge node is running trusted software"""
+    
+    # Check PCR values against known-good values
+    expected_pcrs = load_expected_pcrs()
+    
+    for pcr, value in attestation['pcr_values'].items():
+        if value != expected_pcrs.get(pcr):
+            return False
+    
+    # Verify signature
+    if not verify_signature(attestation['signature'], attestation['pcr_values']):
+        return False
+    
+    return True
+```
+
+### 5. Zero-trust architecture
+
+**Never trust, always verify** - even internal services must authenticate.
+
+**Service mesh with mutual TLS:**
+```yaml
+# istio/mtls-policy.yaml
+
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: iluminara
+spec:
+  mtls:
+    mode: STRICT  # Require mTLS for all services
+
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: frenasa-policy
+  namespace: iluminara
+spec:
+  selector:
+    matchLabels:
+      app: frenasa-engine
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/iluminara/sa/api-service"]
+    to:
+    - operation:
+        methods: ["POST"]
+        paths: ["/process-voice"]
+```
+
+**Identity-based access control:**
+```python
+from functools import wraps
+from flask import request, abort
+
+def require_identity(allowed_services: List[str]):
+    """Decorator to enforce identity-based access control"""
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            # Extract service identity from mTLS certificate
+            client_cert = request.environ.get('SSL_CLIENT_CERT')
+            service_identity = extract_identity(client_cert)
+            
+            if service_identity not in allowed_services:
+                abort(403, f"Service {service_identity} not authorized")
+            
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+@app.route('/process-voice', methods=['POST'])
+@require_identity(['api-service', 'edge-node'])
+def process_voice():
+    # Only api-service and edge-node can call this endpoint
+    pass
+```
+
+## Security monitoring
+
+### Real-time threat detection
+
+```python
+from prometheus_client import Counter, Histogram
+
+# Metrics
+failed_auth_attempts = Counter('failed_auth_attempts_total', 'Failed authentication attempts')
+quantum_attack_detected = Counter('quantum_attack_detected_total', 'Quantum attack attempts')
+biometric_liveness_failed = Counter('biometric_liveness_failed_total', 'Liveness detection failures')
+
+class ThreatDetector:
+    def __init__(self):
+        self.failed_attempts = {}
+    
+    def detect_brute_force(self, user_id: str):
+        """Detect brute force attacks"""
+        self.failed_attempts[user_id] = self.failed_attempts.get(user_id, 0) + 1
+        
+        if self.failed_attempts[user_id] > 5:
+            # Lock account and alert
+            self.lock_account(user_id)
+            self.send_alert(f'🚨 Brute force attack on {user_id}')
+            failed_auth_attempts.inc()
+    
+    def detect_quantum_attack(self, ciphertext: bytes):
+        """Detect quantum computer attack patterns"""
+        # Analyze ciphertext for quantum attack signatures
+        # (e.g., Shor's algorithm patterns)
+        if self.is_quantum_attack(ciphertext):
+            quantum_attack_detected.inc()
+            self.send_alert('🚨 QUANTUM ATTACK DETECTED')
+```
+
+## Success metrics
+
+<AccordionGroup>
+  <Accordion title="Quantum resistance">
+    - ✅ 100% of data encrypted with Kyber-1024
+    - ✅ Zero successful quantum decryption attempts
+    - ✅ <10ms performance overhead
+  </Accordion>
+  <Accordion title="Biometric security">
+    - ✅ WebAuthn support (YubiKey, TouchID, FaceID)
+    - ✅ 99.9% liveness detection accuracy
+    - ✅ <5% false rejection rate
+  </Accordion>
+  <Accordion title="Social recovery">
+    - ✅ 3-of-5 guardian threshold
+    - ✅ <24 hour recovery time
+    - ✅ Zero unauthorized recoveries
+  </Accordion>
+  <Accordion title="Hardware attestation">
+    - ✅ TPM-backed keys for all edge nodes
+    - ✅ Remote attestation every 5 minutes
+    - ✅ Zero compromised nodes
+  </Accordion>
+</AccordionGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Phase 4: Compliance"
+    icon="scale-balanced"
+    href="/roadmap/phase-4-compliance"
+  >
+    Policy-as-Code for 45+ global frameworks
+  </Card>
+  <Card
+    title="Crypto Shredder v2"
+    icon="atom"
+    href="/security/crypto-shredder-v2"
+  >
+    Quantum-resistant implementation
+  </Card>
+  <Card
+    title="WebAuthn setup"
+    icon="fingerprint"
+    href="/security/webauthn"
+  >
+    Biometric authentication guide
+  </Card>
+  <Card
+    title="TPM integration"
+    icon="microchip"
+    href="/security/tpm"
+  >
+    Hardware attestation setup
+  </Card>
+</CardGroup>

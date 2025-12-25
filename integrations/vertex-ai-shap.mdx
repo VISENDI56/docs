@@ -1,248 +1,256 @@
 ---
 title: Vertex AI + SHAP integration
-description: Right to Explanation with explainable AI for high-risk clinical inferences
+description: Right to Explanation for high-risk AI inferences with SHAP explainability
 ---
 
 ## Overview
 
-Every high-risk clinical inference in iLuminara-Core requires explainability to comply with the EU AI Act §6 and GDPR Art. 22. This integration combines Google Cloud Vertex AI with SHAP (SHapley Additive exPlanations) to provide transparent, auditable AI decisions.
+Every high-risk clinical inference in iLuminara-Core requires explainability. The Vertex AI + SHAP integration provides transparent, auditable AI decision-making that complies with the EU AI Act §6 and GDPR Art. 22.
 
 <Card
-  title="Compliance"
+  title="Compliance mandate"
   icon="scale-balanced"
 >
-  EU AI Act §6 (High-Risk AI) + GDPR Art. 22 (Right to Explanation)
+  "Every high-risk clinical inference requires explainability (SHAP values, feature importance)." — EU AI Act §6
 </Card>
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────┐
-│      MOBILE APP / CHV DEVICE        │
-│  Patient symptoms + vital signs     │
-└─────────────────┬───────────────────┘
+┌─────────────────────────────────────────┐
+│         Mobile App / CHV Device         │
+└─────────────────┬───────────────────────┘
                   │
                   ▼
-┌─────────────────────────────────────┐
-│      VERTEX AI MODEL                │
-│  - Outbreak prediction              │
-│  - Disease classification           │
-│  - Risk scoring                     │
-└─────────────────┬───────────────────┘
-                  │
-                  ▼ (if confidence > 0.7)
-┌─────────────────────────────────────┐
-│      SHAP EXPLAINER                 │
-│  - Feature contributions            │
-│  - Evidence chain                   │
-│  - Baseline comparison              │
-└─────────────────┬───────────────────┘
+┌─────────────────────────────────────────┐
+│         Vertex AI Endpoint              │
+│  - Cholera outbreak prediction          │
+│  - Malaria risk assessment              │
+│  - Disease classification               │
+└─────────────────┬───────────────────────┘
                   │
                   ▼
-┌─────────────────────────────────────┐
-│      AUDIT TRAIL (BigQuery)         │
-│  - Tamper-proof logging             │
-│  - Compliance attestation           │
-└─────────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│    Explainability Threshold Check       │
+│    Confidence > 0.7 → Trigger SHAP      │
+└─────────────────┬───────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────────┐
+│         SHAP Explainer                  │
+│  - Feature contributions                │
+│  - Evidence chain                       │
+│  - Decision rationale                   │
+└─────────────────┬───────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────────┐
+│      Tamper-Proof Audit Trail           │
+│  BigQuery → Cloud Spanner → Cloud KMS   │
+└─────────────────────────────────────────┘
 ```
 
 ## Risk levels
 
-| Level | Confidence | Explainability Required | Use Case |
-|-------|-----------|------------------------|----------|
-| **LOW** | < 0.5 | No | Routine monitoring |
-| **MEDIUM** | 0.5-0.7 | No | Increased surveillance |
-| **HIGH** | 0.7-0.9 | **Yes** | Clinical decision support |
-| **CRITICAL** | > 0.9 | **Yes** | Emergency response |
+| Level | Confidence Range | Explainability Required | Compliance |
+|-------|------------------|-------------------------|------------|
+| **LOW** | < 0.5 | ❌ No | Routine monitoring |
+| **MEDIUM** | 0.5 - 0.7 | ❌ No | Increased surveillance |
+| **HIGH** | 0.7 - 0.9 | ✅ Yes | EU AI Act §6, GDPR Art. 22 |
+| **CRITICAL** | > 0.9 | ✅ Yes | Mandatory audit trail |
 
 ## Basic usage
 
 ```python
-from integrations.vertex_ai_shap import VertexAIExplainer
+from cloud_oracle.vertex_ai_shap import VertexAIExplainer
 
 # Initialize explainer
 explainer = VertexAIExplainer(
     project_id="iluminara-core",
     location="us-central1",
-    model_name="outbreak-predictor",
-    high_risk_threshold=0.7,
+    model_name="cholera-outbreak-predictor",
+    explainability_threshold=0.7,
     enable_audit=True
 )
 
-# Patient features
-patient_features = {
-    "fever": True,
-    "diarrhea": True,
-    "vomiting": True,
-    "age": 35,
-    "location_lat": 0.0512,
-    "location_lng": 40.3129,
-    "days_since_onset": 2
-}
+# Prepare input features
+instances = [{
+    "fever": 1,
+    "diarrhea": 1,
+    "vomiting": 1,
+    "dehydration": 1,
+    "location_risk": 0.8,
+    "population_density": 0.9,
+    "water_quality": 0.3
+}]
 
-# Get prediction with automatic explanation
+feature_names = [
+    "fever", "diarrhea", "vomiting", "dehydration",
+    "location_risk", "population_density", "water_quality"
+]
+
+# Make prediction with explanation
 result = explainer.predict_with_explanation(
-    features=patient_features,
+    instances=instances,
+    feature_names=feature_names,
     patient_id="PAT_12345",
-    jurisdiction="KDPA_KE"
+    jurisdiction="GDPR_EU"
 )
-
-print(f"Prediction: {result['prediction']:.2%}")
-print(f"Confidence: {result['confidence']:.2%}")
-print(f"Risk Level: {result['risk_level']}")
-
-if result['explanation']:
-    print(f"\\nTop Contributing Features:")
-    for feature in result['explanation']['top_features']:
-        print(f"  - {feature['feature']}: {feature['contribution']:+.2%}")
 ```
 
 ## Response format
 
-### High-risk inference (with explanation)
+### High-risk prediction (confidence > 0.7)
 
 ```json
 {
-  "prediction": 0.85,
-  "confidence": 0.92,
-  "risk_level": "critical",
+  "predictions": [[0.95, 0.05]],
+  "confidence": 0.95,
+  "risk_level": "CRITICAL",
+  "timestamp": "2025-12-20T10:00:00Z",
+  "model_name": "cholera-outbreak-predictor",
+  "patient_id": "PAT_12345",
+  "jurisdiction": "GDPR_EU",
   "explanation": {
     "method": "SHAP",
-    "baseline_value": 0.45,
     "feature_contributions": {
-      "fever": {
-        "value": true,
-        "contribution": 0.25,
-        "importance": 0.25
-      },
-      "diarrhea": {
-        "value": true,
-        "contribution": 0.30,
-        "importance": 0.30
-      }
+      "fever": 0.35,
+      "diarrhea": 0.28,
+      "location_risk": 0.22,
+      "dehydration": 0.10,
+      "vomiting": 0.05
     },
-    "top_features": [
-      {
-        "feature": "diarrhea",
-        "value": true,
-        "contribution": 0.30
-      },
-      {
-        "feature": "fever",
-        "value": true,
-        "contribution": 0.25
-      }
-    ],
     "evidence_chain": [
-      "diarrhea=true increases risk by 30.00%",
-      "fever=true increases risk by 25.00%"
-    ]
+      "Primary factor: fever (35% contribution)",
+      "Secondary factor: diarrhea (28% contribution)",
+      "Contributing factor: location_risk (22% contribution)"
+    ],
+    "base_value": 0.15,
+    "prediction_value": 0.95
   },
   "compliance": {
-    "eu_ai_act_s6": true,
-    "gdpr_art_22": true,
     "explainability_required": true,
-    "jurisdiction": "KDPA_KE"
-  },
-  "metadata": {
-    "model_name": "outbreak-predictor",
-    "timestamp": "2025-12-25T18:00:00.000Z",
-    "patient_id": "PAT_12345"
+    "explainability_method": "SHAP",
+    "frameworks": [
+      "EU AI Act §6 (High-Risk AI Systems)",
+      "GDPR Art. 22 (Right to Explanation)",
+      "HIPAA §164.524 (Right of Access)"
+    ],
+    "audit_trail": true
   }
 }
 ```
 
-## SHAP explanation components
+### Low-risk prediction (confidence < 0.7)
+
+```json
+{
+  "predictions": [[0.45, 0.55]],
+  "confidence": 0.45,
+  "risk_level": "LOW",
+  "explanation": null,
+  "compliance": {
+    "explainability_required": false,
+    "reason": "Confidence 45% below threshold 70%"
+  }
+}
+```
+
+## SHAP explanation
+
+SHAP (SHapley Additive exPlanations) provides feature-level contributions to predictions:
 
 ### Feature contributions
 
-Shows how each feature influenced the prediction:
+Each feature's contribution to the final prediction:
 
-- **Positive contribution** - Increases risk
-- **Negative contribution** - Decreases risk
-- **Importance** - Absolute magnitude of contribution
+```python
+{
+  "fever": 0.35,           # 35% contribution (positive)
+  "diarrhea": 0.28,        # 28% contribution (positive)
+  "location_risk": 0.22,   # 22% contribution (positive)
+  "dehydration": 0.10,     # 10% contribution (positive)
+  "vomiting": 0.05,        # 5% contribution (positive)
+  "population_density": 0.03,
+  "water_quality": -0.03   # Negative contribution (protective factor)
+}
+```
 
 ### Evidence chain
 
 Human-readable explanation of the decision:
 
 ```
-"diarrhea=true increases risk by 30.00%"
-"fever=true increases risk by 25.00%"
-"age=35 decreases risk by 5.00%"
-```
-
-### Baseline value
-
-The expected prediction without any patient-specific features. Deviations from baseline are explained by feature contributions.
-
-## Batch prediction
-
-Process multiple patients with explainability:
-
-```python
-# Multiple patients
-patients = [
-    {"fever": True, "cough": True, "age": 45},
-    {"diarrhea": True, "vomiting": True, "age": 28},
-    {"fever": True, "rash": True, "age": 12}
-]
-
-patient_ids = ["PAT_001", "PAT_002", "PAT_003"]
-
-# Batch prediction
-results = explainer.batch_predict_with_explanation(
-    features_list=patients,
-    patient_ids=patient_ids,
-    jurisdiction="KDPA_KE"
-)
-
-# Process results
-for result in results:
-    if result['risk_level'] in ['high', 'critical']:
-        print(f"🚨 High-risk patient: {result['metadata']['patient_id']}")
-        print(f"   Evidence: {result['explanation']['evidence_chain']}")
-```
-
-## Audit trail
-
-All high-risk inferences are automatically logged to BigQuery:
-
-```sql
-SELECT
-  timestamp,
-  patient_id,
-  prediction,
-  confidence,
-  risk_level,
-  explanation_provided,
-  compliance_eu_ai_act,
-  compliance_gdpr_art_22
-FROM `iluminara_audit.ai_explanations`
-WHERE risk_level IN ('high', 'critical')
-ORDER BY timestamp DESC
-LIMIT 100
+1. Primary factor: fever (35% contribution)
+2. Secondary factor: diarrhea (28% contribution)
+3. Contributing factor: location_risk (22% contribution)
+4. Contributing factor: dehydration (10% contribution)
+5. Contributing factor: vomiting (5% contribution)
 ```
 
 ## Compliance validation
 
-The explainer automatically validates compliance:
+Validate that predictions meet compliance requirements:
 
 ```python
-# Compliance check
-if result['compliance']['eu_ai_act_s6']:
-    print("✅ EU AI Act §6 compliant")
+# Validate compliance
+is_compliant = explainer.validate_compliance(result)
 
-if result['compliance']['gdpr_art_22']:
-    print("✅ GDPR Art. 22 compliant")
+if not is_compliant:
+    print("❌ Compliance violation detected")
+    # Block action or escalate
+else:
+    print("✅ Compliance validation passed")
+```
 
-if result['compliance']['explainability_required']:
-    print("⚠️ High-risk inference - Explanation mandatory")
+**Validation checks:**
+- High-risk predictions have explanations
+- Explanation includes required fields (method, feature_contributions, evidence_chain)
+- Audit trail is enabled
+- Tamper-proof logging is active
+
+## Batch predictions
+
+Process multiple predictions with explanations:
+
+```python
+# Batch prediction
+results = explainer.batch_predict_with_explanations(
+    instances=[instance1, instance2, instance3],
+    feature_names=feature_names,
+    patient_ids=["PAT_001", "PAT_002", "PAT_003"]
+)
+
+# Process results
+for result in results:
+    if result["risk_level"] in ["HIGH", "CRITICAL"]:
+        print(f"🚨 High-risk case: {result['patient_id']}")
+        print(f"   Evidence: {result['explanation']['evidence_chain'][0]}")
+```
+
+## Audit trail
+
+All high-risk inferences are logged to BigQuery for tamper-proof audit:
+
+```sql
+-- Query audit trail
+SELECT
+  timestamp,
+  patient_id,
+  confidence,
+  risk_level,
+  explainability_method,
+  feature_contributions,
+  evidence_chain
+FROM `iluminara_audit.ai_explanations`
+WHERE risk_level IN ('HIGH', 'CRITICAL')
+ORDER BY timestamp DESC
+LIMIT 100
 ```
 
 ## Integration with SovereignGuardrail
 
-All AI inferences are validated against sovereignty constraints:
+AI inferences are validated against sovereignty constraints:
 
 ```python
 from governance_kernel.vector_ledger import SovereignGuardrail
@@ -253,48 +261,93 @@ guardrail = SovereignGuardrail()
 guardrail.validate_action(
     action_type='High_Risk_Inference',
     payload={
-        'inference': 'diagnosis',
+        'inference': 'cholera_diagnosis',
         'explanation': result['explanation'],
         'confidence_score': result['confidence'],
-        'evidence_chain': result['explanation']['evidence_chain']
+        'evidence_chain': result['explanation']['evidence_chain'],
+        'consent_token': 'VALID_TOKEN',
+        'consent_scope': 'diagnosis'
     },
     jurisdiction='GDPR_EU'
 )
 ```
 
-## Deployment
+## Model deployment
 
-### Local development
+### Deploy to Vertex AI
 
 ```bash
-# Install dependencies
-pip install shap google-cloud-aiplatform google-cloud-bigquery
+# Deploy model to Vertex AI
+gcloud ai models upload \
+  --region=us-central1 \
+  --display-name=cholera-outbreak-predictor \
+  --container-image-uri=gcr.io/iluminara-core/cholera-model:latest
 
-# Set environment variables
-export GOOGLE_CLOUD_PROJECT=iluminara-core
-export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+# Create endpoint
+gcloud ai endpoints create \
+  --region=us-central1 \
+  --display-name=cholera-outbreak-predictor
 
-# Run example
-python integrations/vertex_ai_shap.py
+# Deploy model to endpoint
+gcloud ai endpoints deploy-model ENDPOINT_ID \
+  --region=us-central1 \
+  --model=MODEL_ID \
+  --display-name=cholera-v1
 ```
 
-### Production (Cloud Run)
+### Configure explainability
 
-```bash
-# Deploy to Cloud Run
-gcloud run deploy vertex-ai-explainer \
-  --source integrations/ \
-  --region us-central1 \
-  --allow-unauthenticated \
-  --set-env-vars GOOGLE_CLOUD_PROJECT=iluminara-core
+```python
+# Configure Vertex AI Explainability
+from google.cloud import aiplatform
+
+aiplatform.init(project="iluminara-core", location="us-central1")
+
+model = aiplatform.Model.upload(
+    display_name="cholera-outbreak-predictor",
+    artifact_uri="gs://iluminara-models/cholera",
+    serving_container_image_uri="gcr.io/iluminara-core/cholera-model:latest",
+    explanation_metadata={
+        "inputs": {
+            "fever": {"input_tensor_name": "fever"},
+            "diarrhea": {"input_tensor_name": "diarrhea"},
+            # ... other features
+        },
+        "outputs": {
+            "prediction": {"output_tensor_name": "prediction"}
+        }
+    },
+    explanation_parameters={
+        "sampled_shapley_attribution": {
+            "path_count": 10
+        }
+    }
+)
 ```
 
 ## Performance considerations
 
-- **SHAP calculation time**: ~100-500ms per inference
-- **Batch optimization**: Process multiple patients in parallel
-- **Caching**: Cache SHAP explainer for repeated use
+- **Explainability overhead**: ~50-100ms per prediction
+- **Batch processing**: Recommended for >10 predictions
+- **Caching**: Cache SHAP explainer for repeated predictions
 - **Async processing**: Use async for non-blocking explanations
+
+## Compliance frameworks
+
+<AccordionGroup>
+  <Accordion title="EU AI Act §6 (High-Risk AI Systems)">
+    Requires transparency and explainability for high-risk AI systems used in healthcare
+  </Accordion>
+  <Accordion title="GDPR Art. 22 (Right to Explanation)">
+    Individuals have the right to obtain an explanation of automated decisions
+  </Accordion>
+  <Accordion title="HIPAA §164.524 (Right of Access)">
+    Patients have the right to access their health information and understand how decisions are made
+  </Accordion>
+  <Accordion title="ISO 27001 A.18.1.4">
+    Privacy and protection of personally identifiable information requires transparency
+  </Accordion>
+</AccordionGroup>
 
 ## Next steps
 
@@ -304,27 +357,27 @@ gcloud run deploy vertex-ai-explainer \
     icon="mobile"
     href="/integrations/bio-interface"
   >
-    Integrate with mobile health apps
+    Integrate mobile health apps with Golden Thread
   </Card>
   <Card
     title="Governance kernel"
     icon="shield-check"
     href="/governance/overview"
   >
-    Understand compliance enforcement
-  </Card>
-  <Card
-    title="AI agents"
-    icon="brain-circuit"
-    href="/ai-agents/overview"
-  >
-    Deploy autonomous surveillance
+    Configure sovereignty constraints
   </Card>
   <Card
     title="Audit trail"
     icon="file-contract"
     href="/governance/audit"
   >
-    Configure tamper-proof logging
+    Set up tamper-proof logging
+  </Card>
+  <Card
+    title="Deployment"
+    icon="rocket"
+    href="/deployment/gcp"
+  >
+    Deploy to Google Cloud Platform
   </Card>
 </CardGroup>

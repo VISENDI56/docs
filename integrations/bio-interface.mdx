@@ -5,69 +5,72 @@ description: Mobile health apps integration with Golden Thread protocol
 
 ## Overview
 
-The Bio-Interface REST API enables mobile health applications to submit health data that automatically integrates with the Golden Thread data fusion engine. All submissions are validated against sovereignty constraints and fused with EMR and IDSR data streams.
+The Bio-Interface REST API enables mobile health applications to submit health data that automatically integrates with the Golden Thread data fusion engine. All submissions are validated against sovereignty constraints and logged to a tamper-proof audit trail.
 
 <Card
   title="Philosophy"
   icon="mobile"
 >
-  "Zero-friction data collection with sovereign dignity"
+  "Every mobile submission becomes a CBS signal in the Golden Thread, verified against EMR and IDSR sources."
 </Card>
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────┐
-│      MOBILE HEALTH APPS             │
-│  - CHV devices                      │
-│  - Patient self-reporting           │
-│  - IoT sensors                      │
-└─────────────────┬───────────────────┘
-                  │
-                  ▼ HTTPS/TLS 1.3
-┌─────────────────────────────────────┐
-│      BIO-INTERFACE API              │
-│  - Sovereignty validation           │
-│  - Consent verification             │
-│  - Data normalization               │
-└─────────────────┬───────────────────┘
+┌─────────────────────────────────────────┐
+│      Mobile Health Apps                 │
+│  - CHV data collection                  │
+│  - Patient symptom reporting            │
+│  - IoT sensor integration               │
+└─────────────────┬───────────────────────┘
+                  │ HTTPS/TLS 1.3
+                  ▼
+┌─────────────────────────────────────────┐
+│      Bio-Interface REST API             │
+│  - /api/v1/submit-health-data           │
+│  - /api/v1/submit-outbreak-alert        │
+│  - /api/v1/query-verification           │
+└─────────────────┬───────────────────────┘
                   │
                   ▼
-┌─────────────────────────────────────┐
-│      GOLDEN THREAD                  │
-│  - CBS signal creation              │
-│  - Multi-source fusion              │
-│  - Verification scoring             │
-└─────────────────┬───────────────────┘
+┌─────────────────────────────────────────┐
+│      SovereignGuardrail                 │
+│  - Validate consent                     │
+│  - Check jurisdiction                   │
+│  - Enforce data residency               │
+└─────────────────┬───────────────────────┘
                   │
                   ▼
-┌─────────────────────────────────────┐
-│      STORAGE & ALERTS               │
-│  - BigQuery (analytics)             │
-│  - PubSub (real-time alerts)        │
-│  - Spanner (audit trail)            │
-└─────────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│      Golden Thread                      │
+│  - Create CBS signal                    │
+│  - Fuse with EMR/IDSR                   │
+│  - Calculate verification score         │
+└─────────────────┬───────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────────┐
+│      Pub/Sub → Cloud Functions          │
+│  - Downstream processing                │
+│  - Alert generation                     │
+│  - Analytics pipeline                   │
+└─────────────────────────────────────────┘
 ```
 
 ## Base URL
 
 ```
-http://localhost:8081  # Local development
+http://localhost:8081  # Development
 https://bio-interface.iluminara.health  # Production
 ```
 
 ## Authentication
 
-Production deployments require authentication:
+For production deployments, implement authentication using:
 
-```bash
-# Get access token
-TOKEN=$(gcloud auth print-identity-token)
-
-# Make authenticated request
-curl -H "Authorization: Bearer $TOKEN" \
-  https://bio-interface.iluminara.health/api/v1/submit-health-data
-```
+- **Google Cloud IAM** - Service account authentication
+- **API Keys** - Per-app API keys with rate limiting
+- **OAuth 2.0** - User-level authentication
 
 ## Endpoints
 
@@ -81,11 +84,11 @@ GET /health
 
 ```json
 {
-  "status": "healthy",
-  "service": "Bio-Interface API",
+  "status": "operational",
+  "service": "iLuminara Bio-Interface API",
   "version": "1.0.0",
-  "timestamp": "2025-12-25T18:00:00.000Z",
-  "fortress_status": "OPERATIONAL"
+  "fortress_status": "ACTIVE",
+  "timestamp": "2025-12-20T10:00:00Z"
 }
 ```
 
@@ -95,6 +98,8 @@ GET /health
 POST /api/v1/submit-health-data
 ```
 
+Submit health data from mobile apps with automatic Golden Thread integration.
+
 **Request body:**
 
 ```json
@@ -102,13 +107,14 @@ POST /api/v1/submit-health-data
   "patient_id": "PAT_12345",
   "data_type": "symptom_report",
   "data": {
-    "symptoms": ["fever", "cough"],
+    "symptoms": ["fever", "cough", "fatigue"],
     "severity": 7,
-    "onset_date": "2025-01-15"
+    "onset_date": "2025-12-20T10:00:00Z"
   },
   "location": {
     "lat": 0.0512,
-    "lng": 40.3129
+    "lng": 40.3129,
+    "name": "Dadaab"
   },
   "source": "mobile_app",
   "consent_token": "CONSENT_TOKEN_123",
@@ -116,209 +122,169 @@ POST /api/v1/submit-health-data
 }
 ```
 
-**Response:**
+**Response (200 OK):**
 
 ```json
 {
   "status": "success",
-  "timestamp": "2025-12-25T18:00:00.000Z",
-  "record_id": "REC_789",
-  "verification_score": 0.85,
-  "golden_thread": {
-    "fused": true,
-    "sources": ["CBS", "EMR"],
-    "confidence": 0.85
-  },
+  "submission_id": "SUB_20251220100500",
+  "golden_thread_id": "GT_456",
+  "verification_score": 0.8,
+  "timestamp": "2025-12-20T10:05:00Z",
   "compliance": {
-    "sovereignty_validated": true,
-    "jurisdiction": "KDPA_KE",
-    "consent_verified": true
+    "frameworks": ["GDPR Art. 6", "KDPA §37", "HIPAA §164.312"],
+    "audit_trail": true,
+    "sovereignty_validated": true
   }
 }
 ```
 
-### Submit voice alert
-
-```http
-POST /api/v1/submit-voice-alert
-```
-
-**Request (multipart/form-data):**
-
-```bash
-curl -X POST http://localhost:8081/api/v1/submit-voice-alert \
-  -F "audio=@swahili-symptom.wav" \
-  -F "patient_id=PAT_12345" \
-  -F "lat=0.0512" \
-  -F "lng=40.3129" \
-  -F "consent_token=CONSENT_TOKEN_123" \
-  -F "jurisdiction=KDPA_KE"
-```
-
-**Response:**
+**Error (403 Forbidden):**
 
 ```json
 {
-  "status": "success",
-  "timestamp": "2025-12-25T18:00:00.000Z",
-  "transcription": "Patient reporting fever and cough",
-  "symptoms": ["fever", "cough"],
-  "severity": 6,
-  "record_id": "REC_790",
-  "verification_score": 0.75,
-  "golden_thread": {
-    "fused": true,
-    "sources": ["CBS"],
-    "confidence": 0.75
-  }
+  "status": "error",
+  "error": "sovereignty_violation",
+  "message": "Violates KDPA §37 (Transfer Restrictions)"
 }
 ```
 
-### Get patient timeline
+### Submit outbreak alert
 
 ```http
-GET /api/v1/get-patient-timeline?patient_id=PAT_12345&start_date=2025-01-01&end_date=2025-01-31
+POST /api/v1/submit-outbreak-alert
 ```
 
-**Response:**
-
-```json
-{
-  "status": "success",
-  "patient_id": "PAT_12345",
-  "timeline": [
-    {
-      "timestamp": "2025-01-15T08:00:00.000Z",
-      "data_type": "symptom_report",
-      "symptoms": ["fever", "cough"],
-      "verification_score": 0.85,
-      "sources": ["CBS", "EMR"]
-    }
-  ],
-  "record_count": 1,
-  "verification_summary": {
-    "confirmed": 1,
-    "probable": 0,
-    "unverified": 0
-  }
-}
-```
-
-### Calculate outbreak risk
-
-```http
-POST /api/v1/outbreak-risk
-```
+Submit outbreak alert from CHV or mobile app with emergency override.
 
 **Request body:**
 
 ```json
 {
-  "location": {"lat": 0.0512, "lng": 40.3129},
-  "radius_km": 10,
-  "time_window_days": 7
+  "location": {
+    "lat": 0.0512,
+    "lng": 40.3129,
+    "name": "Dadaab"
+  },
+  "disease": "cholera",
+  "case_count": 5,
+  "severity": "HIGH",
+  "description": "Multiple cases of watery diarrhea reported",
+  "reporter_id": "CHV_AMINA_HASSAN",
+  "consent_token": "EMERGENCY_ALERT",
+  "jurisdiction": "KDPA_KE"
 }
 ```
 
-**Response:**
+**Response (200 OK):**
 
 ```json
 {
   "status": "success",
-  "location": {"lat": 0.0512, "lng": 40.3129},
-  "risk_score": 0.45,
-  "risk_level": "MEDIUM",
-  "timestamp": "2025-12-25T18:00:00.000Z",
-  "recommendations": [
-    "Increase surveillance in the area",
-    "Monitor for symptom clusters",
-    "Prepare rapid response team"
-  ]
+  "alert_id": "ALERT_20251220100500",
+  "timestamp": "2025-12-20T10:05:00Z",
+  "response": {
+    "acknowledged": true,
+    "priority": "IMMEDIATE",
+    "estimated_response_time": "< 5 minutes"
+  },
+  "compliance": {
+    "frameworks": ["WHO IHR Article 6", "KDPA §37"],
+    "emergency_override": true,
+    "audit_trail": true
+  }
+}
+```
+
+### Query verification
+
+```http
+POST /api/v1/query-verification
+```
+
+Query verification status of submitted data.
+
+**Request body:**
+
+```json
+{
+  "submission_id": "SUB_20251220100500",
+  "patient_id": "PAT_12345"
+}
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "status": "success",
+  "submission_id": "SUB_20251220100500",
+  "patient_id": "PAT_12345",
+  "verification_score": 0.95,
+  "verification_status": "CONFIRMED",
+  "data_sources": ["CBS", "EMR"],
+  "timestamp": "2025-12-20T10:05:00Z"
 }
 ```
 
 ## Data types
 
-### Symptom report
+### Health data types
 
-```json
-{
-  "data_type": "symptom_report",
-  "data": {
-    "symptoms": ["fever", "cough", "fatigue"],
-    "severity": 7,
-    "onset_date": "2025-01-15",
-    "duration_days": 3
-  }
-}
+```python
+class HealthDataType(Enum):
+    SYMPTOM_REPORT = "symptom_report"
+    VITAL_SIGNS = "vital_signs"
+    LAB_RESULT = "lab_result"
+    DIAGNOSIS = "diagnosis"
+    TREATMENT = "treatment"
+    VACCINATION = "vaccination"
 ```
 
-### Vital signs
+### Data sources
 
-```json
-{
-  "data_type": "vital_signs",
-  "data": {
-    "temperature": 38.5,
-    "heart_rate": 95,
-    "blood_pressure": "120/80",
-    "respiratory_rate": 18
-  }
-}
-```
-
-### Diagnosis
-
-```json
-{
-  "data_type": "diagnosis",
-  "data": {
-    "diagnosis": "malaria",
-    "icd_code": "B50.9",
-    "confidence": 0.92,
-    "provider_id": "DR_456"
-  }
-}
-```
-
-### Lab result
-
-```json
-{
-  "data_type": "lab_result",
-  "data": {
-    "test_type": "rapid_diagnostic_test",
-    "result": "positive",
-    "pathogen": "plasmodium_falciparum"
-  }
-}
+```python
+class DataSource(Enum):
+    MOBILE_APP = "mobile_app"
+    CHV_DEVICE = "chv_device"
+    IOT_SENSOR = "iot_sensor"
+    VOICE_ALERT = "voice_alert"
+    MANUAL_ENTRY = "manual_entry"
 ```
 
 ## Golden Thread integration
 
-All submitted data automatically becomes a CBS (Community-Based Surveillance) signal:
+All submissions automatically create CBS signals in the Golden Thread:
 
 ```python
-# CBS signal creation
+# CBS signal created from mobile submission
 cbs_signal = {
-    'patient_id': 'PAT_12345',
-    'location': {'lat': 0.0512, 'lng': 40.3129},
-    'timestamp': '2025-12-25T18:00:00.000Z',
-    'data_type': 'symptom_report',
-    'data': {...},
-    'source': 'mobile_app'
+    'location': 'Dadaab',
+    'symptom': 'fever',
+    'timestamp': '2025-12-20T10:00:00Z',
+    'source': 'MOBILE_APP_SUBMISSION',
+    'severity': 7,
+    'patient_id': 'PAT_12345'
 }
 
-# Fuse with Golden Thread
-fused_record = golden_thread.fuse_data_streams(
+# Fused with Golden Thread
+fused = golden_thread.fuse_data_streams(
     cbs_signal=cbs_signal,
     patient_id='PAT_12345'
 )
 
-# Verification score
-# 1.0 = CONFIRMED (CBS + EMR match)
-# 0.5 = UNVERIFIED (CBS only)
+# Verification score: 0.8 (PROBABLE)
+# Status: Waiting for EMR confirmation
 ```
+
+### Verification scores
+
+| Score | Status | Description |
+|-------|--------|-------------|
+| 1.0 | CONFIRMED | CBS + EMR agree on location and time |
+| 0.7-0.9 | PROBABLE | Partial agreement with minor conflicts |
+| 0.4-0.6 | POSSIBLE | Significant conflicts but plausible |
+| 0.0-0.3 | UNVERIFIED | Major conflicts or single source only |
 
 ## Sovereignty validation
 
@@ -329,7 +295,7 @@ from governance_kernel.vector_ledger import SovereignGuardrail
 
 guardrail = SovereignGuardrail()
 
-# Validate before processing
+# Validate submission
 guardrail.validate_action(
     action_type='Data_Processing',
     payload={
@@ -342,20 +308,11 @@ guardrail.validate_action(
 )
 ```
 
-## Real-time alerts
-
-High-severity submissions (severity ≥ 7) trigger PubSub alerts:
-
-```json
-{
-  "alert_type": "HIGH_SEVERITY_SYMPTOM",
-  "patient_id": "PAT_12345",
-  "severity": 9,
-  "location": {"lat": 0.0512, "lng": 40.3129},
-  "timestamp": "2025-12-25T18:00:00.000Z",
-  "verification_score": 0.85
-}
-```
+**Validation rules:**
+- PHI cannot leave sovereign territory
+- Explicit consent required for processing
+- Emergency override for outbreak alerts (WHO IHR Article 6)
+- Tamper-proof audit trail for all actions
 
 ## Mobile SDK examples
 
@@ -372,32 +329,33 @@ class ILuminaraClient(private val baseUrl: String) {
         patientId: String,
         symptoms: List<String>,
         severity: Int,
-        location: Pair<Double, Double>,
+        location: Location,
         consentToken: String
     ): Response {
         val json = JSONObject().apply {
             put("patient_id", patientId)
             put("data_type", "symptom_report")
             put("data", JSONObject().apply {
-                put("symptoms", symptoms)
+                put("symptoms", JSONArray(symptoms))
                 put("severity", severity)
+                put("onset_date", System.currentTimeMillis())
             })
             put("location", JSONObject().apply {
-                put("lat", location.first)
-                put("lng", location.second)
+                put("lat", location.latitude)
+                put("lng", location.longitude)
+                put("name", location.name)
             })
+            put("source", "mobile_app")
             put("consent_token", consentToken)
             put("jurisdiction", "KDPA_KE")
         }
         
-        val body = RequestBody.create(
-            MediaType.parse("application/json"),
-            json.toString()
-        )
-        
         val request = Request.Builder()
             .url("$baseUrl/api/v1/submit-health-data")
-            .post(body)
+            .post(RequestBody.create(
+                MediaType.parse("application/json"),
+                json.toString()
+            ))
             .build()
         
         return client.newCall(request).execute()
@@ -421,9 +379,9 @@ class ILuminaraClient {
         patientId: String,
         symptoms: [String],
         severity: Int,
-        location: (lat: Double, lng: Double),
+        location: Location,
         consentToken: String,
-        completion: @escaping (Result<Data, Error>) -> Void
+        completion: @escaping (Result<SubmissionResponse, Error>) -> Void
     ) {
         let url = URL(string: "\\(baseURL)/api/v1/submit-health-data")!
         var request = URLRequest(url: url)
@@ -435,12 +393,15 @@ class ILuminaraClient {
             "data_type": "symptom_report",
             "data": [
                 "symptoms": symptoms,
-                "severity": severity
+                "severity": severity,
+                "onset_date": ISO8601DateFormatter().string(from: Date())
             ],
             "location": [
-                "lat": location.lat,
-                "lng": location.lng
+                "lat": location.latitude,
+                "lng": location.longitude,
+                "name": location.name
             ],
+            "source": "mobile_app",
             "consent_token": consentToken,
             "jurisdiction": "KDPA_KE"
         ]
@@ -448,11 +409,8 @@ class ILuminaraClient {
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         
         URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                completion(.failure(error))
-            } else if let data = data {
-                completion(.success(data))
-            }
+            // Handle response
+            completion(.success(response))
         }.resume()
     }
 }
@@ -483,9 +441,15 @@ class ILuminaraClient {
         data_type: 'symptom_report',
         data: {
           symptoms,
-          severity
+          severity,
+          onset_date: new Date().toISOString()
         },
-        location,
+        location: {
+          lat: location.latitude,
+          lng: location.longitude,
+          name: location.name
+        },
+        source: 'mobile_app',
         consent_token: consentToken,
         jurisdiction: 'KDPA_KE'
       })
@@ -498,50 +462,83 @@ class ILuminaraClient {
 
 ## Deployment
 
-### Local development
+### Start the API service
 
 ```bash
-# Install dependencies
-pip install flask flask-cors google-cloud-pubsub
-
 # Set environment variables
 export BIO_INTERFACE_PORT=8081
-export PUBSUB_ALERT_TOPIC=projects/iluminara/topics/health-alerts
+export GOOGLE_CLOUD_PROJECT=iluminara-core
+export JURISDICTION=KDPA_KE
 
-# Run API
-python integrations/bio_interface_api.py
+# Start service
+python api/bio_interface.py
 ```
 
-### Production (Cloud Run)
+### Deploy to Cloud Run
 
 ```bash
+# Build container
+gcloud builds submit --tag gcr.io/iluminara-core/bio-interface
+
 # Deploy to Cloud Run
-gcloud run deploy bio-interface-api \
-  --source integrations/ \
+gcloud run deploy bio-interface \
+  --image gcr.io/iluminara-core/bio-interface \
+  --platform managed \
   --region us-central1 \
   --allow-unauthenticated \
-  --set-env-vars BIO_INTERFACE_PORT=8080,PUBSUB_ALERT_TOPIC=projects/iluminara/topics/health-alerts
+  --set-env-vars JURISDICTION=KDPA_KE
 ```
 
-## Error handling
+## Rate limiting
 
-| Error Code | HTTP Status | Description |
-|-----------|-------------|-------------|
-| `missing_field` | 400 | Required field missing |
-| `sovereignty_violation` | 403 | Action violates compliance rules |
-| `no_audio_data` | 400 | No audio file provided |
-| `missing_patient_id` | 400 | patient_id required |
-| `processing_failed` | 500 | Internal processing error |
+For production deployments, implement rate limiting:
+
+```python
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
+limiter = Limiter(
+    app,
+    key_func=get_remote_address,
+    default_limits=["100 per hour"]
+)
+
+@app.route('/api/v1/submit-health-data', methods=['POST'])
+@limiter.limit("10 per minute")
+def submit_health_data():
+    # ...
+```
+
+## Monitoring
+
+### Prometheus metrics
+
+```
+bio_interface_submissions_total
+bio_interface_verification_scores
+bio_interface_sovereignty_violations_total
+bio_interface_response_time_seconds
+```
+
+### Health check monitoring
+
+```bash
+# Check API health
+curl http://localhost:8081/health
+
+# Monitor with Prometheus
+curl http://localhost:8081/metrics
+```
 
 ## Next steps
 
 <CardGroup cols={2}>
   <Card
     title="Vertex AI + SHAP"
-    icon="brain"
+    icon="brain-circuit"
     href="/integrations/vertex-ai-shap"
   >
-    Add explainable AI to your app
+    Add AI explainability to mobile apps
   </Card>
   <Card
     title="Golden Thread"
@@ -560,7 +557,7 @@ gcloud run deploy bio-interface-api \
   <Card
     title="Deployment"
     icon="rocket"
-    href="/deployment/overview"
+    href="/deployment/gcp"
   >
     Deploy to production
   </Card>

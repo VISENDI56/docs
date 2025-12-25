@@ -1,0 +1,571 @@
+---
+title: 'Phase 4: Compliance Expansion'
+description: 'Policy-as-Code for 45+ global legal frameworks'
+icon: 'scale-balanced'
+---
+
+## Objective
+
+Automate the enforcement of 45+ global frameworks (GDPR, LGPD, HIPAA, etc.) using dynamic Policy-as-Code, enabling instant compliance updates without redeployment.
+
+<Card
+  title="Strategic imperative"
+  icon="gavel"
+>
+  "Laws change faster than code deploys. Policy-as-Code enables instant compliance without touching the binary."
+</Card>
+
+## Current architecture (Hardcoded rules)
+
+```python
+# governance_kernel/vector_ledger.py
+
+class SovereignGuardrail:
+    def validate_action(self, action_type, payload, jurisdiction):
+        # ❌ Hardcoded compliance rules
+        if jurisdiction == 'GDPR_EU':
+            if action_type == 'Data_Transfer':
+                if payload['destination'] not in ['EU', 'UK']:
+                    raise SovereigntyViolationError("GDPR Art. 9")
+        
+        if jurisdiction == 'HIPAA_US':
+            if action_type == 'Data_Transfer':
+                if not payload.get('encryption'):
+                    raise SovereigntyViolationError("HIPAA §164.312")
+```
+
+**Problems:**
+- ❌ New law = code change + redeployment
+- ❌ Cannot A/B test compliance policies
+- ❌ No audit trail of policy changes
+- ❌ Difficult to explain decisions to regulators
+
+## Target architecture (Policy-as-Code)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              OPEN POLICY AGENT (OPA)                        │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │   GDPR.rego  │  │  HIPAA.rego  │  │  KDPA.rego   │     │
+│  │   (45 laws)  │  │   (12 laws)  │  │   (8 laws)   │     │
+│  └──────────────┘  └──────────────┘  └──────────────┘     │
+└─────────────────────────────────────────────────────────────┘
+              │
+              │ REST API query
+              ▼
+┌─────────────────────────────────────┐
+│    SOVEREIGN GUARDRAIL              │
+│  - Queries OPA for every action     │
+│  - Enforces policy decisions        │
+│  - Logs policy evaluations          │
+└─────────────────────────────────────┘
+```
+
+**Benefits:**
+- ✅ Update laws in <5 minutes (no redeployment)
+- ✅ A/B test compliance policies
+- ✅ Complete audit trail of policy changes
+- ✅ Explainable decisions for regulators
+
+## Architecture upgrades
+
+### 1. Open Policy Agent (OPA) integration
+
+**OPA deployment:**
+```yaml
+# kubernetes/opa-deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opa
+  namespace: iluminara
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: opa
+  template:
+    metadata:
+      labels:
+        app: opa
+    spec:
+      containers:
+      - name: opa
+        image: openpolicyagent/opa:latest
+        args:
+          - "run"
+          - "--server"
+          - "--addr=0.0.0.0:8181"
+          - "--log-level=info"
+        ports:
+        - containerPort: 8181
+        volumeMounts:
+        - name: policies
+          mountPath: /policies
+      volumes:
+      - name: policies
+        configMap:
+          name: opa-policies
+```
+
+**GDPR policy (Rego):**
+```rego
+# policies/gdpr.rego
+
+package iluminara.gdpr
+
+# GDPR Art. 9: Processing of special categories of personal data
+deny_data_transfer[msg] {
+    input.action_type == "Data_Transfer"
+    input.payload.data_type == "PHI"
+    not is_eu_country(input.payload.destination)
+    msg := "GDPR Art. 9: PHI cannot leave EU without adequacy decision"
+}
+
+# GDPR Art. 17: Right to erasure
+deny_data_retention[msg] {
+    input.action_type == "Data_Retention"
+    days_since_collection := time.now_ns() - input.payload.collection_timestamp
+    days_since_collection > 1825 * 24 * 60 * 60 * 1000000000  # 5 years
+    msg := "GDPR Art. 17: Data must be erased after 5 years"
+}
+
+# GDPR Art. 22: Right to explanation
+deny_high_risk_inference[msg] {
+    input.action_type == "High_Risk_Inference"
+    not input.payload.explanation
+    msg := "GDPR Art. 22: High-risk AI decisions require explanation"
+}
+
+# Helper functions
+is_eu_country(country) {
+    eu_countries := ["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE"]
+    country == eu_countries[_]
+}
+```
+
+**HIPAA policy (Rego):**
+```rego
+# policies/hipaa.rego
+
+package iluminara.hipaa
+
+# HIPAA §164.312(a)(2)(i): Unique user identification
+deny_access[msg] {
+    input.action_type == "Data_Access"
+    not input.payload.user_id
+    msg := "HIPAA §164.312(a)(2)(i): Unique user identification required"
+}
+
+# HIPAA §164.312(e)(1): Transmission security
+deny_data_transfer[msg] {
+    input.action_type == "Data_Transfer"
+    not input.payload.encryption
+    msg := "HIPAA §164.312(e)(1): Data must be encrypted in transit"
+}
+
+# HIPAA §164.530(j): Documentation
+deny_action_without_audit[msg] {
+    not input.payload.audit_log_enabled
+    msg := "HIPAA §164.530(j): All actions must be audited"
+}
+```
+
+**Kenya DPA policy (Rego):**
+```rego
+# policies/kdpa.rego
+
+package iluminara.kdpa
+
+# KDPA §37: Transfer of personal data outside Kenya
+deny_cross_border_transfer[msg] {
+    input.action_type == "Data_Transfer"
+    input.payload.source_country == "KE"
+    not input.payload.destination_country == "KE"
+    not has_dpc_authorization(input.payload)
+    msg := "KDPA §37: Cross-border transfer requires Data Protection Commissioner authorization"
+}
+
+# KDPA §42: Rights of data subjects
+deny_processing_without_consent[msg] {
+    input.action_type == "Data_Processing"
+    not input.payload.consent_token
+    msg := "KDPA §42: Processing requires explicit consent"
+}
+
+has_dpc_authorization(payload) {
+    payload.authorization_authority == "Data Protection Commissioner"
+    payload.authorization_valid == true
+}
+```
+
+### 2. Dynamic policy engine
+
+**SovereignGuardrail v2 (OPA-powered):**
+```python
+# governance_kernel/vector_ledger_v2.py
+
+import requests
+from typing import Dict, List
+
+class DynamicSovereignGuardrail:
+    def __init__(self, opa_url: str = "http://opa:8181"):
+        self.opa_url = opa_url
+    
+    def validate_action(
+        self,
+        action_type: str,
+        payload: Dict,
+        jurisdiction: str
+    ) -> Dict:
+        """Query OPA for policy decision"""
+        
+        # Prepare OPA query
+        opa_input = {
+            "input": {
+                "action_type": action_type,
+                "payload": payload,
+                "jurisdiction": jurisdiction,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        }
+        
+        # Query all relevant policies
+        policies = self.get_policies_for_jurisdiction(jurisdiction)
+        
+        violations = []
+        for policy in policies:
+            response = requests.post(
+                f"{self.opa_url}/v1/data/{policy}",
+                json=opa_input
+            )
+            
+            result = response.json()
+            
+            # Check for policy violations
+            if result.get('result'):
+                for violation_type, messages in result['result'].items():
+                    if messages:
+                        violations.extend(messages)
+        
+        if violations:
+            raise SovereigntyViolationError(
+                f"Policy violations: {', '.join(violations)}"
+            )
+        
+        return {
+            "status": "approved",
+            "policies_evaluated": policies,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    
+    def get_policies_for_jurisdiction(self, jurisdiction: str) -> List[str]:
+        """Map jurisdiction to OPA policy packages"""
+        policy_map = {
+            "GDPR_EU": ["iluminara.gdpr", "iluminara.eu_ai_act"],
+            "HIPAA_US": ["iluminara.hipaa", "iluminara.hitech"],
+            "KDPA_KE": ["iluminara.kdpa"],
+            "POPIA_ZA": ["iluminara.popia"],
+            "LGPD_BR": ["iluminara.lgpd"],
+            # ... 40 more frameworks
+        }
+        
+        return policy_map.get(jurisdiction, ["iluminara.global_default"])
+```
+
+### 3. Policy versioning and rollback
+
+**Git-based policy management:**
+```bash
+# policies/
+├── gdpr/
+│   ├── v1.0.0.rego
+│   ├── v1.1.0.rego
+│   └── v2.0.0.rego
+├── hipaa/
+│   ├── v1.0.0.rego
+│   └── v1.1.0.rego
+└── kdpa/
+    └── v1.0.0.rego
+```
+
+**Policy deployment pipeline:**
+```yaml
+# .github/workflows/deploy-policies.yml
+
+name: Deploy OPA Policies
+
+on:
+  push:
+    paths:
+      - 'policies/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Validate policies
+        run: |
+          opa test policies/
+      
+      - name: Deploy to OPA
+        run: |
+          for policy in policies/**/*.rego; do
+            curl -X PUT \
+              --data-binary @$policy \
+              http://opa:8181/v1/policies/$(basename $policy)
+          done
+      
+      - name: Verify deployment
+        run: |
+          curl http://opa:8181/v1/policies
+```
+
+**Policy rollback:**
+```bash
+# Rollback GDPR policy to v1.0.0
+kubectl rollout undo deployment/opa
+
+# Or deploy specific version
+curl -X PUT \
+  --data-binary @policies/gdpr/v1.0.0.rego \
+  http://opa:8181/v1/policies/gdpr
+```
+
+### 4. Policy testing and simulation
+
+**Test framework:**
+```rego
+# policies/gdpr_test.rego
+
+package iluminara.gdpr
+
+test_deny_data_transfer_outside_eu {
+    deny_data_transfer[msg] with input as {
+        "action_type": "Data_Transfer",
+        "payload": {
+            "data_type": "PHI",
+            "destination": "US"
+        }
+    }
+    
+    msg == "GDPR Art. 9: PHI cannot leave EU without adequacy decision"
+}
+
+test_allow_data_transfer_within_eu {
+    not deny_data_transfer[msg] with input as {
+        "action_type": "Data_Transfer",
+        "payload": {
+            "data_type": "PHI",
+            "destination": "DE"
+        }
+    }
+}
+```
+
+**Run tests:**
+```bash
+opa test policies/ -v
+
+# Output:
+# policies/gdpr_test.rego:
+#   test_deny_data_transfer_outside_eu: PASS (0.5ms)
+#   test_allow_data_transfer_within_eu: PASS (0.3ms)
+# 
+# PASS: 2/2
+```
+
+### 5. Compliance dashboard
+
+**Real-time policy evaluation metrics:**
+```python
+from prometheus_client import Counter, Histogram
+
+# Metrics
+policy_evaluations_total = Counter(
+    'policy_evaluations_total',
+    'Total policy evaluations',
+    ['jurisdiction', 'policy', 'result']
+)
+
+policy_evaluation_duration = Histogram(
+    'policy_evaluation_duration_seconds',
+    'Policy evaluation duration',
+    ['jurisdiction', 'policy']
+)
+
+class ComplianceDashboard:
+    def record_evaluation(
+        self,
+        jurisdiction: str,
+        policy: str,
+        result: str,
+        duration: float
+    ):
+        """Record policy evaluation metrics"""
+        policy_evaluations_total.labels(
+            jurisdiction=jurisdiction,
+            policy=policy,
+            result=result
+        ).inc()
+        
+        policy_evaluation_duration.labels(
+            jurisdiction=jurisdiction,
+            policy=policy
+        ).observe(duration)
+```
+
+**Grafana dashboard:**
+```json
+{
+  "dashboard": {
+    "title": "Compliance Dashboard",
+    "panels": [
+      {
+        "title": "Policy Evaluations by Jurisdiction",
+        "targets": [
+          {
+            "expr": "sum(rate(policy_evaluations_total[5m])) by (jurisdiction)"
+          }
+        ]
+      },
+      {
+        "title": "Policy Violations",
+        "targets": [
+          {
+            "expr": "sum(rate(policy_evaluations_total{result=\"denied\"}[5m])) by (policy)"
+          }
+        ]
+      },
+      {
+        "title": "Policy Evaluation Latency",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, policy_evaluation_duration_seconds)"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+## Supported frameworks (45+)
+
+<AccordionGroup>
+  <Accordion title="Data protection (15 frameworks)">
+    - GDPR (EU)
+    - KDPA (Kenya)
+    - POPIA (South Africa)
+    - LGPD (Brazil)
+    - PIPEDA (Canada)
+    - CCPA (California)
+    - VCDPA (Virginia)
+    - CPA (Colorado)
+    - CTDPA (Connecticut)
+    - UCPA (Utah)
+    - PDPA (Singapore)
+    - PDPA (Thailand)
+    - APPI (Japan)
+    - PIPL (China)
+    - DPA (Nigeria)
+  </Accordion>
+  
+  <Accordion title="Healthcare (8 frameworks)">
+    - HIPAA (USA)
+    - HITECH (USA)
+    - FDA 21 CFR Part 11 (USA)
+    - NHS Data Security Standards (UK)
+    - PHIPA (Ontario)
+    - HIA (Australia)
+    - HIPA (Saskatchewan)
+    - FHIR Security (Global)
+  </Accordion>
+  
+  <Accordion title="AI & Ethics (5 frameworks)">
+    - EU AI Act
+    - UNESCO AI Ethics
+    - IEEE Ethically Aligned Design
+    - OECD AI Principles
+    - Singapore Model AI Governance
+  </Accordion>
+  
+  <Accordion title="Security (10 frameworks)">
+    - ISO 27001
+    - ISO 27701
+    - SOC 2
+    - NIST CSF
+    - NIST 800-53
+    - PCI DSS
+    - FedRAMP
+    - COBIT
+    - CIS Controls
+    - HITRUST CSF
+  </Accordion>
+  
+  <Accordion title="Humanitarian (7 frameworks)">
+    - Geneva Conventions
+    - WHO IHR (2005)
+    - UN Humanitarian Principles
+    - Sphere Standards
+    - Core Humanitarian Standard
+    - ICRC Medical Ethics
+    - UN Convention on Rights of the Child
+  </Accordion>
+</AccordionGroup>
+
+## Success metrics
+
+<AccordionGroup>
+  <Accordion title="Policy agility">
+    - ✅ Update policies in <5 minutes
+    - ✅ Zero downtime during policy updates
+    - ✅ A/B test policies before production
+  </Accordion>
+  <Accordion title="Performance">
+    - ✅ <10ms policy evaluation latency
+    - ✅ 10,000+ evaluations/second throughput
+    - ✅ 99.99% OPA availability
+  </Accordion>
+  <Accordion title="Compliance">
+    - ✅ 45+ frameworks supported
+    - ✅ Zero compliance violations
+    - ✅ Automated audit reports
+  </Accordion>
+</AccordionGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Phase 5: Deployment"
+    icon="rocket"
+    href="/roadmap/phase-5-deployment"
+  >
+    One-click global release pipelines
+  </Card>
+  <Card
+    title="OPA setup"
+    icon="gavel"
+    href="/governance/opa"
+  >
+    Policy-as-Code implementation guide
+  </Card>
+  <Card
+    title="Policy testing"
+    icon="flask"
+    href="/governance/policy-testing"
+  >
+    Test framework and simulation
+  </Card>
+  <Card
+    title="Compliance dashboard"
+    icon="chart-line"
+    href="/governance/compliance-dashboard"
+  >
+    Real-time monitoring and reporting
+  </Card>
+</CardGroup>
