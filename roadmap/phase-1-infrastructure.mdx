@@ -9,374 +9,349 @@ icon: 'cloud'
 Transcend vendor lock-in by replacing GCP-specific code with portable, containerized logic. This ensures iLuminara can run on AWS, Azure, or bare metal servers in a bunker.
 
 <Card
-  title="Strategic goal"
-  icon="bullseye"
+  title="Strategic imperative"
+  icon="flag"
 >
-  **Zero vendor dependency** - Deploy to any cloud or on-premises infrastructure in <24 hours
+  "A sovereign health system cannot depend on a single cloud provider. True sovereignty requires the ability to deploy anywhere, instantly."
 </Card>
 
-## Current state
+## Current architecture (GCP-locked)
 
-### GCP dependencies
-
-iLuminara-Core currently has 47 GCP-specific API calls:
-
-| Service | Usage | Lock-in Risk |
-|---------|-------|--------------|
-| **Cloud Run** | API hosting | High |
-| **Vertex AI** | Model training | High |
-| **BigQuery** | Data warehouse | Medium |
-| **Cloud Spanner** | Audit ledger | High |
-| **Cloud KMS** | Key management | Medium |
-| **Pub/Sub** | Event streaming | Medium |
-
-### Migration complexity
-
-```python
-# Current: GCP-specific
-from google.cloud import bigquery
-
-client = bigquery.Client()
-query = "SELECT * FROM outbreak_data"
-results = client.query(query).result()
+```
+┌─────────────────────────────────────┐
+│         GOOGLE CLOUD PLATFORM       │
+│  ┌──────────────────────────────┐  │
+│  │  Cloud Run (API)             │  │
+│  │  Vertex AI (Forecasting)     │  │
+│  │  BigQuery (Analytics)        │  │
+│  │  Cloud Spanner (Audit)       │  │
+│  │  Cloud KMS (Crypto)          │  │
+│  └──────────────────────────────┘  │
+└─────────────────────────────────────┘
 ```
 
-**Problem:** This code only works on GCP. Migrating to AWS requires complete rewrite.
+**Problems:**
+- ❌ Cannot deploy to AWS/Azure without rewriting code
+- ❌ GCP outage = complete system failure
+- ❌ Pricing changes create financial risk
+- ❌ Data sovereignty violations if GCP changes regions
+
+## Target architecture (Cloud-agnostic)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              TERRAFORM INFRASTRUCTURE LAYER                 │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │   AWS        │  │   AZURE      │  │   GCP        │     │
+│  │   EKS        │  │   AKS        │  │   GKE        │     │
+│  └──────────────┘  └──────────────┘  └──────────────┘     │
+└─────────────────────────────────────────────────────────────┘
+              │                │                │
+              └────────────────┼────────────────┘
+                               ▼
+                    ┌──────────────────────┐
+                    │   KUBERNETES PODS    │
+                    │  - FRENASA Engine    │
+                    │  - AI Agents         │
+                    │  - Governance Kernel │
+                    └──────────────────────┘
+```
+
+**Benefits:**
+- ✅ Deploy to any cloud in <24 hours
+- ✅ Multi-cloud redundancy (no single point of failure)
+- ✅ Negotiate pricing across providers
+- ✅ Data sovereignty by region selection
 
 ## Architecture upgrades
 
-### 1. Infrastructure-as-Code (IaC)
+### 1. Infrastructure-as-Code (Terraform)
 
-Implement **Terraform** to define cloud-agnostic infrastructure.
+Replace manual GCP console clicks with declarative infrastructure definitions.
 
-#### Terraform modules
+**Before (manual):**
+```bash
+gcloud run deploy frenasa-api --image gcr.io/iluminara/frenasa:latest
+gcloud sql instances create audit-db --tier db-n1-standard-1
+```
 
+**After (Terraform):**
 ```hcl
-# modules/compute/main.tf
-resource "kubernetes_deployment" "frenasa_engine" {
-  metadata {
-    name = "frenasa-engine"
-    labels = {
-      app = "iluminara"
-      component = "frenasa"
-    }
-  }
+# terraform/main.tf
+
+module "kubernetes_cluster" {
+  source = "./modules/k8s"
   
-  spec {
-    replicas = var.replicas
-    
-    selector {
-      match_labels = {
-        app = "iluminara"
-        component = "frenasa"
-      }
-    }
-    
-    template {
-      metadata {
-        labels = {
-          app = "iluminara"
-          component = "frenasa"
-        }
-      }
-      
-      spec {
-        container {
-          name  = "frenasa"
-          image = var.container_image
-          
-          resources {
-            requests = {
-              cpu    = "500m"
-              memory = "1Gi"
-            }
-            limits = {
-              cpu    = "2000m"
-              memory = "4Gi"
-            }
-          }
-        }
-      }
-    }
-  }
+  cloud_provider = var.cloud_provider  # "aws" | "azure" | "gcp"
+  region         = var.region
+  node_count     = var.node_count
+}
+
+module "storage" {
+  source = "./modules/storage"
+  
+  provider = var.cloud_provider
+  # Automatically maps to S3, Azure Blob, or GCS
+}
+
+module "database" {
+  source = "./modules/database"
+  
+  provider = var.cloud_provider
+  # Automatically maps to RDS, Azure SQL, or Cloud SQL
 }
 ```
 
-#### Multi-cloud deployment
+**Deploy to AWS:**
+```bash
+terraform apply -var="cloud_provider=aws" -var="region=af-south-1"
+```
 
-```hcl
-# environments/gcp/main.tf
-module "compute" {
-  source = "../../modules/compute"
-  
-  provider = "gcp"
-  region   = "africa-south1"
-  cluster  = "gke-iluminara-prod"
-}
-
-# environments/aws/main.tf
-module "compute" {
-  source = "../../modules/compute"
-  
-  provider = "aws"
-  region   = "af-south-1"
-  cluster  = "eks-iluminara-prod"
-}
+**Deploy to Azure:**
+```bash
+terraform apply -var="cloud_provider=azure" -var="region=southafricawest"
 ```
 
 ### 2. Kubernetes migration
 
-Transition from Cloud Run to **Kubernetes** for true portability.
+Containerize all services for portability across clouds.
 
-#### Deployment strategy
+**Helm chart structure:**
+```
+iluminara-core/
+├── Chart.yaml
+├── values.yaml
+├── templates/
+│   ├── frenasa-deployment.yaml
+│   ├── ai-agents-deployment.yaml
+│   ├── governance-kernel-deployment.yaml
+│   ├── api-service.yaml
+│   └── ingress.yaml
+```
+
+**Deploy to any Kubernetes cluster:**
+```bash
+# AWS EKS
+helm install iluminara ./iluminara-core --set cloud=aws
+
+# Azure AKS
+helm install iluminara ./iluminara-core --set cloud=azure
+
+# GCP GKE
+helm install iluminara ./iluminara-core --set cloud=gcp
+```
+
+### 3. Storage abstraction layer
+
+Unified interface for S3, Azure Blob, and Google Cloud Storage.
+
+**Before (GCP-specific):**
+```python
+from google.cloud import storage
+
+client = storage.Client()
+bucket = client.bucket('iluminara-data')
+blob = bucket.blob('patient_records.json')
+blob.upload_from_string(data)
+```
+
+**After (cloud-agnostic):**
+```python
+from iluminara.storage import CloudStorage
+
+storage = CloudStorage(provider=os.getenv('CLOUD_PROVIDER'))
+storage.upload('patient_records.json', data)
+
+# Automatically routes to:
+# - S3 if provider=aws
+# - Azure Blob if provider=azure
+# - GCS if provider=gcp
+```
+
+**Implementation:**
+```python
+# iluminara/storage.py
+
+class CloudStorage:
+    def __init__(self, provider: str):
+        if provider == 'aws':
+            self.client = boto3.client('s3')
+        elif provider == 'azure':
+            self.client = BlobServiceClient()
+        elif provider == 'gcp':
+            self.client = storage.Client()
+    
+    def upload(self, key: str, data: bytes):
+        if isinstance(self.client, boto3.client):
+            self.client.put_object(Bucket=BUCKET, Key=key, Body=data)
+        elif isinstance(self.client, BlobServiceClient):
+            blob_client = self.client.get_blob_client(CONTAINER, key)
+            blob_client.upload_blob(data)
+        elif isinstance(self.client, storage.Client):
+            bucket = self.client.bucket(BUCKET)
+            blob = bucket.blob(key)
+            blob.upload_from_string(data)
+```
+
+### 4. Database abstraction
+
+Unified interface for RDS, Azure SQL, and Cloud SQL.
+
+**Before (GCP-specific):**
+```python
+from google.cloud import spanner
+
+client = spanner.Client()
+instance = client.instance('iluminara-audit')
+database = instance.database('audit-trail')
+```
+
+**After (cloud-agnostic):**
+```python
+from iluminara.database import Database
+
+db = Database(provider=os.getenv('CLOUD_PROVIDER'))
+db.execute("INSERT INTO audit_trail VALUES (...)")
+
+# Automatically routes to:
+# - RDS PostgreSQL if provider=aws
+# - Azure SQL if provider=azure
+# - Cloud Spanner if provider=gcp
+```
+
+### 5. MLflow for model portability
+
+Replace Vertex AI with MLflow for cloud-agnostic model training.
+
+**Before (Vertex AI):**
+```python
+from google.cloud import aiplatform
+
+aiplatform.init(project='iluminara', location='us-central1')
+
+job = aiplatform.CustomTrainingJob(
+    display_name='cholera-forecast',
+    script_path='train.py'
+)
+job.run()
+```
+
+**After (MLflow):**
+```python
+import mlflow
+
+mlflow.set_tracking_uri(os.getenv('MLFLOW_TRACKING_URI'))
+
+with mlflow.start_run():
+    model = train_cholera_forecast()
+    mlflow.sklearn.log_model(model, 'cholera-forecast')
+
+# Deploy to any cloud:
+# - AWS SageMaker
+# - Azure ML
+# - Vertex AI
+```
+
+## Auto-scaling configuration
+
+Horizontal Pod Autoscaling based on real-time inference load.
+
+```yaml
+# kubernetes/hpa.yaml
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: frenasa-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: frenasa-engine
+  minReplicas: 2
+  maxReplicas: 100
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Pods
+    pods:
+      metric:
+        name: inference_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "1000"
+```
+
+**Behavior:**
+- Normal load: 2 pods
+- Outbreak detected: Auto-scales to 100 pods in <60 seconds
+- Cost optimization: Scales down when load decreases
+
+## Migration strategy
 
 <Steps>
-  <Step title="Containerize all services">
-    Package FRENASA Engine, API Service, and Dashboard as Docker containers
+  <Step title="Week 1-2: Terraform setup">
+    Create IaC modules for AWS, Azure, and GCP
   </Step>
-  <Step title="Create Helm charts">
-    Define Kubernetes manifests with Helm for templating and versioning
+  <Step title="Week 3-4: Containerization">
+    Package all services as Docker containers with Helm charts
   </Step>
-  <Step title="Deploy to GKE">
-    Initial migration to Google Kubernetes Engine (maintains GCP but adds portability)
+  <Step title="Week 5-6: Storage abstraction">
+    Implement CloudStorage and Database abstraction layers
   </Step>
-  <Step title="Multi-cloud validation">
-    Deploy identical stack to AWS EKS and Azure AKS to prove portability
+  <Step title="Week 7-8: MLflow migration">
+    Replace Vertex AI with MLflow for model training
+  </Step>
+  <Step title="Week 9-10: Testing">
+    Deploy to AWS and Azure test environments
+  </Step>
+  <Step title="Week 11-12: Production cutover">
+    Migrate production traffic to multi-cloud architecture
   </Step>
 </Steps>
 
-#### Helm chart structure
+## Cost comparison
 
-```yaml
-# charts/iluminara/values.yaml
-replicaCount: 3
+| Provider | Monthly Cost (10K users) | Sovereignty | Latency (Africa) |
+|----------|--------------------------|-------------|------------------|
+| **GCP only** | $4,200 | ❌ Single vendor | 120ms |
+| **AWS only** | $3,800 | ❌ Single vendor | 95ms |
+| **Azure only** | $4,500 | ❌ Single vendor | 110ms |
+| **Multi-cloud** | $4,000 | ✅ Sovereign | 85ms (optimized routing) |
 
-image:
-  repository: gcr.io/iluminara/frenasa-engine
-  tag: "1.0.0"
-  pullPolicy: IfNotPresent
-
-service:
-  type: LoadBalancer
-  port: 8080
-
-autoscaling:
-  enabled: true
-  minReplicas: 3
-  maxReplicas: 100
-  targetCPUUtilizationPercentage: 70
-
-resources:
-  requests:
-    cpu: 500m
-    memory: 1Gi
-  limits:
-    cpu: 2000m
-    memory: 4Gi
-
-sovereignty:
-  jurisdiction: "KDPA_KE"
-  dataResidency: "africa-south1"
-  auditEnabled: true
-```
-
-### 3. Storage abstraction
-
-Unified interface for S3/Azure Blob/GCS.
-
-#### Storage adapter pattern
-
-```python
-# storage/adapter.py
-from abc import ABC, abstractmethod
-from typing import BinaryIO, Optional
-
-class StorageAdapter(ABC):
-    """Abstract storage interface for multi-cloud portability"""
-    
-    @abstractmethod
-    def upload(self, bucket: str, key: str, data: BinaryIO) -> str:
-        """Upload data to storage"""
-        pass
-    
-    @abstractmethod
-    def download(self, bucket: str, key: str) -> bytes:
-        """Download data from storage"""
-        pass
-    
-    @abstractmethod
-    def delete(self, bucket: str, key: str) -> bool:
-        """Delete data from storage"""
-        pass
-
-# storage/gcs_adapter.py
-from google.cloud import storage
-
-class GCSAdapter(StorageAdapter):
-    def __init__(self):
-        self.client = storage.Client()
-    
-    def upload(self, bucket: str, key: str, data: BinaryIO) -> str:
-        bucket_obj = self.client.bucket(bucket)
-        blob = bucket_obj.blob(key)
-        blob.upload_from_file(data)
-        return f"gs://{bucket}/{key}"
-
-# storage/s3_adapter.py
-import boto3
-
-class S3Adapter(StorageAdapter):
-    def __init__(self):
-        self.client = boto3.client('s3')
-    
-    def upload(self, bucket: str, key: str, data: BinaryIO) -> str:
-        self.client.upload_fileobj(data, bucket, key)
-        return f"s3://{bucket}/{key}"
-
-# storage/factory.py
-def get_storage_adapter(provider: str) -> StorageAdapter:
-    """Factory pattern for storage adapters"""
-    adapters = {
-        "gcp": GCSAdapter,
-        "aws": S3Adapter,
-        "azure": AzureBlobAdapter,
-    }
-    return adapters[provider]()
-```
-
-#### Usage
-
-```python
-# Application code (cloud-agnostic)
-from storage.factory import get_storage_adapter
-import os
-
-# Provider determined by environment variable
-provider = os.getenv("CLOUD_PROVIDER", "gcp")
-storage = get_storage_adapter(provider)
-
-# Same code works on any cloud
-storage.upload("outbreak-data", "dadaab-2025.json", data)
-```
-
-### 4. Portable intelligence
-
-Replace Vertex AI with **MLflow** adapters for model training portability.
-
-#### MLflow integration
-
-```python
-# ml/training.py
-import mlflow
-import mlflow.sklearn
-from sklearn.ensemble import RandomForestClassifier
-
-# Set tracking URI (works with any backend)
-mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
-
-# Train model
-with mlflow.start_run():
-    model = RandomForestClassifier(n_estimators=100)
-    model.fit(X_train, y_train)
-    
-    # Log metrics
-    mlflow.log_metric("accuracy", accuracy)
-    mlflow.log_metric("f1_score", f1)
-    
-    # Log model
-    mlflow.sklearn.log_model(model, "outbreak_predictor")
-    
-    # Log parameters
-    mlflow.log_param("n_estimators", 100)
-    mlflow.log_param("jurisdiction", "KDPA_KE")
-```
-
-#### Model serving
-
-```python
-# ml/serving.py
-import mlflow.pyfunc
-
-# Load model (works from any MLflow backend)
-model_uri = "models:/outbreak_predictor/production"
-model = mlflow.pyfunc.load_model(model_uri)
-
-# Predict
-predictions = model.predict(new_data)
-```
-
-## Implementation timeline
-
-| Week | Milestone | Deliverable |
-|------|-----------|-------------|
-| **1-2** | Terraform setup | IaC modules for compute, storage, networking |
-| **3-4** | Containerization | Docker images for all services |
-| **5-6** | Helm charts | Kubernetes manifests with templating |
-| **7-8** | GKE migration | Deploy to Google Kubernetes Engine |
-| **9-10** | Storage abstraction | Unified storage interface |
-| **11-12** | MLflow integration | Portable model training pipeline |
-| **13-14** | AWS validation | Deploy identical stack to EKS |
-| **15-16** | Azure validation | Deploy identical stack to AKS |
+**Multi-cloud advantages:**
+- 5% cost savings through competitive pricing
+- 30% latency reduction through regional optimization
+- 99.99% uptime through redundancy
+- Zero vendor lock-in risk
 
 ## Success metrics
 
-| Metric | Current | Target | Measurement |
-|--------|---------|--------|-------------|
-| **Cloud providers** | 1 (GCP only) | 3+ (GCP/AWS/Azure) | Successful deployment |
-| **Deployment time** | 4-6 hours | <2 hours | Terraform apply duration |
-| **Code portability** | 0% | 95%+ | % of code that's cloud-agnostic |
-| **Vendor lock-in** | 47 GCP APIs | 0 vendor-specific APIs | API dependency count |
-
-## Risk mitigation
-
 <AccordionGroup>
-  <Accordion title="Data migration complexity">
-    **Risk:** Moving 5TB+ of historical data between clouds
-    **Mitigation:** Incremental migration with dual-write strategy during transition
+  <Accordion title="Deployment velocity">
+    - ✅ Deploy to AWS in <24 hours
+    - ✅ Deploy to Azure in <24 hours
+    - ✅ Deploy to bare metal in <48 hours
   </Accordion>
-  <Accordion title="Performance degradation">
-    **Risk:** Kubernetes overhead vs. Cloud Run
-    **Mitigation:** Horizontal Pod Autoscaling (HPA) with aggressive scaling policies
+  <Accordion title="Performance">
+    - ✅ <5% performance degradation vs. GCP-native
+    - ✅ <100ms API latency (p95)
+    - ✅ Auto-scale from 2 to 100 pods in <60 seconds
   </Accordion>
-  <Accordion title="Cost increase">
-    **Risk:** Multi-cloud infrastructure costs
-    **Mitigation:** Reserved instances + spot instances for non-critical workloads
+  <Accordion title="Cost efficiency">
+    - ✅ 5-10% cost reduction through multi-cloud arbitrage
+    - ✅ Zero egress fees through regional optimization
   </Accordion>
-  <Accordion title="Team expertise">
-    **Risk:** Team unfamiliar with Kubernetes/Terraform
-    **Mitigation:** 2-week training program + external DevOps consultant
+  <Accordion title="Sovereignty">
+    - ✅ Data residency in sovereign territory
+    - ✅ Zero code changes for regional deployment
+    - ✅ Instant failover to backup cloud provider
   </Accordion>
 </AccordionGroup>
-
-## Cost analysis
-
-### Current (GCP only)
-
-```
-Cloud Run:        $450/month
-Vertex AI:        $1,200/month
-BigQuery:         $800/month
-Cloud Spanner:    $2,500/month
-Cloud KMS:        $50/month
-Pub/Sub:          $100/month
-─────────────────────────────
-TOTAL:            $5,100/month
-```
-
-### Target (Multi-cloud)
-
-```
-Kubernetes (GKE): $600/month
-Kubernetes (EKS): $600/month (standby)
-MLflow (self-hosted): $200/month
-PostgreSQL (managed): $400/month
-Object Storage:   $300/month
-Load Balancers:   $150/month
-─────────────────────────────
-TOTAL:            $2,250/month
-```
-
-**Savings:** $2,850/month (56% reduction)
 
 ## Next steps
 
@@ -386,27 +361,27 @@ TOTAL:            $2,250/month
     icon="network-wired"
     href="/roadmap/phase-2-resilience"
   >
-    Event-driven architecture with Kafka
+    Event-driven architecture for fault tolerance
   </Card>
   <Card
     title="Terraform modules"
     icon="code"
-    href="https://github.com/VISENDI56/iLuminara-Core/tree/main/terraform"
+    href="/deployment/terraform"
   >
-    View infrastructure code
+    Infrastructure-as-Code implementation guide
   </Card>
   <Card
-    title="Helm charts"
+    title="Kubernetes setup"
     icon="dharmachakra"
-    href="https://github.com/VISENDI56/iLuminara-Core/tree/main/charts"
+    href="/deployment/kubernetes"
   >
-    View Kubernetes manifests
+    Container orchestration configuration
   </Card>
   <Card
-    title="Storage adapters"
-    icon="database"
-    href="/architecture/storage"
+    title="MLflow integration"
+    icon="flask"
+    href="/ai-agents/mlflow"
   >
-    Multi-cloud storage abstraction
+    Cloud-agnostic model training
   </Card>
 </CardGroup>
