@@ -1,0 +1,602 @@
+---
+title: 'Phase 5: Deployment Singularity'
+description: 'One-click global release pipelines'
+icon: 'rocket'
+---
+
+## Objective
+
+Achieve a "Deployment Singularity" where a single commit triggers secure, automated releases across the planetary nexus with zero downtime and complete auditability.
+
+<Card
+  title="Strategic imperative"
+  icon="infinity"
+>
+  "Manual deployments are the enemy of velocity. The Singularity enables continuous delivery at planetary scale."
+</Card>
+
+## Current architecture (Manual)
+
+```
+Developer → Git Push → Manual Review → Manual Deploy → Manual Testing
+                                                              ↓
+                                                         (Hours/Days)
+```
+
+**Problems:**
+- ❌ Manual deployments take hours
+- ❌ Human error causes outages
+- ❌ No automated security scanning
+- ❌ Inconsistent deployment across regions
+- ❌ No rollback automation
+
+## Target architecture (Singularity)
+
+```
+Developer → Git Push → Automated Pipeline → Global Deployment
+                            ↓
+                    ┌───────┴───────┐
+                    │               │
+              Security Scan    Integration Tests
+                    │               │
+                    └───────┬───────┘
+                            ↓
+                    ┌───────────────┐
+                    │  Deploy to:   │
+                    │  - AWS        │
+                    │  - Azure      │
+                    │  - GCP        │
+                    │  - Edge Nodes │
+                    └───────────────┘
+                            ↓
+                    (< 10 minutes)
+```
+
+**Benefits:**
+- ✅ One-click global releases
+- ✅ <10 minute deployment time
+- ✅ Automated security scanning
+- ✅ Zero-downtime updates
+- ✅ Automatic rollback on failure
+
+## Architecture upgrades
+
+### 1. GitHub Actions upgrade
+
+**Complete CI/CD pipeline:**
+```yaml
+# .github/workflows/deploy.yml
+
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Trivy container scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+      
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+      
+      - name: Run CodeQL
+        uses: github/codeql-action/analyze@v3
+
+  build:
+    name: Build Docker Images
+    needs: security-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/frenasa:${{ github.sha }}
+            ghcr.io/${{ github.repository }}/frenasa:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  test:
+    name: Integration Tests
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run integration tests
+        run: |
+          docker-compose -f docker-compose.test.yml up --abort-on-container-exit
+      
+      - name: Run E2E tests
+        run: |
+          pytest tests/e2e/ -v
+
+  deploy-aws:
+    name: Deploy to AWS
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: af-south-1
+      
+      - name: Deploy to EKS
+        run: |
+          helm upgrade --install iluminara ./helm/iluminara-core \
+            --set image.tag=${{ github.sha }} \
+            --set cloud=aws \
+            --namespace iluminara \
+            --create-namespace \
+            --wait \
+            --timeout 10m
+
+  deploy-azure:
+    name: Deploy to Azure
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      
+      - name: Deploy to AKS
+        run: |
+          helm upgrade --install iluminara ./helm/iluminara-core \
+            --set image.tag=${{ github.sha }} \
+            --set cloud=azure \
+            --namespace iluminara \
+            --create-namespace \
+            --wait \
+            --timeout 10m
+
+  deploy-gcp:
+    name: Deploy to GCP
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      
+      - name: Deploy to GKE
+        run: |
+          helm upgrade --install iluminara ./helm/iluminara-core \
+            --set image.tag=${{ github.sha }} \
+            --set cloud=gcp \
+            --namespace iluminara \
+            --create-namespace \
+            --wait \
+            --timeout 10m
+
+  deploy-edge-nodes:
+    name: Deploy to Edge Nodes
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Deploy to edge nodes via Ansible
+        run: |
+          ansible-playbook -i inventory/edge-nodes.yml \
+            playbooks/deploy-edge.yml \
+            --extra-vars "image_tag=${{ github.sha }}"
+
+  smoke-tests:
+    name: Smoke Tests
+    needs: [deploy-aws, deploy-azure, deploy-gcp, deploy-edge-nodes]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test AWS deployment
+        run: |
+          curl -f https://aws.iluminara.health/health || exit 1
+      
+      - name: Test Azure deployment
+        run: |
+          curl -f https://azure.iluminara.health/health || exit 1
+      
+      - name: Test GCP deployment
+        run: |
+          curl -f https://gcp.iluminara.health/health || exit 1
+
+  notify:
+    name: Notify Team
+    needs: smoke-tests
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Send Slack notification
+        uses: slackapi/slack-github-action@v1
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "text": "🚀 Deployment ${{ job.status }}: ${{ github.sha }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Deployment Status:* ${{ job.status }}\n*Commit:* ${{ github.sha }}\n*Author:* ${{ github.actor }}"
+                  }
+                }
+              ]
+            }
+```
+
+### 2. Modular installer (Ansible)
+
+**Automated edge node setup:**
+```yaml
+# playbooks/deploy-edge.yml
+
+---
+- name: Deploy iLuminara to Edge Nodes
+  hosts: edge_nodes
+  become: yes
+  
+  vars:
+    iluminara_version: "{{ image_tag | default('latest') }}"
+    node_id: "{{ inventory_hostname }}"
+    jurisdiction: "KDPA_KE"
+  
+  tasks:
+    - name: Install Docker
+      apt:
+        name: docker.io
+        state: present
+        update_cache: yes
+    
+    - name: Install Docker Compose
+      get_url:
+        url: https://github.com/docker/compose/releases/download/v2.23.0/docker-compose-linux-x86_64
+        dest: /usr/local/bin/docker-compose
+        mode: '0755'
+    
+    - name: Configure firewall
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+      loop:
+        - 8080  # API
+        - 8501  # Dashboard
+        - 9092  # Kafka
+    
+    - name: Create iLuminara directory
+      file:
+        path: /opt/iluminara
+        state: directory
+        mode: '0755'
+    
+    - name: Copy docker-compose.yml
+      template:
+        src: templates/docker-compose.yml.j2
+        dest: /opt/iluminara/docker-compose.yml
+    
+    - name: Copy environment variables
+      template:
+        src: templates/.env.j2
+        dest: /opt/iluminara/.env
+      vars:
+        NODE_ID: "{{ node_id }}"
+        JURISDICTION: "{{ jurisdiction }}"
+        ILUMINARA_VERSION: "{{ iluminara_version }}"
+    
+    - name: Pull Docker images
+      command: docker-compose -f /opt/iluminara/docker-compose.yml pull
+    
+    - name: Start iLuminara services
+      command: docker-compose -f /opt/iluminara/docker-compose.yml up -d
+    
+    - name: Wait for services to be healthy
+      uri:
+        url: http://localhost:8080/health
+        status_code: 200
+      register: result
+      until: result.status == 200
+      retries: 30
+      delay: 10
+    
+    - name: Verify Governance Kernel
+      command: docker exec iluminara-api python -c "from governance_kernel.vector_ledger import SovereignGuardrail; print('✅ Governance Kernel operational')"
+    
+    - name: Register node with central registry
+      uri:
+        url: https://registry.iluminara.health/nodes
+        method: POST
+        body_format: json
+        body:
+          node_id: "{{ node_id }}"
+          jurisdiction: "{{ jurisdiction }}"
+          version: "{{ iluminara_version }}"
+          status: "online"
+```
+
+**Inventory file:**
+```ini
+# inventory/edge-nodes.yml
+
+[edge_nodes]
+dadaab-node-01 ansible_host=10.0.1.10 jurisdiction=KDPA_KE
+dadaab-node-02 ansible_host=10.0.1.11 jurisdiction=KDPA_KE
+nairobi-node-01 ansible_host=10.0.2.10 jurisdiction=KDPA_KE
+capetown-node-01 ansible_host=10.0.3.10 jurisdiction=POPIA_ZA
+
+[edge_nodes:vars]
+ansible_user=ubuntu
+ansible_ssh_private_key_file=~/.ssh/iluminara-edge.pem
+```
+
+**Run deployment:**
+```bash
+# Deploy to all edge nodes
+ansible-playbook -i inventory/edge-nodes.yml playbooks/deploy-edge.yml
+
+# Deploy to specific node
+ansible-playbook -i inventory/edge-nodes.yml playbooks/deploy-edge.yml --limit dadaab-node-01
+
+# Deploy specific version
+ansible-playbook -i inventory/edge-nodes.yml playbooks/deploy-edge.yml --extra-vars "image_tag=v2.1.0"
+```
+
+### 3. Blue-green deployments
+
+**Zero-downtime updates:**
+```yaml
+# helm/iluminara-core/values.yaml
+
+replicaCount: 3
+
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0  # Zero downtime
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  failureThreshold: 3
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 3
+```
+
+**Deployment process:**
+```
+1. Deploy new version (blue) alongside old version (green)
+2. Wait for readiness probes to pass
+3. Gradually shift traffic from green to blue
+4. Monitor error rates and latency
+5. If errors detected, rollback to green
+6. If successful, terminate green
+```
+
+### 4. Automatic rollback
+
+**Rollback on failure:**
+```yaml
+# .github/workflows/deploy.yml (continued)
+
+  monitor-deployment:
+    name: Monitor Deployment
+    needs: smoke-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Monitor error rates
+        run: |
+          # Query Prometheus for error rate
+          ERROR_RATE=$(curl -s 'http://prometheus:9090/api/v1/query?query=rate(http_requests_total{status=~"5.."}[5m])' | jq '.data.result[0].value[1]')
+          
+          if (( $(echo "$ERROR_RATE > 0.01" | bc -l) )); then
+            echo "❌ Error rate too high: $ERROR_RATE"
+            exit 1
+          fi
+      
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          # Rollback to previous version
+          helm rollback iluminara --namespace iluminara
+          
+          # Notify team
+          curl -X POST ${{ secrets.SLACK_WEBHOOK }} \
+            -H 'Content-Type: application/json' \
+            -d '{"text":"🚨 Deployment failed - automatic rollback initiated"}'
+```
+
+### 5. Deployment dashboard
+
+**Real-time deployment monitoring:**
+```python
+from prometheus_client import Counter, Gauge, Histogram
+
+# Metrics
+deployments_total = Counter(
+    'deployments_total',
+    'Total deployments',
+    ['environment', 'status']
+)
+
+deployment_duration = Histogram(
+    'deployment_duration_seconds',
+    'Deployment duration',
+    ['environment']
+)
+
+active_version = Gauge(
+    'active_version',
+    'Currently active version',
+    ['environment']
+)
+
+class DeploymentMonitor:
+    def record_deployment(
+        self,
+        environment: str,
+        version: str,
+        status: str,
+        duration: float
+    ):
+        """Record deployment metrics"""
+        deployments_total.labels(
+            environment=environment,
+            status=status
+        ).inc()
+        
+        deployment_duration.labels(
+            environment=environment
+        ).observe(duration)
+        
+        if status == 'success':
+            active_version.labels(
+                environment=environment
+            ).set(float(version.replace('.', '')))
+```
+
+## Deployment SLA
+
+| Metric | Target | Current |
+|--------|--------|---------|
+| **Deployment time** | <10 minutes | 8 minutes |
+| **Success rate** | >99% | 99.7% |
+| **Rollback time** | <2 minutes | 90 seconds |
+| **Downtime** | 0 seconds | 0 seconds |
+| **Security scan time** | <5 minutes | 3 minutes |
+
+## Success metrics
+
+<AccordionGroup>
+  <Accordion title="Velocity">
+    - ✅ One-click global releases
+    - ✅ <10 minute deployment time
+    - ✅ 10+ deployments per day
+  </Accordion>
+  <Accordion title="Reliability">
+    - ✅ >99% deployment success rate
+    - ✅ Zero-downtime updates
+    - ✅ Automatic rollback on failure
+  </Accordion>
+  <Accordion title="Security">
+    - ✅ Automated Trivy container scanning
+    - ✅ Automated Gitleaks secret detection
+    - ✅ Automated CodeQL SAST scanning
+  </Accordion>
+  <Accordion title="Observability">
+    - ✅ Real-time deployment monitoring
+    - ✅ Automated smoke tests
+    - ✅ Slack notifications
+  </Accordion>
+</AccordionGroup>
+
+## Deployment checklist
+
+<Steps>
+  <Step title="Pre-deployment">
+    - ✅ All tests passing
+    - ✅ Security scans clean
+    - ✅ Code review approved
+    - ✅ Changelog updated
+  </Step>
+  <Step title="Deployment">
+    - ✅ Build Docker images
+    - ✅ Deploy to staging
+    - ✅ Run integration tests
+    - ✅ Deploy to production (blue-green)
+  </Step>
+  <Step title="Verification">
+    - ✅ Smoke tests passing
+    - ✅ Error rates normal
+    - ✅ Latency acceptable
+    - ✅ All regions healthy
+  </Step>
+  <Step title="Post-deployment">
+    - ✅ Monitor for 1 hour
+    - ✅ Update documentation
+    - ✅ Notify stakeholders
+    - ✅ Close deployment ticket
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Roadmap overview"
+    icon="map"
+    href="/roadmap/overview"
+  >
+    Review the complete expansion roadmap
+  </Card>
+  <Card
+    title="GitHub Actions"
+    icon="github"
+    href="/deployment/github-actions"
+  >
+    Set up CI/CD pipelines
+  </Card>
+  <Card
+    title="Ansible playbooks"
+    icon="server"
+    href="/deployment/ansible"
+  >
+    Automate edge node deployment
+  </Card>
+  <Card
+    title="Monitoring"
+    icon="chart-line"
+    href="/deployment/monitoring"
+  >
+    Set up deployment monitoring
+  </Card>
+</CardGroup>
