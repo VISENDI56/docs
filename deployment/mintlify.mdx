@@ -1,0 +1,493 @@
+---
+title: Mintlify deployment
+description: Deploy and maintain iLuminara documentation with continuous updates
+---
+
+## Overview
+
+iLuminara-Core documentation is deployed using **Mintlify**, providing a beautiful, fast, and AI-queryable documentation experience with MCP (Model Context Protocol) integration.
+
+<Card
+  title="Live Documentation"
+  icon="book-open"
+  href="https://visendi56.mintlify.app"
+>
+  Access the live documentation portal
+</Card>
+
+## The 5-step deployment cycle
+
+<Steps>
+  <Step title="Launch local dev server">
+    Preview documentation with hot reload at http://localhost:3000
+  </Step>
+  <Step title="Check for broken links">
+    Diagnose issues with `mint doctor`
+  </Step>
+  <Step title="Build production docs">
+    Generate optimized static site
+  </Step>
+  <Step title="Deploy to Mintlify">
+    Push changes live in seconds
+  </Step>
+  <Step title="Validate full cycle">
+    Test portals, links, and fortress integrity
+  </Step>
+</Steps>
+
+## Prerequisites
+
+### Install Mintlify CLI
+
+```bash
+npm install -g mintlify
+```
+
+### Verify installation
+
+```bash
+mintlify --version
+```
+
+## Step 1: Launch local dev server
+
+Start the Mintlify development server for live preview:
+
+```bash
+mint dev
+```
+
+This opens **http://localhost:3000** with:
+- 🔥 Hot reload on file changes
+- 🎨 Live preview of all components
+- 🔍 Search functionality
+- 📱 Mobile responsive testing
+
+### What to verify
+
+<AccordionGroup>
+  <Accordion title="Navigation structure">
+    - All tabs render correctly
+    - Groups are properly organized
+    - Pages load without errors
+  </Accordion>
+  <Accordion title="Portal links">
+    - Command Console link works
+    - Transparency Audit link works
+    - GitHub repository link works
+  </Accordion>
+  <Accordion title="Content rendering">
+    - MDX components render (Card, Steps, Accordion)
+    - Code blocks have syntax highlighting
+    - Images load correctly
+  </Accordion>
+  <Accordion title="MCP integration">
+    - AI-queryable tools are accessible
+    - Compliance queries work
+    - Nuclear IP queries work
+  </Accordion>
+</AccordionGroup>
+
+## Step 2: Check for broken links
+
+Run Mintlify's diagnostic tool:
+
+```bash
+mint doctor
+```
+
+This checks for:
+- ❌ Broken internal links
+- ❌ Missing pages referenced in navigation
+- ❌ Invalid MDX syntax
+- ❌ Missing required frontmatter
+- ❌ Orphaned pages (not in navigation)
+
+### Fix common issues
+
+**Broken link:**
+```mdx
+<!-- ❌ Wrong -->
+[Link](/wrong-path)
+
+<!-- ✅ Correct -->
+[Link](/correct-path)
+```
+
+**Missing frontmatter:**
+```mdx
+<!-- ❌ Wrong -->
+# My Page
+
+<!-- ✅ Correct -->
+---
+title: My Page
+description: Page description
+---
+
+# My Page
+```
+
+## Step 3: Build production docs
+
+Generate optimized static site:
+
+```bash
+mint build
+```
+
+This creates:
+- Minified JavaScript bundles
+- Optimized images
+- Pre-rendered pages
+- Search index
+- Sitemap
+
+**Output:**
+```
+✓ Building documentation...
+✓ Optimizing assets...
+✓ Generating search index...
+✓ Creating sitemap...
+✅ Build complete: .mintlify/
+```
+
+## Step 4: Deploy to Mintlify
+
+Push changes to live documentation:
+
+```bash
+mint update
+```
+
+**Requirements:**
+- Mintlify API key (set as `MINTLIFY_API_KEY` environment variable)
+- Git repository connected to Mintlify
+
+**Output:**
+```
+🚀 Deploying to Mintlify...
+✓ Uploading assets...
+✓ Updating navigation...
+✓ Rebuilding search index...
+✅ Deployed successfully!
+🌐 Live at: https://visendi56.mintlify.app/
+```
+
+### Set up API key
+
+```bash
+# Add to ~/.bashrc or ~/.zshrc
+export MINTLIFY_API_KEY="your_api_key_here"
+
+# Or use .env file
+echo "MINTLIFY_API_KEY=your_api_key_here" >> .env
+```
+
+## Step 5: Validate full cycle
+
+### Test live site
+
+```bash
+# Open live documentation
+open https://visendi56.mintlify.app/
+
+# Or use curl to check status
+curl -I https://visendi56.mintlify.app/
+```
+
+### Verify portals
+
+<Tabs>
+  <Tab title="Command Console">
+    ```bash
+    # Test Command Console portal
+    curl -I https://iluminara-war-room.streamlit.app
+    ```
+    
+    Expected: HTTP 200 OK
+  </Tab>
+  <Tab title="Transparency Audit">
+    ```bash
+    # Test Transparency Audit portal
+    curl -I https://iluminara-audit.streamlit.app
+    ```
+    
+    Expected: HTTP 200 OK
+  </Tab>
+  <Tab title="Field Validation">
+    ```bash
+    # Test Field Validation portal
+    curl -I https://iluminara-field.streamlit.app
+    ```
+    
+    Expected: HTTP 200 OK
+  </Tab>
+</Tabs>
+
+### Run fortress validation
+
+```bash
+# Validate complete security stack
+./scripts/validate_fortress.sh
+```
+
+**Expected output:**
+```
+🛡️ FORTRESS STATUS: OPERATIONAL
+✓ All critical components validated
+✓ Security audit layer active
+✓ Governance kernel operational
+✓ Nuclear IP stack initialized
+```
+
+## Continuous deployment
+
+### GitHub Actions workflow
+
+The repository includes an automated deployment workflow at `.github/workflows/mintlify.yml`:
+
+```yaml
+name: "Mintlify Documentation Deployment"
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'docs/**'
+      - '*.mdx'
+      - 'docs.json'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+      - run: npm install -g mintlify
+      - run: mintlify doctor
+      - run: mintlify build
+      - run: mintlify update
+        env:
+          MINTLIFY_API_KEY: ${{ secrets.MINTLIFY_API_KEY }}
+```
+
+### Set up GitHub secret
+
+1. Go to repository **Settings** → **Secrets and variables** → **Actions**
+2. Click **New repository secret**
+3. Name: `MINTLIFY_API_KEY`
+4. Value: Your Mintlify API key
+5. Click **Add secret**
+
+### Automatic updates
+
+Every push to `main` that modifies documentation files will:
+1. ✅ Validate with `mint doctor`
+2. 🏗️ Build optimized site
+3. 🚀 Deploy to Mintlify
+4. 🔔 Notify on success/failure
+
+## MCP integration
+
+iLuminara documentation includes **Model Context Protocol (MCP)** integration for AI-queryable documentation.
+
+### Available tools
+
+```json
+{
+  \"tools\": [
+    {
+      \"name\": \"query_compliance\",
+      \"description\": \"Query compliance status across 14 global legal frameworks\"
+    },
+    {
+      \"name\": \"query_nuclear_ip\",
+      \"description\": \"Query Nuclear IP Stack protocols (IP-02 through IP-06)\"
+    },
+    {
+      \"name\": \"query_api\",
+      \"description\": \"Query API endpoints and integration patterns\"
+    },
+    {
+      \"name\": \"query_deployment\",
+      \"description\": \"Query deployment configurations for GCP, edge, and hybrid\"
+    }
+  ]
+}
+```
+
+### Test MCP queries
+
+```bash
+# Query compliance framework
+curl https://visendi56.mintlify.app/mcp/query_compliance \
+  -d '{"framework": "GDPR"}'
+
+# Query Nuclear IP protocol
+curl https://visendi56.mintlify.app/mcp/query_nuclear_ip \
+  -d '{"protocol": "IP-02"}'
+```
+
+## Portal integration
+
+### Add Streamlit apps to sidebar
+
+The documentation includes direct links to live Streamlit applications in the global navigation:
+
+```json
+{
+  \"global\": {
+    \"anchors\": [
+      {
+        \"anchor\": \"Command Console\",
+        \"href\": \"https://iluminara-war-room.streamlit.app\",
+        \"icon\": \"tower-control\"
+      },
+      {
+        \"anchor\": \"Transparency Audit\",
+        \"href\": \"https://iluminara-audit.streamlit.app\",
+        \"icon\": \"file-contract\"
+      }
+    ]
+  }
+}
+```
+
+### Embed documentation in Streamlit
+
+Add documentation links to your Streamlit apps:
+
+```python
+import streamlit as st
+
+st.sidebar.markdown(\"\"\"
+### 📖 Documentation
+- [Getting Started](https://visendi56.mintlify.app/quickstart)
+- [API Reference](https://visendi56.mintlify.app/api-reference/overview)
+- [Governance](https://visendi56.mintlify.app/governance/overview)
+\"\"\")
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title=\"Build fails with 'Module not found'\">
+    **Solution:** Ensure all referenced pages exist and paths are correct in `docs.json`
+    
+    ```bash
+    # Check for missing files
+    mint doctor --check-links
+    ```
+  </Accordion>
+  
+  <Accordion title=\"Deployment fails with 'Unauthorized'\">
+    **Solution:** Verify `MINTLIFY_API_KEY` is set correctly
+    
+    ```bash
+    # Check environment variable
+    echo $MINTLIFY_API_KEY
+    
+    # Re-export if needed
+    export MINTLIFY_API_KEY="your_key"
+    ```
+  </Accordion>
+  
+  <Accordion title=\"Portal links return 404\">
+    **Solution:** Ensure Streamlit apps are deployed and URLs are correct
+    
+    ```bash
+    # Test each portal
+    curl -I https://iluminara-war-room.streamlit.app
+    curl -I https://iluminara-audit.streamlit.app
+    ```
+  </Accordion>
+  
+  <Accordion title=\"MCP queries not working\">
+    **Solution:** Verify MCP configuration in `docs.json`
+    
+    ```json
+    {
+      \"mcp\": {
+        \"enabled\": true,
+        \"name\": \"iLuminara Sovereign Health Fortress\"
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Performance optimization
+
+### Image optimization
+
+```bash
+# Optimize images before committing
+npm install -g sharp-cli
+
+# Resize and compress
+sharp -i input.png -o output.png resize 800 --quality 80
+```
+
+### Code splitting
+
+Mintlify automatically code-splits for optimal performance:
+- Initial bundle: ~50KB gzipped
+- Lazy-loaded pages: ~10KB each
+- Search index: Loaded on demand
+
+### CDN caching
+
+Mintlify uses global CDN with:
+- Edge caching for static assets
+- Smart invalidation on updates
+- 99.99% uptime SLA
+
+## Analytics
+
+### View documentation metrics
+
+```bash
+# Access Mintlify dashboard
+open https://mintlify.com/dashboard
+```
+
+**Available metrics:**
+- 📊 Page views
+- 👥 Unique visitors
+- 🔍 Search queries
+- 📱 Device breakdown
+- 🌍 Geographic distribution
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title=\"Customize theme\"
+    icon=\"palette\"
+    href=\"https://mintlify.com/docs/settings/global\"
+  >
+    Customize colors, fonts, and branding
+  </Card>
+  <Card
+    title=\"Add custom domain\"
+    icon=\"globe\"
+    href=\"https://mintlify.com/docs/settings/custom-domain\"
+  >
+    Use your own domain for documentation
+  </Card>
+  <Card
+    title=\"Set up analytics\"
+    icon=\"chart-line\"
+    href=\"https://mintlify.com/docs/analytics/overview\"
+  >
+    Track documentation usage
+  </Card>
+  <Card
+    title=\"API reference\"
+    icon=\"code\"
+    href=\"https://mintlify.com/docs/api-playground/overview\"
+  >
+    Add interactive API playground
+  </Card>
+</CardGroup>
