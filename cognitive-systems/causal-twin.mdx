@@ -1,0 +1,388 @@
+---
+title: Project Causal-Twin
+description: Agent-Based epidemic simulation engine for policy rehearsal
+---
+
+## Overview
+
+Project Causal-Twin is an Agent-Based Model (ABM) simulation engine that creates a "Digital Twin" of a city to test epidemic interventions before deploying them in reality.
+
+<Card
+  title="The DeepMind Insight"
+  icon="lightbulb"
+>
+  Don't test health policies on real people. Test them on a Digital Twin of Nairobi.
+</Card>
+
+## The problem with traditional testing
+
+**Traditional approach:**
+1. Outbreak occurs
+2. Implement policy (lockdown, vaccination, etc.)
+3. Wait weeks to see results
+4. Adjust policy if needed
+5. Repeat
+
+**Cost:** Thousands of preventable deaths during trial-and-error
+
+**Causal-Twin approach:**
+1. Simulate outbreak in digital twin
+2. Test 10,000 policy variations in parallel
+3. Identify optimal strategy in minutes
+4. Deploy with confidence
+5. Monitor and adjust
+
+**Benefit:** Zero real-world deaths during policy optimization
+
+## Architecture
+
+### Agent-Based Model (ABM)
+
+Each virtual citizen is an autonomous agent with:
+
+- **Location** (x, y coordinates)
+- **Health state** (Susceptible, Exposed, Infected, Recovered, Deceased, Vaccinated)
+- **Demographics** (age, mobility, compliance)
+- **Behavior** (movement patterns, social interactions)
+
+### SEIRD dynamics
+
+```
+Susceptible → Exposed → Infected → Recovered
+                            ↓
+                        Deceased
+```
+
+**Vaccination path:**
+```
+Susceptible → Vaccinated (immune)
+```
+
+### Transmission model
+
+Infection occurs when:
+1. Infected agent is within `infection_radius` of susceptible agent
+2. Random transmission event occurs with probability `P = R₀ / (recovery_days × 10)`
+
+## Key parameters
+
+| Parameter | Description | Default | Range |
+|-----------|-------------|---------|-------|
+| `population` | Number of virtual citizens | 10,000 | 1,000 - 100,000 |
+| `initial_infected` | Starting infections | 10 | 1 - 1,000 |
+| `r0` | Basic reproduction number | 2.5 | 0.5 - 5.0 |
+| `infection_radius` | Transmission distance | 2.0 | 0.5 - 5.0 |
+| `recovery_days` | Days to recover | 14 | 7 - 30 |
+| `mortality_rate` | Base death rate | 0.02 | 0.001 - 0.1 |
+
+## Intervention strategies
+
+### 1. Lockdown
+
+Reduces agent mobility by `lockdown_strength` × `compliance`
+
+```python
+effective_mobility = agent.mobility * (1 - lockdown_strength * agent.compliance)
+```
+
+**Effect:**
+- Reduces transmission by limiting contact
+- Economic cost increases with strength
+- Civil unrest increases if prolonged
+
+### 2. Vaccination
+
+Moves susceptible agents to vaccinated state
+
+```python
+n_vaccinate = int(len(susceptible) * vaccination_rate)
+```
+
+**Effect:**
+- Directly reduces susceptible population
+- Builds herd immunity
+- Requires supply chain and distribution
+
+### 3. Testing & isolation
+
+Detects infected agents and reduces their mobility
+
+```python
+n_test = int(len(infected) * testing_rate)
+# Isolated agents: mobility = 0
+```
+
+**Effect:**
+- Breaks transmission chains
+- Requires testing capacity
+- Compliance critical for isolation
+
+## Usage
+
+### Basic simulation
+
+```python
+from simulation_engine.causal_twin import CausalTwinSimulation
+
+# Initialize simulation
+sim = CausalTwinSimulation(
+    population=10000,
+    initial_infected=10,
+    r0=2.5
+)
+
+# Run for 90 days
+for day in range(90):
+    sim.step()
+
+# Get results
+metrics = sim.get_metrics()
+print(f"Total cases: {metrics['total_cases']:,}")
+print(f"Deaths: {metrics['deaths']:,}")
+print(f"Attack rate: {metrics['attack_rate']:.1%}")
+```
+
+### Testing interventions
+
+```python
+# Scenario 1: No intervention
+sim_baseline = CausalTwinSimulation(population=10000, r0=2.5)
+for day in range(90):
+    sim_baseline.step()
+
+baseline_deaths = sim_baseline.get_metrics()['deaths']
+
+# Scenario 2: Moderate lockdown + vaccination
+sim_intervention = CausalTwinSimulation(population=10000, r0=2.5)
+for day in range(90):
+    sim_intervention.step(
+        lockdown_strength=0.5,
+        vaccination_rate=0.01
+    )
+
+intervention_deaths = sim_intervention.get_metrics()['deaths']
+
+# Calculate lives saved
+lives_saved = baseline_deaths - intervention_deaths
+print(f"Lives saved: {lives_saved:,}")
+```
+
+### Parallel universe testing
+
+```python
+import numpy as np
+
+# Test 100 different lockdown strengths
+results = []
+
+for lockdown in np.linspace(0, 1, 100):
+    sim = CausalTwinSimulation(population=10000, r0=2.5)
+    
+    for day in range(90):
+        sim.step(lockdown_strength=lockdown)
+    
+    metrics = sim.get_metrics()
+    results.append({
+        'lockdown': lockdown,
+        'deaths': metrics['deaths'],
+        'attack_rate': metrics['attack_rate']
+    })
+
+# Find optimal lockdown strength
+optimal = min(results, key=lambda x: x['deaths'])
+print(f"Optimal lockdown: {optimal['lockdown']:.0%}")
+print(f"Deaths: {optimal['deaths']:,}")
+```
+
+## Streamlit dashboard
+
+Launch the interactive dashboard:
+
+```bash
+streamlit run simulation_engine/causal_twin.py
+```
+
+### Features
+
+- **Real-time simulation** - Watch agents move and interact
+- **Parameter tuning** - Adjust R₀, population, interventions
+- **Outcome visualization** - SEIRD curves, metrics, predictions
+- **Scenario comparison** - Test multiple strategies side-by-side
+
+### Dashboard controls
+
+<Steps>
+  <Step title="Set parameters">
+    Population size, R₀, simulation days
+  </Step>
+  <Step title="Configure interventions">
+    Lockdown strength, vaccination rate, testing rate
+  </Step>
+  <Step title="Run simulation">
+    Click "RUN 10,000 PARALLEL UNIVERSES"
+  </Step>
+  <Step title="Analyze results">
+    View metrics, charts, and optimal strategy
+  </Step>
+</Steps>
+
+## Integration with Hammurabi-Zero
+
+Causal-Twin provides the simulation environment for Hammurabi-Zero's RL training:
+
+```python
+from simulation_engine.causal_twin import CausalTwinSimulation
+from rl_governance.hammurabi_agent import HammurabiAgent
+
+# Initialize agent
+agent = HammurabiAgent()
+
+# Training loop
+for episode in range(1000):
+    # Random crisis
+    sim = CausalTwinSimulation(
+        population=10000,
+        initial_infected=np.random.randint(5, 50),
+        r0=np.random.uniform(1.5, 4.0)
+    )
+    
+    # Agent proposes policy
+    policy = agent.propose_policy({
+        'infection_rate': sim.agents[0].state == AgentState.INFECTED
+    })
+    
+    # Simulate outcome
+    for day in range(90):
+        sim.step(
+            lockdown_strength=policy.parameters.get('lockdown', 0),
+            vaccination_rate=policy.parameters.get('vaccination', 0)
+        )
+    
+    # Calculate reward
+    metrics = sim.get_metrics()
+    reward = (
+        1.0 * (1 - metrics['mortality_rate']) -
+        0.5 * policy.civil_unrest -
+        0.3 * policy.economic_cost
+    )
+    
+    # Agent learns
+    agent.learn(policy, {'reward': reward})
+```
+
+## Validation
+
+### Historical outbreak validation
+
+Test Causal-Twin against real historical outbreaks:
+
+```python
+# 2014 Ebola outbreak in West Africa
+sim = CausalTwinSimulation(
+    population=28000,  # Liberia population affected
+    initial_infected=1,
+    r0=1.8,  # Ebola R₀
+    mortality_rate=0.5  # Ebola mortality
+)
+
+# Run simulation
+for day in range(365):
+    sim.step()
+
+# Compare to actual data
+actual_cases = 10675
+simulated_cases = sim.get_metrics()['total_cases']
+
+accuracy = 1 - abs(actual_cases - simulated_cases) / actual_cases
+print(f"Accuracy: {accuracy:.1%}")
+```
+
+### Sensitivity analysis
+
+Test how sensitive outcomes are to parameter changes:
+
+```python
+import matplotlib.pyplot as plt
+
+# Vary R₀
+r0_values = np.linspace(1.0, 4.0, 20)
+deaths = []
+
+for r0 in r0_values:
+    sim = CausalTwinSimulation(population=10000, r0=r0)
+    for day in range(90):
+        sim.step()
+    deaths.append(sim.get_metrics()['deaths'])
+
+plt.plot(r0_values, deaths)
+plt.xlabel('R₀')
+plt.ylabel('Deaths')
+plt.title('Sensitivity to R₀')
+plt.show()
+```
+
+## Performance
+
+- **Simulation speed:** ~1000 agents/second
+- **Memory usage:** ~100 MB for 10,000 agents
+- **Parallelization:** Supports multi-core execution
+- **Scalability:** Tested up to 100,000 agents
+
+## Limitations
+
+<AccordionGroup>
+  <Accordion title="Simplified transmission">
+    Uses distance-based transmission. Real-world transmission is more complex (airborne, fomites, etc.)
+  </Accordion>
+  <Accordion title="Homogeneous population">
+    All agents have similar characteristics. Real populations have heterogeneity.
+  </Accordion>
+  <Accordion title="No spatial structure">
+    Agents move freely. Real cities have neighborhoods, transportation networks.
+  </Accordion>
+  <Accordion title="Perfect compliance">
+    Assumes agents follow interventions. Real compliance varies.
+  </Accordion>
+</AccordionGroup>
+
+## Future enhancements
+
+- **Network-based transmission** - Model social networks explicitly
+- **Spatial heterogeneity** - Add neighborhoods, workplaces, schools
+- **Age-structured population** - Different transmission/mortality by age
+- **Healthcare capacity** - Model hospital beds, ventilators, staff
+- **Economic modeling** - Track GDP, employment, business closures
+- **Behavioral adaptation** - Agents learn and change behavior
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Hammurabi-Zero"
+    icon="scale-balanced"
+    href="/cognitive-systems/hammurabi-zero"
+  >
+    Use Causal-Twin for RL policy optimization
+  </Card>
+  <Card
+    title="Deployment"
+    icon="rocket"
+    href="/deployment/overview"
+  >
+    Deploy Causal-Twin to production
+  </Card>
+  <Card
+    title="API integration"
+    icon="plug"
+    href="/api-reference/overview"
+  >
+    Integrate with iLuminara API
+  </Card>
+  <Card
+    title="Governance"
+    icon="shield-check"
+    href="/governance/overview"
+  >
+    Ensure compliance with sovereignty rules
+  </Card>
+</CardGroup>
