@@ -1,0 +1,302 @@
+---
+title: Climate-Induced Migration Forecasting
+description: GIS-bifurcation modeling for drought-driven displacement prediction in East Africa
+---
+
+## Overview
+
+Climate-Induced Migration Forecasting uses ESRI Living Atlas and NVIDIA Modulus to predict drought-driven population movements 30 days before they occur. By monitoring the Lotikipi Aquifer and regional soil moisture via satellite, iLuminara enables cuOpt to pre-position mobile clinics and supplies, preventing humanitarian crises in Dadaab and Kalobeyei.
+
+<Card
+  title="Implementation"
+  icon="cloud-sun-rain"
+>
+  Complete implementation in `core/migration_forecast/drought_alert.py`
+</Card>
+
+## Key capabilities
+
+<CardGroup cols={2}>
+  <Card title="Tipping point detection" icon="triangle-exclamation">
+    Phase 37 bifurcation analysis
+  </Card>
+  <Card title="Satellite monitoring" icon="satellite">
+    ESRI Living Atlas integration
+  </Card>
+  <Card title="30-day forecasting" icon="calendar">
+    Pre-positioning lead time
+  </Card>
+  <Card title="cuOpt integration" icon="route">
+    Automated supply deployment
+  </Card>
+</CardGroup>
+
+## Quick start
+
+```python
+from core.migration_forecast.drought_alert import MigrationForecaster
+
+# Initialize forecaster
+forecaster = MigrationForecaster()
+
+# Monitor regional moisture index
+moisture_data = forecaster.get_regional_moisture(
+    region="Turkana_Basin",
+    data_source="ESRI_Living_Atlas",
+    time_window_days=90
+)
+
+# Predict migration event
+prediction = forecaster.predict_influx(
+    regional_moisture_index=moisture_data.current_index
+)
+
+if prediction == "TRIGGER_PREPOSITIONING":
+    print("High probability of climate-driven migration event")
+    forecaster.activate_prepositioning_protocol()
+```
+
+## GIS-bifurcation modeling
+
+Phase 37 tipping point analysis detects critical thresholds:
+
+```python
+from integrations.nvidia_modulus import ClimateModel
+from integrations.esri_geospatial import LivingAtlas
+
+# Initialize climate model
+climate_model = ClimateModel(physics_engine="Modulus")
+
+# Load satellite data
+atlas = LivingAtlas()
+soil_moisture = atlas.get_soil_moisture(
+    region="Lotikipi_Aquifer",
+    resolution_meters=250,
+    time_series_days=365
+)
+
+rainfall = atlas.get_rainfall(
+    region="Turkana_Basin",
+    resolution_meters=1000,
+    time_series_days=365
+)
+
+# Train bifurcation model
+bifurcation_model = climate_model.train_bifurcation(
+    features=[soil_moisture, rainfall],
+    target="population_displacement",
+    tipping_points=[0.15, 0.10, 0.05],  # Moisture thresholds
+    historical_events=forecaster.load_historical_migrations()
+)
+
+# Predict tipping point
+forecast = bifurcation_model.predict_tipping_point(
+    current_state=soil_moisture.current,
+    forecast_horizon_days=30
+)
+
+print(f"Tipping point probability: {forecast.probability:.2%}")
+print(f"Expected displacement: {forecast.predicted_population} people")
+```
+
+## Lotikipi Aquifer monitoring
+
+Real-time groundwater surveillance:
+
+```python
+# Monitor aquifer levels
+aquifer_data = forecaster.monitor_aquifer(
+    aquifer_id="Lotikipi",
+    sensors=["satellite_gravimetry", "ground_wells", "GRACE_FO"],
+    update_frequency_hours=6
+)
+
+# Detect depletion trends
+depletion_alert = forecaster.detect_depletion(
+    aquifer_data=aquifer_data,
+    threshold_meters=-2.0,  # 2m drop triggers alert
+    time_window_months=3
+)
+
+if depletion_alert.severity == "CRITICAL":
+    # Predict migration from affected areas
+    migration_zones = forecaster.identify_migration_zones(
+        aquifer_depletion=depletion_alert,
+        population_density=atlas.get_population_density("Turkana_Basin"),
+        livelihood_dependency="pastoralism"
+    )
+```
+
+## cuOpt supply prepositioning
+
+Automated logistics optimization:
+
+```python
+from integrations.nvidia_cuopt import SupplyChainOptimizer
+
+# Trigger prepositioning
+if forecast.probability > 0.7:
+    optimizer = SupplyChainOptimizer()
+    
+    # Calculate supply requirements
+    supply_plan = optimizer.calculate_requirements(
+        predicted_population=forecast.predicted_population,
+        duration_days=90,
+        supply_types=["water", "food", "medical", "shelter"]
+    )
+    
+    # Optimize deployment routes
+    deployment = optimizer.optimize_deployment(
+        supply_plan=supply_plan,
+        origin_depots=["Nairobi_WFP", "Mombasa_UNHCR"],
+        target_locations=migration_zones,
+        vehicle_fleet=["truck_10t", "drone_cargo"],
+        time_constraint_days=30
+    )
+    
+    # Execute prepositioning
+    optimizer.execute_deployment(deployment)
+```
+
+## Integration with Shirika Equity
+
+Migration forecasting informs equitable resource allocation:
+
+```python
+from humanitarian_logic.shirika_equity import ShirikaEquity
+
+# Allocate resources for incoming population
+equity = ShirikaEquity()
+allocation = equity.allocate_for_influx(
+    current_population={"host": 50000, "refugee": 150000},
+    predicted_influx=forecast.predicted_population,
+    resources=["water", "medical_supplies", "shelter"],
+    integration_model="Shirika_Plan_2026"
+)
+
+# Balance with existing communities
+balanced_allocation = equity.balance_with_existing(
+    influx_allocation=allocation,
+    existing_communities=["Kalobeyei_Host", "Kalobeyei_Settlement"],
+    fairness_constraint="proportional_need"
+)
+```
+
+## Early warning system
+
+Multi-channel alert distribution:
+
+```python
+# Generate early warning
+warning = forecaster.generate_early_warning(
+    forecast=forecast,
+    lead_time_days=30,
+    confidence_level=0.85,
+    affected_areas=migration_zones
+)
+
+# Distribute to stakeholders
+forecaster.distribute_warning(
+    warning=warning,
+    recipients=[
+        {"org": "UNHCR", "channel": "API"},
+        {"org": "Kenya_MOH", "channel": "DHIS2"},
+        {"org": "Turkana_County", "channel": "SMS"},
+        {"org": "WFP", "channel": "Email"}
+    ],
+    languages=["English", "Swahili", "Turkana"]
+)
+```
+
+## Use cases
+
+### Drought-driven displacement
+
+```python
+# Monitor drought conditions
+drought_monitor = forecaster.create_drought_monitor(
+    region="Turkana_Basin",
+    indicators=["soil_moisture", "vegetation_index", "rainfall_deficit"],
+    update_frequency_hours=12
+)
+
+# Predict displacement event
+displacement_forecast = drought_monitor.predict_displacement(
+    threshold_indicators={
+        "soil_moisture": 0.15,
+        "vegetation_index": 0.3,
+        "rainfall_deficit_mm": 200
+    },
+    population_at_risk=100000,
+    forecast_horizon_days=30
+)
+
+# Activate response
+if displacement_forecast.likelihood == "HIGH":
+    forecaster.activate_response_protocol(
+        forecast=displacement_forecast,
+        response_type="prepositioning",
+        coordination_partners=["UNHCR", "IOM", "Kenya_Red_Cross"]
+    )
+```
+
+### Flood-induced migration
+
+```python
+# Monitor flood risk
+flood_monitor = forecaster.create_flood_monitor(
+    river_basins=["Tana", "Ewaso_Ngiro"],
+    data_sources=["satellite_altimetry", "weather_models", "dam_levels"],
+    update_frequency_hours=6
+)
+
+# Predict flood displacement
+flood_forecast = flood_monitor.predict_flood_displacement(
+    rainfall_forecast_mm=300,
+    river_levels_current=flood_monitor.get_current_levels(),
+    vulnerable_settlements=["Garissa", "Tana_River_County"],
+    forecast_horizon_days=14
+)
+```
+
+## Climate-health nexus
+
+Link climate events to disease outbreaks:
+
+```python
+from core.biosurveillance.federated_bridge import BioSovereigntyBridge
+
+# Predict disease risk from migration
+bridge = BioSovereigntyBridge()
+disease_risk = bridge.predict_outbreak_from_migration(
+    migration_forecast=forecast,
+    origin_disease_prevalence={"cholera": 0.02, "measles": 0.01},
+    destination_vaccination_coverage=0.65,
+    water_sanitation_capacity=0.4
+)
+
+# Pre-position medical supplies
+if disease_risk.cholera_risk > 0.5:
+    optimizer.preposition_medical_supplies(
+        disease="cholera",
+        target_locations=migration_zones,
+        supply_types=["ORS", "IV_fluids", "antibiotics", "water_purification"]
+    )
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Shirika Equity" icon="scale-balanced" href="/humanitarian/shirika-equity">
+    Fair resource distribution
+  </Card>
+  <Card title="Bio-Sovereignty Bridge" icon="globe" href="/humanitarian/bio-sovereignty">
+    Cross-border outbreak detection
+  </Card>
+  <Card title="Circular Sovereignty" icon="recycle" href="/humanitarian/circular-sovereignty">
+    E-waste infrastructure
+  </Card>
+  <Card title="ESRI Geospatial" icon="map" href="/integrations/esri-geospatial">
+    Living Atlas integration
+  </Card>
+</CardGroup>
