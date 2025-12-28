@@ -1,0 +1,265 @@
+---
+title: TCIM traditional knowledge
+description: Integration of 170+ countries' traditional, complementary, and integrative medicine systems
+---
+
+## Overview
+
+The 2026 global health landscape recognizes that **170 countries use Traditional, Complementary, and Integrative Medicine (TCIM)** as primary or complementary healthcare. Western biomedical models alone cannot serve the majority of the world's population.
+
+The TCIM Global Library Adapter ingests evidence-based traditional medicine knowledge into iLuminara's Semantic Sovereignty layer, enabling **Cultural Health Heritage** innovations that conventional AI systems ignore.
+
+## The knowledge gap
+
+### Western-only AI models
+- Trained exclusively on biomedical literature
+- Ignore 5,000+ years of traditional medical knowledge
+- Culturally inappropriate for most global populations
+- Miss effective treatments used by billions
+
+### TCIM-integrated AI
+- Respects diverse healing traditions
+- Validates traditional knowledge with evidence
+- Culturally appropriate care recommendations
+- Bridges traditional and modern medicine
+
+## Technical architecture
+
+### TCIM global library adapter
+
+The adapter interfaces with WHO's TCIM Global Library to ingest structured traditional medicine knowledge:
+
+```python governance/tcim/knowledge_adapter.py
+class TCIMAdapter:
+    """
+    Ingests 170+ countries' evidence-based traditional medicine 
+    into iLuminara's Semantic Sovereignty layer.
+    """
+    def ingest_traditional_knowledge(self, country_code, condition):
+        # Query WHO TCIM Global Library API
+        tcim_data = self.who_api.query_tcim(
+            country=country_code,
+            condition=condition,
+            evidence_level="validated"
+        )
+        
+        # Integrate with biomedical knowledge graph
+        integrated_knowledge = self.semantic_layer.merge(
+            traditional=tcim_data,
+            biomedical=self.biomedical_kg.query(condition)
+        )
+        
+        return integrated_knowledge
+```
+
+### Semantic sovereignty layer
+
+The Semantic Sovereignty layer ensures traditional knowledge is:
+1. **Attributed** — Source communities receive credit
+2. **Protected** — Sacred knowledge remains confidential
+3. **Validated** — Evidence standards applied consistently
+4. **Integrated** — Linked to biomedical knowledge graphs
+
+## Knowledge categories
+
+### Herbal medicine
+
+Evidence-based phytotherapy from traditional systems:
+- **Traditional Chinese Medicine (TCM)** — 13,000+ medicinal plants
+- **Ayurveda** — 7,000+ plant-based formulations
+- **African traditional medicine** — 5,000+ indigenous plants
+- **Indigenous American medicine** — 2,500+ traditional remedies
+
+### Manual therapies
+
+Physical interventions with clinical evidence:
+- **Acupuncture** — Pain management, nausea, addiction
+- **Massage therapy** — Musculoskeletal conditions, stress
+- **Chiropractic** — Back pain, headaches
+- **Osteopathy** — Chronic pain, mobility
+
+### Mind-body practices
+
+Integrative approaches with mental health benefits:
+- **Meditation** — Anxiety, depression, PTSD
+- **Yoga** — Chronic pain, cardiovascular health
+- **Tai Chi** — Balance, fall prevention, arthritis
+- **Qigong** — Stress reduction, immune function
+
+### Traditional diagnostic systems
+
+Non-Western diagnostic frameworks:
+- **Pulse diagnosis** — TCM, Ayurveda, Tibetan medicine
+- **Tongue diagnosis** — Pattern recognition in TCM
+- **Constitutional typing** — Ayurvedic doshas, TCM patterns
+- **Energy assessment** — Qi, prana, vital force concepts
+
+## Evidence validation
+
+### WHO evidence standards
+
+TCIM knowledge is validated against WHO's evidence framework:
+
+| Evidence level | Criteria | Integration |
+|----------------|----------|-------------|
+| Level 1 | Systematic reviews, meta-analyses | Full integration |
+| Level 2 | Randomized controlled trials | Conditional integration |
+| Level 3 | Observational studies | Supplementary information |
+| Level 4 | Traditional use, expert opinion | Cultural context only |
+
+### Safety monitoring
+
+Traditional remedies are screened for:
+- **Drug interactions** — Herb-drug interactions
+- **Contraindications** — Pregnancy, chronic conditions
+- **Adverse effects** — Known toxicities
+- **Quality control** — Contamination, adulteration
+
+## Cultural appropriateness
+
+### Respecting traditional knowledge
+
+The TCIM adapter implements safeguards against cultural appropriation:
+
+```python
+# Example cultural protection
+def recommend_treatment(patient, condition):
+    # Check patient's cultural background
+    cultural_context = patient.cultural_identity
+    
+    # Only recommend TCIM from patient's own tradition
+    # unless explicitly requested otherwise
+    if cultural_context in ["Chinese", "East Asian"]:
+        tcim_options = tcim_adapter.query(tradition="TCM")
+    elif cultural_context in ["Indian", "South Asian"]:
+        tcim_options = tcim_adapter.query(tradition="Ayurveda")
+    
+    # Always offer biomedical options alongside TCIM
+    biomedical_options = biomedical_kg.query(condition)
+    
+    return {
+        "traditional": tcim_options,
+        "biomedical": biomedical_options,
+        "integrated": integrate_approaches(tcim_options, biomedical_options)
+    }
+```
+
+### Indigenous data sovereignty
+
+For Indigenous traditional knowledge:
+- **CARE principles** — Collective benefit, Authority to control, Responsibility, Ethics
+- **OCAP principles** — Ownership, Control, Access, Possession
+- **Free, Prior, and Informed Consent (FPIC)** — Required for all knowledge use
+
+## Integration with biomedical AI
+
+### Hybrid treatment recommendations
+
+iLuminara provides integrated treatment plans that combine traditional and modern approaches:
+
+```python
+# Example hybrid recommendation
+patient = Patient(
+    condition="chronic_pain",
+    cultural_background="Chinese",
+    preferences=["traditional_first", "evidence_based"]
+)
+
+treatment_plan = generate_hybrid_plan(patient)
+
+# Output:
+# {
+#   "primary": "Acupuncture (Level 1 evidence for chronic pain)",
+#   "complementary": "Herbal formula: Du Huo Ji Sheng Tang",
+#   "biomedical": "NSAIDs as needed for breakthrough pain",
+#   "integrative": "Physical therapy + Tai Chi (Level 1 evidence)"
+# }
+```
+
+### Pharmacovigilance
+
+The system monitors for interactions between traditional and modern treatments:
+- **Herb-drug interactions** — St. John's Wort + SSRIs
+- **Additive effects** — Ginkgo + anticoagulants
+- **Contraindications** — Pregnancy, surgery, chronic conditions
+
+## WHO TCIM global library API
+
+### Data access
+
+The WHO TCIM Global Library provides structured access to validated traditional medicine knowledge:
+
+```python
+# Example API usage
+import requests
+
+def query_tcim_library(country, condition):
+    response = requests.get(
+        "https://apps.who.int/tcim/api/v1/query",
+        params={
+            "country": country,
+            "condition": condition,
+            "evidence_level": "validated",
+            "language": "en"
+        }
+    )
+    return response.json()
+```
+
+### Coverage
+
+| Region | Countries | Traditions | Remedies |
+|--------|-----------|------------|----------|
+| Asia-Pacific | 48 | TCM, Ayurveda, Kampo, Jamu | 25,000+ |
+| Africa | 54 | Traditional African Medicine | 8,000+ |
+| Americas | 35 | Indigenous, Curanderismo | 3,500+ |
+| Europe | 33 | Naturopathy, Homeopathy | 2,000+ |
+
+## Implementation cost
+
+**$0** — WHO TCIM Global Library API is freely accessible.
+
+### Data requirements
+
+| Component | Source | Cost |
+|-----------|--------|------|
+| TCIM knowledge base | WHO Global Library | Free |
+| Evidence validation | Cochrane, PubMed | Free (open access) |
+| Cultural context | Community partnerships | Relationship-based |
+| Safety monitoring | Pharmacovigilance databases | Free (public health) |
+
+## Use cases
+
+### Rural health centers
+
+Integrate locally available traditional remedies with modern diagnostics:
+- Traditional herbalists work alongside nurses
+- AI validates traditional diagnoses with biomedical screening
+- Treatment plans combine both approaches
+
+### Urban integrative clinics
+
+Provide evidence-based TCIM in modern healthcare settings:
+- Acupuncture for pain management
+- Herbal medicine for chronic conditions
+- Mind-body practices for mental health
+
+### Disaster response
+
+Leverage traditional medicine when pharmaceutical supply chains fail:
+- Local medicinal plants for wound care
+- Traditional bone-setting for fractures
+- Herbal remedies for common infections
+
+### Cultural preservation
+
+Document and validate traditional knowledge before it's lost:
+- Elder knowledge capture
+- Evidence validation
+- Integration with modern healthcare
+
+## Next steps
+
+- [Planetary boundaries](/governance/planetary-boundaries) — Monitor Earth's vital signs
+- [PABS sovereignty](/governance/pabs-sovereignty) — Protect traditional knowledge from bio-piracy
+- [Tipping point forecasting](/governance/tipping-point-forecasting) — Predict health system collapse
