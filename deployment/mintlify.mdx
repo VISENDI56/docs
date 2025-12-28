@@ -1,493 +1,459 @@
 ---
 title: Mintlify deployment
-description: Deploy and maintain iLuminara documentation with continuous updates
+description: Deploy and sync iLuminara documentation to Mintlify
 ---
 
 ## Overview
 
-iLuminara-Core documentation is deployed using **Mintlify**, providing a beautiful, fast, and AI-queryable documentation experience with MCP (Model Context Protocol) integration.
+iLuminara-Core documentation is deployed to Mintlify with automated CI/CD pipelines, force sync capabilities, and real-time preview.
 
 <Card
   title="Live Documentation"
-  icon="book-open"
-  href="https://visendi56.mintlify.app"
+  icon="globe"
+  href="https://visendi56.mintlify.app/"
 >
-  Access the live documentation portal
+  Visit the live Sovereign Health Fortress documentation
 </Card>
 
-## The 5-step deployment cycle
+## Deployment methods
 
-<Steps>
-  <Step title="Launch local dev server">
-    Preview documentation with hot reload at http://localhost:3000
-  </Step>
-  <Step title="Check for broken links">
-    Diagnose issues with `mint doctor`
-  </Step>
-  <Step title="Build production docs">
-    Generate optimized static site
-  </Step>
-  <Step title="Deploy to Mintlify">
-    Push changes live in seconds
-  </Step>
-  <Step title="Validate full cycle">
-    Test portals, links, and fortress integrity
-  </Step>
-</Steps>
+<CardGroup cols={2}>
+  <Card
+    title="Automatic deployment"
+    icon="robot"
+  >
+    GitHub Actions automatically deploys on push to main branch
+  </Card>
+  <Card
+    title="Manual force sync"
+    icon="bolt"
+  >
+    Use the force sync script for immediate full rebuild
+  </Card>
+  <Card
+    title="CLI deployment"
+    icon="terminal"
+  >
+    Deploy directly using Mintlify CLI
+  </Card>
+  <Card
+    title="Webhook trigger"
+    icon="webhook"
+  >
+    GitHub App webhook triggers on documentation changes
+  </Card>
+</CardGroup>
 
-## Prerequisites
+## Quick deployment
 
-### Install Mintlify CLI
-
-```bash
-npm install -g mintlify
-```
-
-### Verify installation
-
-```bash
-mintlify --version
-```
-
-## Step 1: Launch local dev server
-
-Start the Mintlify development server for live preview:
+### Method 1: Force sync script (recommended)
 
 ```bash
-mint dev
+# Make script executable
+chmod +x scripts/mintlify_force_sync.sh
+
+# Run force sync
+./scripts/mintlify_force_sync.sh
+
+# Or specify branch
+./scripts/mintlify_force_sync.sh global-health-singularity
 ```
 
-This opens **http://localhost:3000** with:
-- 🔥 Hot reload on file changes
-- 🎨 Live preview of all components
-- 🔍 Search functionality
-- 📱 Mobile responsive testing
+This script:
+1. Syncs latest changes from Git
+2. Validates documentation structure
+3. Deploys to Mintlify with force rebuild
+4. Opens live documentation in browser
 
-### What to verify
+### Method 2: GitHub Actions
+
+Push to main branch triggers automatic deployment:
+
+```bash
+git add .
+git commit -m "docs: update documentation"
+git push origin main
+```
+
+Monitor deployment: https://github.com/VISENDI56/docs/actions
+
+### Method 3: Mintlify CLI
+
+```bash
+# Install Mintlify CLI
+npm install -g mintlify@latest
+
+# Local preview
+mintlify dev
+
+# Deploy to production
+mintlify deploy --force
+```
+
+## Force sync script
+
+The `mintlify_force_sync.sh` script provides comprehensive deployment automation:
+
+### Features
 
 <AccordionGroup>
-  <Accordion title="Navigation structure">
-    - All tabs render correctly
-    - Groups are properly organized
-    - Pages load without errors
+  <Accordion title="Phase 1: Git sync & verification">
+    - Checkout correct branch
+    - Pull latest changes
+    - Show recent commits (last 48 hours)
+    - Validate docs.json syntax
   </Accordion>
-  <Accordion title="Portal links">
-    - Command Console link works
-    - Transparency Audit link works
-    - GitHub repository link works
+  <Accordion title="Phase 2: Pre-deployment validation">
+    - Check required files (index.mdx, quickstart.mdx, docs.json)
+    - Count documentation files
+    - Validate JSON structure
   </Accordion>
-  <Accordion title="Content rendering">
-    - MDX components render (Card, Steps, Accordion)
-    - Code blocks have syntax highlighting
-    - Images load correctly
+  <Accordion title="Phase 3: Mintlify deployment">
+    - Local preview with force rebuild
+    - Production deployment
+    - Alternative npx fallback
   </Accordion>
-  <Accordion title="MCP integration">
-    - AI-queryable tools are accessible
-    - Compliance queries work
-    - Nuclear IP queries work
+  <Accordion title="Phase 4: Git push (webhook trigger)">
+    - Commit changes with timestamp
+    - Push to remote repository
+    - Trigger GitHub App webhook
+  </Accordion>
+  <Accordion title="Phase 5: Deployment verification">
+    - Wait for propagation (30 seconds)
+    - Check site accessibility
+    - Display deployment summary
   </Accordion>
 </AccordionGroup>
 
-## Step 2: Check for broken links
-
-Run Mintlify's diagnostic tool:
+### Usage
 
 ```bash
-mint doctor
+# Basic usage (uses current branch)
+./scripts/mintlify_force_sync.sh
+
+# Specify branch
+./scripts/mintlify_force_sync.sh global-health-singularity
+
+# With verbose output
+bash -x scripts/mintlify_force_sync.sh
 ```
 
-This checks for:
-- ❌ Broken internal links
-- ❌ Missing pages referenced in navigation
-- ❌ Invalid MDX syntax
-- ❌ Missing required frontmatter
-- ❌ Orphaned pages (not in navigation)
+### Output
 
-### Fix common issues
+```
+╔════════════════════════════════════════════════════════════╗
+║     iLuminara Mintlify Full Sync & Deployment             ║
+║     Sovereign Health Fortress Documentation               ║
+╚════════════════════════════════════════════════════════════╝
 
-**Broken link:**
-```mdx
-<!-- ❌ Wrong -->
-[Link](/wrong-path)
+[*] FORCING MINTLIFY FULL REBUILD — ALL PHASES REFLECTED...
 
-<!-- ✅ Correct -->
-[Link](/correct-path)
+═══════════════════════════════════════════════════════════
+PHASE 1: Git Sync & Verification
+═══════════════════════════════════════════════════════════
+
+[1/5] Checking out branch: global-health-singularity
+[2/5] Pulling latest changes...
+[3/5] Git status check...
+[4/5] Documentation inventory...
+   📄 MDX files: 25
+   📋 docs.json: 1
+[5/5] Validating docs.json...
+   ✓ docs.json is valid JSON
+
+...
+
+✅ MINTLIFY FULL SYNC COMPLETED
+
+🌐 Live Documentation:
+   https://visendi56.mintlify.app/
+
+🛡️  The Sovereign Health Fortress documentation is now live.
 ```
 
-**Missing frontmatter:**
-```mdx
-<!-- ❌ Wrong -->
-# My Page
+## GitHub Actions workflow
 
-<!-- ✅ Correct -->
----
-title: My Page
-description: Page description
----
+Automated deployment workflow: `.github/workflows/mintlify-deploy.yml`
 
-# My Page
-```
+### Triggers
 
-## Step 3: Build production docs
+- **Push to main/global-health-singularity** - Automatic deployment
+- **Pull request** - Validation and preview
+- **Manual dispatch** - Force rebuild option
 
-Generate optimized static site:
+### Jobs
+
+<Steps>
+  <Step title="Validate">
+    - Validate docs.json syntax
+    - Count documentation files
+    - Check for broken links
+    - Fortress status check
+  </Step>
+  <Step title="Deploy">
+    - Install Mintlify CLI
+    - Deploy to production
+    - Generate deployment summary
+  </Step>
+  <Step title="Preview">
+    - Generate preview for pull requests
+    - Comment on PR with preview info
+  </Step>
+</Steps>
+
+### Manual trigger
 
 ```bash
-mint build
+# Trigger workflow manually with force rebuild
+gh workflow run mintlify-deploy.yml -f force_rebuild=true
 ```
 
-This creates:
-- Minified JavaScript bundles
-- Optimized images
-- Pre-rendered pages
-- Search index
-- Sitemap
+## Documentation structure
 
-**Output:**
+### Required files
+
 ```
-✓ Building documentation...
-✓ Optimizing assets...
-✓ Generating search index...
-✓ Creating sitemap...
-✅ Build complete: .mintlify/
-```
-
-## Step 4: Deploy to Mintlify
-
-Push changes to live documentation:
-
-```bash
-mint update
-```
-
-**Requirements:**
-- Mintlify API key (set as `MINTLIFY_API_KEY` environment variable)
-- Git repository connected to Mintlify
-
-**Output:**
-```
-🚀 Deploying to Mintlify...
-✓ Uploading assets...
-✓ Updating navigation...
-✓ Rebuilding search index...
-✅ Deployed successfully!
-🌐 Live at: https://visendi56.mintlify.app/
+docs/
+├── index.mdx                    # Homepage
+├── quickstart.mdx               # Quick start guide
+├── docs.json                    # Navigation configuration
+├── architecture/
+│   ├── overview.mdx
+│   └── golden-thread.mdx
+├── governance/
+│   ├── overview.mdx
+│   └── compliance.mdx
+├── ai-agents/
+│   └── overview.mdx
+├── security/
+│   └── overview.mdx
+├── deployment/
+│   ├── overview.mdx
+│   └── mintlify.mdx
+└── api-reference/
+    ├── overview.mdx
+    └── voice-processing.mdx
 ```
 
-### Set up API key
-
-```bash
-# Add to ~/.bashrc or ~/.zshrc
-export MINTLIFY_API_KEY="your_api_key_here"
-
-# Or use .env file
-echo "MINTLIFY_API_KEY=your_api_key_here" >> .env
-```
-
-## Step 5: Validate full cycle
-
-### Test live site
-
-```bash
-# Open live documentation
-open https://visendi56.mintlify.app/
-
-# Or use curl to check status
-curl -I https://visendi56.mintlify.app/
-```
-
-### Verify portals
-
-<Tabs>
-  <Tab title="Command Console">
-    ```bash
-    # Test Command Console portal
-    curl -I https://iluminara-war-room.streamlit.app
-    ```
-    
-    Expected: HTTP 200 OK
-  </Tab>
-  <Tab title="Transparency Audit">
-    ```bash
-    # Test Transparency Audit portal
-    curl -I https://iluminara-audit.streamlit.app
-    ```
-    
-    Expected: HTTP 200 OK
-  </Tab>
-  <Tab title="Field Validation">
-    ```bash
-    # Test Field Validation portal
-    curl -I https://iluminara-field.streamlit.app
-    ```
-    
-    Expected: HTTP 200 OK
-  </Tab>
-</Tabs>
-
-### Run fortress validation
-
-```bash
-# Validate complete security stack
-./scripts/validate_fortress.sh
-```
-
-**Expected output:**
-```
-🛡️ FORTRESS STATUS: OPERATIONAL
-✓ All critical components validated
-✓ Security audit layer active
-✓ Governance kernel operational
-✓ Nuclear IP stack initialized
-```
-
-## Continuous deployment
-
-### GitHub Actions workflow
-
-The repository includes an automated deployment workflow at `.github/workflows/mintlify.yml`:
-
-```yaml
-name: "Mintlify Documentation Deployment"
-
-on:
-  push:
-    branches: [ "main" ]
-    paths:
-      - 'docs/**'
-      - '*.mdx'
-      - 'docs.json'
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-      - run: npm install -g mintlify
-      - run: mintlify doctor
-      - run: mintlify build
-      - run: mintlify update
-        env:
-          MINTLIFY_API_KEY: ${{ secrets.MINTLIFY_API_KEY }}
-```
-
-### Set up GitHub secret
-
-1. Go to repository **Settings** → **Secrets and variables** → **Actions**
-2. Click **New repository secret**
-3. Name: `MINTLIFY_API_KEY`
-4. Value: Your Mintlify API key
-5. Click **Add secret**
-
-### Automatic updates
-
-Every push to `main` that modifies documentation files will:
-1. ✅ Validate with `mint doctor`
-2. 🏗️ Build optimized site
-3. 🚀 Deploy to Mintlify
-4. 🔔 Notify on success/failure
-
-## MCP integration
-
-iLuminara documentation includes **Model Context Protocol (MCP)** integration for AI-queryable documentation.
-
-### Available tools
+### docs.json structure
 
 ```json
 {
-  \"tools\": [
-    {
-      \"name\": \"query_compliance\",
-      \"description\": \"Query compliance status across 14 global legal frameworks\"
-    },
-    {
-      \"name\": \"query_nuclear_ip\",
-      \"description\": \"Query Nuclear IP Stack protocols (IP-02 through IP-06)\"
-    },
-    {
-      \"name\": \"query_api\",
-      \"description\": \"Query API endpoints and integration patterns\"
-    },
-    {
-      \"name\": \"query_deployment\",
-      \"description\": \"Query deployment configurations for GCP, edge, and hybrid\"
-    }
-  ]
-}
-```
-
-### Test MCP queries
-
-```bash
-# Query compliance framework
-curl https://visendi56.mintlify.app/mcp/query_compliance \
-  -d '{"framework": "GDPR"}'
-
-# Query Nuclear IP protocol
-curl https://visendi56.mintlify.app/mcp/query_nuclear_ip \
-  -d '{"protocol": "IP-02"}'
-```
-
-## Portal integration
-
-### Add Streamlit apps to sidebar
-
-The documentation includes direct links to live Streamlit applications in the global navigation:
-
-```json
-{
-  \"global\": {
-    \"anchors\": [
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "iLuminara-Core",
+  "navigation": {
+    "tabs": [
       {
-        \"anchor\": \"Command Console\",
-        \"href\": \"https://iluminara-war-room.streamlit.app\",
-        \"icon\": \"tower-control\"
-      },
-      {
-        \"anchor\": \"Transparency Audit\",
-        \"href\": \"https://iluminara-audit.streamlit.app\",
-        \"icon\": \"file-contract\"
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting started",
+            "pages": ["index", "quickstart"]
+          }
+        ]
       }
     ]
   }
 }
 ```
 
-### Embed documentation in Streamlit
+## Validation
 
-Add documentation links to your Streamlit apps:
+### Pre-deployment checks
 
-```python
-import streamlit as st
+```bash
+# Validate docs.json
+python3 -m json.tool docs.json
 
-st.sidebar.markdown(\"\"\"
-### 📖 Documentation
-- [Getting Started](https://visendi56.mintlify.app/quickstart)
-- [API Reference](https://visendi56.mintlify.app/api-reference/overview)
-- [Governance](https://visendi56.mintlify.app/governance/overview)
-\"\"\")
+# Count MDX files
+find . -name "*.mdx" | wc -l
+
+# Check for broken links
+grep -r "href=\"/" *.mdx
+```
+
+### Post-deployment verification
+
+```bash
+# Check site accessibility
+curl -I https://visendi56.mintlify.app/
+
+# Check specific page
+curl -I https://visendi56.mintlify.app/quickstart
 ```
 
 ## Troubleshooting
 
 <AccordionGroup>
-  <Accordion title=\"Build fails with 'Module not found'\">
-    **Solution:** Ensure all referenced pages exist and paths are correct in `docs.json`
-    
-    ```bash
-    # Check for missing files
-    mint doctor --check-links
-    ```
+  <Accordion title="Deployment fails">
+    **Solution:**
+    1. Check GitHub Actions logs
+    2. Validate docs.json syntax
+    3. Ensure all referenced MDX files exist
+    4. Check MINTLIFY_API_KEY secret
   </Accordion>
-  
-  <Accordion title=\"Deployment fails with 'Unauthorized'\">
-    **Solution:** Verify `MINTLIFY_API_KEY` is set correctly
-    
-    ```bash
-    # Check environment variable
-    echo $MINTLIFY_API_KEY
-    
-    # Re-export if needed
-    export MINTLIFY_API_KEY="your_key"
-    ```
+  <Accordion title="Changes not reflected">
+    **Solution:**
+    1. Run force sync script
+    2. Clear browser cache
+    3. Wait 1-3 minutes for CDN propagation
+    4. Check deployment status in GitHub Actions
   </Accordion>
-  
-  <Accordion title=\"Portal links return 404\">
-    **Solution:** Ensure Streamlit apps are deployed and URLs are correct
-    
-    ```bash
-    # Test each portal
-    curl -I https://iluminara-war-room.streamlit.app
-    curl -I https://iluminara-audit.streamlit.app
-    ```
+  <Accordion title="docs.json validation error">
+    **Solution:**
+    1. Validate JSON syntax: `python3 -m json.tool docs.json`
+    2. Check for trailing commas
+    3. Ensure all page paths are correct
+    4. Verify navigation structure
   </Accordion>
-  
-  <Accordion title=\"MCP queries not working\">
-    **Solution:** Verify MCP configuration in `docs.json`
-    
-    ```json
-    {
-      \"mcp\": {
-        \"enabled\": true,
-        \"name\": \"iLuminara Sovereign Health Fortress\"
-      }
-    }
-    ```
+  <Accordion title="Missing pages">
+    **Solution:**
+    1. Check file paths in docs.json
+    2. Ensure MDX files have frontmatter
+    3. Verify file extensions (.mdx not .md)
+    4. Check for typos in navigation paths
   </Accordion>
 </AccordionGroup>
 
-## Performance optimization
+## Monitoring
 
-### Image optimization
+### GitHub Actions
 
-```bash
-# Optimize images before committing
-npm install -g sharp-cli
+Monitor deployment status:
+- https://github.com/VISENDI56/docs/actions
 
-# Resize and compress
-sharp -i input.png -o output.png resize 800 --quality 80
-```
+### Mintlify Dashboard
 
-### Code splitting
+Access Mintlify dashboard:
+- https://mintlify.com/dashboard
 
-Mintlify automatically code-splits for optimal performance:
-- Initial bundle: ~50KB gzipped
-- Lazy-loaded pages: ~10KB each
-- Search index: Loaded on demand
+### Deployment logs
 
-### CDN caching
-
-Mintlify uses global CDN with:
-- Edge caching for static assets
-- Smart invalidation on updates
-- 99.99% uptime SLA
-
-## Analytics
-
-### View documentation metrics
+View detailed logs in GitHub Actions:
 
 ```bash
-# Access Mintlify dashboard
-open https://mintlify.com/dashboard
+# List recent workflow runs
+gh run list --workflow=mintlify-deploy.yml
+
+# View specific run
+gh run view <run-id>
+
+# View logs
+gh run view <run-id> --log
 ```
 
-**Available metrics:**
-- 📊 Page views
-- 👥 Unique visitors
-- 🔍 Search queries
-- 📱 Device breakdown
-- 🌍 Geographic distribution
+## Best practices
+
+<Steps>
+  <Step title="Test locally first">
+    Run `mintlify dev` to preview changes before deploying
+  </Step>
+  <Step title="Validate docs.json">
+    Always validate JSON syntax before committing
+  </Step>
+  <Step title="Use descriptive commits">
+    Prefix commits with `docs:` for documentation changes
+  </Step>
+  <Step title="Monitor deployments">
+    Check GitHub Actions after pushing changes
+  </Step>
+  <Step title="Force sync when needed">
+    Use force sync script for major updates
+  </Step>
+</Steps>
+
+## Configuration
+
+### Environment variables
+
+```bash
+# Mintlify API key (for CLI deployment)
+export MINTLIFY_API_KEY=your_api_key
+
+# GitHub token (for workflow)
+export GITHUB_TOKEN=your_github_token
+```
+
+### GitHub secrets
+
+Required secrets in repository settings:
+
+- `MINTLIFY_API_KEY` - Mintlify API key for deployment
+
+### Branch protection
+
+Recommended branch protection rules:
+
+- Require pull request reviews
+- Require status checks (validate job)
+- Require branches to be up to date
+
+## Documentation coverage
+
+The iLuminara documentation includes:
+
+<Columns cols={2}>
+  <div>
+    **Core Documentation**
+    - 20 Core Modules
+    - System 2 Dashboards
+    - Eternity Demo
+    - 47-Framework Compliance Matrix
+  </div>
+  <div>
+    **Technical Stack**
+    - Sovereign Auth/Voice/Compliance
+    - 9-Month Historical Data
+    - Realtime Streaming
+    - Safety Rules (CoT/RL/Refusals)
+  </div>
+</Columns>
+
+### Nuclear IP Stack
+
+- ⚡ IP-02: Crypto Shredder (ACTIVE)
+- ⚡ IP-03: Acorn Protocol (Hardware Required)
+- ⚡ IP-04: Silent Flux (Integration Required)
+- ⚡ IP-05: Golden Thread (ACTIVE)
+- ⚡ IP-06: 5DM Bridge (Mobile Network Required)
+
+### Security Stack
+
+- ✓ CodeQL SAST Scanning
+- ✓ Gitleaks Secret Detection
+- ✓ Dependabot Daily Updates
+- ✓ SovereignGuardrail (14 Frameworks)
+- ✓ Tamper-proof Audit Trail
 
 ## Next steps
 
 <CardGroup cols={2}>
   <Card
-    title=\"Customize theme\"
-    icon=\"palette\"
-    href=\"https://mintlify.com/docs/settings/global\"
+    title="View live docs"
+    icon="globe"
+    href="https://visendi56.mintlify.app/"
   >
-    Customize colors, fonts, and branding
+    Visit the deployed documentation
   </Card>
   <Card
-    title=\"Add custom domain\"
-    icon=\"globe\"
-    href=\"https://mintlify.com/docs/settings/custom-domain\"
+    title="GitHub Actions"
+    icon="github"
+    href="https://github.com/VISENDI56/docs/actions"
   >
-    Use your own domain for documentation
+    Monitor deployment status
   </Card>
   <Card
-    title=\"Set up analytics\"
-    icon=\"chart-line\"
-    href=\"https://mintlify.com/docs/analytics/overview\"
+    title="Security stack"
+    icon="shield-halved"
+    href="/security/overview"
   >
-    Track documentation usage
+    Learn about the security architecture
   </Card>
   <Card
-    title=\"API reference\"
-    icon=\"code\"
-    href=\"https://mintlify.com/docs/api-playground/overview\"
+    title="API reference"
+    icon="terminal"
+    href="/api-reference/overview"
   >
-    Add interactive API playground
+    Explore the API documentation
   </Card>
 </CardGroup>
