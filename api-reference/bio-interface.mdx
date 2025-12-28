@@ -5,485 +5,388 @@ description: Mobile health app integration with Golden Thread data fusion
 
 ## Overview
 
-The Bio-Interface REST API enables mobile health applications to integrate with iLuminara-Core using the **Golden Thread protocol** for data fusion from Community-Based Surveillance (CBS) and Electronic Medical Records (EMR).
+The Bio-Interface REST API enables mobile health applications to integrate with iLuminara-Core using the **Golden Thread protocol** to fuse data streams from CBS (Community-Based Surveillance) and EMR (Electronic Medical Records).
 
 <Card
   title="Philosophy"
   icon="mobile"
 >
-  \"Zero-friction data collection with sovereign dignity preservation\"
+  "Zero-friction data collection. Maximum dignity preservation."
 </Card>
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│              MOBILE HEALTH APPS (Bio-Interface)              │
+│                  MOBILE HEALTH APPS                          │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
-│  │   CHV App    │  │  Clinic App  │  │  Patient App │     │
-│  │  (Android)   │  │   (Tablet)   │  │    (iOS)     │     │
+│  │   CHV App    │  │  Patient App │  │  Clinic App  │     │
 │  └──────────────┘  └──────────────┘  └──────────────┘     │
 └─────────────────────────────────────────────────────────────┘
-                            │
-                            │ HTTPS / TLS 1.3
-                            ▼
+                          │
+                          │ HTTPS/TLS 1.3
+                          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                  BIO-INTERFACE REST API                      │
+│                  BIO-INTERFACE API                           │
 │  ┌──────────────────────────────────────────────────────┐  │
-│  │  /api/v1/cbs/report          (CHV voice/text)       │  │
-│  │  /api/v1/emr/record          (Clinic diagnosis)     │  │
-│  │  /api/v1/patient/symptoms    (Self-reporting)       │  │
-│  │  /api/v1/sync/status         (Offline sync)         │  │
-│  │  /api/v1/consent/validate    (Consent management)   │  │
+│  │  /api/v1/health-record                               │  │
+│  │  /api/v1/symptom-report                              │  │
+│  │  /api/v1/voice-alert                                 │  │
+│  │  /api/v1/consent                                     │  │
 │  └──────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
+                          │
+                          │ Golden Thread Fusion
+                          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              SOVEREIGNGUARDRAIL VALIDATION                   │
-│  - Consent validation                                        │
-│  - Data sovereignty check                                    │
-│  - Jurisdiction compliance                                   │
-└─────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│                  GOLDEN THREAD FUSION                        │
-│  Merges CBS + EMR + IDSR into verified timeline             │
-└─────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    DATA STORAGE                              │
-│  - Edge Node (Local SQLite)                                  │
-│  - Cloud Oracle (BigQuery + Spanner)                         │
+│                  GOLDEN THREAD ENGINE                        │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  CBS + EMR + IDSR Data Fusion                        │  │
+│  │  Verification Score Calculation                       │  │
+│  │  Sovereignty Validation                               │  │
+│  └──────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Authentication
+## Core endpoints
 
-All API requests require authentication using JWT tokens.
+### POST /api/v1/health-record
 
-### Obtain access token
-
-```bash
-curl -X POST https://api.iluminara.health/auth/token \
-  -H \"Content-Type: application/json\" \
-  -d '{
-    \"username\": \"chv_amina_hassan\",
-    \"password\": \"secure_password\",
-    \"device_id\": \"DEVICE_12345\"
-  }'
-```
-
-### Response
-
-```json
-{
-  \"access_token\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...\",
-  \"token_type\": \"Bearer\",
-  \"expires_in\": 3600,
-  \"refresh_token\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...\",
-  \"scope\": \"cbs:write emr:read patient:read\"
-}
-```
-
-### Use access token
-
-```bash
-curl -X POST https://api.iluminara.health/api/v1/cbs/report \
-  -H \"Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...\" \
-  -H \"Content-Type: application/json\" \
-  -d '{...}'
-```
-
-## Endpoints
-
-### POST /api/v1/cbs/report
-
-Submit Community-Based Surveillance report from CHV.
+Submit health record from clinic or hospital.
 
 **Request:**
-
 ```json
 {
-  \"chv_id\": \"CHV_AMINA_HASSAN\",
-  \"location\": {
-    \"lat\": 0.0512,
-    \"lng\": 40.3129,
-    \"name\": \"Ifo Camp, Dadaab\"
+  "patient_id": "PAT_12345",
+  "location": {
+    "lat": 0.0512,
+    "lng": 40.3129,
+    "name": "Dadaab Clinic"
   },
-  \"timestamp\": \"2025-12-28T14:30:00Z\",
-  \"symptoms\": [\"diarrhea\", \"vomiting\", \"dehydration\"],
-  \"severity\": 9,
-  \"patient_count\": 1,
-  \"notes\": \"Severe watery diarrhea, suspected cholera\",
-  \"consent_token\": \"CONSENT_12345\",
-  \"offline_mode\": false
+  "diagnosis": "cholera",
+  "symptoms": ["diarrhea", "vomiting", "dehydration"],
+  "severity": 9,
+  "timestamp": "2025-12-28T10:00:00Z",
+  "consent_token": "CONSENT_TOKEN_ABC123",
+  "source": "EMR"
 }
 ```
 
 **Response:**
-
 ```json
 {
-  \"status\": \"success\",
-  \"report_id\": \"CBS_20251228_001\",
-  \"verification_score\": 0.8,
-  \"alert_level\": \"CRITICAL\",
-  \"recommendations\": [
-    \"IMMEDIATE: Suspected cholera. Start ORS immediately.\",
-    \"Isolate patient to prevent spread\",
-    \"Notify district health officer\"
+  "status": "success",
+  "record_id": "REC_67890",
+  "verification_score": 1.0,
+  "verification_status": "CONFIRMED",
+  "golden_thread_id": "GT_11223",
+  "compliance_status": "APPROVED",
+  "timestamp": "2025-12-28T10:00:01Z"
+}
+```
+
+### POST /api/v1/symptom-report
+
+Submit symptom report from CHV or patient.
+
+**Request:**
+```json
+{
+  "reporter_id": "CHV_AMINA_HASSAN",
+  "location": {
+    "lat": 0.0512,
+    "lng": 40.3129,
+    "name": "Ifo Camp"
+  },
+  "symptoms": ["fever", "cough"],
+  "severity": 6,
+  "patient_count": 1,
+  "timestamp": "2025-12-28T09:45:00Z",
+  "consent_token": "CONSENT_TOKEN_XYZ789",
+  "source": "CBS"
+}
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "report_id": "REP_54321",
+  "verification_score": 0.8,
+  "verification_status": "PROBABLE",
+  "alert_level": "MEDIUM",
+  "recommendations": [
+    "Monitor for additional cases",
+    "Notify district health officer if cases increase"
   ],
-  \"golden_thread\": {
-    \"fused\": true,
-    \"emr_match\": false,
-    \"idsr_submitted\": true
-  }
+  "timestamp": "2025-12-28T09:45:01Z"
 }
 ```
 
-### POST /api/v1/emr/record
+### POST /api/v1/voice-alert
 
-Submit Electronic Medical Record from clinic.
+Process voice alert from CHV.
 
 **Request:**
+```
+Content-Type: audio/wav
+Authorization: Bearer <token>
 
-```json
-{
-  \"clinic_id\": \"DADAAB_CLINIC_001\",
-  \"patient_id\": \"PAT_12345\",
-  \"location\": {
-    \"lat\": 0.0512,
-    \"lng\": 40.3129,
-    \"name\": \"Dadaab Clinic\"
-  },
-  \"timestamp\": \"2025-12-28T15:00:00Z\",
-  \"diagnosis\": \"cholera\",
-  \"symptoms\": [\"diarrhea\", \"vomiting\", \"dehydration\"],
-  \"lab_results\": {
-    \"rapid_test\": \"positive\",
-    \"culture\": \"pending\"
-  },
-  \"treatment\": [\"ORS\", \"IV_fluids\", \"antibiotics\"],
-  \"consent_token\": \"CONSENT_12345\"
-}
+[Binary audio data]
 ```
 
 **Response:**
-
 ```json
 {
-  \"status\": \"success\",
-  \"record_id\": \"EMR_20251228_001\",
-  \"verification_score\": 1.0,
-  \"golden_thread\": {
-    \"fused\": true,
-    \"cbs_match\": true,
-    \"cbs_report_id\": \"CBS_20251228_001\",
-    \"time_delta_hours\": 0.5,
-    \"verification_status\": \"CONFIRMED\"
-  }
+  "status": "success",
+  "transcription": "Patient reporting severe watery diarrhea",
+  "symptoms": ["diarrhea", "dehydration"],
+  "severity": 9,
+  "alert_level": "CRITICAL",
+  "location": {
+    "lat": 0.0512,
+    "lng": 40.3129
+  },
+  "recommendations": [
+    "IMMEDIATE: Suspected cholera. Start ORS immediately.",
+    "Isolate patient to prevent spread"
+  ]
 }
 ```
 
-### POST /api/v1/patient/symptoms
+### POST /api/v1/consent
 
-Patient self-reporting via mobile app.
+Manage patient consent.
 
 **Request:**
-
 ```json
 {
-  \"patient_id\": \"PAT_12345\",
-  \"location\": {
-    \"lat\": 0.0512,
-    \"lng\": 40.3129
-  },
-  \"timestamp\": \"2025-12-28T14:00:00Z\",
-  \"symptoms\": [\"fever\", \"cough\", \"fatigue\"],
-  \"severity\": 5,
-  \"duration_days\": 3,
-  \"consent_token\": \"CONSENT_12345\"
+  "patient_id": "PAT_12345",
+  "consent_scope": ["diagnosis", "treatment", "public_health_surveillance"],
+  "consent_given": true,
+  "expiration_days": 365,
+  "jurisdiction": "KDPA_KE"
 }
 ```
 
 **Response:**
-
 ```json
 {
-  \"status\": \"success\",
-  \"report_id\": \"PATIENT_20251228_001\",
-  \"triage_level\": \"YELLOW\",
-  \"recommendations\": [
-    \"Monitor symptoms for 24 hours\",
-    \"Seek medical attention if symptoms worsen\",
-    \"Stay hydrated\"
-  ],
-  \"nearest_clinic\": {
-    \"name\": \"Dadaab Clinic\",
-    \"distance_km\": 2.5,
-    \"estimated_wait_time_minutes\": 45
-  }
+  "status": "success",
+  "consent_token": "CONSENT_TOKEN_ABC123",
+  "expires_at": "2026-12-28T10:00:00Z",
+  "compliance_status": "APPROVED"
 }
 ```
 
-### GET /api/v1/sync/status
+## Golden Thread integration
 
-Check offline sync status.
-
-**Response:**
-
-```json
-{
-  \"status\": \"success\",
-  \"sync_status\": {
-    \"last_sync\": \"2025-12-28T14:00:00Z\",
-    \"pending_reports\": 5,
-    \"pending_records\": 2,
-    \"connectivity\": \"online\",
-    \"queue_size_mb\": 1.2
-  },
-  \"edge_node\": {
-    \"node_id\": \"JOR-47\",
-    \"location\": \"Dadaab\",
-    \"status\": \"operational\"
-  }
-}
-```
-
-### POST /api/v1/consent/validate
-
-Validate patient consent.
-
-**Request:**
-
-```json
-{
-  \"patient_id\": \"PAT_12345\",
-  \"consent_scope\": \"diagnosis\",
-  \"data_type\": \"PHI\",
-  \"jurisdiction\": \"KDPA_KE\"
-}
-```
-
-**Response:**
-
-```json
-{
-  \"status\": \"success\",
-  \"consent_valid\": true,
-  \"consent_token\": \"CONSENT_12345\",
-  \"expires_at\": \"2026-12-28T14:00:00Z\",
-  \"scope\": [\"diagnosis\", \"treatment\", \"public_health_surveillance\"]
-}
-```
-
-## Golden Thread verification
-
-The Bio-Interface automatically triggers Golden Thread data fusion when CBS and EMR signals match.
-
-### Verification logic
+All Bio-Interface submissions automatically trigger Golden Thread fusion:
 
 ```python
 from edge_node.sync_protocol.golden_thread import GoldenThread
 
 gt = GoldenThread()
 
-# CBS signal from CHV
-cbs_signal = {
-    'location': 'Dadaab',
-    'symptom': 'diarrhea',
-    'timestamp': '2025-12-28T14:30:00Z',
-    'source': 'CHV_AMINA_HASSAN'
-}
-
-# EMR record from clinic
-emr_record = {
-    'location': 'Dadaab',
-    'diagnosis': 'cholera',
-    'timestamp': '2025-12-28T15:00:00Z',
-    'source': 'DADAAB_CLINIC_001'
-}
-
-# Fuse data streams
+# Fuse CBS and EMR signals
 fused = gt.fuse_data_streams(
-    cbs_signal=cbs_signal,
-    emr_record=emr_record,
+    cbs_signal={
+        'location': 'Dadaab',
+        'symptom': 'diarrhea',
+        'timestamp': '2025-12-28T09:45:00Z',
+        'source': 'CHV_AMINA_HASSAN'
+    },
+    emr_record={
+        'location': 'Dadaab',
+        'diagnosis': 'cholera',
+        'timestamp': '2025-12-28T10:00:00Z',
+        'source': 'Dadaab_Clinic'
+    },
     patient_id='PAT_12345'
 )
 
-# Check verification score
-print(f\"Verification Score: {fused.verification_score}\")  # 1.0 (CONFIRMED)
-print(f\"Status: {fused.verification_status}\")  # CONFIRMED
+# Verification score: 1.0 (CONFIRMED)
+# Both sources agree on location and time (<24h delta)
 ```
 
-### Verification scores
+## Authentication
 
-| Score | Status | Description |
-|-------|--------|-------------|
-| 1.0 | CONFIRMED | Location and time match (<24h delta) |
-| 0.7-0.9 | PROBABLE | Partial agreement with minor conflicts |
-| 0.4-0.6 | POSSIBLE | Significant conflicts but plausible |
-| 0.0-0.3 | UNVERIFIED | Major conflicts or single source only |
+### API key authentication
 
-## Offline mode
-
-The Bio-Interface supports offline operation with automatic sync when connectivity returns.
-
-### Enable offline mode
-
-```json
-{
-  \"offline_mode\": true,
-  \"queue_locally\": true,
-  \"sync_on_reconnect\": true
-}
+```bash
+curl -X POST https://api.iluminara.health/v1/health-record \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"patient_id": "PAT_12345", ...}'
 ```
 
-### Offline queue management
+### OAuth 2.0
 
 ```python
-from edge_node.ai_agents import OfflineAgent
+import requests
 
-agent = OfflineAgent(name=\"CHV Mobile App\")
+# Get access token
+token_response = requests.post(
+    'https://auth.iluminara.health/oauth/token',
+    data={
+        'grant_type': 'client_credentials',
+        'client_id': 'YOUR_CLIENT_ID',
+        'client_secret': 'YOUR_CLIENT_SECRET'
+    }
+)
 
-# Queue report while offline
-agent.queue_operation(\"cbs_report\", {
-    \"chv_id\": \"CHV_AMINA_HASSAN\",
-    \"location\": {\"lat\": 0.0512, \"lng\": 40.3129},
-    \"symptoms\": [\"fever\", \"cough\"]
-})
+access_token = token_response.json()['access_token']
 
-# Check connectivity
-if agent.connectivity.is_connected():
-    # Sync queued operations
-    agent.sync_to_cloud()
+# Make API request
+response = requests.post(
+    'https://api.iluminara.health/v1/health-record',
+    headers={'Authorization': f'Bearer {access_token}'},
+    json={'patient_id': 'PAT_12345', ...}
+)
 ```
 
-## Mobile SDK integration
+## Mobile SDK
 
-### Android (Kotlin)
+### Android SDK
 
 ```kotlin
-import com.iluminara.sdk.BioInterface
+import health.iluminara.sdk.ILuminaraClient
 
-val bioInterface = BioInterface.Builder()
-    .setApiKey(\"your_api_key\")
-    .setBaseUrl(\"https://api.iluminara.health\")
-    .enableOfflineMode(true)
+val client = ILuminaraClient.Builder()
+    .apiKey("YOUR_API_KEY")
+    .environment(Environment.PRODUCTION)
     .build()
 
-// Submit CBS report
-val report = CBSReport(
-    chvId = \"CHV_AMINA_HASSAN\",
-    location = Location(0.0512, 40.3129, \"Ifo Camp\"),
-    symptoms = listOf(\"diarrhea\", \"vomiting\"),
+// Submit health record
+val record = HealthRecord(
+    patientId = "PAT_12345",
+    location = Location(0.0512, 40.3129, "Dadaab Clinic"),
+    diagnosis = "cholera",
+    symptoms = listOf("diarrhea", "vomiting"),
     severity = 9
 )
 
-bioInterface.submitCBSReport(report) { result ->
+client.submitHealthRecord(record) { result ->
     when (result) {
-        is Success -> println(\"Report submitted: ${result.data.reportId}\")
-        is Error -> println(\"Error: ${result.error.message}\")
+        is Success -> println("Record submitted: ${result.data.recordId}")
+        is Error -> println("Error: ${result.error}")
     }
 }
 ```
 
-### iOS (Swift)
+### iOS SDK
 
 ```swift
-import iLuminaraSDK
+import ILuminaraSDK
 
-let bioInterface = BioInterface(
-    apiKey: \"your_api_key\",
-    baseURL: \"https://api.iluminara.health\",
-    offlineMode: true
+let client = ILuminaraClient(apiKey: "YOUR_API_KEY")
+
+// Submit symptom report
+let report = SymptomReport(
+    reporterId: "CHV_AMINA_HASSAN",
+    location: Location(lat: 0.0512, lng: 40.3129, name: "Ifo Camp"),
+    symptoms: ["fever", "cough"],
+    severity: 6
 )
 
-// Submit patient symptoms
-let symptoms = PatientSymptoms(
-    patientId: \"PAT_12345\",
-    location: Location(lat: 0.0512, lng: 40.3129),
-    symptoms: [\"fever\", \"cough\"],
-    severity: 5
-)
-
-bioInterface.submitPatientSymptoms(symptoms) { result in
+client.submitSymptomReport(report) { result in
     switch result {
     case .success(let response):
-        print(\"Report ID: \\(response.reportId)\")
+        print("Report submitted: \\(response.reportId)")
     case .failure(let error):
-        print(\"Error: \\(error.localizedDescription)\")
+        print("Error: \\(error)")
     }
 }
+```
+
+### Flutter SDK
+
+```dart
+import 'package:iluminara_sdk/iluminara_sdk.dart';
+
+final client = ILuminaraClient(apiKey: 'YOUR_API_KEY');
+
+// Submit voice alert
+final audioFile = File('path/to/audio.wav');
+final result = await client.submitVoiceAlert(
+  audioFile: audioFile,
+  location: Location(lat: 0.0512, lng: 40.3129),
+);
+
+if (result.isSuccess) {
+  print('Alert submitted: ${result.data.transcription}');
+} else {
+  print('Error: ${result.error}');
+}
+```
+
+## Offline support
+
+The Bio-Interface API supports offline operation with automatic sync:
+
+```python
+from edge_node.sync_protocol.offline_queue import OfflineQueue
+
+queue = OfflineQueue()
+
+# Queue submission while offline
+queue.add({
+    'endpoint': '/api/v1/symptom-report',
+    'data': {...},
+    'priority': 'HIGH'
+})
+
+# Automatic sync when connectivity returns
+queue.sync_when_online()
 ```
 
 ## Rate limits
 
 | Endpoint | Rate Limit | Burst |
 |----------|------------|-------|
-| `/api/v1/cbs/report` | 100 req/min | 200 |
-| `/api/v1/emr/record` | 50 req/min | 100 |
-| `/api/v1/patient/symptoms` | 200 req/min | 400 |
-| `/api/v1/sync/status` | 1000 req/min | 2000 |
+| /health-record | 100/min | 200 |
+| /symptom-report | 200/min | 400 |
+| /voice-alert | 10/min | 20 |
+| /consent | 50/min | 100 |
 
 ## Error codes
 
 | Code | HTTP Status | Description |
 |------|-------------|-------------|
-| `INVALID_CONSENT` | 403 | Consent token invalid or expired |
-| `SOVEREIGNTY_VIOLATION` | 403 | Data transfer violates sovereignty rules |
-| `RATE_LIMIT_EXCEEDED` | 429 | Too many requests |
-| `OFFLINE_QUEUE_FULL` | 507 | Offline queue storage full |
-| `INVALID_LOCATION` | 400 | Location coordinates invalid |
-
-## Security
-
-<AccordionGroup>
-  <Accordion title=\"TLS 1.3 encryption\">
-    All API traffic encrypted with TLS 1.3
-  </Accordion>
-  <Accordion title=\"JWT authentication\">
-    Access tokens expire after 1 hour, refresh tokens after 30 days
-  </Accordion>
-  <Accordion title=\"Data sovereignty\">
-    PHI never leaves sovereign territory without explicit authorization
-  </Accordion>
-  <Accordion title=\"Audit logging\">
-    All API calls logged with tamper-proof audit trail
-  </Accordion>
-</AccordionGroup>
+| `invalid_consent` | 403 | Consent token invalid or expired |
+| `sovereignty_violation` | 403 | Action violates data sovereignty rules |
+| `missing_location` | 400 | Location required but not provided |
+| `invalid_severity` | 400 | Severity must be 0-10 |
+| `rate_limit_exceeded` | 429 | Too many requests |
 
 ## Next steps
 
 <CardGroup cols={2}>
   <Card
-    title=\"Golden Thread\"
-    icon=\"link\"
-    href=\"/architecture/golden-thread\"
+    title="Golden Thread"
+    icon="link"
+    href="/architecture/golden-thread"
   >
     Understand data fusion logic
   </Card>
   <Card
-    title=\"AI agents\"
-    icon=\"brain-circuit\"
-    href=\"/ai-agents/overview\"
+    title="Voice processing"
+    icon="microphone"
+    href="/api-reference/voice-processing"
   >
-    Deploy autonomous surveillance
+    Process voice alerts
   </Card>
   <Card
-    title=\"Governance\"
-    icon=\"shield-check\"
-    href=\"/governance/overview\"
+    title="Governance"
+    icon="shield-check"
+    href="/governance/overview"
   >
-    Understand sovereignty constraints
+    Configure compliance
   </Card>
   <Card
-    title=\"Deployment\"
-    icon=\"rocket\"
-    href=\"/deployment/overview\"
+    title="Deploy"
+    icon="rocket"
+    href="/deployment/overview"
   >
     Deploy to production
   </Card>
