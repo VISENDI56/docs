@@ -5,7 +5,11 @@ description: Real-time 3D visualization and simulation for refugee camp health i
 
 ## Overview
 
-NVIDIA Omniverse Digital Twin provides real-time 3D visualization and simulation of refugee camp health infrastructure, enabling crisis response teams to visualize disease spread, optimize resource allocation, and collaborate in real-time.
+NVIDIA Omniverse Digital Twin provides real-time 3D visualization and simulation for "Camp-to-City" urban planning under the Shirika Plan. It enables zero-risk urban redevelopment by simulating infrastructure changes before physical construction.
+
+<Info>
+  Under the Shirika Plan, Dadaab and Kalobeyei are transitioning from refugee camps to integrated municipalities. Omniverse enables this transformation without displacing vulnerable populations.
+</Info>
 
 <Card
   title="Implementation"
@@ -17,19 +21,29 @@ NVIDIA Omniverse Digital Twin provides real-time 3D visualization and simulation
 ## Key capabilities
 
 <CardGroup cols={2}>
-  <Card title="3D visualization" icon="cube">
-    Real-time 3D camp layout with health facilities
+  <Card title="USD pipeline" icon="cube">
+    Universal Scene Description for photorealistic 3D simulation
   </Card>
-  <Card title="Disease simulation" icon="virus">
-    Agent-based disease spread modeling
+  <Card title="Urban planning" icon="city">
+    Drag-and-drop infrastructure testing before construction
   </Card>
-  <Card title="Resource optimization" icon="chart-line">
-    Visual resource allocation optimization
+  <Card title="Impact analysis" icon="chart-line">
+    Simulate foot traffic, airflow, and flood risks
   </Card>
   <Card title="Multi-user collaboration" icon="users">
-    Real-time collaboration for crisis teams
+    Real-time collaboration for planning teams
   </Card>
 </CardGroup>
+
+## Civilization-scale singularity
+
+**The Context:** Under the Shirika Plan, camps are becoming towns. This requires massive urban planning (roads, sewage, power) without displacing vulnerable people.
+
+**The Singularity:** Omniverse USD (Universal Scene Description) Pipeline.
+
+**Deep Architecture:** A real-time, photorealistic 3D simulation of the entire settlement. Planners can "drag and drop" a new clinic or market in the digital twin to see how it affects foot traffic, airflow (disease spread), and flood risks before building it.
+
+**Impact:** Zero-risk urban redevelopment.
 
 ## Architecture
 
@@ -50,36 +64,40 @@ NVIDIA Omniverse Digital Twin provides real-time 3D visualization and simulation
 ## Quick start
 
 ```python
-from nvidia_integrations.omniverse_digital_twin import OmniverseDigitalTwin
+from nvidia_integrations.omniverse_digital_twin import UrbanDigitalTwin
 
-# Initialize digital twin
-twin = OmniverseDigitalTwin(
-    nucleus_server="omniverse://localhost",
-    camp_name="Dadaab"
+# Initialize Camp-to-City digital twin
+twin = UrbanDigitalTwin(
+    nucleus_server="omniverse://dadaab-planning",
+    settlement_name="Dadaab",
+    mode="camp_to_city"
 )
 
-# Create camp layout
-twin.create_camp_layout({
-    "tents": 5000,
-    "clinics": 3,
-    "water_points": 10,
-    "area_km2": 50
-})
+# Load current settlement state
+twin.load_settlement_usd("dadaab_2026_baseline.usd")
 
-# Simulate disease spread
-twin.simulate_disease_spread({
-    "disease": "cholera",
-    "initial_cases": 10,
-    "r_effective": 2.3,
-    "duration_days": 30
-})
+# Simulate new infrastructure
+impact = twin.simulate_infrastructure_change(
+    new_building_usd="market_complex_design.usd",
+    location={"lat": 0.0512, "lng": 40.3129}
+)
 
-# Visualize resource allocation
-twin.visualize_resource_allocation({
-    "ors_packets": 10000,
-    "antibiotics": 5000,
-    "health_workers": 50
-})
+print(f"Flood risk change: {impact['flood_risk_delta']}")
+print(f"Social access improvement: {impact['social_access_score']}")
+print(f"Airflow impact (disease spread): {impact['airflow_coefficient']}")
+
+# Test multiple scenarios
+scenarios = twin.run_scenario_batch([
+    {"type": "clinic", "capacity": 500},
+    {"type": "school", "students": 1000},
+    {"type": "water_station", "daily_liters": 50000}
+])
+
+# Select optimal configuration
+optimal = twin.select_optimal_scenario(
+    scenarios,
+    criteria=["flood_resilience", "accessibility", "cost"]
+)
 ```
 
 ## Integration with Golden Thread
@@ -102,19 +120,38 @@ twin.update_from_golden_thread(fused_data)
 ## Use cases
 
 <AccordionGroup>
-  <Accordion title="Crisis response planning">
-    Visualize camp layout and simulate response scenarios before deployment
+  <Accordion title="Urban redevelopment planning">
+    Test infrastructure changes in 3D before construction to prevent displacement
   </Accordion>
-  <Accordion title="Resource allocation">
-    Optimize placement of clinics, water points, and supply distribution
+  <Accordion title="Flood risk assessment">
+    Simulate drainage systems and identify flood-prone areas during heavy rains
   </Accordion>
-  <Accordion title="Disease spread modeling">
-    Predict disease spread patterns and identify high-risk areas
+  <Accordion title="Disease vector analysis">
+    Model airflow patterns to predict disease spread through settlement layout
   </Accordion>
-  <Accordion title="Training simulations">
-    Train health workers in virtual camp environments
+  <Accordion title="Social infrastructure optimization">
+    Optimize placement of markets, schools, and clinics for maximum accessibility
+  </Accordion>
+  <Accordion title="Multi-stakeholder collaboration">
+    Enable UNHCR, local government, and community leaders to co-design urban plans
   </Accordion>
 </AccordionGroup>
+
+## Real-world scenario (Dadaab 2026)
+
+**Scenario:** The Shirika Plan requires converting Ifo 2 camp into a formal municipality with paved roads, sewage systems, and permanent structures.
+
+**Challenge:** 50,000 residents cannot be displaced during construction. Planning must account for existing informal settlements, water sources, and social networks.
+
+**Solution:** Omniverse Digital Twin simulates the entire transformation:
+
+1. **Baseline scan:** Drone photogrammetry creates a 3D USD model of current Ifo 2 layout
+2. **Infrastructure testing:** Planners drag-and-drop proposed roads, sewage lines, and power grids
+3. **Impact analysis:** System calculates effects on foot traffic, flood drainage, and disease transmission
+4. **Community review:** Residents view the simulation via VR headsets and provide feedback
+5. **Iterative refinement:** Design is adjusted until all stakeholders approve
+
+**Result:** Zero-displacement urban transformation completed in 18 months instead of 5 years.
 
 ## Next steps
 

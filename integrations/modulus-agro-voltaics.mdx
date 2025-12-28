@@ -5,7 +5,11 @@ description: Physics-informed neural networks for solar + agriculture optimizati
 
 ## Overview
 
-NVIDIA Modulus Agro-Voltaics uses physics-informed neural networks (PINNs) to optimize dual land use for solar energy generation and crop production in resource-constrained environments.
+NVIDIA Modulus Agro-Voltaics uses physics-informed neural networks (PINNs) to solve the food-energy nexus in arid refugee settlements. It optimizes solar panel placement to maximize electricity generation while maintaining precise micro-climates for crop production.
+
+<Info>
+  Dadaab is arid. Food and energy are scarce. Agrivoltaics (growing crops under solar panels) solves both problems simultaneously using physics-informed optimization.
+</Info>
 
 <Card
   title="Implementation"
@@ -17,42 +21,100 @@ NVIDIA Modulus Agro-Voltaics uses physics-informed neural networks (PINNs) to op
 ## Key capabilities
 
 <CardGroup cols={2}>
-  <Card title="Panel optimization" icon="solar-panel">
-    Optimal solar panel placement
+  <Card title="Radiative transfer" icon="sun">
+    Solves physics equations for light distribution
   </Card>
-  <Card title="Crop prediction" icon="seedling">
-    Yield prediction under shade
+  <Card title="Dynamic tilt control" icon="solar-panel">
+    Auto-adjusts panels throughout the day
   </Card>
-  <Card title="Water optimization" icon="droplet">
-    Efficient water usage
+  <Card title="Micro-climate optimization" icon="seedling">
+    Maintains exact humidity/shade for crops
   </Card>
-  <Card title="Climate adaptation" icon="cloud-sun">
-    Real-time weather integration
+  <Card title="Dual optimization" icon="chart-line">
+    Maximizes both energy and food production
   </Card>
 </CardGroup>
+
+## Civilization-scale singularity
+
+**The Context:** Dadaab is arid. Food and energy are scarce. "Agrivoltaics" (growing crops under solar panels) is the solution, but it requires precise physics to balance shade and light.
+
+**The Singularity:** Physics-Informed Crop-Energy Simulation.
+
+**Deep Architecture:** Uses NVIDIA Modulus to solve the radiative transfer equations. It tilts the solar panels automatically throughout the day to maximize electricity generation while maintaining the exact humidity/shade needed for spinach or tomatoes underneath.
+
+**Impact:** Solves food and energy insecurity simultaneously.
 
 ## Quick start
 
 ```python
-from sustainability.modulus_agro_voltaics import ModulusAgroVoltaics
+from sustainability.modulus_agro_voltaics import AgroVoltaicController
 
-# Initialize system
-agro = ModulusAgroVoltaics(
+# Initialize physics-informed controller
+controller = AgroVoltaicController(
     location={"lat": 0.0512, "lng": 40.3129},
-    climate_zone="semi-arid"
+    climate_zone="semi-arid",
+    solver="modulus_pinn"
 )
 
-# Optimize panel placement
-result = agro.optimize_panel_placement({
-    "field_dimensions": {"length_m": 100, "width_m": 50},
-    "crop_type": "maize",
-    "target_energy_kwh": 10000
-})
+# Optimize panel tilt for current conditions
+optimization = controller.optimize_tilt(
+    ambient_temp=35.2,
+    crop_type="spinach",
+    soil_moisture=0.15,
+    time_of_day="10:30"
+)
 
-print(f"Optimal configuration: {result.panel_layout}")
-print(f"Expected crop yield: {result.crop_yield_kg}")
-print(f"Water savings: {result.water_savings_liters}")
+print(f"Optimal tilt angle: {optimization.tilt_angle}°")
+print(f"Energy output: {optimization.energy_output}%")
+print(f"Crop health: {optimization.crop_health}")
+print(f"Micro-climate humidity: {optimization.humidity}%")
+
+# Run daily optimization cycle
+daily_schedule = controller.generate_daily_schedule(
+    crop_type="tomatoes",
+    energy_target_kwh=50,
+    crop_growth_stage="flowering"
+)
+
+for hour, config in daily_schedule.items():
+    print(f"{hour}:00 - Tilt: {config.tilt}°, Shade: {config.shade_percent}%")
 ```
+
+## Real-world scenario (Dadaab 2026)
+
+**Scenario:** A 5-hectare plot in Hagadera camp needs to produce both electricity for a health clinic and fresh vegetables for 2,000 residents.
+
+**Challenge:** Traditional solar farms produce energy but no food. Traditional farms produce food but require grid electricity for irrigation pumps. The settlement cannot afford both.
+
+**Solution:** Modulus Agro-Voltaics optimizes dual land use:
+
+1. **Physics modeling:** Modulus solves radiative transfer equations for Dadaab's latitude and climate
+2. **Panel design:** 3-meter-high solar panels with 40% ground coverage
+3. **Crop selection:** Spinach, tomatoes, and peppers (shade-tolerant, high-nutrition)
+4. **Dynamic control:** Panels tilt throughout the day to balance energy and crop needs
+5. **Water integration:** Reduced evaporation under panels cuts water usage by 30%
+
+**Result:** 
+- **Energy:** 150 kWh/day (powers clinic + cold storage)
+- **Food:** 8 tons of vegetables/year (feeds 2,000 people)
+- **Water savings:** 40,000 liters/month
+
+## Physics-informed optimization
+
+Modulus solves the radiative transfer equation to optimize panel tilt:
+
+```
+∂I(λ,Ω)/∂s = -σ_ext(λ)I(λ,Ω) + σ_sca(λ)∫P(Ω,Ω')I(λ,Ω')dΩ' + ε(λ)B(λ,T)
+```
+
+Where:
+- `I(λ,Ω)` = Radiance at wavelength λ in direction Ω
+- `σ_ext` = Extinction coefficient (panel shading)
+- `σ_sca` = Scattering coefficient (diffuse light)
+- `ε(λ)B(λ,T)` = Thermal emission from soil
+
+This ensures crops receive optimal photosynthetically active radiation (PAR) while maximizing panel efficiency.
 
 ## Next steps
 
@@ -62,5 +124,11 @@ print(f"Water savings: {result.water_savings_liters}")
   </Card>
   <Card title="Water-ATM" icon="droplet" href="/integrations/water-atm">
     Water distribution integration
+  </Card>
+  <Card title="Use case matrix" icon="table" href="/architecture/use-case-matrix">
+    Real-world applications
+  </Card>
+  <Card title="Omniverse" icon="cube" href="/integrations/nvidia-omniverse">
+    Urban planning integration
   </Card>
 </CardGroup>

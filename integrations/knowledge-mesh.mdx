@@ -5,7 +5,11 @@ description: Decentralized offline-first education for health workers
 
 ## Overview
 
-Knowledge Mesh is a decentralized education system enabling offline-first learning for Community Health Volunteers (CHVs) with peer-to-peer knowledge sharing and WHO training standards integration.
+Knowledge Mesh is a sovereign AI tutor system providing offline-first education for refugee youth and health workers. It uses local-LLM education agents (NIMs) to democratize high-quality education without internet costs.
+
+<Info>
+  Teacher-to-student ratios in camps are 1:100. Education is the only exit strategy for youth. Knowledge Mesh provides personalized tutoring to thousands of students simultaneously.
+</Info>
 
 <Card
   title="Implementation"
@@ -17,46 +21,107 @@ Knowledge Mesh is a decentralized education system enabling offline-first learni
 ## Key capabilities
 
 <CardGroup cols={2}>
-  <Card title="Offline-first" icon="wifi-slash">
-    Learn without internet connectivity
+  <Card title="Local-LLM tutors" icon="brain-circuit">
+    Quantized LLaMA-3 on IGX Orin edge servers
   </Card>
-  <Card title="Peer-to-peer" icon="users">
-    Mesh network knowledge sharing
+  <Card title="Kenyan curriculum" icon="book-open">
+    Fine-tuned on CBC (Competency-Based Curriculum)
   </Card>
-  <Card title="Competency-based" icon="certificate">
-    Adaptive testing and progression
+  <Card title="6G Ghost-Mesh" icon="wifi">
+    Low-cost tablets connected via mesh network
   </Card>
-  <Card title="WHO standards" icon="hospital">
-    Integrated training standards
+  <Card title="Offline operation" icon="wifi-slash">
+    Full functionality without internet
   </Card>
 </CardGroup>
+
+## Civilization-scale singularity
+
+**The Context:** Teacher-to-student ratios in camps are 1:100. Education is the only exit strategy for youth.
+
+**The Singularity:** Local-LLM Education Agents (NIMs).
+
+**Deep Architecture:** A quantized LLaMA-3 or similar model fine-tuned on the Kenyan Curriculum (CBC), hosted on the local IGX Orin. It provides personalized tutoring to thousands of students via the 6G Ghost-Mesh on low-cost tablets, even offline.
+
+**Impact:** Democratizes high-quality education without internet costs.
 
 ## Quick start
 
 ```python
-from education.knowledge_mesh import KnowledgeMesh
+from education.knowledge_mesh import SovereignTutor
 
-# Initialize mesh node
-mesh = KnowledgeMesh(
-    node_id="NODE-DADAAB-001",
-    sovereignty_zone="KDPA_KE"
+# Initialize local AI tutor
+tutor = SovereignTutor(
+    model="llama3-8b-cbc-finetuned",
+    device="igx_orin",
+    mesh_network="ghost_mesh_dadaab"
 )
 
-# Create learning module
-mesh.create_learning_module({
+# Generate personalized lesson
+lesson = tutor.generate_lesson(
+    subject="mathematics",
+    grade_level=8,
+    student_profile={
+        "language": "somali_english_mixed",
+        "learning_style": "visual",
+        "previous_scores": {"algebra": 65, "geometry": 78}
+    }
+)
+
+print(f"Lesson plan: {lesson.lesson_plan}")
+print(f"Language: {lesson.language}")
+print(f"Estimated duration: {lesson.duration_minutes} minutes")
+
+# Adaptive assessment
+assessment = tutor.assess_student(
+    student_id="STUDENT-AMINA-001",
+    subject="mathematics",
+    adaptive=True
+)
+
+print(f"Competency level: {assessment.competency_level}")
+print(f"Recommended next topic: {assessment.next_topic}")
+print(f"Learning gaps: {assessment.gaps}")
+```
+
+## Real-world scenario (Dadaab 2026)
+
+**Scenario:** 15,000 secondary school students in Dadaab need to prepare for the Kenya Certificate of Secondary Education (KCSE) exam, but there are only 150 qualified teachers.
+
+**Challenge:** Traditional classroom instruction cannot scale. Students have varying levels of English proficiency and learn at different paces.
+
+**Solution:** Knowledge Mesh deploys sovereign AI tutors:
+
+1. **Edge deployment:** IGX Orin servers host quantized LLaMA-3 models fine-tuned on CBC curriculum
+2. **Mesh distribution:** 15,000 low-cost tablets connect via 6G Ghost-Mesh (no internet required)
+3. **Personalized learning:** Each student receives adaptive tutoring in Somali/English mix
+4. **Competency tracking:** System identifies learning gaps and adjusts curriculum in real-time
+5. **Teacher augmentation:** Human teachers focus on mentorship while AI handles content delivery
+
+**Result:** KCSE pass rates increase from 42% to 78% in one academic year.
+
+## Integration with health training
+
+Knowledge Mesh also trains Community Health Volunteers (CHVs):
+
+```python
+# Create CHV training module
+tutor.create_health_training_module({
     "module_id": "CHOLERA-RESPONSE-101",
     "title": "Cholera Response Basics",
     "language": "swahili",
     "duration_minutes": 30,
-    "competencies": ["diagnosis", "treatment", "prevention"]
+    "competencies": ["diagnosis", "treatment", "prevention"],
+    "who_standards": True
 })
 
-# Assess competency
-result = mesh.assess_competency(
+# Assess CHV competency
+result = tutor.assess_competency(
     learner_id="CHV-AMINA",
     skill="cholera_diagnosis"
 )
 print(f"Competency level: {result.level}")
+print(f"Certification ready: {result.certification_ready}")
 ```
 
 ## Next steps
@@ -67,5 +132,11 @@ print(f"Competency level: {result.level}")
   </Card>
   <Card title="AI agents" icon="brain-circuit" href="/ai-agents/overview">
     Autonomous surveillance integration
+  </Card>
+  <Card title="Use case matrix" icon="table" href="/architecture/use-case-matrix">
+    Real-world applications
+  </Card>
+  <Card title="Governance" icon="shield-check" href="/governance/overview">
+    Educational data sovereignty
   </Card>
 </CardGroup>
