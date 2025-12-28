@@ -1,27 +1,94 @@
 ---
-title: Security workflows & repository files
-description: Complete guide to implementing the Sovereign Health Fortress
+title: Security workflows
+description: Implementation guide for CodeQL, Gitleaks, and Dependabot
 ---
 
 ## Overview
 
-This guide provides all the files you need to copy from this documentation repository to your iLuminara-Core repository to implement the complete Sovereign Health Fortress security stack.
+This page provides the complete implementation files for the iLuminara-Core Security Audit Layer. Copy these files to your repository to activate the Sovereign Health Fortress.
 
-<Card
-  title="Implementation Status"
-  icon="check-circle"
->
-  All files are ready for deployment. Copy to your repository and commit.
-</Card>
+## File Structure
 
-## Files to copy
+```
+iLuminara-Core/
+├── .github/
+│   ├── workflows/
+│   │   ├── codeql.yml          # SAST security scanning
+│   │   └── gitleaks.yml        # Secret detection
+│   └── dependabot.yml          # Daily security updates
+├── .gitleaks.toml              # Secret detection rules
+├── governance_kernel/
+│   └── crypto_shredder.py      # IP-02 implementation
+├── config/
+│   └── sovereign_guardrail.yaml # Compliance configuration
+├── scripts/
+│   └── validate_fortress.sh    # Fortress validation
+└── generate_full_docs.py       # Total ingestion engine
+```
 
-### Security workflows
+## Installation
 
-#### 1. CodeQL SAST scanning
+### Step 1: Copy Security Workflows
+
+```bash
+# Create directories
+mkdir -p .github/workflows
+
+# Copy CodeQL workflow
+cat > .github/workflows/codeql.yml << 'EOF'
+# See full content in CodeQL section below
+EOF
+
+# Copy Gitleaks workflow
+cat > .github/workflows/gitleaks.yml << 'EOF'
+# See full content in Gitleaks section below
+EOF
+
+# Copy Dependabot config
+cat > .github/dependabot.yml << 'EOF'
+# See full content in Dependabot section below
+EOF
+
+# Copy Gitleaks config
+cat > .gitleaks.toml << 'EOF'
+# See full content in Gitleaks Config section below
+EOF
+```
+
+### Step 2: Copy Governance Files
+
+```bash
+# Create directories
+mkdir -p governance_kernel config scripts
+
+# Copy Crypto Shredder
+# See Crypto Shredder section below
+
+# Copy SovereignGuardrail config
+# See SovereignGuardrail section below
+
+# Copy validation script
+# See Validation Script section below
+```
+
+### Step 3: Copy Ingestion Engine
+
+```bash
+# Copy ingestion script
+# See Ingestion Engine section below
+
+# Make executable
+chmod +x generate_full_docs.py
+chmod +x scripts/validate_fortress.sh
+```
+
+## CodeQL Workflow
 
 **File:** `.github/workflows/codeql.yml`
 
+This workflow provides SAST (Static Application Security Testing) for Python and JavaScript code.
+
+<Accordion title="View complete CodeQL workflow">
 ```yaml
 name: "CodeQL Security Analysis"
 
@@ -81,11 +148,20 @@ jobs:
         echo "📊 Compliance: GDPR Art. 32 (Security of Processing)"
         echo "🔒 Framework: ISO 27001 A.12.6 (Technical Vulnerability Management)"
 ```
+</Accordion>
 
-#### 2. Gitleaks secret scanning
+**Compliance:**
+- GDPR Art. 32 (Security of Processing)
+- ISO 27001 A.12.6 (Technical Vulnerability Management)
+- SOC 2 (Security Monitoring)
+
+## Gitleaks Workflow
 
 **File:** `.github/workflows/gitleaks.yml`
 
+This workflow detects hardcoded secrets, API keys, and credentials.
+
+<Accordion title="View complete Gitleaks workflow">
 ```yaml
 name: "Gitleaks Secret Scanning"
 
@@ -133,11 +209,19 @@ jobs:
         echo "🛡️ Framework: HIPAA §164.312(a)(2)(i) (Unique User Identification)"
         echo "⚡ IP-02: Ephemeral key validation active"
 ```
+</Accordion>
 
-#### 3. Gitleaks configuration
+**Compliance:**
+- NIST SP 800-53 (IA-5 Authenticator Management)
+- HIPAA §164.312(a)(2)(i) (Unique User Identification)
+
+## Gitleaks Configuration
 
 **File:** `.gitleaks.toml`
 
+Custom rules for secret detection with sovereignty awareness.
+
+<Accordion title="View complete Gitleaks configuration">
 ```toml
 # iLuminara-Core Gitleaks Configuration
 # Sovereign Health Fortress - Secret Detection Rules
@@ -171,6 +255,24 @@ description = "Private Key"
 regex = '''-----BEGIN (RSA|EC|OPENSSH|PGP) PRIVATE KEY-----'''
 tags = ["key", "crypto-shredder"]
 
+[[rules]]
+id = "slack-token"
+description = "Slack Token"
+regex = '''xox[baprs]-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24,32}'''
+tags = ["token", "slack"]
+
+[[rules]]
+id = "github-token"
+description = "GitHub Personal Access Token"
+regex = '''ghp_[0-9a-zA-Z]{36}'''
+tags = ["token", "github"]
+
+[[rules]]
+id = "jwt-token"
+description = "JWT Token"
+regex = '''eyJ[A-Za-z0-9-_=]+\.eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_.+/=]*'''
+tags = ["token", "jwt"]
+
 [allowlist]
 description = "Allowlist for test files and documentation"
 paths = [
@@ -192,11 +294,15 @@ regexes = [
   '''<YOUR_.*>''',
 ]
 ```
+</Accordion>
 
-#### 4. Dependabot configuration
+## Dependabot Configuration
 
 **File:** `.github/dependabot.yml`
 
+Daily automated security updates for all dependencies.
+
+<Accordion title="View complete Dependabot configuration">
 ```yaml
 # iLuminara-Core Dependabot Configuration
 # Daily security updates for the Sovereign Health Fortress
@@ -224,6 +330,10 @@ updates:
     
     versioning-strategy: increase-if-necessary
     
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-patch"]
+    
     groups:
       security:
         patterns:
@@ -236,6 +346,16 @@ updates:
       google-cloud:
         patterns:
           - "google-cloud-*"
+        update-types:
+          - "minor"
+          - "patch"
+      
+      ai-ml:
+        patterns:
+          - "tensorflow"
+          - "torch"
+          - "scikit-learn"
+          - "shap"
         update-types:
           - "minor"
           - "patch"
@@ -257,237 +377,82 @@ updates:
       - "fortress-maintenance"
     commit-message:
       prefix: "chore(actions)"
+
+  # Docker
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "02:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "VISENDI56"
+    labels:
+      - "dependencies"
+      - "docker"
+      - "fortress-maintenance"
+    commit-message:
+      prefix: "chore(docker)"
+
+  # npm (if using JavaScript/TypeScript)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "daily"
+      time: "02:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "VISENDI56"
+    labels:
+      - "dependencies"
+      - "npm"
+      - "fortress-maintenance"
+    commit-message:
+      prefix: "chore(npm)"
+    
+    versioning-strategy: increase-if-necessary
+    
+    groups:
+      security:
+        patterns:
+          - "*"
+        update-types:
+          - "security"
 ```
+</Accordion>
 
-### Governance kernel files
-
-#### 5. Crypto Shredder (IP-02)
-
-**File:** `governance_kernel/crypto_shredder.py`
-
-See the complete implementation in the `repository-files/governance_kernel/crypto_shredder.py` file created earlier.
-
-Key features:
-- Ephemeral key encryption
-- Automatic key shredding after retention period
-- GDPR Art. 17 compliant
-- DoD 5220.22-M standard overwriting
-
-#### 6. SovereignGuardrail configuration
-
-**File:** `config/sovereign_guardrail.yaml`
-
-See the complete configuration in the `repository-files/config/sovereign_guardrail.yaml` file created earlier.
-
-Key features:
-- 14 global legal frameworks
-- Data sovereignty enforcement
-- Cross-border transfer validation
-- Tamper-proof audit trail
-
-### Validation scripts
-
-#### 7. Fortress validation script
-
-**File:** `scripts/validate_fortress.sh`
-
-See the complete script in the `repository-files/scripts/validate_fortress.sh` file created earlier.
-
-Validates:
-- Security audit layer (CodeQL, Gitleaks, Dependabot)
-- Governance kernel (SovereignGuardrail, Crypto Shredder)
-- Edge node & AI agents
-- Cloud oracle
-- Python dependencies
-- Environment configuration
-- Nuclear IP Stack status
-
-## Implementation steps
-
-<Steps>
-  <Step title="Copy security workflows">
-    Copy `.github/workflows/codeql.yml`, `.github/workflows/gitleaks.yml`, `.gitleaks.toml`, and `.github/dependabot.yml` to your repository
-  </Step>
-  <Step title="Copy governance files">
-    Copy `governance_kernel/crypto_shredder.py` and `config/sovereign_guardrail.yaml` to your repository
-  </Step>
-  <Step title="Copy validation script">
-    Copy `scripts/validate_fortress.sh` to your repository and make it executable: `chmod +x scripts/validate_fortress.sh`
-  </Step>
-  <Step title="Commit and push">
-    ```bash
-    git add .
-    git commit -m "feat: integrate SovereignGuardrail and Nuclear IP security stack"
-    git push
-    ```
-  </Step>
-  <Step title="Enable branch protection">
-    Use GitHub CLI to enable branch protection:
-    ```bash
-    gh api repos/VISENDI56/iLuminara-Core/branches/main/protection \
-      --method PUT \
-      --field required_status_checks='{"strict":true,"contexts":["CodeQL","Gitleaks"]}' \
-      --field enforce_admins=true \
-      --field required_pull_request_reviews='{"required_approving_review_count":1}'
-    ```
-  </Step>
-  <Step title="Validate fortress">
-    Run the validation script:
-    ```bash
-    ./scripts/validate_fortress.sh
-    ```
-  </Step>
-</Steps>
-
-## Environment variables
-
-Set these environment variables in your deployment:
-
-```bash
-# Node identification
-export NODE_ID=JOR-47
-export JURISDICTION=KDPA_KE
-
-# API configuration
-export API_HOST=0.0.0.0
-export API_PORT=8080
-
-# GCP configuration
-export GOOGLE_CLOUD_PROJECT=your-project-id
-export GCP_REGION=us-central1
-
-# Governance configuration
-export ENABLE_TAMPER_PROOF_AUDIT=true
-export RETENTION_MAX_DAYS=1825
-export AUDIT_LOG_LEVEL=INFO
-
-# Sovereignty settings
-export DATA_SOVEREIGNTY_REQUIRED=true
-export REQUIRES_EXPLICIT_CONSENT=true
-
-# AI agents configuration
-export ENABLE_OFFLINE_MODE=true
-export SYNC_INTERVAL_SECONDS=300
-
-# Federated learning
-export FEDERATED_LEARNING_EPSILON=1.0
-export FEDERATED_LEARNING_DELTA=1e-5
-```
-
-## GitHub secrets
-
-Configure these secrets in your GitHub repository:
-
-| Secret | Description |
-|--------|-------------|
-| `GOOGLE_CLOUD_CREDENTIALS` | GCP service account JSON |
-| `GITLEAKS_LICENSE` | Gitleaks license key (optional) |
-| `SLACK_WEBHOOK_URL` | Slack webhook for notifications |
-
-## Verification
-
-After implementation, verify the fortress:
-
-```bash
-# Run validation script
-./scripts/validate_fortress.sh
-
-# Check CodeQL status
-gh api repos/VISENDI56/iLuminara-Core/code-scanning/alerts
-
-# Check Dependabot status
-gh api repos/VISENDI56/iLuminara-Core/dependabot/alerts
-
-# Test Crypto Shredder
-python -c "from governance_kernel.crypto_shredder import CryptoShredder; print('✅ Crypto Shredder operational')"
-
-# Test SovereignGuardrail
-python -c "from governance_kernel.vector_ledger import SovereignGuardrail; print('✅ SovereignGuardrail operational')"
-```
-
-## Monitoring
-
-Monitor fortress status using:
-
-### Prometheus metrics
-
-```
-sovereignty_violations_total
-cross_border_transfers_total
-high_risk_inferences_total
-keys_shredded_total
-```
-
-### Grafana dashboards
-
-- **Sovereignty Compliance** - Real-time compliance monitoring
-- **Audit Trail** - Tamper-proof audit visualization
-- **Data Retention** - Key lifecycle and auto-shred status
-
-## Troubleshooting
-
-### CodeQL fails
-
-```bash
-# Check workflow logs
-gh run list --workflow=codeql.yml
-
-# View specific run
-gh run view <run-id>
-```
-
-### Gitleaks detects false positives
-
-Add to `.gitleaks.toml` allowlist:
-
-```toml
-[allowlist]
-paths = [
-  '''path/to/false/positive\.py''',
-]
-```
-
-### Crypto Shredder key not found
-
-```python
-from governance_kernel.crypto_shredder import CryptoShredder
-
-shredder = CryptoShredder()
-
-# Check key status
-status = shredder.get_key_status(key_id)
-print(status)
-```
-
-## Next steps
+## Next Steps
 
 <CardGroup cols={2}>
   <Card
-    title="Security overview"
-    icon="shield-halved"
+    title="Crypto Shredder"
+    icon="fire"
     href="/security/overview"
   >
-    Understand the complete security stack
+    View IP-02 implementation
   </Card>
   <Card
-    title="Governance kernel"
+    title="SovereignGuardrail"
     icon="shield-check"
     href="/governance/overview"
   >
-    Configure compliance enforcement
+    Configure compliance
   </Card>
   <Card
-    title="Deployment"
-    icon="rocket"
-    href="/deployment/overview"
+    title="Validation Script"
+    icon="check-circle"
+    href="/security/overview"
   >
-    Deploy to production
+    Validate fortress status
   </Card>
   <Card
-    title="API reference"
-    icon="terminal"
-    href="/api-reference/overview"
+    title="Ingestion Guide"
+    icon="book"
+    href="/security/overview"
   >
-    Integrate with your application
+    Complete ingestion guide
   </Card>
 </CardGroup>
