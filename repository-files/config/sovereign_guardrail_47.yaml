@@ -1,0 +1,788 @@
+# iLuminara-Core SovereignGuardrail Configuration
+# Enforces 47 global legal frameworks for health data sovereignty
+
+version: "2.0.0"
+fortress_name: "iLuminara Sovereign Health Fortress"
+framework_count: 47
+
+# Jurisdiction Configuration
+jurisdiction:
+  primary: "KDPA_KE"  # Kenya Data Protection Act
+  secondary:
+    - "GDPR_EU"      # European Union
+    - "POPIA_ZA"     # South Africa
+    - "HIPAA_US"     # United States
+    - "PIPEDA_CA"    # Canada
+
+# Data Sovereignty Rules
+sovereignty:
+  # Rule 1: PHI cannot leave sovereign territory
+  data_residency:
+    enabled: true
+    allowed_zones:
+      - "africa-south1"      # Kenya, South Africa
+      - "europe-west1"       # EU (GDPR)
+      - "northamerica-northeast1"  # Canada (PIPEDA)
+      - "us-central1"        # USA (HIPAA) - requires explicit consent
+    
+    blocked_zones:
+      - "asia-*"             # Sovereignty violation
+      - "australia-*"        # Sovereignty violation
+      - "southamerica-*"     # Sovereignty violation
+    
+    enforcement_level: "STRICT"  # STRICT | MODERATE | PERMISSIVE
+    
+  # Rule 2: Cross-border transfers require explicit authorization
+  cross_border_transfers:
+    enabled: true
+    require_authorization: true
+    authorization_authority: "Data Protection Commissioner"
+    
+    # Standard Contractual Clauses (GDPR Art. 46)
+    scc_required: true
+    
+    # Adequacy decisions (GDPR Art. 45)
+    adequacy_whitelist:
+      - "EU"
+      - "UK"
+      - "Switzerland"
+      - "Canada"
+
+# Right to Explanation (EU AI Act §6, GDPR Art. 22)
+explainability:
+  enabled: true
+  
+  # High-risk AI systems require explanation
+  high_risk_threshold: 0.7  # Confidence score
+  
+  # Explanation methods
+  methods:
+    - "SHAP"           # SHapley Additive exPlanations
+    - "LIME"           # Local Interpretable Model-agnostic Explanations
+    - "Feature_Importance"
+  
+  # Minimum explanation requirements
+  requirements:
+    - "confidence_score"
+    - "evidence_chain"
+    - "feature_contributions"
+    - "decision_rationale"
+
+# Consent Management (GDPR Art. 6, POPIA §11, CCPA §1798.100)
+consent:
+  enabled: true
+  
+  # Consent must be explicit for PHI
+  require_explicit_consent: true
+  
+  # Consent scope
+  valid_scopes:
+    - "diagnosis"
+    - "treatment"
+    - "research"
+    - "public_health_surveillance"
+    - "emergency_response"
+  
+  # Consent expiration
+  expiration_days: 365
+  
+  # Emergency override (WHO IHR Article 6)
+  emergency_override:
+    enabled: true
+    conditions:
+      - "public_health_emergency"
+      - "outbreak_response"
+      - "life_threatening_situation"
+
+# Data Retention (GDPR Art. 17, HIPAA §164.530(j))
+retention:
+  enabled: true
+  
+  # Retention policies
+  policies:
+    HOT:
+      days: 180
+      description: "Active operational data"
+      storage_class: "STANDARD"
+    
+    WARM:
+      days: 365
+      description: "Compliance minimum (HIPAA)"
+      storage_class: "NEARLINE"
+    
+    COLD:
+      days: 1825
+      description: "Legal hold maximum (GDPR Art. 17)"
+      storage_class: "COLDLINE"
+    
+    ETERNAL:
+      days: -1
+      description: "Never expires (requires explicit justification)"
+      storage_class: "ARCHIVE"
+  
+  # Auto-shred expired keys (IP-02)
+  auto_shred_enabled: true
+  auto_shred_schedule: "0 2 * * *"  # Daily at 2 AM UTC
+
+# Audit Trail (GDPR Art. 30, HIPAA §164.312(b), SOC 2)
+audit:
+  enabled: true
+  
+  # Tamper-proof audit
+  tamper_proof: true
+  
+  # Audit storage
+  storage:
+    backend: "Cloud_Spanner"  # or "Bigtable", "Local"
+    region: "africa-south1"
+    retention_days: 2555  # 7 years (HIPAA requirement)
+  
+  # Cryptographic signing
+  signing:
+    enabled: true
+    algorithm: "SHA256_RSA"
+    key_management: "Cloud_KMS"
+  
+  # Audit events
+  events:
+    - "Data_Transfer"
+    - "High_Risk_Inference"
+    - "Consent_Validation"
+    - "Data_Retention"
+    - "Key_Shred"
+    - "Sovereignty_Violation"
+    - "Emergency_Override"
+
+# Humanitarian Constraints (Geneva Convention, WHO IHR)
+humanitarian:
+  enabled: true
+  
+  # Constraints
+  constraints:
+    - "Medical_Ethics"
+    - "Resource_Allocation"
+    - "Data_Protection"
+    - "Population_Protection"
+    - "Emergency_Response"
+  
+  # Margin calculation
+  margin_threshold: 0.15  # 15% humanitarian margin
+  
+  # Emergency protocols
+  emergency_protocols:
+    - "WHO_IHR_Article_6"
+    - "Geneva_Convention_Article_3"
+    - "UN_Humanitarian_Principles"
+
+# ═══════════════════════════════════════════════════════════════
+# 47 GLOBAL LEGAL FRAMEWORKS
+# ═══════════════════════════════════════════════════════════════
+
+frameworks:
+  # ─────────────────────────────────────────────────────────────
+  # CATEGORY 1: Core Privacy & Data Protection (14 frameworks)
+  # ─────────────────────────────────────────────────────────────
+  
+  GDPR:
+    enabled: true
+    category: "Core Privacy & Data Protection"
+    region: "EU"
+    full_name: "General Data Protection Regulation"
+    articles:
+      - "Art. 6 (Lawfulness of Processing)"
+      - "Art. 9 (Special Categories)"
+      - "Art. 17 (Right to Erasure)"
+      - "Art. 22 (Right to Explanation)"
+      - "Art. 30 (Records of Processing)"
+      - "Art. 32 (Security of Processing)"
+      - "Art. 45 (Adequacy Decisions)"
+      - "Art. 46 (Standard Contractual Clauses)"
+  
+  KDPA:
+    enabled: true
+    category: "Core Privacy & Data Protection"
+    region: "Kenya"
+    full_name: "Kenya Data Protection Act"
+    sections:
+      - "§37 (Transfer Restrictions)"
+      - "§42 (Data Subject Rights)"
+      - "§43 (Right to Access)"
+      - "§44 (Right to Rectification)"
+  
+  HIPAA:
+    enabled: true
+    category: "Core Privacy & Data Protection"
+    region: "USA"
+    full_name: "Health Insurance Portability and Accountability Act"
+    sections:
+      - "§164.312 (Physical/Technical Safeguards)"
+      - "§164.530(j) (Documentation)"
+      - "§164.308 (Administrative Safeguards)"
+      - "§164.310 (Physical Safeguards)"
+  
+  POPIA:
+    enabled: true
+    category: "Core Privacy & Data Protection"
+    region: "South Africa"
+    full_name: "Protection of Personal Information Act"
+    sections:
+      - "§11 (Lawfulness)"
+      - "§14 (Cross-border Transfers)"
+      - "§15 (Security Safeguards)"
+      - "§16 (Data Subject Participation)"
+  
+  PIPEDA:
+    enabled: true
+    category: "Core Privacy & Data Protection"
+    region: "Canada"
+    full_name: "Personal Information Protection and Electronic Documents Act"
+    sections:
+      - "§5-7 (Lawfulness of Processing)"
+      - "§8 (Openness)"
+      - "§9 (Individual Access)"
+  
+  CCPA:
+    enabled: true
+    category: "Core Privacy & Data Protection"
+    region: "California, USA"
+    full_name: "California Consumer Privacy Act"
+    sections:
+      - "§1798.100 (Right to Know)"
+      - "§1798.105 (Right to Delete)"
+      - "§1798.110 (Right to Access)"
+      - "§1798.120 (Right to Opt-Out)"
+  
+  CPRA:
+    enabled: true
+    category: "Core Privacy & Data Protection"
+    region: "California, USA"
+    full_name: "California Privacy Rights Act"
+    sections:
+      - "§1798.121 (Right to Correct)"
+      - "§1798.140 (Sensitive Personal Information)"
+  
+  LGPD:
+    enabled: true
+    category: "Core Privacy & Data Protection"
+    region: "Brazil"
+    full_name: "Lei Geral de Proteção de Dados"
+    articles:
+      - "Art. 7 (Lawful Basis)"
+      - "Art. 11 (Processing of Sensitive Data)"
+      - "Art. 33 (International Data Transfer)"
+  
+  PDPA_SG:
+    enabled: true
+    category: "Core Privacy & Data Protection"
+    region: "Singapore"
+    full_name: "Personal Data Protection Act (Singapore)"
+    sections:
+      - "§11 (Consent)"
+      - "§24 (Security)"
+      - "§26 (Transfer Limitation)"
+  
+  APPI:
+    enabled: true
+    category: "Core Privacy & Data Protection"
+    region: "Japan"
+    full_name: "Act on the Protection of Personal Information"
+    articles:
+      - "Art. 23 (Provision to Third Parties)"
+      - "Art. 24 (Cross-border Transfer)"
+  
+  PIPL:
+    enabled: true
+    category: "Core Privacy & Data Protection"
+    region: "China"
+    full_name: "Personal Information Protection Law"
+    articles:
+      - "Art. 13 (Consent)"
+      - "Art. 38 (Cross-border Transfer)"
+      - "Art. 51 (Security Assessment)"
+  
+  PDPA_MY:
+    enabled: true
+    category: "Core Privacy & Data Protection"
+    region: "Malaysia"
+    full_name: "Personal Data Protection Act (Malaysia)"
+    sections:
+      - "§6 (General Principle)"
+      - "§129 (Transfer to Places Outside Malaysia)"
+  
+  DPD_UK:
+    enabled: true
+    category: "Core Privacy & Data Protection"
+    region: "United Kingdom"
+    full_name: "Data Protection Act (UK GDPR)"
+    sections:
+      - "§3 (GDPR Principles)"
+      - "§17A (International Data Transfer)"
+  
+  HITECH:
+    enabled: true
+    category: "Core Privacy & Data Protection"
+    region: "USA"
+    full_name: "Health Information Technology for Economic and Clinical Health Act"
+    sections:
+      - "§13410 (Notification of Breach)"
+      - "§13402 (Breach Notification Requirements)"
+
+  # ─────────────────────────────────────────────────────────────
+  # CATEGORY 2: Cybersecurity & Information Security (8 frameworks)
+  # ─────────────────────────────────────────────────────────────
+  
+  NIST_CSF:
+    enabled: true
+    category: "Cybersecurity & Information Security"
+    region: "USA"
+    full_name: "NIST Cybersecurity Framework"
+    functions:
+      - "Identify"
+      - "Protect"
+      - "Detect"
+      - "Respond"
+      - "Recover"
+  
+  ISO_27001:
+    enabled: true
+    category: "Cybersecurity & Information Security"
+    region: "Global"
+    full_name: "ISO/IEC 27001 Information Security Management"
+    controls:
+      - "A.8.3.2 (Disposal of Media)"
+      - "A.12.4 (Logging)"
+      - "A.12.6 (Technical Vulnerability Management)"
+      - "A.18.1 (Compliance with Legal Requirements)"
+  
+  SOC_2:
+    enabled: true
+    category: "Cybersecurity & Information Security"
+    region: "USA"
+    full_name: "Service Organization Control 2"
+    criteria:
+      - "Security"
+      - "Availability"
+      - "Processing Integrity"
+      - "Confidentiality"
+      - "Privacy"
+  
+  CIS_CONTROLS:
+    enabled: true
+    category: "Cybersecurity & Information Security"
+    region: "Global"
+    full_name: "CIS Critical Security Controls"
+    controls:
+      - "Control 1: Inventory of Assets"
+      - "Control 3: Data Protection"
+      - "Control 6: Access Control Management"
+      - "Control 8: Audit Log Management"
+  
+  MITRE_ATTACK:
+    enabled: true
+    category: "Cybersecurity & Information Security"
+    region: "Global"
+    full_name: "MITRE ATT&CK Framework"
+    tactics:
+      - "Initial Access"
+      - "Persistence"
+      - "Defense Evasion"
+      - "Exfiltration"
+  
+  ISO_22301:
+    enabled: true
+    category: "Cybersecurity & Information Security"
+    region: "Global"
+    full_name: "ISO 22301 Business Continuity Management"
+    clauses:
+      - "Clause 8.4 (Business Continuity Plans)"
+      - "Clause 9.1 (Monitoring and Measurement)"
+  
+  NIST_800_53:
+    enabled: true
+    category: "Cybersecurity & Information Security"
+    region: "USA"
+    full_name: "NIST SP 800-53 Security Controls"
+    controls:
+      - "AC (Access Control)"
+      - "AU (Audit and Accountability)"
+      - "IA (Identification and Authentication)"
+      - "SC (System and Communications Protection)"
+  
+  COBIT:
+    enabled: true
+    category: "Cybersecurity & Information Security"
+    region: "Global"
+    full_name: "Control Objectives for Information Technologies"
+    domains:
+      - "Align, Plan and Organise"
+      - "Build, Acquire and Implement"
+      - "Deliver, Service and Support"
+      - "Monitor, Evaluate and Assess"
+
+  # ─────────────────────────────────────────────────────────────
+  # CATEGORY 3: AI Ethics & Governance (6 frameworks)
+  # ─────────────────────────────────────────────────────────────
+  
+  EU_AI_ACT:
+    enabled: true
+    category: "AI Ethics & Governance"
+    region: "EU"
+    full_name: "EU Artificial Intelligence Act"
+    articles:
+      - "§6 (High-Risk AI)"
+      - "§8 (Transparency)"
+      - "§12 (Record Keeping)"
+      - "§13 (Transparency for Users)"
+      - "§52 (Prohibited AI Practices)"
+  
+  IEEE_ETHICS:
+    enabled: true
+    category: "AI Ethics & Governance"
+    region: "Global"
+    full_name: "IEEE Ethically Aligned Design"
+    principles:
+      - "Human Rights"
+      - "Well-being"
+      - "Data Agency"
+      - "Effectiveness"
+      - "Transparency"
+  
+  UNESCO_AI:
+    enabled: true
+    category: "AI Ethics & Governance"
+    region: "Global"
+    full_name: "UNESCO Recommendation on AI Ethics"
+    values:
+      - "Human Dignity"
+      - "Living in Peaceful Societies"
+      - "Environmental Sustainability"
+      - "Cultural Diversity"
+  
+  OECD_AI:
+    enabled: true
+    category: "AI Ethics & Governance"
+    region: "Global"
+    full_name: "OECD AI Principles"
+    principles:
+      - "Inclusive Growth"
+      - "Human-Centred Values"
+      - "Transparency"
+      - "Robustness"
+      - "Accountability"
+  
+  ISO_42001:
+    enabled: true
+    category: "AI Ethics & Governance"
+    region: "Global"
+    full_name: "ISO/IEC 42001 AI Management System"
+    requirements:
+      - "AI Policy"
+      - "Risk Management"
+      - "Transparency"
+      - "Continuous Improvement"
+  
+  NIST_AI_RMF:
+    enabled: true
+    category: "AI Ethics & Governance"
+    region: "USA"
+    full_name: "NIST AI Risk Management Framework"
+    functions:
+      - "Govern"
+      - "Map"
+      - "Measure"
+      - "Manage"
+
+  # ─────────────────────────────────────────────────────────────
+  # CATEGORY 4: Healthcare-Specific (5 frameworks)
+  # ─────────────────────────────────────────────────────────────
+  
+  GDPR_ART9:
+    enabled: true
+    category: "Healthcare-Specific"
+    region: "EU"
+    full_name: "GDPR Article 9 (Special Categories)"
+    provisions:
+      - "Explicit Prohibition on Foreign Transfers"
+      - "Health Data Processing Restrictions"
+      - "Explicit Consent Requirements"
+  
+  FDA_21_CFR_11:
+    enabled: true
+    category: "Healthcare-Specific"
+    region: "USA"
+    full_name: "FDA 21 CFR Part 11 (Electronic Records)"
+    requirements:
+      - "Electronic Signatures"
+      - "Audit Trails"
+      - "System Validation"
+  
+  GXP_COMPLIANCE:
+    enabled: true
+    category: "Healthcare-Specific"
+    region: "Global"
+    full_name: "Good Practice (GxP) Compliance"
+    standards:
+      - "GCP (Good Clinical Practice)"
+      - "GLP (Good Laboratory Practice)"
+      - "GMP (Good Manufacturing Practice)"
+  
+  HIPAA_SECURITY_RULE:
+    enabled: true
+    category: "Healthcare-Specific"
+    region: "USA"
+    full_name: "HIPAA Security Rule"
+    safeguards:
+      - "Administrative Safeguards"
+      - "Physical Safeguards"
+      - "Technical Safeguards"
+  
+  ISO_27799:
+    enabled: true
+    category: "Healthcare-Specific"
+    region: "Global"
+    full_name: "ISO 27799 Health Informatics Security"
+    controls:
+      - "Health Information Security Management"
+      - "Clinical Data Protection"
+      - "Patient Privacy"
+
+  # ─────────────────────────────────────────────────────────────
+  # CATEGORY 5: International Standards (4 frameworks)
+  # ─────────────────────────────────────────────────────────────
+  
+  ISO_9001:
+    enabled: true
+    category: "International Standards"
+    region: "Global"
+    full_name: "ISO 9001 Quality Management"
+    clauses:
+      - "Clause 4 (Context of Organization)"
+      - "Clause 8 (Operation)"
+      - "Clause 10 (Improvement)"
+  
+  ISO_14001:
+    enabled: true
+    category: "International Standards"
+    region: "Global"
+    full_name: "ISO 14001 Environmental Management"
+    requirements:
+      - "Environmental Policy"
+      - "Environmental Aspects"
+      - "Compliance Obligations"
+  
+  ISO_45001:
+    enabled: true
+    category: "International Standards"
+    region: "Global"
+    full_name: "ISO 45001 Occupational Health & Safety"
+    requirements:
+      - "Hazard Identification"
+      - "Risk Assessment"
+      - "Worker Participation"
+  
+  ISO_31000:
+    enabled: true
+    category: "International Standards"
+    region: "Global"
+    full_name: "ISO 31000 Risk Management"
+    principles:
+      - "Integrated"
+      - "Structured and Comprehensive"
+      - "Customized"
+      - "Inclusive"
+
+  # ─────────────────────────────────────────────────────────────
+  # CATEGORY 6: Regional & Sector-Specific (8 frameworks)
+  # ─────────────────────────────────────────────────────────────
+  
+  AFRICAN_UNION_DATA_POLICY:
+    enabled: true
+    category: "Regional & Sector-Specific"
+    region: "Africa"
+    full_name: "African Union Data Policy Framework"
+    pillars:
+      - "Data Sovereignty"
+      - "Digital Infrastructure"
+      - "Data Governance"
+  
+  ASEAN_DATA_PRIVACY:
+    enabled: true
+    category: "Regional & Sector-Specific"
+    region: "ASEAN"
+    full_name: "ASEAN Framework on Personal Data Protection"
+    principles:
+      - "Consent"
+      - "Notification"
+      - "Access and Correction"
+      - "Security"
+  
+  CARICOM:
+    enabled: true
+    category: "Regional & Sector-Specific"
+    region: "Caribbean"
+    full_name: "CARICOM Model Policy on Data Protection"
+    provisions:
+      - "Data Protection Principles"
+      - "Cross-border Data Flows"
+  
+  MERCOSUR:
+    enabled: true
+    category: "Regional & Sector-Specific"
+    region: "South America"
+    full_name: "MERCOSUR Data Protection Agreement"
+    articles:
+      - "Data Transfer Rules"
+      - "Mutual Recognition"
+  
+  EFTA:
+    enabled: true
+    category: "Regional & Sector-Specific"
+    region: "Europe"
+    full_name: "European Free Trade Association Data Rules"
+    provisions:
+      - "GDPR Alignment"
+      - "Cross-border Cooperation"
+  
+  APEC_PRIVACY:
+    enabled: true
+    category: "Regional & Sector-Specific"
+    region: "Asia-Pacific"
+    full_name: "APEC Privacy Framework"
+    principles:
+      - "Preventing Harm"
+      - "Notice"
+      - "Collection Limitation"
+      - "Accountability"
+  
+  FTC_ACT:
+    enabled: true
+    category: "Regional & Sector-Specific"
+    region: "USA"
+    full_name: "Federal Trade Commission Act"
+    sections:
+      - "§5 (Unfair or Deceptive Practices)"
+      - "Health Breach Notification Rule"
+  
+  CAN_SPAM:
+    enabled: true
+    category: "Regional & Sector-Specific"
+    region: "USA"
+    full_name: "Controlling the Assault of Non-Solicited Pornography And Marketing Act"
+    requirements:
+      - "Opt-out Mechanism"
+      - "Accurate Header Information"
+      - "Clear Identification"
+
+  # ─────────────────────────────────────────────────────────────
+  # CATEGORY 7: Humanitarian & Ethical (2 frameworks)
+  # ─────────────────────────────────────────────────────────────
+  
+  GENEVA_CONVENTION:
+    enabled: true
+    category: "Humanitarian & Ethical"
+    region: "Global"
+    full_name: "Geneva Convention (Medical Ethics)"
+    articles:
+      - "Article 3 (Humane Treatment)"
+      - "Article 12 (Protection of Medical Units)"
+      - "Article 16 (Protection of Civilian Medical Personnel)"
+  
+  WHO_IHR:
+    enabled: true
+    category: "Humanitarian & Ethical"
+    region: "Global"
+    full_name: "WHO International Health Regulations (2005)"
+    articles:
+      - "Article 6 (Notification)"
+      - "Article 12 (Public Health Emergency)"
+      - "Article 45 (Treatment of Personal Data)"
+
+# Enforcement Actions
+enforcement:
+  # Violation handling
+  on_violation:
+    action: "BLOCK"  # BLOCK | WARN | LOG
+    notify: true
+    escalate: true
+  
+  # Notification channels
+  notifications:
+    - type: "Email"
+      recipients:
+        - "compliance@iluminara.health"
+        - "dpo@iluminara.health"
+    
+    - type: "PubSub"
+      topic: "projects/iluminara/topics/sovereignty-violations"
+    
+    - type: "Slack"
+      webhook: "${SLACK_WEBHOOK_URL}"
+  
+  # Escalation
+  escalation:
+    enabled: true
+    threshold: 3  # violations
+    window_minutes: 60
+    escalate_to:
+      - "Chief Compliance Officer"
+      - "Data Protection Officer"
+
+# Integration with Nuclear IP Stack
+nuclear_ip:
+  IP_02_CRYPTO_SHREDDER:
+    enabled: true
+    auto_shred: true
+  
+  IP_03_ACORN_PROTOCOL:
+    enabled: false  # Requires hardware attestation
+  
+  IP_04_SILENT_FLUX:
+    enabled: true
+    anxiety_threshold: 0.7
+  
+  IP_05_GOLDEN_THREAD:
+    enabled: true
+    verification_threshold: 0.8
+  
+  IP_06_5DM_BRIDGE:
+    enabled: false  # Requires mobile network integration
+
+# Monitoring & Alerting
+monitoring:
+  enabled: true
+  
+  # Metrics
+  metrics:
+    - "sovereignty_violations_total"
+    - "cross_border_transfers_total"
+    - "high_risk_inferences_total"
+    - "consent_validations_total"
+    - "keys_shredded_total"
+    - "framework_compliance_score"
+  
+  # Prometheus integration
+  prometheus:
+    enabled: true
+    port: 9090
+    path: "/metrics"
+  
+  # Grafana dashboards
+  grafana:
+    enabled: true
+    dashboards:
+      - "Sovereignty Compliance (47 Frameworks)"
+      - "Audit Trail"
+      - "Data Retention"
+      - "Framework Coverage Matrix"
+
+# Development & Testing
+development:
+  # Relaxed mode for testing
+  relaxed_mode: false
+  
+  # Mock services
+  mock_services:
+    enabled: false
+  
+  # Test jurisdiction
+  test_jurisdiction: "GLOBAL_DEFAULT"

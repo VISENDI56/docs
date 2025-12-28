@@ -1,0 +1,150 @@
+---
+title: NVIDIA Omniverse Digital Twin
+description: Real-time 3D visualization and simulation for refugee camp health infrastructure
+---
+
+## Overview
+
+NVIDIA Omniverse Digital Twin provides real-time 3D visualization and simulation of refugee camp health infrastructure, enabling crisis response teams to visualize disease spread, optimize resource allocation, and collaborate in real-time.
+
+<Card
+  title="Implementation"
+  icon="cube"
+>
+  Complete implementation available in `repository-files/nvidia_integrations/omniverse_digital_twin.py`
+</Card>
+
+## Key capabilities
+
+<CardGroup cols={2}>
+  <Card title="3D visualization" icon="cube">
+    Real-time 3D camp layout with health facilities
+  </Card>
+  <Card title="Disease simulation" icon="virus">
+    Agent-based disease spread modeling
+  </Card>
+  <Card title="Resource optimization" icon="chart-line">
+    Visual resource allocation optimization
+  </Card>
+  <Card title="Multi-user collaboration" icon="users">
+    Real-time collaboration for crisis teams
+  </Card>
+</CardGroup>
+
+## Architecture
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│                NVIDIA OMNIVERSE DIGITAL TWIN                    │
+└────────────────────────────────────────────────────────────────┘
+                            │
+        ┌───────────────────┼───────────────────┐
+        │                   │                   │
+   ┌────▼────┐      ┌──────▼──────┐    ┌──────▼──────┐
+   │  USD    │      │   GOLDEN    │    │  NUCLEUS    │
+   │ STAGE   │──────│   THREAD    │────│  SERVER     │
+   │ (3D)    │      │  (Data)     │    │ (Collab)    │
+   └─────────┘      └─────────────┘    └─────────────┘
+```
+
+## Quick start
+
+```python
+from nvidia_integrations.omniverse_digital_twin import OmniverseDigitalTwin
+
+# Initialize digital twin
+twin = OmniverseDigitalTwin(
+    nucleus_server="omniverse://localhost",
+    camp_name="Dadaab"
+)
+
+# Create camp layout
+twin.create_camp_layout({
+    "tents": 5000,
+    "clinics": 3,
+    "water_points": 10,
+    "area_km2": 50
+})
+
+# Simulate disease spread
+twin.simulate_disease_spread({
+    "disease": "cholera",
+    "initial_cases": 10,
+    "r_effective": 2.3,
+    "duration_days": 30
+})
+
+# Visualize resource allocation
+twin.visualize_resource_allocation({
+    "ors_packets": 10000,
+    "antibiotics": 5000,
+    "health_workers": 50
+})
+```
+
+## Integration with Golden Thread
+
+```python
+from edge_node.sync_protocol.golden_thread import GoldenThread
+
+gt = GoldenThread()
+
+# Get verified outbreak data
+fused_data = gt.fuse_data_streams(
+    cbs_signal={"location": "Dadaab", "symptom": "diarrhea"},
+    emr_record={"location": "Dadaab", "diagnosis": "cholera"}
+)
+
+# Update digital twin with verified data
+twin.update_from_golden_thread(fused_data)
+```
+
+## Use cases
+
+<AccordionGroup>
+  <Accordion title="Crisis response planning">
+    Visualize camp layout and simulate response scenarios before deployment
+  </Accordion>
+  <Accordion title="Resource allocation">
+    Optimize placement of clinics, water points, and supply distribution
+  </Accordion>
+  <Accordion title="Disease spread modeling">
+    Predict disease spread patterns and identify high-risk areas
+  </Accordion>
+  <Accordion title="Training simulations">
+    Train health workers in virtual camp environments
+  </Accordion>
+</AccordionGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Implementation details"
+    icon="file-code"
+    href="/IMPLEMENTATION_COMPLETE"
+  >
+    View complete implementation
+  </Card>
+  <Card
+    title="Golden Thread"
+    icon="link"
+    href="/architecture/golden-thread"
+  >
+    Data fusion integration
+  </Card>
+  <Card
+    title="ESRI Geospatial"
+    icon="map"
+    href="/integrations/esri-geospatial"
+  >
+    Geospatial analysis layer
+  </Card>
+  <Card
+    title="AI agents"
+    icon="brain-circuit"
+    href="/ai-agents/overview"
+  >
+    Autonomous surveillance
+  </Card>
+</CardGroup>

@@ -1,0 +1,1331 @@
+# iLuminara-Core Complete SovereignGuardrail Configuration
+# Enforces 47 global legal frameworks for health data sovereignty
+
+version: "2.0.0"
+fortress_name: "iLuminara Sovereign Health Fortress"
+last_updated: "2025-12-28"
+
+# Jurisdiction Configuration
+jurisdiction:
+  primary: "KDPA_KE"  # Kenya Data Protection Act
+  secondary:
+    - "GDPR_EU"
+    - "POPIA_ZA"
+    - "HIPAA_US"
+    - "PIPEDA_CA"
+  auto_detect: true  # Automatically detect jurisdiction from data origin
+
+# ═══════════════════════════════════════════════════════════════════════════
+# COMPLETE COMPLIANCE FRAMEWORK MATRIX (47 Frameworks)
+# ═══════════════════════════════════════════════════════════════════════════
+
+frameworks:
+  # ─────────────────────────────────────────────────────────────────────────
+  # TIER 1: PRIMARY DATA PROTECTION FRAMEWORKS (14)
+  # ─────────────────────────────────────────────────────────────────────────
+  
+  GDPR:
+    name: "General Data Protection Regulation"
+    region: "European Union"
+    enabled: true
+    enforcement_level: "STRICT"
+    articles:
+      - id: "Art. 5"
+        title: "Principles relating to processing"
+        requirements: ["lawfulness", "fairness", "transparency"]
+      - id: "Art. 6"
+        title: "Lawfulness of processing"
+        requirements: ["consent", "contract", "legal_obligation"]
+      - id: "Art. 9"
+        title: "Processing of special categories"
+        requirements: ["explicit_consent", "health_data_protection"]
+      - id: "Art. 17"
+        title: "Right to erasure"
+        requirements: ["data_deletion", "crypto_shredder"]
+      - id: "Art. 22"
+        title: "Automated decision-making"
+        requirements: ["right_to_explanation", "human_intervention"]
+      - id: "Art. 25"
+        title: "Data protection by design"
+        requirements: ["privacy_by_default", "minimization"]
+      - id: "Art. 30"
+        title: "Records of processing activities"
+        requirements: ["audit_trail", "documentation"]
+      - id: "Art. 32"
+        title: "Security of processing"
+        requirements: ["encryption", "pseudonymization", "resilience"]
+      - id: "Art. 33"
+        title: "Notification of breach"
+        requirements: ["72_hour_notification", "incident_response"]
+      - id: "Art. 35"
+        title: "Data protection impact assessment"
+        requirements: ["dpia", "risk_assessment"]
+      - id: "Art. 44-50"
+        title: "Transfers to third countries"
+        requirements: ["adequacy_decision", "scc", "bcr"]
+    penalties:
+      max_fine: "€20M or 4% global revenue"
+      enforcement_authority: "Data Protection Authorities"
+  
+  KDPA:
+    name: "Kenya Data Protection Act"
+    region: "Kenya"
+    enabled: true
+    enforcement_level: "STRICT"
+    sections:
+      - id: "§25"
+        title: "Principles of data protection"
+        requirements: ["lawfulness", "purpose_limitation", "accuracy"]
+      - id: "§30"
+        title: "Processing of special personal data"
+        requirements: ["explicit_consent", "health_data_safeguards"]
+      - id: "§37"
+        title: "Transfer of personal data outside Kenya"
+        requirements: ["adequacy_determination", "dpc_authorization"]
+      - id: "§42"
+        title: "Rights of data subjects"
+        requirements: ["access", "rectification", "erasure", "portability"]
+      - id: "§48"
+        title: "Security of personal data"
+        requirements: ["technical_measures", "organizational_measures"]
+    penalties:
+      max_fine: "KES 5M or 1% revenue"
+      enforcement_authority: "Office of the Data Protection Commissioner"
+  
+  HIPAA:
+    name: "Health Insurance Portability and Accountability Act"
+    region: "United States"
+    enabled: true
+    enforcement_level: "STRICT"
+    sections:
+      - id: "§164.308"
+        title: "Administrative safeguards"
+        requirements: ["security_management", "workforce_security", "access_management"]
+      - id: "§164.310"
+        title: "Physical safeguards"
+        requirements: ["facility_access", "workstation_security", "device_controls"]
+      - id: "§164.312"
+        title: "Technical safeguards"
+        requirements: ["access_control", "audit_controls", "integrity", "transmission_security"]
+      - id: "§164.314"
+        title: "Organizational requirements"
+        requirements: ["business_associate_contracts", "group_health_plans"]
+      - id: "§164.316"
+        title: "Policies and procedures"
+        requirements: ["documentation", "updates", "availability"]
+      - id: "§164.404"
+        title: "Notification of breach"
+        requirements: ["60_day_notification", "media_notification"]
+      - id: "§164.530"
+        title: "Administrative requirements"
+        requirements: ["personnel_designations", "training", "safeguards"]
+    penalties:
+      max_fine: "$1.5M per violation category per year"
+      enforcement_authority: "HHS Office for Civil Rights"
+  
+  HITECH:
+    name: "Health Information Technology for Economic and Clinical Health Act"
+    region: "United States"
+    enabled: true
+    enforcement_level: "STRICT"
+    sections:
+      - id: "§13400"
+        title: "Application of security provisions"
+        requirements: ["business_associate_liability", "direct_liability"]
+      - id: "§13402"
+        title: "Notification in case of breach"
+        requirements: ["individual_notification", "media_notification", "hhs_notification"]
+      - id: "§13404"
+        title: "Application of privacy provisions"
+        requirements: ["accounting_of_disclosures", "restrictions"]
+      - id: "§13410"
+        title: "Increased penalties"
+        requirements: ["tiered_penalties", "willful_neglect"]
+    penalties:
+      max_fine: "$1.5M per violation"
+      enforcement_authority: "HHS Office for Civil Rights"
+  
+  PIPEDA:
+    name: "Personal Information Protection and Electronic Documents Act"
+    region: "Canada"
+    enabled: true
+    enforcement_level: "STRICT"
+    sections:
+      - id: "§5"
+        title: "Principles"
+        requirements: ["accountability", "consent", "limiting_collection"]
+      - id: "§6"
+        title: "Consent"
+        requirements: ["meaningful_consent", "withdrawal_rights"]
+      - id: "§7"
+        title: "Collection, use, disclosure"
+        requirements: ["purpose_specification", "limitation"]
+      - id: "§8"
+        title: "Individual access"
+        requirements: ["access_rights", "correction_rights"]
+      - id: "§10.1"
+        title: "Breach notification"
+        requirements: ["record_keeping", "notification", "reporting"]
+    penalties:
+      max_fine: "CAD $100K per violation"
+      enforcement_authority: "Office of the Privacy Commissioner"
+  
+  POPIA:
+    name: "Protection of Personal Information Act"
+    region: "South Africa"
+    enabled: true
+    enforcement_level: "STRICT"
+    sections:
+      - id: "§9"
+        title: "Processing limitation"
+        requirements: ["lawfulness", "minimality", "consent"]
+      - id: "§11"
+        title: "Purpose specification"
+        requirements: ["specific_purpose", "compatible_use"]
+      - id: "§14"
+        title: "Further processing limitation"
+        requirements: ["compatible_processing", "consent_for_new_purpose"]
+      - id: "§26"
+        title: "Special personal information"
+        requirements: ["health_data_protection", "explicit_consent"]
+      - id: "§57"
+        title: "Transborder information flows"
+        requirements: ["adequacy", "consent", "safeguards"]
+      - id: "§72"
+        title: "Security measures"
+        requirements: ["integrity", "confidentiality", "availability"]
+    penalties:
+      max_fine: "ZAR 10M or 10 years imprisonment"
+      enforcement_authority: "Information Regulator"
+  
+  CCPA:
+    name: "California Consumer Privacy Act"
+    region: "California, USA"
+    enabled: true
+    enforcement_level: "MODERATE"
+    sections:
+      - id: "§1798.100"
+        title: "Right to know"
+        requirements: ["disclosure", "categories", "sources"]
+      - id: "§1798.105"
+        title: "Right to delete"
+        requirements: ["deletion_request", "exceptions"]
+      - id: "§1798.110"
+        title: "Right to access"
+        requirements: ["specific_information", "portable_format"]
+      - id: "§1798.115"
+        title: "Right to know about sales"
+        requirements: ["disclosure_of_sales", "categories_sold"]
+      - id: "§1798.120"
+        title: "Right to opt-out"
+        requirements: ["opt_out_mechanism", "do_not_sell"]
+    penalties:
+      max_fine: "$7,500 per intentional violation"
+      enforcement_authority: "California Attorney General"
+  
+  CPRA:
+    name: "California Privacy Rights Act"
+    region: "California, USA"
+    enabled: true
+    enforcement_level: "MODERATE"
+    sections:
+      - id: "§1798.121"
+        title: "Right to limit use of sensitive personal information"
+        requirements: ["sensitive_data_limitation", "opt_out"]
+      - id: "§1798.130"
+        title: "Notice requirements"
+        requirements: ["privacy_notice", "collection_notice"]
+      - id: "§1798.140"
+        title: "Definitions"
+        requirements: ["sensitive_personal_information", "precise_geolocation"]
+    penalties:
+      max_fine: "$7,500 per intentional violation"
+      enforcement_authority: "California Privacy Protection Agency"
+  
+  LGPD:
+    name: "Lei Geral de Proteção de Dados"
+    region: "Brazil"
+    enabled: true
+    enforcement_level: "MODERATE"
+    articles:
+      - id: "Art. 6"
+        title: "Principles"
+        requirements: ["purpose", "adequacy", "necessity", "transparency"]
+      - id: "Art. 7"
+        title: "Legal bases"
+        requirements: ["consent", "legal_obligation", "legitimate_interest"]
+      - id: "Art. 11"
+        title: "Sensitive personal data"
+        requirements: ["specific_consent", "health_data_protection"]
+      - id: "Art. 18"
+        title: "Rights of data subjects"
+        requirements: ["access", "correction", "deletion", "portability"]
+      - id: "Art. 33"
+        title: "International data transfer"
+        requirements: ["adequacy", "safeguards", "consent"]
+    penalties:
+      max_fine: "BRL 50M or 2% revenue"
+      enforcement_authority: "ANPD (National Data Protection Authority)"
+  
+  PDPA_SG:
+    name: "Personal Data Protection Act (Singapore)"
+    region: "Singapore"
+    enabled: true
+    enforcement_level: "MODERATE"
+    sections:
+      - id: "§11"
+        title: "Consent"
+        requirements: ["voluntary_consent", "withdrawal_rights"]
+      - id: "§13"
+        title: "Purpose limitation"
+        requirements: ["reasonable_purpose", "notification"]
+      - id: "§18"
+        title: "Accuracy"
+        requirements: ["reasonable_efforts", "correction"]
+      - id: "§24"
+        title: "Protection"
+        requirements: ["security_arrangements", "reasonable_measures"]
+      - id: "§26"
+        title: "Transfer limitation"
+        requirements: ["comparable_protection", "consent"]
+    penalties:
+      max_fine: "SGD 1M"
+      enforcement_authority: "Personal Data Protection Commission"
+  
+  APPI:
+    name: "Act on the Protection of Personal Information"
+    region: "Japan"
+    enabled: true
+    enforcement_level: "MODERATE"
+    articles:
+      - id: "Art. 15"
+        title: "Purpose of use"
+        requirements: ["specific_purpose", "notification"]
+      - id: "Art. 16"
+        title: "Proper acquisition"
+        requirements: ["lawful_means", "notification"]
+      - id: "Art. 20"
+        title: "Security control"
+        requirements: ["necessary_measures", "supervision"]
+      - id: "Art. 24"
+        title: "Cross-border transfer"
+        requirements: ["consent", "adequate_protection"]
+      - id: "Art. 28"
+        title: "Disclosure"
+        requirements: ["disclosure_request", "exceptions"]
+    penalties:
+      max_fine: "JPY 100M"
+      enforcement_authority: "Personal Information Protection Commission"
+  
+  PDPA_TH:
+    name: "Personal Data Protection Act (Thailand)"
+    region: "Thailand"
+    enabled: true
+    enforcement_level: "MODERATE"
+    sections:
+      - id: "§19"
+        title: "Consent"
+        requirements: ["explicit_consent", "withdrawal"]
+      - id: "§21"
+        title: "Purpose limitation"
+        requirements: ["specified_purpose", "compatible_use"]
+      - id: "§26"
+        title: "Sensitive data"
+        requirements: ["explicit_consent", "health_data"]
+      - id: "§28"
+        title: "Cross-border transfer"
+        requirements: ["adequacy", "safeguards"]
+      - id: "§37"
+        title: "Rights of data subjects"
+        requirements: ["access", "rectification", "erasure", "portability"]
+    penalties:
+      max_fine: "THB 5M"
+      enforcement_authority: "Personal Data Protection Committee"
+  
+  PDPB:
+    name: "Personal Data Protection Bill"
+    region: "India"
+    enabled: true
+    enforcement_level: "MODERATE"
+    sections:
+      - id: "§4"
+        title: "Obligations of data fiduciary"
+        requirements: ["purpose_limitation", "data_minimization"]
+      - id: "§11"
+        title: "Sensitive personal data"
+        requirements: ["explicit_consent", "health_data_protection"]
+      - id: "§17"
+        title: "Rights of data principal"
+        requirements: ["confirmation", "correction", "erasure"]
+      - id: "§33"
+        title: "Cross-border transfer"
+        requirements: ["explicit_consent", "approved_countries"]
+      - id: "§34"
+        title: "Transfer to specific countries"
+        requirements: ["government_approval", "safeguards"]
+    penalties:
+      max_fine: "INR 150M or 4% revenue"
+      enforcement_authority: "Data Protection Authority of India"
+  
+  DPA_UAE:
+    name: "Data Protection Law (UAE)"
+    region: "United Arab Emirates"
+    enabled: true
+    enforcement_level: "MODERATE"
+    articles:
+      - id: "Art. 5"
+        title: "Principles"
+        requirements: ["lawfulness", "transparency", "purpose_limitation"]
+      - id: "Art. 8"
+        title: "Consent"
+        requirements: ["informed_consent", "withdrawal"]
+      - id: "Art. 12"
+        title: "Sensitive data"
+        requirements: ["explicit_consent", "special_safeguards"]
+      - id: "Art. 21"
+        title: "Cross-border transfer"
+        requirements: ["adequacy", "safeguards", "consent"]
+      - id: "Art. 13"
+        title: "Rights of data subjects"
+        requirements: ["access", "rectification", "erasure"]
+    penalties:
+      max_fine: "AED 3M"
+      enforcement_authority: "UAE Data Office"
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # TIER 2: SECURITY & COMPLIANCE STANDARDS (15)
+  # ─────────────────────────────────────────────────────────────────────────
+  
+  ISO_27001:
+    name: "ISO/IEC 27001:2022 Information Security Management"
+    region: "Global"
+    enabled: true
+    enforcement_level: "STRICT"
+    controls:
+      - id: "A.5.1"
+        title: "Policies for information security"
+        requirements: ["policy_documentation", "review", "approval"]
+      - id: "A.8.3"
+        title: "Media handling"
+        requirements: ["disposal", "transfer", "physical_media"]
+      - id: "A.8.3.2"
+        title: "Disposal of media"
+        requirements: ["secure_disposal", "crypto_shredder"]
+      - id: "A.12.4"
+        title: "Logging and monitoring"
+        requirements: ["event_logging", "log_protection", "audit_trail"]
+      - id: "A.12.6"
+        title: "Technical vulnerability management"
+        requirements: ["vulnerability_assessment", "patch_management"]
+      - id: "A.14.2"
+        title: "Security in development and support"
+        requirements: ["secure_development", "change_control"]
+      - id: "A.18.1"
+        title: "Compliance with legal requirements"
+        requirements: ["statutory_compliance", "privacy_protection"]
+    certification:
+      required: true
+      audit_frequency: "Annual"
+  
+  ISO_27701:
+    name: "ISO/IEC 27701:2019 Privacy Information Management"
+    region: "Global"
+    enabled: true
+    enforcement_level: "STRICT"
+    controls:
+      - id: "6.2"
+        title: "Conditions for collection and processing"
+        requirements: ["lawful_basis", "consent_management"]
+      - id: "6.7"
+        title: "Limiting collection"
+        requirements: ["data_minimization", "purpose_limitation"]
+      - id: "6.13"
+        title: "Privacy by design and default"
+        requirements: ["privacy_engineering", "default_settings"]
+      - id: "7.2"
+        title: "Identify legal basis"
+        requirements: ["legal_basis_documentation", "consent_records"]
+      - id: "7.3"
+        title: "Determining information for PII principals"
+        requirements: ["transparency", "privacy_notices"]
+    certification:
+      required: false
+      audit_frequency: "Annual"
+  
+  SOC_2:
+    name: "SOC 2 Type II"
+    region: "United States"
+    enabled: true
+    enforcement_level: "STRICT"
+    trust_service_criteria:
+      - id: "CC1"
+        title: "Control Environment"
+        requirements: ["governance", "risk_management", "ethics"]
+      - id: "CC2"
+        title: "Communication and Information"
+        requirements: ["internal_communication", "external_communication"]
+      - id: "CC3"
+        title: "Risk Assessment"
+        requirements: ["risk_identification", "risk_analysis", "fraud_risk"]
+      - id: "CC4"
+        title: "Monitoring Activities"
+        requirements: ["ongoing_monitoring", "separate_evaluations"]
+      - id: "CC5"
+        title: "Control Activities"
+        requirements: ["control_selection", "technology_controls"]
+      - id: "CC6"
+        title: "Logical and Physical Access"
+        requirements: ["access_control", "authentication", "authorization"]
+      - id: "CC7"
+        title: "System Operations"
+        requirements: ["capacity", "monitoring", "incident_management"]
+      - id: "CC8"
+        title: "Change Management"
+        requirements: ["change_control", "testing", "deployment"]
+      - id: "CC9"
+        title: "Risk Mitigation"
+        requirements: ["risk_treatment", "vulnerability_management"]
+      - id: "A1"
+        title: "Availability"
+        requirements: ["uptime", "disaster_recovery", "backup"]
+      - id: "C1"
+        title: "Confidentiality"
+        requirements: ["data_classification", "encryption", "disposal"]
+      - id: "P1"
+        title: "Privacy"
+        requirements: ["notice", "choice", "collection", "use", "retention"]
+      - id: "PI1"
+        title: "Processing Integrity"
+        requirements: ["accuracy", "completeness", "timeliness"]
+    audit:
+      type: "Type II"
+      duration: "6-12 months"
+      frequency: "Annual"
+  
+  NIST_CSF:
+    name: "NIST Cybersecurity Framework"
+    region: "United States"
+    enabled: true
+    enforcement_level: "MODERATE"
+    functions:
+      - id: "ID"
+        title: "Identify"
+        categories: ["Asset Management", "Business Environment", "Governance", "Risk Assessment"]
+      - id: "PR"
+        title: "Protect"
+        categories: ["Access Control", "Data Security", "Protective Technology"]
+      - id: "DE"
+        title: "Detect"
+        categories: ["Anomalies and Events", "Security Monitoring", "Detection Processes"]
+      - id: "RS"
+        title: "Respond"
+        categories: ["Response Planning", "Communications", "Analysis", "Mitigation"]
+      - id: "RC"
+        title: "Recover"
+        categories: ["Recovery Planning", "Improvements", "Communications"]
+  
+  NIST_800_53:
+    name: "NIST SP 800-53 Security Controls"
+    region: "United States"
+    enabled: true
+    enforcement_level: "STRICT"
+    control_families:
+      - id: "AC"
+        title: "Access Control"
+        requirements: ["least_privilege", "separation_of_duties", "remote_access"]
+      - id: "AU"
+        title: "Audit and Accountability"
+        requirements: ["audit_events", "audit_storage", "audit_review"]
+      - id: "IA"
+        title: "Identification and Authentication"
+        requirements: ["user_identification", "device_identification", "authenticator_management"]
+      - id: "SC"
+        title: "System and Communications Protection"
+        requirements: ["boundary_protection", "cryptographic_protection", "transmission_confidentiality"]
+      - id: "SI"
+        title: "System and Information Integrity"
+        requirements: ["flaw_remediation", "malicious_code_protection", "information_input_validation"]
+  
+  NIST_800_88:
+    name: "NIST SP 800-88 Media Sanitization"
+    region: "United States"
+    enabled: true
+    enforcement_level: "STRICT"
+    methods:
+      - id: "Clear"
+        title: "Clearing"
+        requirements: ["logical_techniques", "overwriting", "block_erase"]
+      - id: "Purge"
+        title: "Purging"
+        requirements: ["cryptographic_erase", "degaussing", "physical_destruction"]
+      - id: "Destroy"
+        title: "Destruction"
+        requirements: ["disintegration", "pulverization", "melting", "incineration"]
+    iluminara_implementation: "IP-02 Crypto Shredder (Cryptographic Erase)"
+  
+  PCI_DSS:
+    name: "Payment Card Industry Data Security Standard"
+    region: "Global"
+    enabled: false  # Not primary focus for health data
+    enforcement_level: "MODERATE"
+    requirements:
+      - id: "Req 1"
+        title: "Install and maintain firewall"
+        requirements: ["network_segmentation", "firewall_rules"]
+      - id: "Req 3"
+        title: "Protect stored cardholder data"
+        requirements: ["encryption", "key_management", "data_retention"]
+      - id: "Req 8"
+        title: "Identify and authenticate access"
+        requirements: ["unique_ids", "mfa", "password_policy"]
+      - id: "Req 10"
+        title: "Track and monitor access"
+        requirements: ["audit_trails", "log_review", "time_synchronization"]
+  
+  FedRAMP:
+    name: "Federal Risk and Authorization Management Program"
+    region: "United States"
+    enabled: false  # For US federal deployments only
+    enforcement_level: "STRICT"
+    impact_levels:
+      - id: "Low"
+        requirements: ["NIST_800_53_Low_Baseline", "125_controls"]
+      - id: "Moderate"
+        requirements: ["NIST_800_53_Moderate_Baseline", "325_controls"]
+      - id: "High"
+        requirements: ["NIST_800_53_High_Baseline", "421_controls"]
+  
+  FISMA:
+    name: "Federal Information Security Management Act"
+    region: "United States"
+    enabled: false
+    enforcement_level: "STRICT"
+    requirements:
+      - "risk_based_approach"
+      - "continuous_monitoring"
+      - "annual_assessment"
+      - "incident_response"
+  
+  CIS_Controls:
+    name: "CIS Critical Security Controls"
+    region: "Global"
+    enabled: true
+    enforcement_level: "MODERATE"
+    implementation_groups:
+      - id: "IG1"
+        title: "Basic Cyber Hygiene"
+        controls: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+      - id: "IG2"
+        title: "Enterprise Security"
+        controls: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+      - id: "IG3"
+        title: "Advanced Security"
+        controls: "All 18 controls"
+  
+  COBIT:
+    name: "Control Objectives for Information Technologies"
+    region: "Global"
+    enabled: true
+    enforcement_level: "MODERATE"
+    domains:
+      - "Plan and Organize"
+      - "Acquire and Implement"
+      - "Deliver and Support"
+      - "Monitor and Evaluate"
+  
+  CSA_CCM:
+    name: "Cloud Security Alliance Cloud Controls Matrix"
+    region: "Global"
+    enabled: true
+    enforcement_level: "MODERATE"
+    domains:
+      - "Application & Interface Security"
+      - "Audit Assurance & Compliance"
+      - "Business Continuity Management"
+      - "Change Control & Configuration Management"
+      - "Data Security & Privacy"
+      - "Encryption & Key Management"
+      - "Governance and Risk Management"
+      - "Identity & Access Management"
+      - "Infrastructure & Virtualization Security"
+      - "Interoperability & Portability"
+      - "Mobile Security"
+      - "Security Incident Management"
+      - "Supply Chain Management"
+      - "Threat and Vulnerability Management"
+  
+  HITRUST_CSF:
+    name: "HITRUST Common Security Framework"
+    region: "United States (Healthcare)"
+    enabled: true
+    enforcement_level: "STRICT"
+    requirements:
+      - "HIPAA_compliance"
+      - "HITECH_compliance"
+      - "ISO_27001_alignment"
+      - "NIST_CSF_alignment"
+      - "PCI_DSS_alignment"
+    certification_levels:
+      - "HITRUST CSF Validated"
+      - "HITRUST CSF Certified"
+  
+  GDPR_DPIA:
+    name: "GDPR Data Protection Impact Assessment"
+    region: "European Union"
+    enabled: true
+    enforcement_level: "STRICT"
+    requirements:
+      - "systematic_description"
+      - "necessity_assessment"
+      - "risk_assessment"
+      - "mitigation_measures"
+      - "consultation_with_dpo"
+    triggers:
+      - "high_risk_processing"
+      - "large_scale_processing"
+      - "sensitive_data_processing"
+      - "automated_decision_making"
+  
+  ENISA_Guidelines:
+    name: "ENISA Cybersecurity Guidelines"
+    region: "European Union"
+    enabled: true
+    enforcement_level: "MODERATE"
+    focus_areas:
+      - "Cloud Security"
+      - "IoT Security"
+      - "Critical Infrastructure Protection"
+      - "Incident Response"
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # TIER 3: HUMANITARIAN & HEALTH-SPECIFIC FRAMEWORKS (10)
+  # ─────────────────────────────────────────────────────────────────────────
+  
+  WHO_IHR:
+    name: "WHO International Health Regulations (2005)"
+    region: "Global"
+    enabled: true
+    enforcement_level: "STRICT"
+    articles:
+      - id: "Art. 6"
+        title: "Notification"
+        requirements: ["24_hour_notification", "public_health_emergency"]
+      - id: "Art. 7"
+        title: "Information sharing"
+        requirements: ["timely_information", "verification"]
+      - id: "Art. 45"
+        title: "Treatment of personal data"
+        requirements: ["confidentiality", "anonymization", "security"]
+      - id: "Art. 46"
+        title: "Transport and handling"
+        requirements: ["safe_transport", "proper_handling"]
+    emergency_override:
+      enabled: true
+      conditions: ["public_health_emergency", "outbreak_response"]
+  
+  GENEVA_CONVENTION:
+    name: "Geneva Conventions (1949) & Additional Protocols"
+    region: "Global"
+    enabled: true
+    enforcement_level: "STRICT"
+    articles:
+      - id: "Common Art. 3"
+        title: "Protection of non-combatants"
+        requirements: ["humane_treatment", "medical_care", "no_discrimination"]
+      - id: "Protocol I, Art. 10"
+        title: "Protection of medical units"
+        requirements: ["respect_medical_facilities", "protection_of_wounded"]
+      - id: "Protocol I, Art. 16"
+        title: "Protection of medical personnel"
+        requirements: ["respect_medical_staff", "protection_from_attack"]
+    humanitarian_margin: 0.15  # 15% margin for humanitarian operations
+  
+  UN_HUMANITARIAN_PRINCIPLES:
+    name: "UN Humanitarian Principles"
+    region: "Global"
+    enabled: true
+    enforcement_level: "STRICT"
+    principles:
+      - id: "Humanity"
+        requirements: ["alleviate_suffering", "protect_life", "ensure_respect"]
+      - id: "Neutrality"
+        requirements: ["no_sides", "impartiality"]
+      - id: "Impartiality"
+        requirements: ["need_based", "no_discrimination"]
+      - id: "Independence"
+        requirements: ["autonomous_action", "no_political_interference"]
+  
+  SPHERE_STANDARDS:
+    name: "Sphere Humanitarian Standards"
+    region: "Global"
+    enabled: true
+    enforcement_level: "STRICT"
+    standards:
+      - id: "Health Systems"
+        requirements: ["essential_health_services", "clinical_care"]
+      - id: "Water Supply"
+        requirements: ["safe_water", "adequate_quantity"]
+      - id: "Sanitation"
+        requirements: ["safe_excreta_disposal", "hygiene_promotion"]
+      - id: "Food Security"
+        requirements: ["adequate_nutrition", "food_safety"]
+      - id: "Shelter"
+        requirements: ["adequate_shelter", "settlement_planning"]
+  
+  ICRC_MEDICAL_ETHICS:
+    name: "ICRC Medical Ethics in Armed Conflict"
+    region: "Global"
+    enabled: true
+    enforcement_level: "STRICT"
+    principles:
+      - "medical_neutrality"
+      - "duty_to_treat"
+      - "informed_consent"
+      - "confidentiality"
+      - "do_no_harm"
+  
+  WHO_EMERGENCY_TRIAGE:
+    name: "WHO Emergency Triage Assessment and Treatment"
+    region: "Global"
+    enabled: true
+    enforcement_level: "STRICT"
+    categories:
+      - id: "Emergency"
+        color: "Red"
+        requirements: ["immediate_treatment", "priority_1"]
+      - id: "Priority"
+        color: "Yellow"
+        requirements: ["urgent_treatment", "priority_2"]
+      - id: "Non-urgent"
+        color: "Green"
+        requirements: ["routine_treatment", "priority_3"]
+  
+  UN_CONVENTION_RIGHTS_CHILD:
+    name: "UN Convention on the Rights of the Child"
+    region: "Global"
+    enabled: true
+    enforcement_level: "STRICT"
+    articles:
+      - id: "Art. 24"
+        title: "Right to health"
+        requirements: ["access_to_health_services", "preventive_care"]
+      - id: "Art. 16"
+        title: "Right to privacy"
+        requirements: ["protection_of_privacy", "no_arbitrary_interference"]
+  
+  CORE_HUMANITARIAN_STANDARD:
+    name: "Core Humanitarian Standard on Quality and Accountability"
+    region: "Global"
+    enabled: true
+    enforcement_level: "STRICT"
+    commitments:
+      - "Communities and people receive assistance appropriate to their needs"
+      - "Communities and people have access to safe and responsive mechanisms"
+      - "Communities and people are not negatively affected"
+      - "Communities and people know their rights"
+      - "Communities and people have access to safe complaint mechanisms"
+      - "Communities and people participate in decisions"
+      - "Communities and people can expect improved assistance"
+      - "Communities and people receive timely assistance"
+      - "Communities and people are treated with respect"
+  
+  IDSR_FRAMEWORK:
+    name: "Integrated Disease Surveillance and Response"
+    region: "Africa (WHO AFRO)"
+    enabled: true
+    enforcement_level: "STRICT"
+    components:
+      - "Case detection and registration"
+      - "Reporting"
+      - "Data analysis and interpretation"
+      - "Epidemic preparedness"
+      - "Outbreak investigation and response"
+      - "Laboratory support"
+      - "Supervision and monitoring"
+    integration: "Golden Thread (IP-05)"
+  
+  DHIS2_STANDARDS:
+    name: "DHIS2 Health Information System Standards"
+    region: "Global (WHO endorsed)"
+    enabled: true
+    enforcement_level: "MODERATE"
+    requirements:
+      - "standardized_data_elements"
+      - "interoperability"
+      - "data_quality_checks"
+      - "aggregate_reporting"
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # TIER 4: SECTOR-SPECIFIC & EMERGING FRAMEWORKS (8)
+  # ─────────────────────────────────────────────────────────────────────────
+  
+  EU_AI_ACT:
+    name: "EU Artificial Intelligence Act"
+    region: "European Union"
+    enabled: true
+    enforcement_level: "STRICT"
+    risk_categories:
+      - id: "Unacceptable"
+        examples: ["social_scoring", "subliminal_manipulation"]
+        action: "PROHIBITED"
+      - id: "High-Risk"
+        examples: ["medical_devices", "critical_infrastructure", "law_enforcement"]
+        requirements: ["risk_management", "data_governance", "transparency", "human_oversight"]
+      - id: "Limited-Risk"
+        examples: ["chatbots", "emotion_recognition"]
+        requirements: ["transparency_obligations"]
+      - id: "Minimal-Risk"
+        examples: ["spam_filters", "video_games"]
+        requirements: ["voluntary_codes_of_conduct"]
+    articles:
+      - id: "§6"
+        title: "Classification of high-risk AI"
+        requirements: ["risk_assessment", "conformity_assessment"]
+      - id: "§8"
+        title: "Compliance with requirements"
+        requirements: ["quality_management", "documentation"]
+      - id: "§12"
+        title: "Record-keeping"
+        requirements: ["automatic_logging", "traceability"]
+      - id: "§13"
+        title: "Transparency and provision of information"
+        requirements: ["user_information", "explainability"]
+      - id: "§14"
+        title: "Human oversight"
+        requirements: ["human_in_the_loop", "override_capability"]
+    penalties:
+      max_fine: "€30M or 6% global revenue"
+  
+  EU_NIS2_DIRECTIVE:
+    name: "EU Network and Information Security Directive 2"
+    region: "European Union"
+    enabled: true
+    enforcement_level: "STRICT"
+    requirements:
+      - "risk_management_measures"
+      - "incident_handling"
+      - "business_continuity"
+      - "supply_chain_security"
+      - "security_in_acquisition"
+      - "vulnerability_disclosure"
+    sectors:
+      - "Healthcare"
+      - "Digital Infrastructure"
+      - "Public Administration"
+  
+  EU_DIGITAL_SERVICES_ACT:
+    name: "EU Digital Services Act"
+    region: "European Union"
+    enabled: false  # Not primary focus
+    enforcement_level: "MODERATE"
+  
+  EU_DIGITAL_MARKETS_ACT:
+    name: "EU Digital Markets Act"
+    region: "European Union"
+    enabled: false  # Not primary focus
+    enforcement_level: "MODERATE"
+  
+  UK_GDPR:
+    name: "UK General Data Protection Regulation"
+    region: "United Kingdom"
+    enabled: true
+    enforcement_level: "STRICT"
+    differences_from_eu_gdpr:
+      - "UK_ICO_as_regulator"
+      - "UK_adequacy_decisions"
+      - "post_brexit_provisions"
+  
+  AUSTRALIA_PRIVACY_ACT:
+    name: "Privacy Act 1988 (Australia)"
+    region: "Australia"
+    enabled: true
+    enforcement_level: "MODERATE"
+    principles:
+      - "Open and transparent management"
+      - "Anonymity and pseudonymity"
+      - "Collection of solicited information"
+      - "Dealing with unsolicited information"
+      - "Notification of collection"
+      - "Use or disclosure"
+      - "Direct marketing"
+      - "Cross-border disclosure"
+      - "Government related identifiers"
+      - "Quality of personal information"
+      - "Security of personal information"
+      - "Access to personal information"
+      - "Correction of personal information"
+  
+  CHINA_PIPL:
+    name: "Personal Information Protection Law (China)"
+    region: "China"
+    enabled: false  # Sovereignty conflict
+    enforcement_level: "STRICT"
+    note: "Data localization requirements conflict with African sovereignty"
+  
+  RUSSIA_FEDERAL_LAW_152:
+    name: "Federal Law No. 152-FZ on Personal Data"
+    region: "Russia"
+    enabled: false  # Sovereignty conflict
+    enforcement_level: "STRICT"
+    note: "Data localization requirements conflict with African sovereignty"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# DATA SOVEREIGNTY RULES
+# ═══════════════════════════════════════════════════════════════════════════
+
+sovereignty:
+  data_residency:
+    enabled: true
+    allowed_zones:
+      - region: "africa-south1"
+        countries: ["Kenya", "South Africa", "Tanzania", "Uganda"]
+        frameworks: ["KDPA", "POPIA"]
+      - region: "europe-west1"
+        countries: ["EU Member States"]
+        frameworks: ["GDPR"]
+      - region: "northamerica-northeast1"
+        countries: ["Canada"]
+        frameworks: ["PIPEDA"]
+      - region: "us-central1"
+        countries: ["United States"]
+        frameworks: ["HIPAA", "HITECH"]
+        requires_explicit_consent: true
+    
+    blocked_zones:
+      - "asia-*"
+      - "australia-*"
+      - "southamerica-*"
+    
+    enforcement_level: "STRICT"
+  
+  cross_border_transfers:
+    enabled: true
+    require_authorization: true
+    authorization_authority: "Data Protection Commissioner"
+    
+    standard_contractual_clauses:
+      enabled: true
+      template: "EU_SCC_2021"
+    
+    adequacy_whitelist:
+      - "EU"
+      - "UK"
+      - "Switzerland"
+      - "Canada"
+      - "Japan"
+      - "South Korea"
+    
+    transfer_impact_assessment:
+      required: true
+      template: "EDPB_TIA_2021"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# RIGHT TO EXPLANATION (EU AI Act §6, GDPR Art. 22)
+# ═══════════════════════════════════════════════════════════════════════════
+
+explainability:
+  enabled: true
+  high_risk_threshold: 0.7
+  
+  methods:
+    - name: "SHAP"
+      library: "shap"
+      requirements: ["feature_contributions", "base_value", "expected_value"]
+    - name: "LIME"
+      library: "lime"
+      requirements: ["local_explanation", "feature_importance"]
+    - name: "Feature_Importance"
+      library: "sklearn"
+      requirements: ["global_importance", "permutation_importance"]
+  
+  requirements:
+    - "confidence_score"
+    - "evidence_chain"
+    - "feature_contributions"
+    - "decision_rationale"
+    - "alternative_outcomes"
+    - "human_review_option"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# CONSENT MANAGEMENT
+# ═══════════════════════════════════════════════════════════════════════════
+
+consent:
+  enabled: true
+  require_explicit_consent: true
+  
+  valid_scopes:
+    - "diagnosis"
+    - "treatment"
+    - "research"
+    - "public_health_surveillance"
+    - "emergency_response"
+    - "quality_improvement"
+    - "training"
+  
+  expiration_days: 365
+  
+  withdrawal:
+    enabled: true
+    immediate_effect: true
+    crypto_shredder_trigger: true
+  
+  emergency_override:
+    enabled: true
+    conditions:
+      - "public_health_emergency"
+      - "outbreak_response"
+      - "life_threatening_situation"
+    authority: "WHO_IHR_Article_6"
+    documentation_required: true
+
+# ═══════════════════════════════════════════════════════════════════════════
+# DATA RETENTION (GDPR Art. 17, HIPAA §164.530(j))
+# ═══════════════════════════════════════════════════════════════════════════
+
+retention:
+  enabled: true
+  
+  policies:
+    HOT:
+      days: 180
+      description: "Active operational data"
+      storage_class: "STANDARD"
+      encryption: "AES-256-GCM"
+    
+    WARM:
+      days: 365
+      description: "Compliance minimum (HIPAA)"
+      storage_class: "NEARLINE"
+      encryption: "AES-256-GCM"
+    
+    COLD:
+      days: 1825
+      description: "Legal hold maximum (GDPR Art. 17)"
+      storage_class: "COLDLINE"
+      encryption: "AES-256-GCM"
+    
+    ETERNAL:
+      days: -1
+      description: "Never expires (requires explicit justification)"
+      storage_class: "ARCHIVE"
+      encryption: "AES-256-GCM"
+      justification_required: true
+  
+  auto_shred:
+    enabled: true
+    schedule: "0 2 * * *"  # Daily at 2 AM UTC
+    method: "IP-02 Crypto Shredder"
+    notification: true
+
+# ═══════════════════════════════════════════════════════════════════════════
+# AUDIT TRAIL (GDPR Art. 30, HIPAA §164.312(b), SOC 2)
+# ═══════════════════════════════════════════════════════════════════════════
+
+audit:
+  enabled: true
+  tamper_proof: true
+  
+  storage:
+    backend: "Cloud_Spanner"
+    region: "africa-south1"
+    retention_days: 2555  # 7 years (HIPAA requirement)
+    replication: "multi_region"
+  
+  signing:
+    enabled: true
+    algorithm: "SHA256_RSA"
+    key_management: "Cloud_KMS"
+    key_rotation_days: 90
+  
+  events:
+    - "Data_Transfer"
+    - "High_Risk_Inference"
+    - "Consent_Validation"
+    - "Data_Retention"
+    - "Key_Shred"
+    - "Sovereignty_Violation"
+    - "Emergency_Override"
+    - "Access_Grant"
+    - "Access_Revoke"
+    - "Data_Export"
+    - "Configuration_Change"
+  
+  real_time_monitoring:
+    enabled: true
+    alert_on_violation: true
+    escalation_threshold: 3
+
+# ═══════════════════════════════════════════════════════════════════════════
+# HUMANITARIAN CONSTRAINTS
+# ═══════════════════════════════════════════════════════════════════════════
+
+humanitarian:
+  enabled: true
+  
+  constraints:
+    - name: "Medical_Ethics"
+      frameworks: ["WHO_Emergency_Triage", "ICRC_Medical_Ethics"]
+    - name: "Resource_Allocation"
+      frameworks: ["Sphere_Standards", "UN_Humanitarian_Principles"]
+    - name: "Data_Protection"
+      frameworks: ["GDPR", "HIPAA", "KDPA"]
+    - name: "Population_Protection"
+      frameworks: ["Geneva_Convention", "UN_Convention_Rights_Child"]
+    - name: "Emergency_Response"
+      frameworks: ["WHO_IHR", "Core_Humanitarian_Standard"]
+  
+  margin_threshold: 0.15  # 15% humanitarian margin
+  
+  emergency_protocols:
+    - "WHO_IHR_Article_6"
+    - "Geneva_Convention_Article_3"
+    - "UN_Humanitarian_Principles"
+    - "Sphere_Standards"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ENFORCEMENT ACTIONS
+# ═══════════════════════════════════════════════════════════════════════════
+
+enforcement:
+  on_violation:
+    action: "BLOCK"  # BLOCK | WARN | LOG
+    notify: true
+    escalate: true
+    audit_log: true
+  
+  notifications:
+    - type: "Email"
+      recipients:
+        - "compliance@iluminara.health"
+        - "dpo@iluminara.health"
+        - "ciso@iluminara.health"
+    
+    - type: "PubSub"
+      topic: "projects/iluminara/topics/sovereignty-violations"
+    
+    - type: "Slack"
+      webhook: "${SLACK_WEBHOOK_URL}"
+      channel: "#fortress-alerts"
+    
+    - type: "PagerDuty"
+      integration_key: "${PAGERDUTY_KEY}"
+      severity: "critical"
+  
+  escalation:
+    enabled: true
+    threshold: 3
+    window_minutes: 60
+    escalate_to:
+      - "Chief Compliance Officer"
+      - "Data Protection Officer"
+      - "Chief Information Security Officer"
+      - "Legal Counsel"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# NUCLEAR IP STACK INTEGRATION
+# ═══════════════════════════════════════════════════════════════════════════
+
+nuclear_ip:
+  IP_02_CRYPTO_SHREDDER:
+    enabled: true
+    auto_shred: true
+    retention_policies: ["HOT", "WARM", "COLD"]
+    sovereignty_zones: ["KENYA", "EU", "SOUTH_AFRICA", "CANADA", "USA"]
+  
+  IP_03_ACORN_PROTOCOL:
+    enabled: false
+    requires: "hardware_attestation"
+    tpm_required: true
+    somatic_factors: ["posture", "location", "stillness"]
+  
+  IP_04_SILENT_FLUX:
+    enabled: false
+    requires: "anxiety_monitoring"
+    output_regulation: "dynamic"
+  
+  IP_05_GOLDEN_THREAD:
+    enabled: true
+    verification_threshold: 0.8
+    data_streams: ["CBS", "EMR", "IDSR"]
+    fusion_method: "quantum_entanglement_logic"
+  
+  IP_06_5DM_BRIDGE:
+    enabled: false
+    requires: "mobile_network_integration"
+    target_nodes: "14M+"
+    cac_reduction: "94%"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# MONITORING & ALERTING
+# ═══════════════════════════════════════════════════════════════════════════
+
+monitoring:
+  enabled: true
+  
+  metrics:
+    - name: "sovereignty_violations_total"
+      type: "counter"
+      labels: ["jurisdiction", "violation_type"]
+    
+    - name: "cross_border_transfers_total"
+      type: "counter"
+      labels: ["source_zone", "destination_zone", "authorized"]
+    
+    - name: "high_risk_inferences_total"
+      type: "counter"
+      labels: ["model", "confidence", "explained"]
+    
+    - name: "consent_validations_total"
+      type: "counter"
+      labels: ["scope", "status"]
+    
+    - name: "keys_shredded_total"
+      type: "counter"
+      labels: ["retention_policy", "reason"]
+    
+    - name: "audit_events_total"
+      type: "counter"
+      labels: ["event_type", "severity"]
+    
+    - name: "framework_compliance_score"
+      type: "gauge"
+      labels: ["framework", "jurisdiction"]
+  
+  prometheus:
+    enabled: true
+    port: 9090
+    path: "/metrics"
+    scrape_interval: "15s"
+  
+  grafana:
+    enabled: true
+    dashboards:
+      - "Sovereignty Compliance"
+      - "Audit Trail"
+      - "Data Retention"
+      - "Framework Coverage"
+      - "Violation Trends"
+      - "Humanitarian Margin"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# DEVELOPMENT & TESTING
+# ═══════════════════════════════════════════════════════════════════════════
+
+development:
+  relaxed_mode: false
+  mock_services:
+    enabled: false
+  test_jurisdiction: "GLOBAL_DEFAULT"
+  
+  testing:
+    unit_tests: true
+    integration_tests: true
+    compliance_tests: true
+    penetration_tests: true
+    
+  ci_cd:
+    codeql_enabled: true
+    gitleaks_enabled: true
+    dependabot_enabled: true
+    security_gate: true

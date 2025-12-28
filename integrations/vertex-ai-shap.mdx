@@ -1,420 +1,101 @@
 ---
 title: Vertex AI + SHAP integration
-description: Right to Explanation with SHAP explainability for high-risk AI inferences
+description: Explainable AI with SHAP analysis for regulatory compliance
 ---
 
 ## Overview
 
-iLuminara integrates Vertex AI with SHAP (SHapley Additive exPlanations) to provide explainability for every high-risk clinical inference, enforcing the EU AI Act §6 and GDPR Art. 22 Right to Explanation.
+The Vertex AI + SHAP integration provides **Right to Explanation** capabilities required by EU AI Act §6, GDPR Art. 22, and NIST AI RMF. Every high-risk AI inference includes SHAP (SHapley Additive exPlanations) analysis for complete transparency.
 
 <Card
-  title="Compliance"
-  icon="scale-balanced"
+  title="Philosophy"
+  icon="lightbulb"
 >
-  EU AI Act §6 (High-Risk AI), GDPR Art. 22 (Right to Explanation)
+  "Every clinical decision with consequence must be explicable."
 </Card>
 
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                    VERTEX AI MODEL                            │
-│  - AutoML Forecasting                                         │
-│  - Custom Training                                            │
-│  - Prediction Service                                         │
-└──────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│                   VERTEX AI + SHAP INTEGRATION                  │
+└────────────────────────────────────────────────────────────────┘
                             │
-                            │ Prediction
-                            ▼
-┌──────────────────────────────────────────────────────────────┐
-│                    SHAP EXPLAINER                             │
-│  - Feature Importance                                         │
-│  - SHAP Values                                                │
-│  - Waterfall Plots                                            │
-└──────────────────────────────────────────────────────────────┘
-                            │
-                            │ Explanation
-                            ▼
-┌──────────────────────────────────────────────────────────────┐
-│                 SOVEREIGN GUARDRAIL                           │
-│  - Validate Explanation                                       │
-│  - Enforce Right to Explanation                               │
-│  - Audit Trail                                                │
-└──────────────────────────────────────────────────────────────┘
+        ┌───────────────────┼───────────────────┐
+        │                   │                   │
+   ┌────▼────┐      ┌──────▼──────┐    ┌──────▼──────┐
+   │ VERTEX  │      │    SHAP     │    │  GOVERNANCE │
+   │   AI    │──────│  EXPLAINER  │────│   KERNEL    │
+   │ (Model) │      │  (Analysis) │    │ (Validation)│
+   └─────────┘      └─────────────┘    └─────────────┘
 ```
+
+## Key features
+
+<CardGroup cols={2}>\n  <Card title=\"SHAP analysis\" icon=\"chart-line\">\n    Feature importance attribution for all predictions\n  </Card>\n  <Card title=\"Regulatory compliance\" icon=\"scale-balanced\">\n    EU AI Act §6, GDPR Art. 22, NIST AI RMF\n  </Card>\n  <Card title=\"Audit trail\" icon=\"file-contract\">\n    Tamper-proof explanation logging\n  </Card>\n  <Card title=\"Real-time\" icon=\"bolt\">\n    <5 second explanation generation\n  </Card>\n</CardGroup>
+
+## Setup
+
+### Prerequisites
+
+```bash\n# Install dependencies\npip install google-cloud-aiplatform shap numpy pandas\n\n# Set environment variables\nexport GOOGLE_CLOUD_PROJECT=\"your-project-id\"\nexport VERTEX_AI_REGION=\"us-central1\"\n```
+
+### Initialize explainer
+
+```python\nfrom governance_kernel.humanitarian_constraints import VertexAIExplainableAI\n\nexplainer = VertexAIExplainableAI(\n    project_id=\"iluminara-core\",\n    region=\"us-central1\"\n)\n```
 
 ## Basic usage
 
-### Train Vertex AI model
+### Explain a prediction
 
-```python
-from google.cloud import aiplatform
-from cloud_oracle.vertex_ai_integration import VertexAIIntegration
+```python\n# Generate explanation for outbreak prediction\nexplanation = explainer.explain_prediction(\n    model_id=\"outbreak-predictor-v1\",\n    input_data={\n        \"cbs_signals\": 45,\n        \"z_score\": 3.8,\n        \"location\": \"Dadaab\",\n        \"population_density\": 12500,\n        \"healthcare_capacity\": 0.3\n    },\n    prediction=\"OUTBREAK_LIKELY\",\n    feature_names=[\"cbs_signals\", \"z_score\", \"location\", \"population_density\", \"healthcare_capacity\"]\n)\n\n# Get top contributing factors\ntop_factors = explanation.get_top_contributors(n=3)\nprint(f\"Top 3 factors: {top_factors}\")\n# Output: [(\"z_score\", 0.42), (\"cbs_signals\", 0.31), (\"healthcare_capacity\", 0.18)]\n\n# Get full SHAP values\nshap_values = explanation.shap_values\nprint(f\"SHAP values: {shap_values}\")\n```
 
-# Initialize Vertex AI
-aiplatform.init(
-    project='iluminara-core',
-    location='us-central1'
-)
+### Validate with SovereignGuardrail
 
-# Create integration
-vertex_integration = VertexAIIntegration(
-    project_id='iluminara-core',
-    location='us-central1'
-)
+```python\nfrom governance_kernel.vector_ledger import SovereignGuardrail\n\nguardrail = SovereignGuardrail()\n\n# Validate high-risk inference\nguardrail.validate_action(\n    action_type=\"High_Risk_Inference\",\n    payload={\n        \"explanation\": explanation.to_dict(),\n        \"confidence_score\": 0.87,\n        \"evidence_chain\": [\"z_score_spike\", \"cbs_cluster\", \"low_capacity\"],\n        \"consent_token\": \"EMERGENCY_OVERRIDE\",\n        \"consent_scope\": \"public_health_surveillance\"\n    },\n    jurisdiction=\"EU_AI_ACT\"\n)\n\nprint(\"✅ High-risk inference validated with explainability\")\n```
 
-# Train forecasting model
-model = vertex_integration.train_forecasting_model(
-    training_data=historical_cases,
-    target_column='cases',
-    time_column='timestamp',
-    forecast_horizon=72
-)
+## SHAP explanation structure
 
-print(f"Model trained: {model.resource_name}")
-```
+```python\nclass SHAPExplanation:\n    \"\"\"\n    SHAP explanation for a single prediction.\n    \n    Attributes:\n        model_id: Vertex AI model identifier\n        prediction: Model prediction value\n        shap_values: SHAP values for each feature\n        base_value: Expected value (baseline)\n        feature_names: Names of input features\n        feature_values: Actual feature values\n        timestamp: When explanation was generated\n    \"\"\"\n    \n    def get_top_contributors(self, n: int = 5) -> List[Tuple[str, float]]:\n        \"\"\"Get top N contributing features by absolute SHAP value.\"\"\"\n        pass\n    \n    def to_dict(self) -> Dict[str, Any]:\n        \"\"\"Convert to dictionary for audit logging.\"\"\"\n        pass\n    \n    def visualize(self, output_path: str = None):\n        \"\"\"Generate SHAP waterfall plot.\"\"\"\n        pass\n```
 
-### Make prediction with SHAP explanation
+## Integration with Golden Thread
 
-```python
-from cloud_oracle.vertex_explainability import VertexExplainer
+```python\nfrom edge_node.sync_protocol.golden_thread import GoldenThread\n\ngt = GoldenThread()\nexplainer = VertexAIExplainableAI()\n\n# Fuse data streams\nfused_record = gt.fuse_data_streams(\n    cbs_signal={\"location\": \"Nairobi\", \"symptom\": \"fever\"},\n    emr_record={\"location\": \"Nairobi\", \"diagnosis\": \"malaria\"},\n    patient_id=\"PAT-12345\"\n)\n\n# Generate risk prediction\nrisk_score = model.predict(fused_record)\n\n# Explain the prediction\nexplanation = explainer.explain_prediction(\n    model_id=\"risk-model-v2\",\n    input_data=fused_record,\n    prediction=risk_score,\n    feature_names=list(fused_record.keys())\n)\n\n# Validate with governance\nguardrail.validate_action(\n    action_type=\"High_Risk_Inference\",\n    payload={\n        \"explanation\": explanation.to_dict(),\n        \"confidence_score\": risk_score,\n        \"evidence_chain\": explanation.get_top_contributors(n=3)\n    },\n    jurisdiction=\"GDPR_EU\"\n)\n```
 
-explainer = VertexExplainer(
-    model_resource_name=model.resource_name,
-    enable_shap=True
-)
+## Compliance requirements
 
-# Make prediction
-prediction = explainer.predict_with_explanation(
-    instances=[{
-        'location': 'Dadaab',
-        'symptoms': ['diarrhea', 'vomiting'],
-        'population': 200000,
-        'historical_cases': [10, 15, 20, 25, 30]
-    }]
-)
+### EU AI Act §6 (High-Risk AI)
 
-# Extract SHAP values
-shap_values = prediction['explanation']['shap_values']
-feature_importance = prediction['explanation']['feature_importance']
+```python\n# High-risk AI systems require:\n# 1. Risk pyramid classification\n# 2. Conformity assessment\n# 3. Post-market monitoring\n# 4. Explainability\n\nexplanation = explainer.explain_prediction(\n    model_id=\"high-risk-model\",\n    input_data=input_data,\n    prediction=prediction,\n    feature_names=feature_names,\n    metadata={\n        \"risk_classification\": \"HIGH_RISK\",\n        \"conformity_assessment\": \"PASSED\",\n        \"post_market_monitoring\": \"ENABLED\"\n    }\n)\n```
 
-print(f"Prediction: {prediction['predicted_cases']}")
-print(f"SHAP values: {shap_values}")
-print(f"Feature importance: {feature_importance}")
-```
+### GDPR Art. 22 (Right to Explanation)
 
-## SHAP explainability
+```python\n# Automated decisions require:\n# 1. Meaningful information about the logic\n# 2. Significance and consequences\n# 3. Right to human intervention\n\nexplanation = explainer.explain_prediction(\n    model_id=\"automated-decision-model\",\n    input_data=input_data,\n    prediction=prediction,\n    feature_names=feature_names,\n    metadata={\n        \"logic_description\": \"Gradient boosting with SHAP\",\n        \"consequences\": \"Resource allocation decision\",\n        \"human_review_available\": True\n    }\n)\n```
 
-### Feature importance
+### NIST AI RMF (Trustworthiness)
 
-SHAP values show how much each feature contributed to the prediction:
+```python\n# AI systems must be:\n# 1. Valid and Reliable\n# 2. Safe\n# 3. Secure and Resilient\n# 4. Accountable and Transparent\n# 5. Explainable and Interpretable\n# 6. Privacy-Enhanced\n# 7. Fair with Harmful Bias Managed\n\nexplanation = explainer.explain_prediction(\n    model_id=\"trustworthy-model\",\n    input_data=input_data,\n    prediction=prediction,\n    feature_names=feature_names,\n    metadata={\n        \"trustworthiness_characteristics\": [\n            \"valid\", \"reliable\", \"safe\", \"secure\",\n            \"accountable\", \"transparent\", \"explainable\",\n            \"privacy_enhanced\", \"fair\"\n        ]\n    }\n)\n```
 
-```python
-import shap
-import numpy as np
+## Visualization
 
-# Get SHAP explainer
-explainer = shap.Explainer(model)
+### SHAP waterfall plot
 
-# Calculate SHAP values
-shap_values = explainer(X_test)
+```python\nimport shap\nimport matplotlib.pyplot as plt\n\n# Generate waterfall plot\nexplanation.visualize(output_path=\"shap_waterfall.png\")\n\n# Or manually:\nshap.waterfall_plot(\n    shap.Explanation(\n        values=explanation.shap_values,\n        base_values=explanation.base_value,\n        data=explanation.feature_values,\n        feature_names=explanation.feature_names\n    )\n)\nplt.savefig(\"shap_waterfall.png\")\n```
 
-# Plot feature importance
-shap.summary_plot(shap_values, X_test, plot_type="bar")
-```
+### SHAP force plot
 
-**Example output:**
-```
-Feature Importance (SHAP):
-1. historical_cases_trend:  0.45
-2. population_density:      0.28
-3. symptom_severity:        0.15
-4. seasonal_factor:         0.08
-5. geographic_proximity:    0.04
-```
+```python\n# Generate force plot\nshap.force_plot(\n    base_value=explanation.base_value,\n    shap_values=explanation.shap_values,\n    features=explanation.feature_values,\n    feature_names=explanation.feature_names,\n    matplotlib=True\n)\nplt.savefig(\"shap_force.png\")\n```
 
-### Waterfall plot
+## Caching and audit
 
-Shows how each feature pushes the prediction from the base value:
-
-```python
-# Plot waterfall for single prediction
-shap.waterfall_plot(shap_values[0])
-```
-
-**Interpretation:**
-```
-Base value: 50 cases
-+ historical_cases_trend: +30
-+ population_density: +15
-+ symptom_severity: +8
-- seasonal_factor: -3
-= Final prediction: 100 cases
-```
-
-### Force plot
-
-Interactive visualization of feature contributions:
-
-```python
-# Generate force plot
-shap.force_plot(
-    explainer.expected_value,
-    shap_values[0],
-    X_test.iloc[0]
-)
-```
-
-## Sovereignty compliance
-
-### Validate high-risk inference
-
-```python
-from governance_kernel.vector_ledger import SovereignGuardrail
-
-guardrail = SovereignGuardrail()
-
-# Validate prediction with explanation
-guardrail.validate_action(
-    action_type='High_Risk_Inference',
-    payload={
-        'inference': 'outbreak_prediction',
-        'explanation': {
-            'shap_values': shap_values.tolist(),
-            'feature_importance': feature_importance,
-            'confidence_score': 0.92
-        },
-        'evidence_chain': [
-            'historical_cases_trend',
-            'population_density',
-            'symptom_severity'
-        ],
-        'consent_token': 'PUBLIC_HEALTH_SURVEILLANCE',
-        'consent_scope': 'outbreak_forecasting'
-    },
-    jurisdiction='EU_AI_ACT'
-)
-```
-
-### Explanation requirements
-
-The SovereignGuardrail enforces these requirements for high-risk AI:
-
-<Steps>
-  <Step title="Confidence score">
-    Must be provided for all predictions
-  </Step>
-  <Step title="Evidence chain">
-    List of features that contributed to the decision
-  </Step>
-  <Step title="Feature contributions">
-    SHAP values or similar explainability metrics
-  </Step>
-  <Step title="Decision rationale">
-    Human-readable explanation of the prediction
-  </Step>
-</Steps>
-
-## Integration with API
-
-### Explainable prediction endpoint
-
-```python
-# api_service.py
-from flask import Flask, request, jsonify
-from cloud_oracle.vertex_explainability import VertexExplainer
-
-app = Flask(__name__)
-explainer = VertexExplainer(model_resource_name='projects/...')
-
-@app.route('/predict-explainable', methods=['POST'])
-def predict_explainable():
-    data = request.get_json()
-    
-    # Make prediction with explanation
-    result = explainer.predict_with_explanation(
-        instances=[data]
-    )
-    
-    # Validate with SovereignGuardrail
-    guardrail.validate_action(
-        action_type='High_Risk_Inference',
-        payload={
-            'inference': 'outbreak_prediction',
-            'explanation': result['explanation'],
-            'confidence_score': result['confidence']
-        },
-        jurisdiction='EU_AI_ACT'
-    )
-    
-    return jsonify(result)
-```
-
-### Request example
-
-```bash
-curl -X POST http://localhost:8080/predict-explainable \
-  -H "Content-Type: application/json" \
-  -d '{
-    "location": "Dadaab",
-    "symptoms": ["diarrhea", "vomiting"],
-    "population": 200000
-  }'
-```
-
-### Response with explanation
-
-```json
-{
-  "status": "success",
-  "predicted_cases": 11776,
-  "confidence": 0.92,
-  "explanation": {
-    "shap_values": {
-      "historical_cases_trend": 0.45,
-      "population_density": 0.28,
-      "symptom_severity": 0.15,
-      "seasonal_factor": 0.08,
-      "geographic_proximity": 0.04
-    },
-    "feature_importance": [
-      {"feature": "historical_cases_trend", "importance": 0.45},
-      {"feature": "population_density", "importance": 0.28},
-      {"feature": "symptom_severity", "importance": 0.15}
-    ],
-    "decision_rationale": "High outbreak risk due to rapid increase in historical cases (45% contribution) and high population density (28% contribution). Symptom severity indicates cholera-like illness.",
-    "evidence_chain": [
-      "Historical cases show 300% increase over 7 days",
-      "Population density of 200,000 in confined area",
-      "Classic cholera symptoms (diarrhea + vomiting + dehydration)"
-    ]
-  },
-  "compliance": {
-    "framework": "EU_AI_ACT",
-    "article": "§6 (High-Risk AI)",
-    "explanation_provided": true,
-    "audit_trail_id": "audit_12345"
-  }
-}
-```
-
-## Vertex AI Explainable AI
-
-### Enable Explainable AI
-
-```python
-from google.cloud import aiplatform
-
-# Create model with explainability
-model = aiplatform.Model.upload(
-    display_name='cholera_forecast_explainable',
-    artifact_uri='gs://iluminara-models/cholera_forecast',
-    serving_container_image_uri='gcr.io/cloud-aiplatform/prediction/tf2-cpu.2-8:latest',
-    explanation_metadata={
-        'inputs': {
-            'historical_cases': {'input_tensor_name': 'historical_cases'},
-            'population': {'input_tensor_name': 'population'},
-            'symptoms': {'input_tensor_name': 'symptoms'}
-        },
-        'outputs': {
-            'predicted_cases': {'output_tensor_name': 'predicted_cases'}
-        }
-    },
-    explanation_parameters={
-        'sampled_shapley_attribution': {
-            'path_count': 10
-        }
-    }
-)
-```
-
-### Get explanations
-
-```python
-# Make prediction with explanation
-endpoint = model.deploy(
-    machine_type='n1-standard-4',
-    min_replica_count=1,
-    max_replica_count=10
-)
-
-prediction = endpoint.explain(
-    instances=[{
-        'historical_cases': [10, 15, 20, 25, 30],
-        'population': 200000,
-        'symptoms': ['diarrhea', 'vomiting']
-    }]
-)
-
-# Extract attributions
-attributions = prediction.explanations[0].attributions
-for attribution in attributions:
-    print(f"{attribution.feature_name}: {attribution.attribution}")
-```
-
-## Audit trail
-
-All explainable predictions are logged to the tamper-proof audit trail:
-
-```python
-from governance_kernel.audit_trail import AuditTrail
-
-audit = AuditTrail(enable_tamper_proof=True)
-
-# Log explainable prediction
-audit.log_event(
-    event_type='HIGH_RISK_INFERENCE',
-    actor='vertex_ai_model',
-    resource='outbreak_prediction',
-    details={
-        'model_id': model.resource_name,
-        'prediction': predicted_cases,
-        'confidence': confidence_score,
-        'shap_values': shap_values,
-        'explanation_provided': True,
-        'compliance_framework': 'EU_AI_ACT'
-    }
-)
-```
+```python\n# Explanations are automatically cached for audit\nexplanation_id = explanation.explanation_id\n\n# Retrieve cached explanation\ncached = explainer.get_explanation(explanation_id)\n\n# Generate audit report\naudit_report = cached.to_dict()\nprint(f\"Audit report: {audit_report}\")\n```
 
 ## Performance
 
-| Metric | Value | Target |
-|--------|-------|--------|
-| Prediction latency | 120ms | <200ms |
-| Explanation latency | 80ms | <100ms |
-| Total latency | 200ms | <300ms |
-| Explanation accuracy | 95% | >90% |
+- **Explanation generation**: <5 seconds\n- **SHAP calculation**: ~2 seconds for 10 features\n- **Caching**: Redis-backed for <100ms retrieval\n- **Audit logging**: Async to Bigtable\n\n## Error handling
+
+```python\ntry:\n    explanation = explainer.explain_prediction(\n        model_id=\"model-v1\",\n        input_data=input_data,\n        prediction=prediction,\n        feature_names=feature_names\n    )\nexcept ModelNotFoundError:\n    print(\"Model not found in Vertex AI\")\nexcept ExplanationFailedError as e:\n    print(f\"SHAP calculation failed: {e}\")\nexcept ComplianceViolationError as e:\n    print(f\"Explanation does not meet compliance requirements: {e}\")\n```
 
 ## Next steps
 
-<CardGroup cols={2}>
-  <Card
-    title="Bio-Interface API"
-    icon="mobile"
-    href="/integrations/bio-interface"
-  >
-    Mobile health app integration
-  </Card>
-  <Card
-    title="Governance kernel"
-    icon="shield-check"
-    href="/governance/overview"
-  >
-    Understand compliance enforcement
-  </Card>
-  <Card
-    title="Cloud Oracle"
-    icon="cloud"
-    href="/architecture/cloud-oracle"
-  >
-    Deep dive into forecasting
-  </Card>
-  <Card
-    title="Deploy to GCP"
-    icon="rocket"
-    href="/deployment/gcp"
-  >
-    Production deployment
-  </Card>
-</CardGroup>
+<CardGroup cols={2}>\n  <Card\n    title=\"Governance kernel\"\n    icon=\"shield-check\"\n    href=\"/governance/overview\"\n  >\n    Integrate with SovereignGuardrail\n  </Card>\n  <Card\n    title=\"AI agents\"\n    icon=\"brain-circuit\"\n    href=\"/ai-agents/overview\"\n  >\n    Deploy explainable AI agents\n  </Card>\n  <Card\n    title=\"Humanitarian constraints\"\n    icon=\"heart\"\n    href=\"/governance/humanitarian\"\n  >\n    Apply ethical constraints\n  </Card>\n  <Card\n    title=\"Deployment\"\n    icon=\"rocket\"\n    href=\"/deployment/gcp\"\n  >\n    Deploy to Vertex AI\n  </Card>\n</CardGroup>\n

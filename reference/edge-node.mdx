@@ -1,0 +1,404 @@
+---
+title: Edge node
+description: Complete reference for the edge node module
+---
+
+## Overview
+
+The edge node provides offline-first data collection, AI agents, and synchronization protocols for resource-constrained environments.
+
+**Location:** `edge_node/`  
+**Files:** 200+  
+**Lines of Code:** 30,000+  
+**Languages:** Python, Dart
+
+## Core modules
+
+<CardGroup cols={2}>
+  <Card title="FRENASA Engine" icon="microphone">
+    Voice-to-JSON transformation with Swahili support
+  </Card>
+  <Card title="AI Agents" icon="brain-circuit">
+    Autonomous disease surveillance agents
+  </Card>
+  <Card title="Golden Thread" icon="link">
+    IP-05: Data fusion engine (CBS + EMR + IDSR)
+  </Card>
+  <Card title="Acorn Protocol" icon="fingerprint">
+    IP-03: Somatic authentication
+  </Card>
+</CardGroup>
+
+## File structure
+
+```
+edge_node/
+├── __init__.py
+├── acorn_protocol.py                # IP-03: Somatic auth
+├── crypto_shredder.py               # IP-02: Data dissolution
+├── field_processor.py               # Field data processing
+├── field_terminal.py                # Terminal interface
+├── data_ingestion_layer.py          # Data ingestion
+├── distribution_gate.py             # Distribution control
+├── frenasa_engine/                  # Voice processing
+│   ├── __init__.py
+│   ├── voice_processor.py           # Main voice processor
+│   ├── voice_to_json.py             # Voice-to-JSON conversion
+│   ├── voice_transcription.py       # Transcription engine
+│   ├── symptom_extraction.py        # Symptom extractor
+│   ├── symptom_extractor_server.py  # Symptom API server
+│   ├── silent_flux.py               # IP-04: Anxiety regulation
+│   ├── five_dm_bridge.py            # IP-06: Mobile integration
+│   ├── simulate_outbreak.py         # Outbreak simulator
+│   └── Dockerfile
+├── ai_agents/                       # Autonomous agents
+│   ├── __init__.py
+│   ├── base_agent.py                # Base agent class
+│   ├── offline_agent.py             # Offline operation
+│   ├── federated_client.py          # Federated learning
+│   ├── agent_registry.py            # Agent discovery
+│   ├── agent_orchestrator.py        # Agent coordination
+│   ├── epidemiological_forecasting_agent.py
+│   ├── spatiotemporal_analysis_agent.py
+│   ├── early_warning_system_agent.py
+│   ├── hybrid_sync_manager.py       # Sync management
+│   ├── swahili_translator.py        # Swahili translation
+│   ├── swahili_entity_extractor.py  # Entity extraction
+│   ├── swahili_medical_qa.py        # Medical Q&A
+│   ├── swahili_triage_agent.py      # Triage agent
+│   ├── config.py                    # Agent configuration
+│   └── example_usage.py
+├── sync_protocol/                   # Synchronization
+│   ├── __init__.py
+│   ├── golden_thread.py             # IP-05: Data fusion
+│   └── sovereign_sync.py            # Sovereign sync protocol
+├── speech_recognition/              # Speech processing
+│   ├── __init__.py
+│   └── swahili_recognizer.py        # Swahili recognizer
+├── vector_store/                    # Vector database
+│   └── __init__.py
+├── lora_mesh/                       # LoRa networking
+│   └── __init__.py
+├── ghost_mode/                      # Offline mode
+│   └── gossip_engine.py             # Gossip protocol
+├── data_ingestion_layer/            # Data ingestion
+│   └── __init__.py
+└── distribution_gateway/            # Distribution gateway
+    ├── __init__.py
+    └── gateway_bridge.py
+```
+
+## FRENASA Engine
+
+Voice-to-JSON transformation engine with Swahili language support.
+
+### VoiceProcessor
+
+Main voice processing class.
+
+```python
+from edge_node.frenasa_engine.voice_processor import VoiceProcessor
+
+processor = VoiceProcessor()
+
+# Process voice alert
+result = processor.process_voice(
+    audio_data=audio_bytes,
+    language='swahili',
+    location={'lat': 0.0512, 'lng': 40.3129}
+)
+
+print(f"Symptoms: {result['symptoms']}")
+print(f"Severity: {result['severity']}")
+```
+
+**Methods:**
+- `process_voice()` - Process audio to structured JSON
+- `extract_symptoms()` - Extract symptoms from text
+- `calculate_severity()` - Calculate severity score
+
+### SymptomExtractor
+
+Extracts symptoms from voice transcriptions.
+
+```python
+from edge_node.frenasa_engine.symptom_extraction import SymptomExtractor
+
+extractor = SymptomExtractor()
+
+symptoms = extractor.extract(
+    text="Patient reporting severe watery diarrhea and vomiting",
+    language='swahili'
+)
+```
+
+## AI Agents
+
+Autonomous disease surveillance agents with offline operation.
+
+### EpidemiologicalForecastingAgent
+
+SEIR, SIR, and ARIMA forecasting with R0 estimation.
+
+```python
+from edge_node.ai_agents import EpidemiologicalForecastingAgent
+
+agent = EpidemiologicalForecastingAgent(
+    location="Nairobi",
+    population_size=100000
+)
+
+forecast = agent.forecast_outbreak(
+    disease="cholera",
+    historical_data=cases,
+    forecast_horizon_days=14
+)
+
+print(f"R0: {forecast.estimated_r0}")
+print(f"Peak cases: {forecast.peak_cases}")
+```
+
+### SpatiotemporalAnalysisAgent
+
+Multi-scale spatial clustering and hotspot detection.
+
+```python
+from edge_node.ai_agents import SpatiotemporalAnalysisAgent
+
+agent = SpatiotemporalAnalysisAgent(
+    location="Dadaab",
+    spatial_resolution="district"
+)
+
+analysis = agent.analyze_spatial_patterns(
+    case_data=cases,
+    time_window_days=30
+)
+
+print(f"Hotspots: {len(analysis.hotspots)}")
+```
+
+### EarlyWarningSystemAgent
+
+Real-time multi-source data fusion with <5 second latency.
+
+```python
+from edge_node.ai_agents import EarlyWarningSystemAgent
+
+agent = EarlyWarningSystemAgent(
+    location="Garissa",
+    alert_threshold=0.7
+)
+
+# Ingest data
+agent.ingest_cbs_reports(chv_reports)
+agent.ingest_iot_data(sensor_readings)
+
+# Generate alerts
+alerts = agent.generate_alerts()
+```
+
+### OfflineAgent
+
+Autonomous operation without network connectivity.
+
+```python
+from edge_node.ai_agents import OfflineAgent
+
+agent = OfflineAgent(
+    name="Edge Surveillance Agent",
+    capabilities=[
+        AgentCapability.OFFLINE_OPERATION,
+        AgentCapability.AUTONOMOUS_INFERENCE
+    ]
+)
+
+# Queue operations while offline
+agent.queue_operation("inference", {"data": "..."})
+
+# Sync when connectivity returns
+agent.check_and_sync()
+```
+
+### FederatedLearningClient
+
+Privacy-preserving collaborative training.
+
+```python
+from edge_node.ai_agents import FederatedLearningClient
+
+client = FederatedLearningClient(
+    name="Hospital A Client",
+    epsilon=1.0,  # Privacy budget
+    delta=1e-5
+)
+
+# Train on local data
+client.train_local_model(training_data, epochs=5)
+
+# Get privacy-preserving update
+update = client.get_model_update(apply_privacy=True)
+
+# Apply global model
+client.apply_global_model(global_model)
+```
+
+## Golden Thread (IP-05)
+
+Data fusion engine that merges CBS, EMR, and IDSR streams.
+
+```python
+from edge_node.sync_protocol.golden_thread import GoldenThread
+
+gt = GoldenThread()
+
+# Merge data streams
+fused = gt.fuse_data_streams(
+    cbs_signal={'location': 'Dadaab', 'symptom': 'fever'},
+    emr_record={'location': 'Dadaab', 'diagnosis': 'malaria'},
+    patient_id='PAT_001'
+)
+
+# Verification score: 1.0 (CONFIRMED)
+print(f"Verification: {fused.verification_score}")
+```
+
+**Verification logic:**
+```
+IF cbs.location == emr.location AND |cbs.timestamp - emr.timestamp| < 24h
+    THEN verification_score = 1.0 (CONFIRMED)
+    ELSE score degrades based on conflict severity
+```
+
+## Acorn Protocol (IP-03)
+
+Somatic security using posture + location + stillness.
+
+```python
+from edge_node.acorn_protocol import AcornProtocol
+
+acorn = AcornProtocol()
+
+# Authenticate using somatic signals
+authenticated = acorn.authenticate(
+    posture='sitting',
+    location={'lat': 0.0512, 'lng': 40.3129},
+    stillness_duration=5.0  # seconds
+)
+```
+
+## Swahili AI Agents
+
+Language-specific agents for Swahili-speaking regions.
+
+### SwahiliTriageAgent
+
+Medical triage with Swahili language support.
+
+```python
+from edge_node.ai_agents import SwahiliTriageAgent
+
+agent = SwahiliTriageAgent()
+
+# Triage patient
+result = agent.triage(
+    symptoms="Homa kali na kichefuchefu",  # High fever and dizziness
+    vital_signs={'temp': 39.5, 'hr': 110}
+)
+
+print(f"Priority: {result.priority}")
+print(f"Recommended action: {result.action}")
+```
+
+### SwahiliEntityExtractor
+
+Extract medical entities from Swahili text.
+
+```python
+from edge_node.ai_agents import SwahiliEntityExtractor
+
+extractor = SwahiliEntityExtractor()
+
+entities = extractor.extract(
+    text="Mgonjwa ana homa na kichefuchefu"
+)
+
+# Output: [{'entity': 'homa', 'type': 'symptom'}, ...]
+```
+
+### SwahiliMedicalQA
+
+Medical question answering in Swahili.
+
+```python
+from edge_node.ai_agents import SwahiliMedicalQA
+
+qa = SwahiliMedicalQA()
+
+answer = qa.answer(
+    question="Je, dalili za kipindupindu ni zipi?"
+)
+
+print(answer)  # Symptoms of cholera
+```
+
+## Offline operation
+
+All edge node components support offline operation:
+
+```python
+# Check connectivity
+is_online = agent.connectivity.is_connected()
+
+# Queue operations while offline
+if not is_online:
+    agent.queue_operation("inference", data)
+
+# Sync when online
+if is_online:
+    agent.sync_to_cloud()
+```
+
+## Testing
+
+Run edge node tests:
+
+```bash
+pytest tests/edge_node/
+pytest tests/edge_node/ai_agents/
+pytest tests/test_swahili_recognizer.py
+pytest tests/test_symptom_extractor.py
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="FRENASA Engine"
+    icon="microphone"
+    href="/reference/edge-node/frenasa-engine"
+  >
+    Voice processing details
+  </Card>
+  <Card
+    title="AI Agents"
+    icon="brain-circuit"
+    href="/reference/edge-node/ai-agents"
+  >
+    Autonomous surveillance agents
+  </Card>
+  <Card
+    title="Golden Thread"
+    icon="link"
+    href="/reference/edge-node/sync-protocol/golden-thread"
+  >
+    Data fusion engine
+  </Card>
+  <Card
+    title="Swahili AI"
+    icon="language"
+    href="/reference/edge-node/ai-agents/swahili"
+  >
+    Language-specific agents
+  </Card>
+</CardGroup>

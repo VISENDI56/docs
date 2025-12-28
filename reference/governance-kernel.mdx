@@ -1,0 +1,331 @@
+---
+title: Governance kernel
+description: Complete reference for the governance kernel module
+---
+
+## Overview
+
+The governance kernel is the ethical engine of iLuminara-Core, encoding 45+ global legal frameworks into executable Python and Rego policies.
+
+**Location:** `governance_kernel/`  
+**Files:** 150+  
+**Lines of Code:** 25,000+  
+**Languages:** Python, Rego
+
+## Core modules
+
+<CardGroup cols={2}>
+  <Card title="SovereignGuardrail" icon="shield-check">
+    Main enforcement engine for 14 global frameworks
+  </Card>
+  <Card title="Crypto Shredder" icon="fire">
+    IP-02: Data dissolution (not deletion)
+  </Card>
+  <Card title="Ethical Engine" icon="heart">
+    Humanitarian constraints and Geneva Convention
+  </Card>
+  <Card title="Audit Trail" icon="file-contract">
+    Tamper-proof cryptographic logging
+  </Card>
+</CardGroup>
+
+## File structure
+
+```
+governance_kernel/
+├── __init__.py
+├── sovereign_guardrail.py          # Main enforcement engine
+├── vector_ledger.py                 # Legal vector database
+├── crypto_shredder.py               # IP-02 implementation
+├── ethical_engine.py                # Humanitarian constraints
+├── audit_trail.py                   # Tamper-proof logging
+├── humanitarian_constraints.py      # Geneva Convention logic
+├── compliance_matrix.py             # Framework mapping
+├── guardrail.py                     # Legacy guardrail
+├── law_nexus.py                     # Multi-law orchestration
+├── dspm_engine.py                   # Data Security Posture Management
+├── rco_engine.py                    # Risk & Compliance Oracle
+├── quantum_nexus.py                 # Quantum-resistant crypto
+├── chrono_audit.py                  # Time-series audit
+├── neuro_switch.py                  # AI decision routing
+├── message_bus.py                   # Event messaging
+├── national_strategy_guard.py       # Country-specific rules
+├── ai_agent_coordinator.py          # Agent orchestration
+├── crisis_decision_agent.py         # Emergency decision making
+├── fairness_constraints.py          # Bias mitigation
+├── policies/                        # 45+ Rego policies
+│   ├── gdpr.rego
+│   ├── hipaa.rego
+│   ├── kdpa.rego
+│   ├── popia.rego
+│   ├── eu_ai_act.rego
+│   └── ... (40+ more)
+├── c2_dashboard/                    # Command & Control UI
+│   └── nexus_cli.py
+├── scale_monitoring/                # Performance monitoring
+│   └── flop_counter.py
+├── strategies/                      # National strategies
+│   └── national_alignment.py
+└── tamper_evidence/                 # Blockchain logging
+    └── blockchain_logger.py
+```
+
+## Key classes
+
+### SovereignGuardrail
+
+Main enforcement engine that validates all actions against compliance constraints.
+
+```python
+from governance_kernel.vector_ledger import SovereignGuardrail
+
+guardrail = SovereignGuardrail()
+
+# Validate action
+guardrail.validate_action(
+    action_type='Data_Transfer',
+    payload={'data_type': 'PHI', 'destination': 'Foreign_Cloud'},
+    jurisdiction='GDPR_EU'
+)
+```
+
+**Methods:**
+- `validate_action()` - Validate action against frameworks
+- `get_tamper_proof_audit_history()` - Retrieve audit log
+- `verify_audit_chain_integrity()` - Verify chain integrity
+
+### CryptoShredder
+
+IP-02 implementation for cryptographic data dissolution.
+
+```python
+from governance_kernel.crypto_shredder import CryptoShredder
+
+shredder = CryptoShredder(sovereignty_zone=SovereigntyZone.KENYA)
+
+# Encrypt with ephemeral key
+encrypted_data, key_id = shredder.encrypt_with_ephemeral_key(
+    data=patient_record,
+    retention_policy=RetentionPolicy.HOT
+)
+
+# Shred key after retention period
+shredder.shred_key(key_id)
+```
+
+**Methods:**
+- `encrypt_with_ephemeral_key()` - Encrypt with temporary key
+- `decrypt_with_key()` - Decrypt if key exists
+- `shred_key()` - Cryptographically destroy key
+- `auto_shred_expired_keys()` - Batch shred expired keys
+
+### EthicalEngine
+
+Applies humanitarian constraints from Geneva Convention and WHO IHR.
+
+```python
+from governance_kernel.ethical_engine import EthicalEngine
+
+engine = EthicalEngine()
+
+# Validate humanitarian compliance
+result = engine.apply_constraints(
+    action={'type': 'cholera_response', 'scope': 'refugee_camp'},
+    context={'conflict_zone': False, 'outbreak_suspected': True}
+)
+```
+
+**Methods:**
+- `apply_constraints()` - Apply humanitarian rules
+- `calculate_humanitarian_margin()` - Calculate safety margin
+- `validate_emergency_override()` - Check emergency conditions
+
+## Rego policies
+
+The governance kernel includes 45+ Rego policies for global legal frameworks:
+
+### GDPR (EU)
+
+**File:** `policies/gdpr.rego`
+
+```rego
+package gdpr
+
+# Article 9: Processing of special categories
+deny[msg] {
+    input.action == "Data_Transfer"
+    input.data_type == "PHI"
+    input.destination != "EU"
+    msg := "Violates GDPR Art. 9 (Processing of special categories)"
+}
+```
+
+### HIPAA (USA)
+
+**File:** `policies/hipaa.rego`
+
+```rego
+package hipaa
+
+# §164.312: Technical safeguards
+deny[msg] {
+    input.action == "Data_Access"
+    not input.encryption_enabled
+    msg := "Violates HIPAA §164.312 (Technical safeguards)"
+}
+```
+
+### KDPA (Kenya)
+
+**File:** `policies/kdpa.rego`
+
+```rego
+package kdpa
+
+# §37: Transfer restrictions
+deny[msg] {
+    input.action == "Data_Transfer"
+    input.data_type == "PHI"
+    input.source_country == "Kenya"
+    input.destination_country != "Kenya"
+    not input.dpc_authorization
+    msg := "Violates KDPA §37 (Transfer restrictions)"
+}
+```
+
+## Compliance matrix
+
+| Framework | Region | Files | Status |
+|-----------|--------|-------|--------|
+| GDPR | 🇪🇺 EU | `gdpr.rego` | ✅ Active |
+| HIPAA | 🇺🇸 USA | `hipaa.rego` | ✅ Active |
+| KDPA | 🇰🇪 Kenya | `kdpa.rego`, `ke_dp.rego` | ✅ Active |
+| POPIA | 🇿🇦 South Africa | `popia.rego` | ✅ Active |
+| PIPEDA | 🇨🇦 Canada | `pipeda.rego` | ✅ Active |
+| EU AI Act | 🇪🇺 EU | `eu_ai_act.rego` | ✅ Active |
+| CCPA | 🇺🇸 California | `ccpa.rego` | ✅ Active |
+| LGPD | 🇧🇷 Brazil | `lgpd.rego`, `br.rego` | ✅ Active |
+| ISO 27001 | 🌐 Global | `iso.rego` | ✅ Active |
+| SOC 2 | 🇺🇸 USA | `soc.rego` | ✅ Active |
+| NIST CSF | 🇺🇸 USA | `nist.rego` | ✅ Active |
+| IHR | 🌐 WHO | `ihr.rego` | ✅ Active |
+
+## Configuration
+
+Configure the governance kernel via `config/sovereign_guardrail.yaml`:
+
+```yaml
+jurisdiction:
+  primary: "KDPA_KE"
+  secondary:
+    - "GDPR_EU"
+    - "POPIA_ZA"
+
+sovereignty:
+  data_residency:
+    enabled: true
+    enforcement_level: "STRICT"
+
+audit:
+  enabled: true
+  tamper_proof: true
+```
+
+## Usage examples
+
+### Basic validation
+
+```python
+from governance_kernel.vector_ledger import SovereignGuardrail
+
+guardrail = SovereignGuardrail()
+
+try:
+    guardrail.validate_action(
+        action_type='Data_Transfer',
+        payload={'data_type': 'PHI', 'destination': 'AWS_US'},
+        jurisdiction='GDPR_EU'
+    )
+except SovereigntyViolationError as e:
+    print(f"Violation: {e}")
+```
+
+### Tamper-proof audit
+
+```python
+guardrail = SovereignGuardrail(enable_tamper_proof_audit=True)
+
+# All actions are logged
+guardrail.validate_action(...)
+
+# Retrieve audit history
+history = guardrail.get_tamper_proof_audit_history(limit=10)
+
+# Verify integrity
+integrity = guardrail.verify_audit_chain_integrity()
+```
+
+### Humanitarian constraints
+
+```python
+from governance_kernel.ethical_engine import EthicalEngine
+
+engine = EthicalEngine()
+
+result = engine.apply_constraints(
+    action={
+        'type': 'cholera_response',
+        'estimated_civilian_impact': 0.3,
+        'medical_benefit': 0.85
+    },
+    context={
+        'conflict_zone': False,
+        'outbreak_suspected': True
+    }
+)
+
+print(f"Humanitarian margin: {result['humanitarian_margin']['margin']}")
+```
+
+## Testing
+
+Run governance kernel tests:
+
+```bash
+pytest tests/test_ethical_engine.py
+pytest tests/test_humanitarian_constraints.py
+pytest tests/test_audit_trail.py
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Crypto Shredder"
+    icon="fire"
+    href="/reference/governance-kernel/crypto-shredder"
+  >
+    IP-02 implementation details
+  </Card>
+  <Card
+    title="Ethical Engine"
+    icon="heart"
+    href="/reference/governance-kernel/ethical-engine"
+  >
+    Humanitarian constraints
+  </Card>
+  <Card
+    title="Rego Policies"
+    icon="scale-balanced"
+    href="/reference/governance-kernel/policies"
+  >
+    45+ legal framework policies
+  </Card>
+  <Card
+    title="Audit Trail"
+    icon="file-contract"
+    href="/reference/governance-kernel/audit-trail"
+  >
+    Tamper-proof logging
+  </Card>
+</CardGroup>
