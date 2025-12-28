@@ -5,63 +5,55 @@ description: Mobile health apps integration with Golden Thread protocol
 
 ## Overview
 
-The Bio-Interface REST API enables mobile health applications to submit CBS (Community-Based Surveillance) and EMR (Electronic Medical Records) data using the Golden Thread protocol.
+The Bio-Interface REST API enables mobile health applications to submit data through iLuminara's Sovereign Health Fortress, ensuring all data flows through SovereignGuardrail validation, Golden Thread fusion, and Crypto Shredder lifecycle management.
 
 <Card
-  title="Verification"
-  icon="check-double"
+  title="Philosophy"
+  icon="mobile"
 >
-  Signals are tagged as CONFIRMED only if location and time-delta match within 24 hours
+  "Every mobile health signal becomes a verified thread in the sovereign tapestry."
 </Card>
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────┐
-│      MOBILE HEALTH APP              │
+│   MOBILE HEALTH APP                 │
 │  - CHV data collection              │
-│  - Patient symptom reporting        │
+│  - Patient symptoms                 │
+│  - GPS location                     │
+└─────────────────────────────────────┘
+              │ HTTPS/TLS 1.3
+              ▼
+┌─────────────────────────────────────┐
+│   BIO-INTERFACE API                 │
+│  - Request validation               │
+│  - Privacy-preserving hashing       │
 └─────────────────────────────────────┘
               │
-              ▼ HTTPS/TLS 1.3
+              ▼
 ┌─────────────────────────────────────┐
-│      BIO-INTERFACE API              │
-│  - Sovereignty validation           │
+│   SOVEREIGNGUARDRAIL                │
+│  - Compliance validation            │
 │  - Consent verification             │
 └─────────────────────────────────────┘
               │
               ▼
 ┌─────────────────────────────────────┐
-│      GOLDEN THREAD                  │
-│  - CBS + EMR fusion                 │
-│  - Verification scoring             │
+│   CRYPTO SHREDDER (IP-02)           │
+│  - Ephemeral key encryption         │
+│  - Retention policy enforcement     │
 └─────────────────────────────────────┘
               │
               ▼
 ┌─────────────────────────────────────┐
-│      CLOUD ORACLE                   │
-│  - BigQuery storage                 │
-│  - Vertex AI forecasting            │
+│   GOLDEN THREAD (IP-05)             │
+│  - CBS + EMR fusion                 │
+│  - Verification scoring             │
 └─────────────────────────────────────┘
 ```
 
-## Base URL
-
-```
-http://localhost:8080/api/v1
-```
-
-For production: `https://api.iluminara.health/api/v1`
-
-## Authentication
-
-Currently uses consent tokens. For production, implement:
-
-- OAuth 2.0
-- JWT tokens
-- API keys with rate limiting
-
-## Core endpoints
+## API endpoints
 
 ### Health check
 
@@ -70,255 +62,229 @@ GET /health
 ```
 
 **Response:**
-
 ```json
 {
-  "status": "healthy",
+  "status": "operational",
   "service": "Bio-Interface API",
-  "version": "1.0.0",
-  "timestamp": "2025-12-26T10:00:00.000Z",
+  "fortress": "iLuminara Sovereign Health Fortress",
+  "timestamp": "2025-12-28T20:00:00.000Z",
   "compliance": {
-    "GDPR": "enforced",
-    "HIPAA": "enforced",
-    "KDPA": "enforced"
+    "guardrail": "active",
+    "crypto_shredder": "active",
+    "golden_thread": "active"
   }
 }
 ```
 
-### Submit CBS signal
+### Submit CBS report
+
+Submit Community-Based Surveillance report from mobile app.
 
 ```bash
-POST /api/v1/cbs/submit
+POST /api/v1/submit-cbs-report
+Content-Type: application/json
 ```
 
-**Request:**
-
+**Request body:**
 ```json
 {
-  "chv_id": "CHV_AMINA_HASSAN",
+  "patient_id": "PATIENT_12345",
   "location": {"lat": 0.0512, "lng": 40.3129},
-  "symptom": "fever",
+  "symptoms": ["fever", "cough"],
   "severity": 7,
-  "timestamp": "2025-12-26T10:00:00Z",
-  "consent_token": "VALID_TOKEN",
-  "jurisdiction": "KDPA_KE"
+  "timestamp": "2025-01-15T08:00:00Z",
+  "source": "CHV_MOBILE_APP",
+  "consent_token": "VALID_TOKEN"
 }
 ```
 
-**Response:**
-
+**Response (201 Created):**
 ```json
 {
   "status": "success",
-  "signal_id": "CBS_12345",
-  "verification_status": "PENDING",
-  "message": "CBS signal recorded. Awaiting EMR correlation.",
-  "timestamp": "2025-12-26T10:00:00.000Z"
+  "timestamp": "2025-12-28T20:00:00.000Z",
+  "patient_hash": "a1b2c3d4e5f6g7h8",
+  "key_id": "abc123",
+  "verification_score": 0.8,
+  "alert_level": "HIGH",
+  "message": "CBS report submitted successfully"
 }
 ```
 
 ### Submit EMR record
 
+Submit Electronic Medical Record from clinic/hospital.
+
 ```bash
-POST /api/v1/emr/submit
+POST /api/v1/submit-emr-record
+Content-Type: application/json
 ```
 
-**Request:**
-
+**Request body:**
 ```json
 {
-  "patient_id": "PAT_12345",
+  "patient_id": "PATIENT_12345",
   "location": {"lat": 0.0512, "lng": 40.3129},
   "diagnosis": "malaria",
-  "symptoms": ["fever", "chills", "headache"],
-  "timestamp": "2025-12-26T10:30:00Z",
-  "facility_id": "DADAAB_CLINIC",
-  "consent_token": "VALID_TOKEN",
-  "jurisdiction": "KDPA_KE"
+  "timestamp": "2025-01-15T08:30:00Z",
+  "source": "DADAAB_CLINIC",
+  "consent_token": "VALID_TOKEN"
 }
 ```
 
-**Response:**
-
+**Response (201 Created):**
 ```json
 {
   "status": "success",
-  "record_id": "EMR_12345",
-  "verification_status": "CONFIRMED",
+  "timestamp": "2025-12-28T20:00:00.000Z",
+  "patient_hash": "a1b2c3d4e5f6g7h8",
+  "key_id": "def456",
   "verification_score": 1.0,
-  "message": "EMR recorded and verified with CBS signal.",
-  "timestamp": "2025-12-26T10:30:00.000Z"
+  "message": "EMR record submitted successfully"
 }
 ```
 
 ### Fuse data streams
 
+Manually trigger Golden Thread data fusion.
+
 ```bash
-POST /api/v1/golden-thread/fuse
+POST /api/v1/fuse-data
+Content-Type: application/json
 ```
 
-**Request:**
-
+**Request body:**
 ```json
 {
+  "patient_id": "PATIENT_12345",
   "cbs_signal": {
     "location": {"lat": 0.0512, "lng": 40.3129},
     "symptom": "fever",
-    "timestamp": "2025-12-26T10:00:00Z"
+    "timestamp": "2025-01-15T08:00:00Z"
   },
   "emr_record": {
     "location": {"lat": 0.0512, "lng": 40.3129},
     "diagnosis": "malaria",
-    "timestamp": "2025-12-26T10:30:00Z"
-  },
-  "patient_id": "PAT_12345"
+    "timestamp": "2025-01-15T08:30:00Z"
+  }
 }
 ```
 
-**Response:**
-
+**Response (200 OK):**
 ```json
 {
   "status": "success",
+  "timestamp": "2025-12-28T20:00:00.000Z",
+  "patient_hash": "a1b2c3d4e5f6g7h8",
   "verification_score": 1.0,
-  "verification_status": "CONFIRMED",
   "fused_record": {
-    "patient_id": "PAT_12345",
     "location": {"lat": 0.0512, "lng": 40.3129},
-    "symptom": "fever",
+    "symptoms": ["fever"],
     "diagnosis": "malaria",
-    "cbs_timestamp": "2025-12-26T10:00:00Z",
-    "emr_timestamp": "2025-12-26T10:30:00Z",
-    "time_delta_hours": 0.5,
-    "verification_score": 1.0
-  },
-  "timestamp": "2025-12-26T10:30:00.000Z"
+    "verification_status": "CONFIRMED"
+  }
 }
 ```
 
-### Get verification status
+## Privacy-preserving patient hashing
 
-```bash
-GET /api/v1/verification/status?patient_id=PAT_12345
+The API uses SHA-256 hashing to create privacy-preserving patient identifiers:
+
+```python
+import hashlib
+
+def generate_patient_hash(patient_id: str) -> str:
+    """Generate privacy-preserving patient hash"""
+    return hashlib.sha256(patient_id.encode()).hexdigest()[:16]
+
+# Example
+patient_id = "PATIENT_12345"
+patient_hash = generate_patient_hash(patient_id)
+# Output: "a1b2c3d4e5f6g7h8"
 ```
 
-**Response:**
+**Benefits:**
+- Original patient ID never stored
+- Consistent hashing enables data linkage
+- Complies with GDPR Art. 32 (Pseudonymization)
 
-```json
-{
-  "status": "success",
-  "verification_score": 0.95,
-  "verification_status": "CONFIRMED",
-  "matched_records": [],
-  "timestamp": "2025-12-26T10:30:00.000Z"
-}
-```
+## Alert levels
 
-### Validate consent
+The API automatically calculates alert levels based on severity:
 
-```bash
-POST /api/v1/consent/validate
-```
+| Severity Score | Alert Level | Response |
+|----------------|-------------|----------|
+| 9-10 | CRITICAL | Immediate emergency response |
+| 7-8 | HIGH | Urgent attention required |
+| 4-6 | MEDIUM | Increased surveillance |
+| 0-3 | LOW | Routine monitoring |
 
-**Request:**
+## Data retention policies
 
-```json
-{
-  "consent_token": "TOKEN_12345",
-  "patient_id": "PAT_12345",
-  "scope": "diagnosis",
-  "jurisdiction": "KDPA_KE"
-}
-```
+Different data types have different retention policies:
 
-**Response:**
+| Data Type | Retention Policy | Duration | Storage Class |
+|-----------|------------------|----------|---------------|
+| CBS | HOT | 180 days | STANDARD |
+| EMR | WARM | 365 days | NEARLINE |
+| IDSR | COLD | 1825 days | COLDLINE |
 
-```json
-{
-  "status": "success",
-  "valid": true,
-  "expires_at": "2026-12-26T10:00:00Z",
-  "timestamp": "2025-12-26T10:00:00.000Z"
-}
-```
+After retention period, keys are automatically shredded by Crypto Shredder (IP-02).
 
-## Verification scores
-
-| Score | Status | Description |
-|-------|--------|-------------|
-| 1.0 | CONFIRMED | Location and time match within 24h |
-| 0.7-0.9 | PROBABLE | Partial agreement with minor conflicts |
-| 0.4-0.6 | POSSIBLE | Significant conflicts but plausible |
-| 0.0-0.3 | UNVERIFIED | Major conflicts or single source only |
-
-## Error responses
-
-### Sovereignty violation
-
-```json
-{
-  "status": "error",
-  "error": "sovereignty_violation",
-  "message": "Data processing violates sovereignty constraints"
-}
-```
-
-### Missing fields
-
-```json
-{
-  "status": "error",
-  "error": "Missing required fields: location, timestamp"
-}
-```
-
-### Invalid consent
-
-```json
-{
-  "status": "error",
-  "valid": false,
-  "error": "Consent token expired or invalid"
-}
-```
-
-## Mobile SDK examples
+## Mobile SDK integration
 
 ### Android (Kotlin)
 
 ```kotlin
-import retrofit2.http.*
+import okhttp3.*
+import org.json.JSONObject
 
-interface BioInterfaceAPI {
-    @POST("api/v1/cbs/submit")
-    suspend fun submitCBSSignal(
-        @Body signal: CBSSignal
-    ): Response<CBSResponse>
+class ILuminaraClient(private val baseUrl: String) {
+    private val client = OkHttpClient()
     
-    @POST("api/v1/emr/submit")
-    suspend fun submitEMRRecord(
-        @Body record: EMRRecord
-    ): Response<EMRResponse>
+    fun submitCBSReport(
+        patientId: String,
+        location: Pair<Double, Double>,
+        symptoms: List<String>,
+        severity: Int,
+        consentToken: String
+    ): Response {
+        val json = JSONObject().apply {
+            put("patient_id", patientId)
+            put("location", JSONObject().apply {
+                put("lat", location.first)
+                put("lng", location.second)
+            })
+            put("symptoms", JSONArray(symptoms))
+            put("severity", severity)
+            put("timestamp", System.currentTimeMillis())
+            put("source", "CHV_MOBILE_APP")
+            put("consent_token", consentToken)
+        }
+        
+        val body = RequestBody.create(
+            MediaType.parse("application/json"),
+            json.toString()
+        )
+        
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/submit-cbs-report")
+            .post(body)
+            .build()
+        
+        return client.newCall(request).execute()
+    }
 }
 
 // Usage
-val api = Retrofit.Builder()
-    .baseUrl("https://api.iluminara.health/")
-    .addConverterFactory(GsonConverterFactory.create())
-    .build()
-    .create(BioInterfaceAPI::class.java)
-
-val signal = CBSSignal(
-    chvId = "CHV_AMINA_HASSAN",
-    location = Location(0.0512, 40.3129),
-    symptom = "fever",
+val client = ILuminaraClient("https://api.iluminara.health")
+val response = client.submitCBSReport(
+    patientId = "PATIENT_12345",
+    location = Pair(0.0512, 40.3129),
+    symptoms = listOf("fever", "cough"),
     severity = 7,
-    timestamp = "2025-12-26T10:00:00Z",
-    consentToken = "VALID_TOKEN",
-    jurisdiction = "KDPA_KE"
+    consentToken = "VALID_TOKEN"
 )
-
-val response = api.submitCBSSignal(signal)
 ```
 
 ### iOS (Swift)
@@ -326,67 +292,211 @@ val response = api.submitCBSSignal(signal)
 ```swift
 import Foundation
 
-struct CBSSignal: Codable {
-    let chvId: String
-    let location: Location
-    let symptom: String
-    let severity: Int
-    let timestamp: String
-    let consentToken: String
-    let jurisdiction: String
+class ILuminaraClient {
+    let baseURL: String
+    
+    init(baseURL: String) {
+        self.baseURL = baseURL
+    }
+    
+    func submitCBSReport(
+        patientId: String,
+        location: (lat: Double, lng: Double),
+        symptoms: [String],
+        severity: Int,
+        consentToken: String,
+        completion: @escaping (Result<Data, Error>) -> Void
+    ) {
+        let url = URL(string: "\(baseURL)/api/v1/submit-cbs-report")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body: [String: Any] = [
+            "patient_id": patientId,
+            "location": ["lat": location.lat, "lng": location.lng],
+            "symptoms": symptoms,
+            "severity": severity,
+            "timestamp": ISO8601DateFormatter().string(from: Date()),
+            "source": "CHV_MOBILE_APP",
+            "consent_token": consentToken
+        ]
+        
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+            
+            if let data = data {
+                completion(.success(data))
+            }
+        }.resume()
+    }
 }
 
-func submitCBSSignal(signal: CBSSignal) async throws -> CBSResponse {
-    let url = URL(string: "https://api.iluminara.health/api/v1/cbs/submit")!
-    var request = URLRequest(url: url)
-    request.httpMethod = "POST"
-    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    request.httpBody = try JSONEncoder().encode(signal)
-    
-    let (data, _) = try await URLSession.shared.data(for: request)
-    return try JSONDecoder().decode(CBSResponse.self, from: data)
+// Usage
+let client = ILuminaraClient(baseURL: "https://api.iluminara.health")
+client.submitCBSReport(
+    patientId: "PATIENT_12345",
+    location: (lat: 0.0512, lng: 40.3129),
+    symptoms: ["fever", "cough"],
+    severity: 7,
+    consentToken: "VALID_TOKEN"
+) { result in
+    switch result {
+    case .success(let data):
+        print("✅ CBS report submitted")
+    case .failure(let error):
+        print("❌ Error: \(error)")
+    }
 }
 ```
 
 ### React Native (JavaScript)
 
 ```javascript
-const submitCBSSignal = async (signal) => {
-  const response = await fetch('https://api.iluminara.health/api/v1/cbs/submit', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(signal),
-  });
+class ILuminaraClient {
+  constructor(baseURL) {
+    this.baseURL = baseURL;
+  }
   
-  return await response.json();
-};
+  async submitCBSReport({
+    patientId,
+    location,
+    symptoms,
+    severity,
+    consentToken
+  }) {
+    const response = await fetch(`${this.baseURL}/api/v1/submit-cbs-report`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        patient_id: patientId,
+        location: location,
+        symptoms: symptoms,
+        severity: severity,
+        timestamp: new Date().toISOString(),
+        source: 'CHV_MOBILE_APP',
+        consent_token: consentToken
+      })
+    });
+    
+    return await response.json();
+  }
+}
 
 // Usage
-const signal = {
-  chv_id: 'CHV_AMINA_HASSAN',
-  location: { lat: 0.0512, lng: 40.3129 },
-  symptom: 'fever',
-  severity: 7,
-  timestamp: new Date().toISOString(),
-  consent_token: 'VALID_TOKEN',
-  jurisdiction: 'KDPA_KE',
-};
+const client = new ILuminaraClient('https://api.iluminara.health');
 
-const result = await submitCBSSignal(signal);
-console.log(result);
+const result = await client.submitCBSReport({
+  patientId: 'PATIENT_12345',
+  location: { lat: 0.0512, lng: 40.3129 },
+  symptoms: ['fever', 'cough'],
+  severity: 7,
+  consentToken: 'VALID_TOKEN'
+});
+
+console.log('✅ CBS report submitted:', result);
+```
+
+## Error handling
+
+### Common errors
+
+| Error Code | HTTP Status | Description |
+|------------|-------------|-------------|
+| `missing_patient_id` | 400 | Patient ID not provided |
+| `missing_location` | 400 | Location data not provided |
+| `missing_data_type` | 400 | Data type not specified |
+| `sovereignty_violation` | 403 | Action violates compliance rules |
+| `decryption_failed` | 404 | Key shredded or expired |
+| `processing_failed` | 500 | Internal processing error |
+
+### Error response format
+
+```json
+{
+  "status": "error",
+  "error": "sovereignty_violation",
+  "message": "Violates GDPR Art. 9 (Processing of special categories)"
+}
+```
+
+## Testing
+
+### Local testing
+
+```bash
+# Start API server
+python integrations/bio_interface_api.py
+
+# Test CBS submission
+curl -X POST http://localhost:8080/api/v1/submit-cbs-report \
+  -H "Content-Type: application/json" \
+  -d '{
+    "patient_id": "PATIENT_12345",
+    "location": {"lat": 0.0512, "lng": 40.3129},
+    "symptoms": ["fever", "cough"],
+    "severity": 7,
+    "source": "CHV_MOBILE_APP",
+    "consent_token": "VALID_TOKEN"
+  }'
+```
+
+### Integration tests
+
+```python
+import requests
+import pytest
+
+BASE_URL = "http://localhost:8080"
+
+def test_submit_cbs_report():
+    response = requests.post(
+        f"{BASE_URL}/api/v1/submit-cbs-report",
+        json={
+            "patient_id": "PATIENT_12345",
+            "location": {"lat": 0.0512, "lng": 40.3129},
+            "symptoms": ["fever", "cough"],
+            "severity": 7,
+            "source": "CHV_MOBILE_APP",
+            "consent_token": "VALID_TOKEN"
+        }
+    )
+    
+    assert response.status_code == 201
+    data = response.json()
+    assert data["status"] == "success"
+    assert "patient_hash" in data
+    assert "key_id" in data
+    assert data["verification_score"] >= 0.0
+
+def test_sovereignty_violation():
+    response = requests.post(
+        f"{BASE_URL}/api/v1/submit-cbs-report",
+        json={
+            "patient_id": "PATIENT_12345",
+            "location": {"lat": 0.0512, "lng": 40.3129},
+            "symptoms": ["fever"],
+            "severity": 5,
+            "source": "FOREIGN_CLOUD",  # Sovereignty violation
+            "consent_token": "INVALID"
+        }
+    )
+    
+    assert response.status_code == 403
+    data = response.json()
+    assert data["error"] == "sovereignty_violation"
 ```
 
 ## Deployment
 
-### Start the API server
-
-```bash
-python integrations/bio_interface_api.py
-```
-
-### Docker deployment
+### Docker
 
 ```dockerfile
 FROM python:3.9-slim
@@ -396,57 +506,26 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-COPY . .
+COPY integrations/bio_interface_api.py .
+COPY governance_kernel/ ./governance_kernel/
+COPY edge_node/ ./edge_node/
 
 EXPOSE 8080
 
-CMD ["python", "integrations/bio_interface_api.py"]
+CMD ["python", "bio_interface_api.py"]
 ```
 
-```bash
-docker build -t bio-interface-api .
-docker run -p 8080:8080 bio-interface-api
-```
-
-### GCP Cloud Run deployment
+### Cloud Run
 
 ```bash
 # Build and deploy
 gcloud run deploy bio-interface-api \
   --source . \
+  --platform managed \
   --region us-central1 \
   --allow-unauthenticated \
-  --set-env-vars JURISDICTION=KDPA_KE
+  --set-env-vars NODE_ID=JOR-47,JURISDICTION=KDPA_KE
 ```
-
-## Security considerations
-
-<AccordionGroup>
-  <Accordion title="TLS encryption">
-    All production endpoints must use TLS 1.3 for data in transit
-  </Accordion>
-  <Accordion title="Rate limiting">
-    Implement rate limiting: 100 requests/minute per IP
-  </Accordion>
-  <Accordion title="Consent validation">
-    All requests validate consent tokens through SovereignGuardrail
-  </Accordion>
-  <Accordion title="Data sovereignty">
-    PHI never leaves sovereign territory without explicit authorization
-  </Accordion>
-  <Accordion title="Audit logging">
-    All API calls logged to tamper-proof audit trail
-  </Accordion>
-</AccordionGroup>
-
-## Compliance
-
-The Bio-Interface API enforces:
-
-- **GDPR Art. 9** - Special categories of personal data
-- **HIPAA §164.312** - Technical safeguards
-- **Kenya DPA §37** - Transfer restrictions
-- **POPIA §14** - Cross-border transfers
 
 ## Next steps
 
@@ -466,11 +545,11 @@ The Bio-Interface API enforces:
     Understand data fusion logic
   </Card>
   <Card
-    title="Governance"
-    icon="shield-check"
-    href="/governance/overview"
+    title="Crypto Shredder"
+    icon="fire"
+    href="/security/overview"
   >
-    Configure sovereignty constraints
+    Configure data lifecycle
   </Card>
   <Card
     title="Deployment"

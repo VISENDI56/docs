@@ -1,0 +1,532 @@
+---
+title: Google Cloud Platform deployment
+description: Deploy iLuminara-Core to GCP with Cloud Run, Vertex AI, and BigQuery
+---
+
+## Overview
+
+Deploy the complete iLuminara-Core stack to Google Cloud Platform with automated scripts and infrastructure-as-code.
+
+<Card
+  title="Deployment time"
+  icon="clock"
+>
+  ~15 minutes for complete stack deployment
+</Card>
+
+## Prerequisites
+
+### Required tools
+
+```bash
+# Install Google Cloud SDK
+curl https://sdk.cloud.google.com | bash
+exec -l $SHELL
+
+# Initialize gcloud
+gcloud init
+
+# Install additional components
+gcloud components install kubectl
+```
+
+### GCP project setup
+
+```bash
+# Create new project
+gcloud projects create iluminara-core --name="iLuminara Core"
+
+# Set as active project
+gcloud config set project iluminara-core
+
+# Enable billing
+gcloud beta billing projects link iluminara-core \
+  --billing-account=YOUR_BILLING_ACCOUNT_ID
+```
+
+### Required APIs
+
+The deployment script automatically enables these APIs:
+
+- Cloud Run
+- Cloud Functions
+- BigQuery
+- Vertex AI
+- Cloud Spanner
+- Cloud Storage
+- Dataflow
+- PubSub
+- Cloud KMS
+- Secret Manager
+
+## Quick deployment
+
+### One-command deployment
+
+```bash
+# Clone repository
+git clone https://github.com/VISENDI56/iLuminara-Core.git
+cd iLuminara-Core
+
+# Make deployment script executable
+chmod +x deploy_gcp_prototype.sh
+
+# Deploy complete stack
+./deploy_gcp_prototype.sh
+```
+
+### What gets deployed
+
+<Steps>
+  <Step title="Enable GCP services">
+    Activates all required APIs and services
+  </Step>
+  <Step title="Create BigQuery datasets">
+    Sets up outbreak_intelligence dataset with tables
+  </Step>
+  <Step title="Deploy FRENASA Engine">
+    Voice processing service on Cloud Run
+  </Step>
+  <Step title="Deploy Cloud Oracle">
+    Forecasting and analytics on Vertex AI
+  </Step>
+  <Step title="Create HSML Ledger">
+    Tamper-proof audit trail on Cloud Spanner
+  </Step>
+  <Step title="Configure PubSub">
+    Alert distribution topics and subscriptions
+  </Step>
+  <Step title="Deploy dashboards">
+    Streamlit dashboards on Cloud Run
+  </Step>
+</Steps>
+
+## Manual deployment
+
+### Step 1: Enable services
+
+```bash
+# Enable required GCP services
+gcloud services enable \
+  run.googleapis.com \
+  cloudfunctions.googleapis.com \
+  bigquery.googleapis.com \
+  aiplatform.googleapis.com \
+  spanner.googleapis.com \
+  storage.googleapis.com \
+  dataflow.googleapis.com \
+  pubsub.googleapis.com \
+  cloudkms.googleapis.com \
+  secretmanager.googleapis.com
+```
+
+### Step 2: Create BigQuery dataset
+
+```bash
+# Create dataset
+bq mk --dataset \
+  --location=us-central1 \
+  --description="iLuminara outbreak intelligence" \
+  iluminara-core:outbreak_intelligence
+
+# Create outbreak_events table
+bq mk --table \
+  iluminara-core:outbreak_intelligence.outbreak_events \
+  schema/outbreak_events.json
+```
+
+**Schema (outbreak_events.json):**
+```json
+[
+  {"name": "event_id", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "timestamp", "type": "TIMESTAMP", "mode": "REQUIRED"},
+  {"name": "location", "type": "GEOGRAPHY", "mode": "REQUIRED"},
+  {"name": "disease", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "cases", "type": "INTEGER", "mode": "REQUIRED"},
+  {"name": "z_score", "type": "FLOAT", "mode": "NULLABLE"},
+  {"name": "verification_score", "type": "FLOAT", "mode": "NULLABLE"},
+  {"name": "source", "type": "STRING", "mode": "REQUIRED"}
+]
+```
+
+### Step 3: Deploy API service to Cloud Run
+
+```bash
+# Build container
+gcloud builds submit --tag gcr.io/iluminara-core/api-service
+
+# Deploy to Cloud Run
+gcloud run deploy iluminara-api \
+  --image gcr.io/iluminara-core/api-service \
+  --platform managed \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --memory 2Gi \
+  --cpu 2 \
+  --max-instances 100 \
+  --set-env-vars NODE_ID=GCP-CLOUD-01,JURISDICTION=GLOBAL_DEFAULT
+```
+
+### Step 4: Deploy Vertex AI models
+
+```python
+# train_vertex_model.py
+from google.cloud import aiplatform
+
+aiplatform.init(
+    project='iluminara-core',
+    location='us-central1'
+)
+
+# Create AutoML time-series dataset
+dataset = aiplatform.TimeSeriesDataset.create(
+    display_name='outbreak_forecasting',
+    bq_source='bq://iluminara-core.outbreak_intelligence.outbreak_events',
+    time_column='timestamp',
+    time_series_identifier_column='location',
+    target_column='cases'
+)
+
+# Train forecasting model
+job = aiplatform.AutoMLForecastingTrainingJob(
+    display_name='cholera_forecast',
+    optimization_objective='minimize-rmse',
+    column_specs={
+        'timestamp': 'time',
+        'location': 'categorical',
+        'cases': 'numeric'
+    }
+)
+
+model = job.run(
+    dataset=dataset,
+    target_column='cases',
+    time_column='timestamp',
+    time_series_identifier_column='location',
+    forecast_horizon=72,  # 72 hours
+    budget_milli_node_hours=1000
+)
+```
+
+### Step 5: Create Cloud Spanner instance
+
+```bash
+# Create Spanner instance
+gcloud spanner instances create iluminara-hsml \
+  --config=regional-us-central1 \
+  --description="HSML Ledger - Tamper-proof audit trail" \
+  --nodes=1
+
+# Create database
+gcloud spanner databases create audit_ledger \
+  --instance=iluminara-hsml \
+  --ddl='CREATE TABLE audit_events (
+    event_id STRING(36) NOT NULL,
+    timestamp TIMESTAMP NOT NULL,
+    action STRING(50) NOT NULL,
+    actor STRING(100),
+    resource STRING(200),
+    jurisdiction STRING(50),
+    hash STRING(64),
+    signature STRING(512)
+  ) PRIMARY KEY (event_id, timestamp)'
+```
+
+### Step 6: Configure PubSub
+
+```bash
+# Create topics
+gcloud pubsub topics create outbreak-alerts
+gcloud pubsub topics create critical-alerts
+gcloud pubsub topics create voice-alerts
+
+# Create subscriptions
+gcloud pubsub subscriptions create email-notifications \
+  --topic=outbreak-alerts \
+  --push-endpoint=https://iluminara-api-xxx.run.app/pubsub/email
+
+gcloud pubsub subscriptions create sms-alerts \
+  --topic=critical-alerts \
+  --push-endpoint=https://iluminara-api-xxx.run.app/pubsub/sms
+```
+
+### Step 7: Deploy dashboards
+
+```bash
+# Build dashboard container
+docker build -t gcr.io/iluminara-core/dashboard -f Dockerfile.dashboard .
+docker push gcr.io/iluminara-core/dashboard
+
+# Deploy to Cloud Run
+gcloud run deploy iluminara-dashboard \
+  --image gcr.io/iluminara-core/dashboard \
+  --platform managed \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --memory 1Gi \
+  --port 8501
+```
+
+## Configuration
+
+### Environment variables
+
+```bash
+# Set environment variables for Cloud Run
+gcloud run services update iluminara-api \
+  --set-env-vars \
+    NODE_ID=GCP-CLOUD-01,\
+    JURISDICTION=KDPA_KE,\
+    GOOGLE_CLOUD_PROJECT=iluminara-core,\
+    GCP_REGION=us-central1,\
+    ENABLE_TAMPER_PROOF_AUDIT=true,\
+    BIGQUERY_DATASET=outbreak_intelligence,\
+    SPANNER_INSTANCE=iluminara-hsml,\
+    SPANNER_DATABASE=audit_ledger
+```
+
+### Secrets management
+
+```bash
+# Create secrets
+echo -n "your-api-key" | gcloud secrets create api-key --data-file=-
+echo -n "your-db-password" | gcloud secrets create db-password --data-file=-
+
+# Grant access to Cloud Run
+gcloud secrets add-iam-policy-binding api-key \
+  --member=serviceAccount:PROJECT_NUMBER-compute@developer.gserviceaccount.com \
+  --role=roles/secretmanager.secretAccessor
+
+# Mount secrets in Cloud Run
+gcloud run services update iluminara-api \
+  --update-secrets=API_KEY=api-key:latest,DB_PASSWORD=db-password:latest
+```
+
+## Monitoring and observability
+
+### Cloud Monitoring
+
+```bash
+# Create uptime check
+gcloud monitoring uptime create iluminara-api-health \
+  --resource-type=uptime-url \
+  --host=iluminara-api-xxx.run.app \
+  --path=/health \
+  --check-interval=60s
+```
+
+### Cloud Logging
+
+```bash
+# View logs
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=iluminara-api" \
+  --limit 50 \
+  --format json
+
+# Create log-based metric
+gcloud logging metrics create sovereignty_violations \
+  --description="Count of sovereignty violations" \
+  --log-filter='jsonPayload.error="sovereignty_violation"'
+```
+
+### Cloud Trace
+
+```python
+# Enable tracing in application
+from google.cloud import trace_v1
+
+tracer = trace_v1.TraceServiceClient()
+
+with tracer.span(name='process_voice'):
+    result = voice_processor.process_audio(audio_data)
+```
+
+## Scaling configuration
+
+### Autoscaling
+
+```bash
+# Configure autoscaling
+gcloud run services update iluminara-api \
+  --min-instances=1 \
+  --max-instances=100 \
+  --cpu-throttling \
+  --concurrency=80
+```
+
+### Load balancing
+
+```bash
+# Create load balancer
+gcloud compute backend-services create iluminara-backend \
+  --global \
+  --load-balancing-scheme=EXTERNAL \
+  --protocol=HTTP
+
+# Add Cloud Run backend
+gcloud compute backend-services add-backend iluminara-backend \
+  --global \
+  --serverless-backend-service=iluminara-api \
+  --serverless-backend-service-region=us-central1
+```
+
+## Cost optimization
+
+### Recommendations
+
+<AccordionGroup>
+  <Accordion title="Use committed use discounts">
+    Save up to 57% with 1-year or 3-year commitments for Compute Engine and Cloud Run
+  </Accordion>
+  <Accordion title="Enable BigQuery BI Engine">
+    Cache frequently accessed data for faster queries and lower costs
+  </Accordion>
+  <Accordion title="Use Cloud Storage lifecycle policies">
+    Automatically transition old data to Nearline or Coldline storage
+  </Accordion>
+  <Accordion title="Optimize Vertex AI training">
+    Use preemptible VMs for training jobs to save up to 80%
+  </Accordion>
+</AccordionGroup>
+
+### Budget alerts
+
+```bash
+# Create budget alert
+gcloud billing budgets create \
+  --billing-account=YOUR_BILLING_ACCOUNT_ID \
+  --display-name="iLuminara Monthly Budget" \
+  --budget-amount=1000USD \
+  --threshold-rule=percent=50 \
+  --threshold-rule=percent=90 \
+  --threshold-rule=percent=100
+```
+
+## Security hardening
+
+### IAM configuration
+
+```bash
+# Create service account
+gcloud iam service-accounts create iluminara-api \
+  --display-name="iLuminara API Service Account"
+
+# Grant minimal permissions
+gcloud projects add-iam-policy-binding iluminara-core \
+  --member=serviceAccount:iluminara-api@iluminara-core.iam.gserviceaccount.com \
+  --role=roles/bigquery.dataEditor
+
+gcloud projects add-iam-policy-binding iluminara-core \
+  --member=serviceAccount:iluminara-api@iluminara-core.iam.gserviceaccount.com \
+  --role=roles/spanner.databaseUser
+```
+
+### VPC configuration
+
+```bash
+# Create VPC
+gcloud compute networks create iluminara-vpc \
+  --subnet-mode=custom
+
+# Create subnet
+gcloud compute networks subnets create iluminara-subnet \
+  --network=iluminara-vpc \
+  --region=us-central1 \
+  --range=10.0.0.0/24
+
+# Configure Cloud Run to use VPC
+gcloud run services update iluminara-api \
+  --vpc-connector=iluminara-connector \
+  --vpc-egress=private-ranges-only
+```
+
+## Disaster recovery
+
+### Backup strategy
+
+```bash
+# Export BigQuery data
+bq extract \
+  --destination_format=AVRO \
+  iluminara-core:outbreak_intelligence.outbreak_events \
+  gs://iluminara-backups/outbreak_events_$(date +%Y%m%d).avro
+
+# Backup Spanner database
+gcloud spanner databases ddl update audit_ledger \
+  --instance=iluminara-hsml \
+  --ddl='CREATE BACKUP audit_backup_$(date +%Y%m%d) 
+        FOR DATABASE audit_ledger 
+        EXPIRE_TIME "2026-01-01T00:00:00Z"'
+```
+
+### Multi-region deployment
+
+```bash
+# Deploy to multiple regions
+for region in us-central1 europe-west1 asia-southeast1; do
+  gcloud run deploy iluminara-api-$region \
+    --image gcr.io/iluminara-core/api-service \
+    --platform managed \
+    --region $region \
+    --allow-unauthenticated
+done
+
+# Configure global load balancer
+gcloud compute url-maps create iluminara-lb \
+  --default-service=iluminara-backend
+```
+
+## Troubleshooting
+
+### Common issues
+
+<AccordionGroup>
+  <Accordion title="Cloud Run deployment fails">
+    Check container logs: `gcloud run services logs read iluminara-api`
+    
+    Verify IAM permissions: `gcloud projects get-iam-policy iluminara-core`
+  </Accordion>
+  <Accordion title="BigQuery quota exceeded">
+    Check quota usage: `gcloud compute project-info describe --project=iluminara-core`
+    
+    Request quota increase: https://console.cloud.google.com/iam-admin/quotas
+  </Accordion>
+  <Accordion title="Vertex AI training fails">
+    Check training logs in Cloud Console
+    
+    Verify dataset format and schema
+  </Accordion>
+</AccordionGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Edge deployment"
+    icon="microchip"
+    href="/deployment/edge"
+  >
+    Deploy to NVIDIA Jetson Orin
+  </Card>
+  <Card
+    title="Hybrid deployment"
+    icon="network-wired"
+    href="/deployment/hybrid"
+  >
+    Edge-to-cloud synchronization
+  </Card>
+  <Card
+    title="Monitoring"
+    icon="chart-line"
+    href="/deployment/monitoring"
+  >
+    Set up monitoring and alerts
+  </Card>
+  <Card
+    title="API reference"
+    icon="terminal"
+    href="/api-reference/overview"
+  >
+    Explore API endpoints
+  </Card>
+</CardGroup>
