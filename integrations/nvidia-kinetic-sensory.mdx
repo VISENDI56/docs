@@ -1,0 +1,91 @@
+---
+title: NVIDIA Kinetic & Sensory Layer
+description: Real-time pose estimation and stress monitoring for health workers
+---
+
+## Overview
+
+NVIDIA Kinetic & Sensory Layer provides real-time pose estimation, fatigue detection, and stress monitoring for health workers using NVIDIA Isaac Sim, enabling Silent Flux (IP-04) and Acorn Protocol (IP-03) integration.
+
+<Card
+  title="Implementation"
+  icon="person-running"
+>
+  Complete implementation in `repository-files/nvidia_integrations/kinetic_sensory.py`
+</Card>
+
+## Key capabilities
+
+<CardGroup cols={2}>
+  <Card title="Pose estimation" icon="person">
+    Real-time human pose tracking
+  </Card>
+  <Card title="Fatigue detection" icon="bed">
+    Worker safety monitoring
+  </Card>
+  <Card title="Stress monitoring" icon="heart-pulse">
+    Physiological stress levels
+  </Card>
+  <Card title="Privacy-preserving" icon="shield-check">
+    Edge processing only
+  </Card>
+</CardGroup>
+
+## Quick start
+
+```python
+from nvidia_integrations.kinetic_sensory import NVIDIAKineticSensoryLayer
+
+# Initialize layer
+kinetic = NVIDIAKineticSensoryLayer(
+    camera_config={"resolution": "1920x1080", "fps": 30}
+)
+
+# Estimate pose
+pose = kinetic.estimate_pose(video_stream)
+print(f"Posture: {pose.posture_type}")
+
+# Detect fatigue
+fatigue = kinetic.detect_fatigue(
+    pose_data=pose,
+    duration_minutes=120
+)
+print(f"Fatigue level: {fatigue.level}")
+
+# Monitor stress
+stress = kinetic.monitor_stress({
+    "heart_rate_bpm": 95,
+    "breathing_rate": 22,
+    "skin_conductance": 0.8
+})
+print(f"Stress level: {stress.level}")
+```
+
+## Integration with Silent Flux (IP-04)
+
+```python
+from nuclear_ip.silent_flux import AdaptiveSerenityFlow
+
+# Initialize Silent Flux
+asf = AdaptiveSerenityFlow()
+
+# Get stress level from kinetic layer
+stress_level = kinetic.monitor_stress(physiological_data)
+
+# Adapt AI output based on stress
+asf.modulate_output(
+    stress_level=stress_level.level,
+    content_type="outbreak_alert"
+)
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Implementation" icon="file-code" href="/IMPLEMENTATION_COMPLETE">
+    Complete implementation
+  </Card>
+  <Card title="Security stack" icon="shield-halved" href="/security/overview">
+    Acorn Protocol integration
+  </Card>
+</CardGroup>
