@@ -1,0 +1,407 @@
+---
+title: FRENASA Engine
+description: Voice-to-JSON transformation engine for Swahili medical data
+---
+
+## Overview
+
+The FRENASA Engine is iLuminara's voice-to-JSON transformation pipeline that converts Swahili voice notes from Community Health Volunteers (CHVs) into structured, actionable health intelligence.
+
+<Card
+  title="Philosophy"
+  icon="microphone"
+>
+  "From voice to verified intelligence in seconds."
+</Card>
+
+## Complete pipeline
+
+<Steps>
+  <Step title="Audio input">
+    Swahili voice notes recorded by CHVs on mobile devices
+  </Step>
+  <Step title="Transcription">
+    Cloud Speech-to-Text converts audio to Swahili text
+  </Step>
+  <Step title="Symptom extraction">
+    FRENASA extracts symptoms, diseases, and urgency levels
+  </Step>
+  <Step title="Data fusion">
+    Golden Thread merges with EMR and IDSR data streams
+  </Step>
+  <Step title="Governance validation">
+    SovereignGuardrail validates sovereignty compliance
+  </Step>
+  <Step title="Structured output">
+    JSON output ready for analytics and forecasting
+  </Step>
+</Steps>
+
+## Voice-to-JSON pipeline
+
+### Basic usage
+
+```python
+from edge_node.frenasa_engine.voice_to_json import VoiceToJSONPipeline
+
+# Initialize pipeline
+pipeline = VoiceToJSONPipeline(
+    mode="edge",
+    jurisdiction="KDPA_KE",
+    enable_logging=True
+)
+
+# Process voice note
+result = pipeline.process(
+    audio_data=audio_bytes,
+    patient_id="PATIENT_001",
+    location="Dadaab",
+    chv_id="CHV_AMINA_HASSAN",
+    consent_token="CONSENT_TOKEN"
+)
+
+# Get structured JSON
+print(result.to_json())
+```
+
+### Processing modes
+
+| Mode | Description | Use Case |
+|------|-------------|----------|
+| `edge` | All processing on edge device | Offline operation, data sovereignty |
+| `cloud` | Cloud-based processing | High-volume, advanced analytics |
+| `hybrid` | Edge + cloud enhancement | Best of both worlds |
+
+## Swahili transcription
+
+### SwahiliTranscriber
+
+Converts Swahili audio to text using Google Cloud Speech-to-Text.
+
+```python
+from edge_node.frenasa_engine.voice_transcription import SwahiliTranscriber
+
+transcriber = SwahiliTranscriber(
+    credentials_path="path/to/credentials.json",
+    language_code="sw-KE"  # Swahili (Kenya)
+)
+
+# Transcribe audio
+result = transcriber.transcribe_audio(
+    audio_data=audio_bytes,
+    sample_rate_hertz=16000,
+    encoding="LINEAR16"
+)
+
+print(f"Text: {result.text}")
+print(f"Confidence: {result.confidence:.2%}")
+```
+
+### Supported languages
+
+- `sw-KE` - Swahili (Kenya)
+- `sw-TZ` - Swahili (Tanzania)
+- `sw-UG` - Swahili (Uganda)
+
+### Offline fallback
+
+When cloud connectivity is unavailable, the transcriber uses:
+- Cached transcriptions for common phrases
+- Local speech recognition models
+- Phonetic matching algorithms
+
+## Symptom extraction
+
+### FRENASASymptomExtractor
+
+Extracts medical entities from Swahili text using Vertex AI and rule-based fallbacks.
+
+```python
+from edge_node.frenasa_engine.symptom_extraction import FRENASASymptomExtractor
+
+extractor = FRENASASymptomExtractor(
+    credentials_path="path/to/credentials.json"
+)
+
+# Extract symptoms
+result = extractor.extract_symptoms(
+    text="Mgonjwa ana homa kali na maumivu ya tumbo",
+    location="Dadaab"
+)
+
+print(f"Symptoms: {result.symptoms}")
+print(f"Urgency: {result.urgency_level}")
+print(f"Disease suspicion: {result.disease_suspicion}")
+```
+
+### Extracted entities
+
+<AccordionGroup>
+  <Accordion title="Symptoms">
+    - Fever (homa)
+    - Cough (kikohozi)
+    - Diarrhea (kuhara)
+    - Vomiting (kutapika)
+    - Headache (maumivu ya kichwa)
+  </Accordion>
+  <Accordion title="Diseases">
+    - Malaria
+    - Cholera
+    - Typhoid
+    - Tuberculosis
+    - COVID-19
+  </Accordion>
+  <Accordion title="Body parts">
+    - Head (kichwa)
+    - Stomach (tumbo)
+    - Chest (kifua)
+    - Throat (koo)
+  </Accordion>
+  <Accordion title="Medications">
+    - Paracetamol
+    - ORS (Oral Rehydration Salts)
+    - Antibiotics
+  </Accordion>
+</AccordionGroup>
+
+### Urgency classification
+
+| Level | Description | Action |
+|-------|-------------|--------|
+| `EMERGENCY` | Life-threatening | Immediate evacuation |
+| `URGENT` | Serious symptoms | Same-day clinic visit |
+| `ROUTINE` | Minor symptoms | Schedule appointment |
+| `MONITORING` | Observation needed | Follow-up in 24-48h |
+
+## Pipeline result
+
+### VoiceToJSONResult
+
+Complete result from voice-to-JSON transformation:
+
+```json
+{
+  "pipeline_id": "PIPELINE-V2J-20251219200000",
+  "success": true,
+  "audio_metadata": {
+    "size_bytes": 48000,
+    "format": "LINEAR16",
+    "sample_rate": 16000,
+    "location": "Dadaab",
+    "chv_id": "CHV_AMINA_HASSAN",
+    "patient_id": "PATIENT_001"
+  },
+  "transcription": {
+    "text": "Mgonjwa ana homa kali na maumivu ya tumbo",
+    "confidence": 0.95,
+    "language": "sw-KE"
+  },
+  "symptoms": {
+    "symptoms": [
+      {"symptom_name": "homa", "severity": "HIGH"},
+      {"symptom_name": "maumivu ya tumbo", "severity": "MEDIUM"}
+    ],
+    "urgency_level": "URGENT",
+    "disease_suspicion": "malaria"
+  },
+  "golden_thread_record": {
+    "record_id": "GT-20251219-001",
+    "verification_score": 0.85,
+    "retention_status": "HOT"
+  },
+  "governance_status": "compliant",
+  "sovereignty_compliant": true,
+  "total_time_ms": 4250,
+  "processing_mode": "edge"
+}
+```
+
+## Integration with Golden Thread
+
+Voice alerts automatically become CBS (Community-Based Surveillance) signals:
+
+```python
+from edge_node.sync_protocol.golden_thread import GoldenThread
+
+gt = GoldenThread()
+
+# Voice alert becomes CBS signal
+fused = gt.fuse_data_streams(
+    cbs_signal={
+        'location': 'Dadaab',
+        'symptom': 'homa, maumivu ya tumbo',
+        'timestamp': '2025-12-19T20:00:00Z',
+        'source': 'CHV_Voice_Alert',
+        'chv_id': 'CHV_AMINA_HASSAN',
+        'urgency': 'URGENT',
+        'disease_suspicion': 'malaria'
+    },
+    patient_id='PATIENT_001'
+)
+
+print(f"Verification Score: {fused.verification_score}")
+```
+
+## Swahili AI agents
+
+### Medical translation
+
+```python
+from edge_node.ai_agents import SwahiliMedicalTranslator
+
+translator = SwahiliMedicalTranslator(
+    project_id="iluminara-production",
+    location="europe-west4"
+)
+
+# Translate Swahili to English
+english = translator.translate("Nina homa na maumivu ya tumbo")
+print(english)  # "I have fever and stomach pain"
+
+# Translate English to Swahili
+swahili = translator.translate("Take paracetamol twice daily", target="sw")
+print(swahili)  # "Tumia paracetamol mara mbili kwa siku"
+```
+
+### Entity extraction
+
+```python
+from edge_node.ai_agents import SwahiliMedicalEntityExtractor
+
+extractor = SwahiliMedicalEntityExtractor()
+
+entities = extractor.extract_entities(
+    "Mgonjwa ana homa na malaria"
+)
+
+print(entities)
+# {
+#   "symptoms": ["homa"],
+#   "diseases": ["malaria"],
+#   "medications": [],
+#   "body_parts": []
+# }
+```
+
+### Symptom triage
+
+```python
+from edge_node.ai_agents import SwahiliTriageAgent
+
+triage = SwahiliTriageAgent(project_id="iluminara-production")
+
+advice = triage.triage_symptom("kukosa pumzi")
+
+print(advice)
+# {
+#   "urgency": "EMERGENCY",
+#   "advice_sw": "Tafuta msaada wa haraka! Hii ni dharura.",
+#   "advice_en": "Seek immediate help! This is an emergency.",
+#   "recommended_action": "IMMEDIATE_EVACUATION"
+# }
+```
+
+### Medical Q&A
+
+```python
+from edge_node.ai_agents import SwahiliMedicalQA
+
+qa = SwahiliMedicalQA()
+
+result = qa.ask("Je, dalili za malaria ni zipi?")
+
+print(result)
+# {
+#   "answer_sw": "Dalili za malaria ni pamoja na homa, baridi, na jasho...",
+#   "answer_en": "Malaria symptoms include fever, chills, and sweating...",
+#   "sources": ["WHO", "CDC"],
+#   "confidence": 0.92
+# }
+```
+
+## Performance
+
+- **Transcription**: ~2-3s average (cloud), ~5-7s (offline)
+- **Symptom extraction**: ~1-2s average
+- **Data fusion**: <100ms
+- **Total pipeline**: ~4-5s end-to-end
+- **Throughput**: 100+ voice notes/minute
+
+## Offline operation
+
+The FRENASA Engine operates fully offline using:
+
+<CardGroup cols={2}>
+  <Card title="Cached transcriptions" icon="database">
+    Common Swahili medical phrases pre-transcribed
+  </Card>
+  <Card title="Rule-based extraction" icon="code">
+    Pattern matching for symptom identification
+  </Card>
+  <Card title="Local models" icon="microchip">
+    Edge-deployed speech recognition
+  </Card>
+  <Card title="Queue management" icon="list">
+    Sync when connectivity returns
+  </Card>
+</CardGroup>
+
+## Sovereignty compliance
+
+All voice processing enforces sovereignty constraints:
+
+```python
+from governance_kernel.vector_ledger import SovereignGuardrail
+
+guardrail = SovereignGuardrail()
+
+# Voice data processed at edge
+guardrail.validate_action(
+    action_type='Data_Processing',
+    payload={
+        'data_type': 'PHI',
+        'processing_location': 'Edge_Node',
+        'consent_token': 'EMERGENCY_CHV_ALERT'
+    },
+    jurisdiction='KDPA_KE'
+)
+```
+
+**Compliance:**
+- GDPR Art. 9 (Special Categories)
+- KDPA §37 (Transfer Restrictions)
+- HIPAA §164.312 (Safeguards)
+- EU AI Act §6 (High-Risk AI)
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Voice processing API"
+    icon="microphone"
+    href="/api-reference/voice-processing"
+  >
+    Use the voice processing endpoint
+  </Card>
+  <Card
+    title="Golden Thread"
+    icon="link"
+    href="/architecture/golden-thread"
+  >
+    Understand data fusion logic
+  </Card>
+  <Card
+    title="Swahili AI"
+    icon="language"
+    href="/components/swahili-ai"
+  >
+    Explore Swahili AI agents
+  </Card>
+  <Card
+    title="Deployment"
+    icon="rocket"
+    href="/deployment/edge"
+  >
+    Deploy to edge devices
+  </Card>
+</CardGroup>
