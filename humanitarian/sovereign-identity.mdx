@@ -1,0 +1,344 @@
+---
+title: Sovereign Dignity Identity
+description: ZKP-based identity system using somatic attestation for refugees in Kalobeyei and Dadaab
+---
+
+## Overview
+
+Sovereign Dignity Identity creates a privacy-preserving identity system based on somatic factors (gait, posture, voice) rather than invasive biometrics. Stored in the IGX Safety Island with Zero-Knowledge Proof (ZKP) encryption, refugees in Kalobeyei can access health records and Bio-Credits (ReFi) without physical cards or surveillance-style iris scans, maintaining full ownership of their data.
+
+<Card
+  title="Implementation"
+  icon="fingerprint"
+>
+  Complete implementation in `core/identity/sovereign_zkp.py` (Phase 43)
+</Card>
+
+## Key capabilities
+
+<CardGroup cols={2}>
+  <Card title="Somatic attestation" icon="person-walking">
+    Gait, posture, voice recognition
+  </Card>
+  <Card title="ZKP encryption" icon="lock">
+    Zero-knowledge proof identity
+  </Card>
+  <Card title="IGX Safety Island" icon="shield">
+    Secure enclave storage
+  </Card>
+  <Card title="Bio-Credits (ReFi)" icon="coins">
+    Regenerative finance integration
+  </Card>
+</CardGroup>
+
+## Quick start
+
+```python
+from core.identity.sovereign_zkp import SovereignIdentity
+
+# Initialize identity system
+identity = SovereignIdentity(storage="IGX_Safety_Island")
+
+# Create sovereign identity from somatic factors
+sovereign_id = identity.create_identity(
+    somatic_factors={
+        "gait_signature": identity.capture_gait(),
+        "posture_profile": identity.capture_posture(),
+        "voice_print": identity.capture_voice(language="Somali")
+    },
+    encryption="ZKP_Lattice",
+    owner_controlled=True
+)
+
+print(f"Sovereign ID created: {sovereign_id.public_key}")
+print(f"Data vault: {sovereign_id.zkp_vault_address}")
+```
+
+## Somatic attestation
+
+Non-invasive identity verification:
+
+```python
+from integrations.nvidia_kinetic_sensory import KineticSensor
+
+# Capture gait signature
+kinetic = KineticSensor()
+gait_data = kinetic.capture_gait(
+    duration_seconds=10,
+    environment="outdoor",
+    terrain="uneven"
+)
+
+# Generate gait signature
+gait_signature = identity.generate_gait_signature(
+    gait_data=gait_data,
+    normalization="age_height_adjusted",
+    privacy_preserving=True
+)
+
+# Capture posture profile
+posture_data = kinetic.capture_posture(
+    positions=["standing", "sitting", "walking"],
+    duration_seconds=30
+)
+
+posture_profile = identity.generate_posture_profile(
+    posture_data=posture_data,
+    skeletal_model="NVIDIA_Omniverse",
+    anonymization=True
+)
+
+# Capture voice print
+from api.voice_processing import VoiceProcessor
+voice = VoiceProcessor()
+voice_print = voice.create_voice_print(
+    audio_sample=voice.record(duration_seconds=15),
+    language="Somali",
+    dialect="Maay",
+    privacy_mode="ZKP"
+)
+```
+
+## ZKP identity vault
+
+Zero-knowledge proof data ownership:
+
+```python
+# Create ZKP vault
+vault = identity.create_zkp_vault(
+    owner_id=sovereign_id.public_key,
+    encryption="Lattice_Based_Cryptography",
+    access_control="owner_only"
+)
+
+# Store health records
+vault.store_health_record(
+    record_type="vaccination",
+    data={
+        "vaccine": "COVID-19_Moderna",
+        "date": "2026-03-15",
+        "batch": "XYZ123",
+        "provider": "Kalobeyei_Clinic"
+    },
+    encryption=True,
+    owner_signature=sovereign_id.sign()
+)
+
+# Access without revealing identity
+proof = vault.generate_proof(
+    claim="vaccinated_covid19",
+    reveal_data=False  # Only prove vaccination status, not identity
+)
+
+# Verify proof
+verified = identity.verify_proof(
+    proof=proof,
+    required_claim="vaccinated_covid19"
+)
+print(f"Vaccination verified: {verified}")
+```
+
+## IGX Safety Island
+
+Secure enclave for sensitive data:
+
+```python
+from integrations.nvidia_igx import SafetyIsland
+
+# Initialize Safety Island
+safety_island = SafetyIsland(
+    security_level="FIPS_140_3",
+    isolation="hardware_enclave"
+)
+
+# Store sovereign identity
+safety_island.store_identity(
+    identity=sovereign_id,
+    encryption="AES_256_GCM",
+    access_policy={
+        "owner": "full_access",
+        "healthcare_provider": "read_health_records",
+        "government": "no_access"
+    }
+)
+
+# Audit access attempts
+audit_log = safety_island.get_audit_log(
+    identity_id=sovereign_id.public_key,
+    time_window_days=30
+)
+
+for entry in audit_log:
+    print(f"Access: {entry.timestamp} by {entry.accessor} - {entry.action}")
+```
+
+## Bio-Credits (ReFi)
+
+Regenerative finance integration:
+
+```python
+from integrations.refi_credits import BioCreditSystem
+
+# Initialize Bio-Credit system
+bio_credits = BioCreditSystem()
+
+# Link sovereign identity to Bio-Credit wallet
+wallet = bio_credits.create_wallet(
+    owner_id=sovereign_id.public_key,
+    currency="Bio_Credit_KES",
+    blockchain="Celo"
+)
+
+# Earn credits for circular economy participation
+credits_earned = bio_credits.award_credits(
+    wallet=wallet,
+    activity="e_waste_recycling",
+    quantity=5,  # 5 solar panels recycled
+    verification=identity.sign_activity()
+)
+
+# Access health services with Bio-Credits
+payment = bio_credits.pay_for_service(
+    wallet=wallet,
+    service="clinic_consultation",
+    provider="Kalobeyei_Primary_Clinic",
+    amount=50,  # 50 Bio-Credits
+    proof=vault.generate_proof("sufficient_balance")
+)
+```
+
+## Identity recovery
+
+Resilient identity recovery without documents:
+
+```python
+# Recover identity using somatic factors
+recovery_attempt = identity.recover_identity(
+    gait_signature=kinetic.capture_gait(),
+    voice_print=voice.create_voice_print(),
+    confidence_threshold=0.95
+)
+
+if recovery_attempt.success:
+    print(f"Identity recovered: {recovery_attempt.identity_id}")
+    # Restore access to health records and Bio-Credits
+    vault.restore_access(recovery_attempt.identity_id)
+else:
+    # Fallback to community attestation
+    community_attestation = identity.request_community_attestation(
+        attestors=["community_leader", "healthcare_worker", "neighbor"],
+        min_attestations=2
+    )
+```
+
+## Integration with health systems
+
+Seamless healthcare access:
+
+```python
+from integrations.bio_interface import BioInterface
+
+# Access health records at clinic
+bio = BioInterface()
+health_data = bio.retrieve_health_data(
+    identity_proof=vault.generate_proof("identity_verified"),
+    data_types=["vaccination_history", "medical_conditions", "allergies"],
+    clinic_id="Kalobeyei_Primary_Clinic"
+)
+
+# Update health records
+bio.update_health_record(
+    identity_proof=vault.generate_proof("identity_verified"),
+    record_type="diagnosis",
+    data={"condition": "malaria", "treatment": "artemether_lumefantrine"},
+    provider_signature=clinic.sign()
+)
+```
+
+## Privacy-preserving authentication
+
+Authenticate without revealing identity:
+
+```python
+# Prove eligibility for services
+eligibility_proof = vault.generate_proof(
+    claims=[
+        "age_over_18",
+        "resident_kalobeyei",
+        "registered_refugee"
+    ],
+    reveal_identity=False
+)
+
+# Access service
+service_access = identity.authenticate_for_service(
+    service="water_atm",
+    proof=eligibility_proof,
+    location="Kalobeyei_Zone_3"
+)
+
+if service_access.granted:
+    # Dispense water without logging personal identity
+    from integrations.water_atm import WaterATM
+    atm = WaterATM()
+    atm.dispense_water(
+        amount_liters=20,
+        payment=bio_credits.pay(50),
+        anonymous=True
+    )
+```
+
+## Use cases
+
+### Healthcare access without documents
+
+```python
+# Patient arrives at clinic without ID card
+patient_verification = identity.verify_at_clinic(
+    somatic_factors={
+        "gait": kinetic.capture_gait(),
+        "voice": voice.capture_voice()
+    },
+    clinic_id="Dadaab_Hospital"
+)
+
+if patient_verification.confidence > 0.95:
+    # Access full health history
+    health_history = bio.get_health_history(
+        identity_id=patient_verification.identity_id
+    )
+    print(f"Patient verified: {health_history.summary}")
+```
+
+### Cross-border identity portability
+
+```python
+# Refugee relocates from Dadaab to Kakuma
+relocation = identity.transfer_identity(
+    from_location="Dadaab",
+    to_location="Kakuma",
+    identity_proof=vault.generate_proof("identity_verified"),
+    preserve_data=True
+)
+
+# Health records and Bio-Credits transfer automatically
+print(f"Identity transferred: {relocation.new_location}")
+print(f"Bio-Credit balance: {relocation.wallet_balance}")
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Shirika Equity" icon="scale-balanced" href="/humanitarian/shirika-equity">
+    Fair resource distribution
+  </Card>
+  <Card title="Bio-Sovereignty Bridge" icon="globe" href="/humanitarian/bio-sovereignty">
+    Cross-border data sharing
+  </Card>
+  <Card title="Circular Sovereignty" icon="recycle" href="/humanitarian/circular-sovereignty">
+    Bio-Credits for e-waste
+  </Card>
+  <Card title="Security Stack" icon="shield" href="/security/overview">
+    ZKP encryption details
+  </Card>
+</CardGroup>
