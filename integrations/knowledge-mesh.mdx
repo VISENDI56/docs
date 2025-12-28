@@ -48,29 +48,40 @@ Knowledge Mesh is a sovereign AI tutor system providing offline-first education 
 ## Quick start
 
 ```python
-from education.knowledge_mesh import KnowledgeMesh
+from education.knowledge_mesh import SovereignTutor
 
-# Initialize mesh node
-mesh = KnowledgeMesh(
-    node_id="NODE-DADAAB-001",
-    sovereignty_zone="KDPA_KE"
+# Initialize local AI tutor
+tutor = SovereignTutor(
+    model="llama3-8b-cbc-finetuned",
+    device="igx_orin",
+    mesh_network="ghost_mesh_dadaab"
 )
 
-# Create learning module
-mesh.create_learning_module({
-    "module_id": "CHOLERA-RESPONSE-101",
-    "title": "Cholera Response Basics",
-    "language": "swahili",
-    "duration_minutes": 30,
-    "competencies": ["diagnosis", "treatment", "prevention"]
-})
-
-# Assess competency
-result = mesh.assess_competency(
-    learner_id="CHV-AMINA",
-    skill="cholera_diagnosis"
+# Generate personalized lesson
+lesson = tutor.generate_lesson(
+    subject="mathematics",
+    grade_level=8,
+    student_profile={
+        "language": "somali_english_mixed",
+        "learning_style": "visual",
+        "previous_scores": {"algebra": 65, "geometry": 78}
+    }
 )
-print(f"Competency level: {result.level}")
+
+print(f"Lesson plan: {lesson.lesson_plan}")
+print(f"Language: {lesson.language}")
+print(f"Estimated duration: {lesson.duration_minutes} minutes")
+
+# Adaptive assessment
+assessment = tutor.assess_student(
+    student_id="STUDENT-AMINA-001",
+    subject="mathematics",
+    adaptive=True
+)
+
+print(f"Competency level: {assessment.competency_level}")
+print(f"Recommended next topic: {assessment.next_topic}")
+print(f"Learning gaps: {assessment.gaps}")
 ```
 
 ## Next steps
