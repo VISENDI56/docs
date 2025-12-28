@@ -48,32 +48,48 @@ Tele-Justice Nodes provide access to justice for 200,000+ unrepresented refugees
 ## Quick start
 
 ```python
-from justice.tele_justice import TeleJusticeNode
+from justice.tele_justice import LegalGuardian
 
-# Initialize node
-node = TeleJusticeNode(
+# Initialize Legal-LLM enclave
+guardian = LegalGuardian(
     node_id="JUSTICE-DADAAB-001",
-    jurisdiction="UNHCR_REFUGEE_LAW"
+    jurisdiction="UNHCR_REFUGEE_LAW",
+    confidential_computing=True
 )
 
-# Create case
-case = node.create_case({
-    "case_type": "family_reunification",
-    "plaintiff": "REFUGEE-001",
-    "description": "Family reunification request"
-})
-
-# Schedule hearing
-node.schedule_hearing(
-    case_id=case.case_id,
-    participants=["REFUGEE-001", "LEGAL_AID_OFFICER"]
+# Start secure legal consultation
+session = guardian.start_secure_session(
+    user_zkp="ZKP_REFUGEE_001",
+    case_type="asylum_appeal"
 )
 
-# Record verdict
-node.record_verdict(
-    case_id=case.case_id,
-    verdict={"decision": "APPROVED", "reasoning": "..."}
+print(f"Session ID: {session.session_id}")
+print(f"TEE attestation: {session.tee_attestation}")
+print(f"Privacy level: {session.privacy}")
+
+# Draft legal document
+document = guardian.draft_affidavit(
+    case_details={
+        "case_type": "asylum_appeal",
+        "grounds": "persecution_based_on_religion",
+        "evidence": ["witness_statements", "medical_records"],
+        "jurisdiction": "Kenya_Refugee_Act_2021"
+    }
 )
+
+print(f"Document: {document.document}")
+print(f"Legal citations: {document.citations}")
+print(f"Privacy: {document.privacy}")
+
+# Get legal advice
+advice = guardian.get_legal_advice(
+    question="What are my rights under the 1951 Refugee Convention?",
+    context="asylum_seeker_kenya"
+)
+
+print(f"Advice: {advice.answer}")
+print(f"Legal basis: {advice.legal_framework}")
+print(f"Next steps: {advice.recommended_actions}")
 ```
 
 ## Next steps
