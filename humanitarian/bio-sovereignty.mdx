@@ -1,0 +1,252 @@
+---
+title: Cross-Border Bio-Sovereignty Bridge
+description: Privacy-first federated learning for regional outbreak detection across Somalia, South Sudan, and Kenya
+---
+
+## Overview
+
+The Cross-Border Bio-Sovereignty Bridge enables pathogen surveillance across national borders without compromising data sovereignty. Using PABS (Privacy-Aware Biosurveillance) Federated Learning, Somali clinics and Kenyan camps train shared outbreak models without sharing raw patient data, creating a 2026 early warning system for the entire East African region.
+
+<Card
+  title="Implementation"
+  icon="globe"
+>
+  Complete implementation in `core/biosurveillance/federated_bridge.py`
+</Card>
+
+## Key capabilities
+
+<CardGroup cols={2}>
+  <Card title="Federated learning" icon="network-wired">
+    Train models without data sharing
+  </Card>
+  <Card title="National sovereignty" icon="flag">
+    Respect data residency laws
+  </Card>
+  <Card title="Regional early warning" icon="bell">
+    Cross-border outbreak detection
+  </Card>
+  <Card title="BERT/ERNIE models" icon="brain">
+    NLP for clinical notes
+  </Card>
+</CardGroup>
+
+## Quick start
+
+```python
+from core.biosurveillance.federated_bridge import BioSovereigntyBridge
+
+# Initialize bridge
+bridge = BioSovereigntyBridge()
+
+# Register participating nodes
+bridge.register_node(
+    node_id="Somalia_Mogadishu_Clinic",
+    country="Somalia",
+    data_residency="SO",
+    encryption="ZKP_Lattice"
+)
+
+bridge.register_node(
+    node_id="Kenya_Dadaab_Hospital",
+    country="Kenya",
+    data_residency="KE",
+    encryption="ZKP_Lattice"
+)
+
+# Train federated outbreak model
+model = bridge.train_federated_model(
+    model_type="BERT_Clinical",
+    nodes=["Somalia_Mogadishu_Clinic", "Kenya_Dadaab_Hospital"],
+    target_diseases=["cholera", "measles", "dengue"],
+    privacy_budget=0.1  # Differential privacy epsilon
+)
+```
+
+## PABS federated learning
+
+Privacy-Aware Biosurveillance uses secure aggregation:
+
+```python
+# Configure federated learning parameters
+config = bridge.create_federated_config(
+    aggregation_method="secure_aggregation",
+    min_nodes=3,
+    max_rounds=100,
+    convergence_threshold=0.001,
+    privacy_mechanism="differential_privacy",
+    epsilon=0.1,
+    delta=1e-5
+)
+
+# Train without sharing raw data
+training_results = bridge.federated_train(
+    config=config,
+    local_epochs=5,
+    batch_size=32,
+    learning_rate=0.001
+)
+
+print(f"Model accuracy: {training_results.accuracy:.3f}")
+print(f"Privacy budget consumed: {training_results.epsilon_consumed}")
+```
+
+## BERT/ERNIE for clinical notes
+
+NLP models extract outbreak signals from unstructured text:
+
+```python
+from integrations.nvidia_nemo import ClinicalBERT
+
+# Initialize clinical NLP model
+bert = ClinicalBERT(language="multilingual")
+
+# Process clinical notes in local languages
+notes = [
+    "Patient presents with watery diarrhea and dehydration",  # English
+    "Mgonjwa ana kuharisha maji na ukosefu wa maji mwilini",  # Swahili
+    "Bukaaga uu qabo shuban biyo ah iyo qallalan"  # Somali
+]
+
+# Extract disease signals
+signals = bert.extract_disease_signals(
+    notes=notes,
+    target_diseases=["cholera", "typhoid", "dysentery"]
+)
+
+# Federate signals (not raw notes)
+bridge.federate_signals(signals, preserve_privacy=True)
+```
+
+## Regional early warning system
+
+Detect outbreaks before they cross borders:
+
+```python
+# Monitor regional disease trends
+alert = bridge.detect_regional_outbreak(
+    disease="cholera",
+    time_window_days=14,
+    threshold_cases=50,
+    geographic_radius_km=200
+)
+
+if alert.risk_level == "HIGH":
+    # Notify all participating countries
+    bridge.broadcast_alert(
+        alert=alert,
+        recipients=["Kenya_MOH", "Somalia_MOH", "South_Sudan_MOH"],
+        channels=["SMS", "DHIS2", "WHO_EWARS"]
+    )
+    
+    # Trigger cuOpt supply prepositioning
+    from integrations.nvidia_cuopt import SupplyChainOptimizer
+    optimizer = SupplyChainOptimizer()
+    optimizer.preposition_supplies(
+        disease="cholera",
+        predicted_cases=alert.predicted_cases,
+        target_locations=alert.high_risk_zones
+    )
+```
+
+## Data sovereignty compliance
+
+Respect national data residency laws:
+
+```python
+# Enforce data residency
+bridge.enforce_data_residency(
+    node_id="Somalia_Mogadishu_Clinic",
+    allowed_countries=["Somalia"],
+    data_types=["patient_records", "clinical_notes"],
+    encryption_at_rest=True,
+    encryption_in_transit=True
+)
+
+# Audit data flows
+audit_log = bridge.audit_data_flows(
+    period="2026-Q1",
+    compliance_frameworks=["GDPR", "Kenya_DPA_2019", "AU_Convention"]
+)
+
+# Generate sovereignty report
+report = bridge.generate_sovereignty_report(
+    audit_log=audit_log,
+    stakeholders=["Kenya_MOH", "Somalia_MOH", "UNHCR"]
+)
+```
+
+## Integration with Shirika Equity
+
+Bio-Sovereignty Bridge informs equitable resource allocation:
+
+```python
+from humanitarian_logic.shirika_equity import ShirikaEquity
+
+# Allocate medical supplies based on outbreak predictions
+equity = ShirikaEquity()
+allocation = equity.allocate_outbreak_response(
+    outbreak_predictions=alert.predicted_cases,
+    communities=["Dadaab_Host", "Dadaab_Refugee", "Garissa_County"],
+    supply_types=["ORS", "antibiotics", "IV_fluids"]
+)
+```
+
+## Use cases
+
+### Cholera surveillance network
+
+```python
+# Create cross-border cholera surveillance
+cholera_network = bridge.create_surveillance_network(
+    disease="cholera",
+    participating_countries=["Kenya", "Somalia", "South_Sudan"],
+    data_sources=["clinic_records", "lab_results", "community_reports"],
+    update_frequency_hours=6
+)
+
+# Train federated cholera prediction model
+cholera_model = bridge.train_disease_model(
+    network=cholera_network,
+    features=["diarrhea_cases", "water_quality", "rainfall", "temperature"],
+    prediction_horizon_days=7
+)
+```
+
+### Measles outbreak coordination
+
+```python
+# Detect measles outbreak spanning borders
+measles_alert = bridge.detect_cross_border_outbreak(
+    disease="measles",
+    origin_country="Somalia",
+    border_crossings=["Liboi", "Mandera"],
+    refugee_movements=True
+)
+
+# Coordinate vaccination campaign
+if measles_alert.cross_border_risk == "HIGH":
+    bridge.coordinate_vaccination_campaign(
+        target_countries=["Kenya", "Somalia"],
+        target_population=50000,
+        vaccine_type="MMR",
+        campaign_duration_days=21
+    )
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Shirika Equity" icon="scale-balanced" href="/humanitarian/shirika-equity">
+    Fair resource distribution
+  </Card>
+  <Card title="Migration Forecasting" icon="cloud-sun-rain" href="/humanitarian/migration-forecast">
+    Climate-induced displacement prediction
+  </Card>
+  <Card title="Sovereign Identity" icon="fingerprint" href="/humanitarian/sovereign-identity">
+    ZKP-based dignity preservation
+  </Card>
+  <Card title="NVIDIA NeMo" icon="microphone" href="/api-reference/voice-processing">
+    Multilingual clinical NLP
+  </Card>
+</CardGroup>
