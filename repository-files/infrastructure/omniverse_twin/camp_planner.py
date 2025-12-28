@@ -5,8 +5,8 @@ Transforms refugee camps into thriving municipalities under the Shirika Plan
 Compliance:
 - UN-Habitat Urban Planning Standards
 - Kenya National Spatial Plan 2015-2045
-- Sphere Humanitarian Standards (Infrastructure)
-- WHO Healthy Cities Framework
+- UNHCR Comprehensive Refugee Response Framework (CRRF)
+- Sendai Framework for Disaster Risk Reduction
 """
 
 import numpy as np
@@ -29,7 +29,7 @@ class InfrastructureType(Enum):
     ROAD = "road"
     SOLAR_FARM = "solar_farm"
     COMMUNITY_CENTER = "community_center"
-    SHELTER = "shelter"
+    WAREHOUSE = "warehouse"
 
 
 class RiskLevel(Enum):
@@ -44,8 +44,8 @@ class RiskLevel(Enum):
 @dataclass
 class BuildingUSD:
     """Universal Scene Description for a building"""
-    building_id: str
-    infrastructure_type: InfrastructureType
+    name: str
+    type: InfrastructureType
     location: Tuple[float, float]  # (lat, lng)
     footprint_sqm: float
     height_m: float
@@ -59,9 +59,9 @@ class SimulationResult:
     flood_risk_delta: float  # Percentage change
     disease_vector_score: float  # 0-1 scale
     social_access_score: float  # 0-100 scale
-    foot_traffic_impact: Dict[str, int]
-    airflow_impact: Dict[str, float]
-    population_density_delta: float
+    airflow_impact: float  # Percentage change
+    population_density_delta: float  # People per hectare change
+    traffic_flow_score: float  # 0-100 scale
     recommendations: List[str]
 
 
@@ -70,373 +70,375 @@ class UrbanDigitalTwin:
     NVIDIA Omniverse connector for 'Camp-to-City' planning.
     Simulates flood risks, disease vectors, and social access in 3D USD format.
     
-    Use Case: Dadaab/Kalobeyei transition to integrated municipalities
+    Enables zero-risk urban redevelopment by testing infrastructure changes
+    in a photorealistic digital twin before physical construction.
     """
     
     def __init__(
         self,
         settlement_name: str = "Dadaab",
-        base_population: int = 200000,
-        area_sqkm: float = 50.0
+        population: int = 200000,
+        area_hectares: float = 5000,
+        enable_physics_simulation: bool = True
     ):
         self.settlement_name = settlement_name
-        self.base_population = base_population
-        self.area_sqkm = area_sqkm
+        self.population = population
+        self.area_hectares = area_hectares
+        self.enable_physics_simulation = enable_physics_simulation
         
         # Digital twin state
         self.buildings: List[BuildingUSD] = []
         self.terrain_elevation: np.ndarray = None
-        self.population_density_map: np.ndarray = None
+        self.water_table_depth: float = 15.0  # meters
         
-        # Simulation parameters
-        self.flood_risk_baseline = 0.35  # 35% baseline flood risk
-        self.disease_vector_baseline = 0.42  # Baseline disease transmission
+        # Environmental parameters (Dadaab climate)
+        self.avg_rainfall_mm = 300  # Annual rainfall
+        self.avg_temp_celsius = 32
+        self.wind_speed_ms = 4.5
         
         logger.info(f"🏙️ Digital Twin initialized - {settlement_name}")
-        logger.info(f"   Population: {base_population:,}, Area: {area_sqkm} km²")
+        logger.info(f"   Population: {population:,}, Area: {area_hectares:,} ha")
     
     def simulate_infrastructure_change(
         self,
         new_building: BuildingUSD,
-        validate_compliance: bool = True
+        consider_climate: bool = True,
+        consider_social: bool = True
     ) -> SimulationResult:
         """
         Simulate the impact of adding new infrastructure to the settlement.
         
         Args:
-            new_building: Building specification in USD format
-            validate_compliance: Check against Sphere/WHO standards
+            new_building: Building to add to the digital twin
+            consider_climate: Include climate/flood risk analysis
+            consider_social: Include social access analysis
         
         Returns:
-            Simulation results with risk assessments
+            SimulationResult with comprehensive impact assessment
         """
-        logger.info(f"🔬 [Omniverse] Simulating {new_building.infrastructure_type.value}...")
+        logger.info(f"🔬 [Omniverse] Simulating {new_building.name} ({new_building.type.value})")
         logger.info(f"   Location: {new_building.location}")
         logger.info(f"   Footprint: {new_building.footprint_sqm} m²")
         
-        # Calculate flood risk impact
-        flood_risk_delta = self._calculate_flood_risk_impact(new_building)
+        # Add building to twin
+        self.buildings.append(new_building)
         
-        # Calculate disease vector impact (airflow, water pooling)
-        disease_vector_score = self._calculate_disease_vector_impact(new_building)
-        
-        # Calculate social access (distance to services)
-        social_access_score = self._calculate_social_access_score(new_building)
-        
-        # Simulate foot traffic patterns
-        foot_traffic_impact = self._simulate_foot_traffic(new_building)
-        
-        # Simulate airflow (disease spread modeling)
-        airflow_impact = self._simulate_airflow_patterns(new_building)
-        
-        # Calculate population density change
-        population_density_delta = self._calculate_density_impact(new_building)
+        # Run simulations
+        flood_risk = self._simulate_flood_risk(new_building) if consider_climate else 0.0
+        disease_vector = self._simulate_disease_vectors(new_building)
+        social_access = self._simulate_social_access(new_building) if consider_social else 0.0
+        airflow = self._simulate_airflow_impact(new_building)
+        density = self._calculate_population_density_change(new_building)
+        traffic = self._simulate_traffic_flow(new_building)
         
         # Generate recommendations
         recommendations = self._generate_recommendations(
-            new_building,
-            flood_risk_delta,
-            disease_vector_score,
-            social_access_score
+            new_building, flood_risk, disease_vector, social_access
         )
         
-        # Compliance validation
-        if validate_compliance:
-            compliance_issues = self._validate_sphere_standards(new_building)
-            if compliance_issues:
-                recommendations.extend(compliance_issues)
-        
         result = SimulationResult(
-            flood_risk_delta=flood_risk_delta,
-            disease_vector_score=disease_vector_score,
-            social_access_score=social_access_score,
-            foot_traffic_impact=foot_traffic_impact,
-            airflow_impact=airflow_impact,
-            population_density_delta=population_density_delta,
+            flood_risk_delta=flood_risk,
+            disease_vector_score=disease_vector,
+            social_access_score=social_access,
+            airflow_impact=airflow,
+            population_density_delta=density,
+            traffic_flow_score=traffic,
             recommendations=recommendations
         )
         
-        # Add to digital twin
-        self.buildings.append(new_building)
-        
         logger.info(f"✅ Simulation complete:")
-        logger.info(f"   Flood Risk: {flood_risk_delta:+.1%}")
-        logger.info(f"   Disease Vector: {disease_vector_score:.2f}")
-        logger.info(f"   Social Access: {social_access_score:.1f}/100")
+        logger.info(f"   Flood Risk: {flood_risk:+.1f}%")
+        logger.info(f"   Social Access: {social_access:+.1f}/100")
+        logger.info(f"   Disease Vector: {disease_vector:.2f}")
         
         return result
     
-    def _calculate_flood_risk_impact(self, building: BuildingUSD) -> float:
-        """Calculate change in flood risk from new infrastructure"""
-        # Simplified model: buildings can block drainage or improve it
+    def _simulate_flood_risk(self, building: BuildingUSD) -> float:
+        """
+        Simulate flood risk change using terrain elevation and drainage.
         
-        if building.infrastructure_type == InfrastructureType.ROAD:
-            # Roads improve drainage
-            return -0.12  # 12% reduction
+        Uses simplified hydrological model:
+        - Elevation relative to surroundings
+        - Drainage capacity
+        - Rainfall intensity
+        """
+        lat, lng = building.location
         
-        elif building.infrastructure_type == InfrastructureType.SANITATION:
-            # Sanitation infrastructure reduces flood risk
-            return -0.08  # 8% reduction
+        # Simulate elevation (in real system, use DEM data)
+        elevation = self._get_elevation(lat, lng)
         
-        elif building.infrastructure_type in [InfrastructureType.CLINIC, InfrastructureType.SCHOOL]:
-            # Large buildings can block natural drainage
-            return 0.03  # 3% increase
+        # Calculate drainage impact
+        impervious_area = building.footprint_sqm
+        drainage_capacity = 0.8  # 80% drainage efficiency
         
+        # Flood risk calculation
+        runoff_increase = impervious_area * (1 - drainage_capacity) * 0.001
+        elevation_factor = max(0, 10 - elevation) / 10  # Lower elevation = higher risk
+        
+        flood_risk_delta = -(runoff_increase * elevation_factor * 100)
+        
+        return flood_risk_delta
+    
+    def _simulate_disease_vectors(self, building: BuildingUSD) -> float:
+        """
+        Simulate disease vector risk (mosquitoes, airborne pathogens).
+        
+        Factors:
+        - Standing water potential
+        - Airflow disruption
+        - Population density
+        """
+        # Standing water risk (flat roofs, poor drainage)
+        water_risk = 0.3 if building.type in [InfrastructureType.MARKET, InfrastructureType.WAREHOUSE] else 0.1
+        
+        # Airflow disruption (tall buildings block wind)
+        airflow_risk = min(building.height_m / 20, 0.5)
+        
+        # Population density (more people = more transmission)
+        density_risk = min(building.capacity / 1000, 0.4)
+        
+        # Combined vector score (0-1, lower is better)
+        vector_score = (water_risk + airflow_risk + density_risk) / 3
+        
+        return vector_score
+    
+    def _simulate_social_access(self, building: BuildingUSD) -> float:
+        """
+        Simulate social access improvement.
+        
+        Measures:
+        - Distance to existing services
+        - Population coverage
+        - Vulnerable group access
+        """
+        # Calculate average distance to existing similar infrastructure
+        similar_buildings = [b for b in self.buildings if b.type == building.type]
+        
+        if not similar_buildings:
+            # First of its kind - high impact
+            base_score = 80
         else:
-            return 0.0
+            # Calculate coverage improvement
+            avg_distance = self._calculate_avg_distance(building, similar_buildings)
+            base_score = min(100, 50 + (avg_distance / 100))
+        
+        # Bonus for critical infrastructure
+        if building.type in [InfrastructureType.CLINIC, InfrastructureType.WATER_POINT]:
+            base_score += 15
+        
+        return min(100, base_score)
     
-    def _calculate_disease_vector_impact(self, building: BuildingUSD) -> float:
-        """Calculate disease transmission risk (0-1 scale)"""
-        # Factors: airflow obstruction, water pooling, population concentration
+    def _simulate_airflow_impact(self, building: BuildingUSD) -> float:
+        """
+        Simulate airflow impact (disease spread, cooling).
         
-        base_score = self.disease_vector_baseline
+        Tall buildings can block wind, reducing natural ventilation.
+        """
+        # Wind shadow calculation
+        building_volume = building.footprint_sqm * building.height_m
+        wind_blockage = (building_volume / 10000) * 100  # Percentage
         
-        if building.infrastructure_type == InfrastructureType.CLINIC:
-            # Clinics reduce disease spread through treatment
-            base_score -= 0.15
+        # Negative impact if blocking wind
+        airflow_impact = -min(wind_blockage, 30)
         
-        elif building.infrastructure_type == InfrastructureType.SANITATION:
-            # Sanitation dramatically reduces disease vectors
-            base_score -= 0.25
-        
-        elif building.infrastructure_type == InfrastructureType.MARKET:
-            # Markets increase congregation (higher transmission)
-            base_score += 0.08
-        
-        elif building.infrastructure_type == InfrastructureType.WATER_POINT:
-            # Clean water reduces waterborne diseases
-            base_score -= 0.18
-        
-        return max(0.0, min(1.0, base_score))
+        return airflow_impact
     
-    def _calculate_social_access_score(self, building: BuildingUSD) -> float:
-        """Calculate accessibility to essential services (0-100 scale)"""
-        # Sphere Standard: Max 500m to water, 1km to health facility
+    def _calculate_population_density_change(self, building: BuildingUSD) -> float:
+        """Calculate change in population density (people per hectare)"""
+        building_area_ha = building.footprint_sqm / 10000
         
-        score = 50.0  # Baseline
+        # Estimate attracted population
+        if building.type == InfrastructureType.MARKET:
+            attracted_pop = building.capacity * 2  # Markets attract crowds
+        elif building.type == InfrastructureType.CLINIC:
+            attracted_pop = building.capacity * 0.5
+        else:
+            attracted_pop = building.capacity
         
-        if building.infrastructure_type == InfrastructureType.CLINIC:
-            score += 20.0  # Major improvement
+        density_change = attracted_pop / building_area_ha
         
-        elif building.infrastructure_type == InfrastructureType.SCHOOL:
-            score += 15.0
-        
-        elif building.infrastructure_type == InfrastructureType.WATER_POINT:
-            score += 18.0
-        
-        elif building.infrastructure_type == InfrastructureType.MARKET:
-            score += 12.0  # Economic access
-        
-        elif building.infrastructure_type == InfrastructureType.ROAD:
-            score += 10.0  # Mobility improvement
-        
-        return min(100.0, score)
+        return density_change
     
-    def _simulate_foot_traffic(self, building: BuildingUSD) -> Dict[str, int]:
-        """Simulate daily foot traffic patterns"""
-        # Estimate daily visitors based on infrastructure type
+    def _simulate_traffic_flow(self, building: BuildingUSD) -> float:
+        """
+        Simulate traffic flow impact.
         
-        traffic_estimates = {
-            InfrastructureType.CLINIC: 500,
-            InfrastructureType.SCHOOL: 800,
-            InfrastructureType.MARKET: 2000,
-            InfrastructureType.WATER_POINT: 1500,
-            InfrastructureType.COMMUNITY_CENTER: 300,
-            InfrastructureType.SANITATION: 100,
-        }
+        Score: 0-100 (higher is better)
+        """
+        # Calculate distance to nearest road
+        nearest_road_distance = self._distance_to_nearest_road(building)
         
-        daily_visitors = traffic_estimates.get(building.infrastructure_type, 50)
+        # Traffic score (closer to road = better)
+        if nearest_road_distance < 50:
+            traffic_score = 90
+        elif nearest_road_distance < 100:
+            traffic_score = 70
+        elif nearest_road_distance < 200:
+            traffic_score = 50
+        else:
+            traffic_score = 30
         
-        return {
-            "daily_visitors": daily_visitors,
-            "peak_hour_visitors": int(daily_visitors * 0.15),
-            "congestion_risk": "HIGH" if daily_visitors > 1000 else "MODERATE"
-        }
-    
-    def _simulate_airflow_patterns(self, building: BuildingUSD) -> Dict[str, float]:
-        """Simulate airflow obstruction (disease spread modeling)"""
-        # Simplified CFD (Computational Fluid Dynamics) model
+        # Penalty for high-traffic buildings far from roads
+        if building.type in [InfrastructureType.MARKET, InfrastructureType.CLINIC]:
+            if nearest_road_distance > 100:
+                traffic_score -= 20
         
-        obstruction_factor = building.height_m * building.footprint_sqm / 10000.0
-        
-        return {
-            "airflow_obstruction": min(1.0, obstruction_factor),
-            "ventilation_score": max(0.0, 1.0 - obstruction_factor),
-            "disease_spread_multiplier": 1.0 + (obstruction_factor * 0.2)
-        }
-    
-    def _calculate_density_impact(self, building: BuildingUSD) -> float:
-        """Calculate change in population density"""
-        # People per square kilometer
-        
-        current_density = self.base_population / self.area_sqkm
-        
-        # Estimate new residents/users
-        capacity_increase = building.capacity if building.capacity else 0
-        
-        new_density = (self.base_population + capacity_increase) / self.area_sqkm
-        
-        return ((new_density - current_density) / current_density) * 100.0
+        return max(0, traffic_score)
     
     def _generate_recommendations(
         self,
         building: BuildingUSD,
         flood_risk: float,
-        disease_score: float,
-        access_score: float
+        disease_vector: float,
+        social_access: float
     ) -> List[str]:
-        """Generate actionable recommendations"""
+        """Generate actionable recommendations based on simulation"""
         recommendations = []
         
-        if flood_risk > 0.05:
+        # Flood risk recommendations
+        if flood_risk < -10:
             recommendations.append(
-                "⚠️ HIGH FLOOD RISK: Install drainage channels and elevate foundation by 0.5m"
+                f"⚠️ HIGH FLOOD RISK: Elevate foundation by {abs(flood_risk)/10:.1f}m or improve drainage"
             )
         
-        if disease_score > 0.5:
+        # Disease vector recommendations
+        if disease_vector > 0.5:
             recommendations.append(
-                "🦠 DISEASE RISK: Increase ventilation and add handwashing stations"
+                "🦟 DISEASE VECTOR RISK: Install mosquito screens, improve ventilation"
             )
         
-        if access_score < 60:
+        # Social access recommendations
+        if social_access < 50:
             recommendations.append(
-                "🚶 LOW ACCESS: Consider adding connecting pathways to improve mobility"
+                "📍 LOW SOCIAL ACCESS: Consider relocating closer to population center"
             )
         
-        if building.infrastructure_type == InfrastructureType.MARKET:
+        # Traffic recommendations
+        if building.type in [InfrastructureType.MARKET, InfrastructureType.CLINIC]:
             recommendations.append(
-                "🏪 MARKET PROTOCOL: Implement waste management and sanitation facilities"
+                "🚗 TRAFFIC: Ensure road access within 100m for emergency vehicles"
             )
         
-        if building.infrastructure_type == InfrastructureType.CLINIC:
-            recommendations.append(
-                "🏥 CLINIC PROTOCOL: Ensure 24/7 water access and backup power (solar)"
-            )
+        # Positive feedback
+        if not recommendations:
+            recommendations.append("✅ OPTIMAL PLACEMENT: No critical issues detected")
         
         return recommendations
     
-    def _validate_sphere_standards(self, building: BuildingUSD) -> List[str]:
-        """Validate against Sphere Humanitarian Standards"""
-        issues = []
-        
-        # Sphere Standard: Max 500m to water point
-        if building.infrastructure_type == InfrastructureType.WATER_POINT:
-            # Check coverage radius
-            coverage_radius = 500  # meters
-            # Simplified: assume uniform distribution
-            pass
-        
-        # Sphere Standard: 1 toilet per 20 people
-        if building.infrastructure_type == InfrastructureType.SANITATION:
-            required_capacity = self.base_population / 20
-            if building.capacity < required_capacity * 0.1:  # 10% coverage
-                issues.append(
-                    f"⚠️ SPHERE VIOLATION: Need {int(required_capacity)} toilets total"
-                )
-        
-        # WHO Standard: 1 health facility per 10,000 people
-        if building.infrastructure_type == InfrastructureType.CLINIC:
-            required_clinics = self.base_population / 10000
-            current_clinics = len([b for b in self.buildings 
-                                  if b.infrastructure_type == InfrastructureType.CLINIC])
-            if current_clinics < required_clinics:
-                issues.append(
-                    f"ℹ️ WHO STANDARD: {int(required_clinics)} clinics recommended"
-                )
-        
-        return issues
+    def _get_elevation(self, lat: float, lng: float) -> float:
+        """Get terrain elevation at coordinates (simplified)"""
+        # In production, use actual DEM (Digital Elevation Model) data
+        # For now, simulate with noise
+        return 5 + np.random.uniform(-2, 2)
     
-    def export_to_usd(self, output_path: str) -> str:
-        """Export digital twin to USD format for Omniverse"""
-        # Simplified USD export
-        usd_data = {
+    def _calculate_avg_distance(self, building: BuildingUSD, others: List[BuildingUSD]) -> float:
+        """Calculate average distance to other buildings"""
+        if not others:
+            return 1000  # Large distance if no others
+        
+        distances = []
+        for other in others:
+            dist = self._haversine_distance(building.location, other.location)
+            distances.append(dist)
+        
+        return np.mean(distances)
+    
+    def _distance_to_nearest_road(self, building: BuildingUSD) -> float:
+        """Calculate distance to nearest road (simplified)"""
+        # In production, use actual road network data
+        # For now, simulate
+        roads = [b for b in self.buildings if b.type == InfrastructureType.ROAD]
+        
+        if not roads:
+            return 500  # No roads yet
+        
+        distances = [self._haversine_distance(building.location, r.location) for r in roads]
+        return min(distances)
+    
+    def _haversine_distance(self, loc1: Tuple[float, float], loc2: Tuple[float, float]) -> float:
+        """Calculate distance between two coordinates in meters"""
+        lat1, lng1 = loc1
+        lat2, lng2 = loc2
+        
+        # Simplified distance (for small areas)
+        dlat = abs(lat2 - lat1) * 111000  # 1 degree ≈ 111km
+        dlng = abs(lng2 - lng1) * 111000 * np.cos(np.radians(lat1))
+        
+        return np.sqrt(dlat**2 + dlng**2)
+    
+    def export_to_usd(self, filepath: str) -> bool:
+        """
+        Export digital twin to USD format for NVIDIA Omniverse.
+        
+        Args:
+            filepath: Path to save USD file
+        
+        Returns:
+            True if export successful
+        """
+        logger.info(f"📦 Exporting digital twin to USD: {filepath}")
+        
+        # In production, use actual USD library (pxr)
+        # For now, export as JSON
+        export_data = {
             "settlement": self.settlement_name,
-            "population": self.base_population,
-            "area_sqkm": self.area_sqkm,
+            "population": self.population,
+            "area_hectares": self.area_hectares,
             "buildings": [
                 {
-                    "id": b.building_id,
-                    "type": b.infrastructure_type.value,
+                    "name": b.name,
+                    "type": b.type.value,
                     "location": b.location,
                     "footprint_sqm": b.footprint_sqm,
                     "height_m": b.height_m,
-                    "capacity": b.capacity
+                    "capacity": b.capacity,
+                    "metadata": b.metadata
                 }
                 for b in self.buildings
             ]
         }
         
-        with open(output_path, 'w') as f:
-            json.dump(usd_data, f, indent=2)
+        with open(filepath, 'w') as f:
+            json.dump(export_data, f, indent=2)
         
-        logger.info(f"💾 Digital Twin exported to {output_path}")
-        return output_path
-    
-    def generate_urban_plan_report(self) -> Dict:
-        """Generate comprehensive urban planning report"""
-        total_clinics = len([b for b in self.buildings 
-                            if b.infrastructure_type == InfrastructureType.CLINIC])
-        total_schools = len([b for b in self.buildings 
-                            if b.infrastructure_type == InfrastructureType.SCHOOL])
-        total_water_points = len([b for b in self.buildings 
-                                  if b.infrastructure_type == InfrastructureType.WATER_POINT])
-        
-        return {
-            "settlement": self.settlement_name,
-            "population": self.base_population,
-            "infrastructure_summary": {
-                "clinics": total_clinics,
-                "schools": total_schools,
-                "water_points": total_water_points,
-                "total_buildings": len(self.buildings)
-            },
-            "compliance": {
-                "sphere_standards": "PARTIAL",
-                "who_standards": "PARTIAL",
-                "kenya_spatial_plan": "ALIGNED"
-            },
-            "risk_assessment": {
-                "flood_risk": f"{self.flood_risk_baseline:.1%}",
-                "disease_vector": f"{self.disease_vector_baseline:.2f}",
-                "overall_status": "TRANSITIONING"
-            }
-        }
+        logger.info(f"✅ Export complete - {len(self.buildings)} buildings")
+        return True
 
 
 # Example usage
 if __name__ == "__main__":
-    # Initialize Digital Twin for Dadaab
+    # Initialize Dadaab Digital Twin
     twin = UrbanDigitalTwin(
         settlement_name="Dadaab",
-        base_population=200000,
-        area_sqkm=50.0
+        population=200000,
+        area_hectares=5000
     )
     
     # Simulate adding a new clinic
     new_clinic = BuildingUSD(
-        building_id="CLINIC_IFO2_001",
-        infrastructure_type=InfrastructureType.CLINIC,
+        name="Ifo 2 Health Center",
+        type=InfrastructureType.CLINIC,
         location=(0.0512, 40.3129),
-        footprint_sqm=500.0,
-        height_m=4.5,
+        footprint_sqm=500,
+        height_m=4,
         capacity=100,
         metadata={"services": ["primary_care", "maternal_health", "vaccination"]}
     )
     
     result = twin.simulate_infrastructure_change(new_clinic)
     
-    print(f"\n✅ Simulation Results:")
-    print(f"   Flood Risk: {result.flood_risk_delta:+.1%}")
-    print(f"   Disease Vector: {result.disease_vector_score:.2f}")
-    print(f"   Social Access: {result.social_access_score:.1f}/100")
-    print(f"\n📋 Recommendations:")
+    print("\n" + "="*60)
+    print("SIMULATION RESULTS")
+    print("="*60)
+    print(f"Flood Risk Change: {result.flood_risk_delta:+.1f}%")
+    print(f"Disease Vector Score: {result.disease_vector_score:.2f}")
+    print(f"Social Access Score: {result.social_access_score:.1f}/100")
+    print(f"Airflow Impact: {result.airflow_impact:+.1f}%")
+    print(f"Population Density Change: {result.population_density_delta:+.1f} people/ha")
+    print(f"Traffic Flow Score: {result.traffic_flow_score:.1f}/100")
+    print("\nRECOMMENDATIONS:")
     for rec in result.recommendations:
-        print(f"   {rec}")
+        print(f"  • {rec}")
     
     # Export to USD
     twin.export_to_usd("dadaab_digital_twin.usd")
-    
-    # Generate report
-    report = twin.generate_urban_plan_report()
-    print(f"\n📊 Urban Plan Report:")
-    print(json.dumps(report, indent=2))

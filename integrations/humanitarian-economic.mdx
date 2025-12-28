@@ -1,0 +1,93 @@
+---
+title: Humanitarian & Economic Layer
+description: Cost-effectiveness analysis and economic impact assessment
+---
+
+## Overview
+
+Humanitarian & Economic Layer provides cost-effectiveness analysis, resource allocation optimization, and economic impact assessment for humanitarian health operations, integrated with World Bank and UN data.
+
+<Card
+  title="Implementation"
+  icon="chart-pie"
+>
+  Complete implementation in `repository-files/economic/humanitarian_economic.py`
+</Card>
+
+## Key capabilities
+
+<CardGroup cols={2}>
+  <Card title="Cost-effectiveness" icon="dollar-sign">
+    Cost per DALY averted
+  </Card>
+  <Card title="Resource optimization" icon="chart-line">
+    Linear programming allocation
+  </Card>
+  <Card title="Impact assessment" icon="chart-bar">
+    Economic outbreak impact
+  </Card>
+  <Card title="IFRS S2 compliance" icon="scale-balanced">
+    Climate disclosures
+  </Card>
+</CardGroup>
+
+## Quick start
+
+```python
+from economic.humanitarian_economic import HumanitarianEconomicLayer
+
+# Initialize layer
+econ = HumanitarianEconomicLayer(economic_model="CEA")
+
+# Calculate cost-effectiveness
+cea = econ.calculate_cost_effectiveness({
+    "intervention": "cholera_vaccination",
+    "cost_usd": 100000,
+    "dalys_averted": 500
+})
+print(f"Cost per DALY: ${cea.cost_per_daly}")
+
+# Optimize resource allocation
+allocation = econ.optimize_resource_allocation(
+    budget=1000000,
+    interventions=[
+        {"name": "vaccination", "cost": 100000, "dalys": 500},
+        {"name": "water_treatment", "cost": 50000, "dalys": 300}
+    ]
+)
+
+# Assess economic impact
+impact = econ.assess_economic_impact({
+    "disease": "cholera",
+    "cases": 1000,
+    "deaths": 50,
+    "duration_days": 90
+})
+print(f"Economic loss: ${impact.total_loss_usd}")
+```
+
+## DALY calculation
+
+Disability-Adjusted Life Years (DALYs) = Years of Life Lost (YLL) + Years Lived with Disability (YLD)
+
+```python
+# Calculate DALYs
+dalys = econ.calculate_dalys({
+    "deaths": 50,
+    "average_age_at_death": 35,
+    "life_expectancy": 65,
+    "disability_weight": 0.2,
+    "duration_years": 0.25
+})
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Implementation" icon="file-code" href="/IMPLEMENTATION_COMPLETE">
+    Complete implementation
+  </Card>
+  <Card title="Governance" icon="shield-check" href="/governance/overview">
+    IFRS S2 compliance
+  </Card>
+</CardGroup>
