@@ -1,7 +1,11 @@
 ---
 title: Outbreak prediction
-description: Predict outbreak risk using Z-score analysis and spatiotemporal modeling
+description: Predict outbreak risk using Z-score analysis and multi-scale forecasting
 ---
+
+## Overview
+
+The Outbreak Prediction API uses multi-scale spatial forecasting with Z-score analysis to predict disease outbreak trajectories with 95% confidence intervals.
 
 ## Endpoint
 
@@ -9,281 +13,312 @@ description: Predict outbreak risk using Z-score analysis and spatiotemporal mod
 POST /predict
 ```
 
-## Description
-
-Predict outbreak risk using Z-score analysis, spatiotemporal modeling, and historical data patterns. Integrates with the Cloud Oracle for multi-scale forecasting.
-
-## Headers
-
-| Header | Value | Required |
-|--------|-------|----------|
-| `Content-Type` | `application/json` | Yes |
-
 ## Request body
+
+```json
+{
+  "location": {
+    "lat": 0.4221,
+    "lng": 40.2255
+  },
+  "symptoms": ["diarrhea", "vomiting", "dehydration"],
+  "temporal_window_days": 14,
+  "forecast_horizon_hours": 72
+}
+```
+
+## Request fields
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `location` | object | Yes | Geographic coordinates |
-| `location.lat` | float | Yes | Latitude |
-| `location.lng` | float | Yes | Longitude (or `lon`) |
+| `location.lat` | float | Yes | Latitude coordinate |
+| `location.lng` | float | Yes | Longitude coordinate |
 | `symptoms` | array | Yes | List of symptoms |
-| `population` | integer | No | Population size for risk calculation |
-| `historical_data` | array | No | Historical case data for trend analysis |
-
-## Request
-
-```bash
-curl -X POST http://localhost:8080/predict \
-  -H "Content-Type: application/json" \
-  -d '{
-    "location": {
-      "lat": 0.4221,
-      "lng": 40.2255
-    },
-    "symptoms": ["diarrhea", "vomiting", "dehydration"],
-    "population": 200000
-  }'
-```
+| `temporal_window_days` | integer | No | Historical data window (default: 14) |
+| `forecast_horizon_hours` | integer | No | Forecast horizon (default: 72) |
 
 ## Response
-
-### Success (200 OK)
 
 ```json
 {
   "status": "success",
   "timestamp": "2025-12-19T20:00:00.000Z",
   "processing_time_ms": 45,
-  "location": {
-    "lat": 0.4221,
-    "lng": 40.2255,
-    "name": "Dadaab Refugee Camp"
-  },
-  "z_score": 10.3,
-  "risk_level": "CRITICAL",
-  "predicted_cases": 11776,
-  "confidence_interval": {
-    "lower": 9500,
-    "upper": 14000
-  },
-  "outbreak_probability": 0.98,
-  "disease_likelihood": {
-    "cholera": 0.92,
-    "typhoid": 0.15,
-    "dysentery": 0.08
+  "prediction": {
+    "risk_level": "HIGH",
+    "z_score": 10.3,
+    "confidence": 0.95,
+    "outbreak_probability": 0.87,
+    "estimated_cases": {
+      "current": 11776,
+      "24h_forecast": 14720,
+      "48h_forecast": 18400,
+      "72h_forecast": 23000
+    },
+    "spatial_hierarchy": {
+      "community": {
+        "name": "Ifo Camp",
+        "current_cases": 15,
+        "forecast": [18, 22, 27]
+      },
+      "district": {
+        "name": "Dadaab",
+        "current_cases": 45,
+        "forecast": [55, 68, 82]
+      },
+      "region": {
+        "name": "Garissa",
+        "current_cases": 120,
+        "forecast": [145, 175, 210]
+      },
+      "national": {
+        "name": "Kenya",
+        "current_cases": 450,
+        "forecast": [550, 680, 820]
+      }
+    },
+    "disease_classification": {
+      "primary_disease": "cholera",
+      "confidence": 0.92,
+      "differential_diagnoses": [
+        {"disease": "cholera", "probability": 0.92},
+        {"disease": "rotavirus", "probability": 0.06},
+        {"disease": "norovirus", "probability": 0.02}
+      ]
+    },
+    "parametric_bond": {
+      "status": "PAYOUT_RELEASED",
+      "trigger_threshold": 8.0,
+      "current_z_score": 10.3,
+      "payout_amount_usd": 500000
+    }
   },
   "recommendations": [
-    "IMMEDIATE: Activate emergency response protocol",
+    "IMMEDIATE: Activate emergency response protocols",
     "Deploy rapid response teams to affected areas",
-    "Establish oral rehydration stations",
-    "Initiate contact tracing and isolation",
-    "Notify WHO and regional health authorities"
-  ],
-  "forecast_72h": {
-    "24h": 13500,
-    "48h": 15800,
-    "72h": 18200
-  },
-  "spatial_spread": {
-    "radius_km": 5.2,
-    "affected_zones": ["Ifo", "Dagahaley", "Hagadera"]
-  }
+    "Establish treatment centers in Ifo Camp",
+    "Initiate contact tracing and surveillance",
+    "Coordinate with WHO and local health authorities"
+  ]
 }
 ```
 
-### Response fields
+## Response fields
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `status` | string | "success" or "error" |
-| `timestamp` | string | ISO 8601 timestamp |
-| `processing_time_ms` | integer | Processing time in milliseconds |
-| `location` | object | Geographic location details |
-| `z_score` | float | Statistical deviation from baseline |
 | `risk_level` | string | LOW, MEDIUM, HIGH, CRITICAL |
-| `predicted_cases` | integer | Predicted case count |
-| `confidence_interval` | object | 95% confidence interval |
+| `z_score` | float | Statistical deviation from baseline |
+| `confidence` | float | Prediction confidence (0-1) |
 | `outbreak_probability` | float | Probability of outbreak (0-1) |
-| `disease_likelihood` | object | Disease-specific probabilities |
+| `estimated_cases` | object | Current and forecasted case counts |
+| `spatial_hierarchy` | object | Multi-scale spatial forecasts |
+| `disease_classification` | object | Disease identification with confidence |
+| `parametric_bond` | object | Insurance bond status and payout |
 | `recommendations` | array | Recommended actions |
-| `forecast_72h` | object | 72-hour forecast |
-| `spatial_spread` | object | Geographic spread analysis |
-
-### Error (400 Bad Request)
-
-```json
-{
-  "status": "error",
-  "error": "missing_location",
-  "message": "Location is required (lat, lng)"
-}
-```
 
 ## Risk levels
 
-| Level | Z-Score Range | Description | Action |
-|-------|---------------|-------------|--------|
-| `LOW` | < 2.0 | Normal variation | Routine monitoring |
-| `MEDIUM` | 2.0 - 4.0 | Elevated cases | Increased surveillance |
-| `HIGH` | 4.0 - 8.0 | Significant outbreak | Activate response teams |
-| `CRITICAL` | > 8.0 | Severe outbreak | Emergency response |
+| Level | Z-Score Range | Description |
+|-------|---------------|-------------|
+| **LOW** | 0-3 | Normal variation, routine monitoring |
+| **MEDIUM** | 3-5 | Elevated cases, increased surveillance |
+| **HIGH** | 5-8 | Significant outbreak, response required |
+| **CRITICAL** | >8 | Severe outbreak, emergency response |
 
 ## Z-score calculation
 
-The Z-score measures how many standard deviations the current case count is from the historical mean:
+The Z-score measures statistical deviation from historical baseline:
 
-```
-Z = (X - μ) / σ
-
-Where:
-- X = Current case count
-- μ = Historical mean
-- σ = Standard deviation
+```python
+z_score = (current_cases - historical_mean) / historical_std_dev
 ```
 
 **Interpretation:**
-- Z < 2: Within normal range
-- Z = 2-4: Unusual but not alarming
-- Z = 4-8: Significant outbreak
-- Z > 8: Severe outbreak requiring immediate action
+- Z-score < 3: Normal variation
+- Z-score 3-5: Unusual but not alarming
+- Z-score 5-8: Significant outbreak
+- Z-score > 8: Severe outbreak (parametric bond trigger)
 
-## Disease likelihood
+## Spatial hierarchy
 
-The system calculates disease-specific probabilities based on:
+Forecasts are generated at multiple spatial scales with bottom-up aggregation:
 
-1. **Symptom patterns** - Matching symptoms to disease profiles
-2. **Geographic factors** - Endemic diseases in the region
-3. **Seasonal patterns** - Time of year and weather conditions
-4. **Historical data** - Previous outbreaks in the area
+```
+Community (Ifo Camp)      → Event count: 15  → Forecast: [18, 22, 27]
+    ↓
+District (Dadaab)         → Event count: 45  → Forecast: [55, 68, 82]
+    ↓
+Region (Garissa)          → Event count: 120 → Forecast: [145, 175, 210]
+    ↓
+National (Kenya)          → Event count: 450 → Forecast: [550, 680, 820]
+```
 
-### Example: Cholera detection
+This ensures spatial consistency: national forecast = sum of regional forecasts.
+
+## Parametric bonds
+
+When Z-score exceeds threshold (typically 8.0), parametric insurance bonds automatically trigger payouts:
 
 ```json
 {
-  "symptoms": ["diarrhea", "vomiting", "dehydration"],
-  "disease_likelihood": {
-    "cholera": 0.92,  // High probability due to classic symptoms
-    "typhoid": 0.15,  // Lower probability
-    "dysentery": 0.08 // Unlikely
-  }
+  "status": "PAYOUT_RELEASED",
+  "trigger_threshold": 8.0,
+  "current_z_score": 10.3,
+  "payout_amount_usd": 500000
 }
 ```
 
-## Spatiotemporal forecasting
+**Bond states:**
+- `LOCKED`: Z-score below threshold
+- `MONITORING`: Z-score approaching threshold
+- `TRIGGERED`: Z-score exceeded threshold
+- `PAYOUT_RELEASED`: Funds disbursed
 
-The Cloud Oracle uses hierarchical forecasting across spatial scales:
-
-```
-Community (Ifo Camp)      → Forecast: [18, 22, 27]
-    ↓
-District (Dadaab)         → Forecast: [55, 68, 82]
-    ↓
-Region (Garissa)          → Forecast: [145, 175, 210]
-    ↓
-National (Kenya)          → Forecast: [550, 680, 820]
-```
-
-## Integration with Golden Thread
-
-Predictions automatically integrate with the Golden Thread data fusion engine:
-
-```python
-from cloud_oracle.outbreak_predictor import OutbreakPredictor
-from edge_node.sync_protocol.golden_thread import GoldenThread
-
-predictor = OutbreakPredictor()
-gt = GoldenThread()
-
-# Make prediction
-prediction = predictor.predict(
-    location={'lat': 0.4221, 'lng': 40.2255},
-    symptoms=['diarrhea', 'vomiting']
-)
-
-# Fuse with CBS and EMR data
-fused = gt.fuse_data_streams(
-    cbs_signal={'location': 'Dadaab', 'symptom': 'diarrhea'},
-    emr_record={'location': 'Dadaab', 'diagnosis': 'cholera'},
-    patient_id='AUTO_GENERATED'
-)
-
-# Verification score enhances prediction confidence
-if fused.verification_score > 0.8:
-    print("High confidence prediction")
-```
-
-## Sovereignty compliance
-
-All outbreak predictions enforce sovereignty constraints:
-
-```python
-from governance_kernel.vector_ledger import SovereignGuardrail
-
-guardrail = SovereignGuardrail()
-
-# Validate prediction action
-guardrail.validate_action(
-    action_type='Outbreak_Analysis',
-    payload={
-        'data_type': 'Health_Analytics',
-        'processing_location': 'Cloud_Oracle',
-        'consent_token': 'PUBLIC_HEALTH_SURVEILLANCE'
-    },
-    jurisdiction='KDPA_KE'
-)
-```
-
-## PubSub alerts
-
-High-risk predictions automatically trigger PubSub alerts:
-
-```python
-from cloud_oracle.pubsub_alerts import AlertPublisher
-
-publisher = AlertPublisher()
-
-# Publish alert if risk is HIGH or CRITICAL
-if prediction['risk_level'] in ['HIGH', 'CRITICAL']:
-    publisher.publish_outbreak_alert(prediction)
-```
-
-## Python SDK example
+## Example: Python
 
 ```python
 import requests
 
-# Predict outbreak
 response = requests.post(
-    'http://localhost:8080/predict',
+    "http://localhost:8080/predict",
     json={
-        'location': {'lat': 0.4221, 'lng': 40.2255},
-        'symptoms': ['diarrhea', 'vomiting', 'dehydration'],
-        'population': 200000
+        "location": {"lat": 0.4221, "lng": 40.2255},
+        "symptoms": ["diarrhea", "vomiting", "dehydration"],
+        "temporal_window_days": 14,
+        "forecast_horizon_hours": 72
     }
 )
 
 result = response.json()
 
-if result['status'] == 'success':
-    print(f"Z-Score: {result['z_score']}")
-    print(f"Risk Level: {result['risk_level']}")
-    print(f"Predicted Cases: {result['predicted_cases']}")
-    
-    # Check if emergency response needed
-    if result['risk_level'] == 'CRITICAL':
-        print("🚨 CRITICAL OUTBREAK - Activating emergency response")
-        
-        # Trigger response actions
-        for recommendation in result['recommendations']:
-            print(f"  - {recommendation}")
+print(f"Risk Level: {result['prediction']['risk_level']}")
+print(f"Z-Score: {result['prediction']['z_score']}")
+print(f"Outbreak Probability: {result['prediction']['outbreak_probability']:.1%}")
+print(f"Current Cases: {result['prediction']['estimated_cases']['current']}")
+print(f"72h Forecast: {result['prediction']['estimated_cases']['72h_forecast']}")
+
+if result['prediction']['parametric_bond']['status'] == 'PAYOUT_RELEASED':
+    payout = result['prediction']['parametric_bond']['payout_amount_usd']
+    print(f"🚨 Parametric bond triggered - Payout: ${payout:,}")
+```
+
+## Example: cURL
+
+```bash
+curl -X POST http://localhost:8080/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "location": {"lat": 0.4221, "lng": 40.2255},
+    "symptoms": ["diarrhea", "vomiting", "dehydration"],
+    "temporal_window_days": 14,
+    "forecast_horizon_hours": 72
+  }'
+```
+
+## Integration with Golden Thread
+
+Outbreak predictions integrate with Golden Thread for verified timelines:
+
+```python
+from edge_node.sync_protocol.golden_thread import GoldenThread
+import requests
+
+# Get outbreak prediction
+response = requests.post(
+    "http://localhost:8080/predict",
+    json={
+        "location": {"lat": 0.4221, "lng": 40.2255},
+        "symptoms": ["diarrhea", "vomiting"]
+    }
+)
+
+prediction = response.json()['prediction']
+
+# Fuse with Golden Thread
+gt = GoldenThread()
+fused = gt.fuse_data_streams(
+    cbs_signal={
+        'location': 'Dadaab',
+        'symptom': 'diarrhea',
+        'timestamp': prediction['timestamp']
+    },
+    prediction_data=prediction,
+    patient_id='OUTBREAK_DADAAB_001'
+)
+
+# Verification score indicates confidence
+print(f"Verification Score: {fused.verification_score}")
+```
+
+## Integration with Vertex AI
+
+The outbreak prediction API uses Vertex AI for multi-scale forecasting:
+
+```python
+from cloud_oracle.vertex_ai_forecasting import VertexAIForecaster
+
+forecaster = VertexAIForecaster(
+    project_id="iluminara-project",
+    region="us-central1"
+)
+
+# Train hierarchical forecasting model
+forecaster.train_hierarchical_model(
+    training_data=historical_cases,
+    spatial_hierarchy={
+        "national": ["region1", "region2"],
+        "region1": ["district1", "district2"],
+        "district1": ["community1", "community2"]
+    }
+)
+
+# Generate 72-hour forecast
+forecast = forecaster.forecast(
+    location="Dadaab",
+    horizon_hours=72,
+    confidence_level=0.95
+)
 ```
 
 ## Performance
 
-- **Prediction latency**: ~45ms average
+- **Prediction latency**: <50ms average
+- **Forecast accuracy**: 95% confidence intervals
+- **Spatial consistency**: 100% (bottom-up aggregation)
 - **Throughput**: 100+ predictions/second
-- **Accuracy**: 92% for cholera outbreaks (validated against historical data)
-- **False positive rate**: <5%
+
+## Error handling
+
+### Missing location
+
+```json
+{
+  "status": "error",
+  "error": "missing_location",
+  "message": "Location coordinates required for outbreak prediction"
+}
+```
+
+### Missing symptoms
+
+```json
+{
+  "status": "error",
+  "error": "missing_symptoms",
+  "message": "Symptoms list required for disease classification"
+}
+```
+
+### Insufficient data
+
+```json
+{
+  "status": "error",
+  "error": "insufficient_data",
+  "message": "Insufficient historical data for reliable prediction"
+}
+```
 
 ## Next steps
 
@@ -293,7 +328,7 @@ if result['status'] == 'success':
     icon="microphone"
     href="/api-reference/voice-processing"
   >
-    Create CBS signals from voice alerts
+    Convert voice alerts to outbreak data
   </Card>
   <Card
     title="Golden Thread"
@@ -303,17 +338,17 @@ if result['status'] == 'success':
     Understand data fusion logic
   </Card>
   <Card
+    title="Vertex AI integration"
+    icon="brain"
+    href="/deployment/vertex-ai"
+  >
+    Deploy forecasting models
+  </Card>
+  <Card
     title="Cloud Oracle"
     icon="cloud"
     href="/architecture/cloud-oracle"
   >
-    Deep dive into forecasting engine
-  </Card>
-  <Card
-    title="Deploy to GCP"
-    icon="rocket"
-    href="/deployment/gcp"
-  >
-    Production deployment guide
+    Multi-scale forecasting architecture
   </Card>
 </CardGroup>
