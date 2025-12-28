@@ -2,103 +2,51 @@
 
 ## Overview
 
-This guide walks you through the **Total Repository Ingestion** process that generates comprehensive documentation for all 800+ files in the iLuminara-Core repository.
+This guide explains how to execute the **Total Repository Ingestion Engine** to generate comprehensive documentation for all 800+ files in the iLuminara-Core repository.
 
 ## Why Total Ingestion?
 
-Standard AI agents cannot generate 800 files in a single turn due to context limits. The solution is a **Recursive Scaffolding Script** that programmatically:
+Standard AI agents cannot generate 800 files in a single turn due to context limits. The solution is to use a Python script to programmatically:
 
-1. Crawls your entire repository
-2. Generates a documentation page for every single file
-3. Updates the navigation structure to include them all
-4. Bypasses AI summarization by physically creating files
+1. **Crawl** your entire repository
+2. **Generate** a documentation page for every single file
+3. **Update** the docs.json navigation map to include them all
 
-## The Fortress Documentation Stack
+This bypasses AI summarization by physically creating documentation files for every component.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                  DOCUMENTATION FORTRESS                      │
-├─────────────────────────────────────────────────────────────┤
-│  Layer 1: Core Documentation (Manual)                       │
-│  - Getting Started, Architecture, API Reference             │
-│                                                              │
-│  Layer 2: Security Stack (Automated)                        │
-│  - CodeQL, Gitleaks, Dependabot, Crypto Shredder           │
-│                                                              │
-│  Layer 3: Total Ingestion (Automated)                       │
-│  - 800+ files, complete code reference                      │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## Step 1: Prepare Your Environment
-
-### Prerequisites
+## Prerequisites
 
 ```bash
-# Ensure you're in the iLuminara-Core repository
-cd /path/to/iLuminara-Core
-
-# Verify Python 3.8+
+# Ensure Python 3.8+ is installed
 python3 --version
 
-# Install required packages
-pip install pathlib
+# Navigate to repository root
+cd /path/to/iLuminara-Core
 ```
 
-### Set Up GitHub Permissions
+## Step 1: Copy the Ingestion Engine
+
+Copy `generate_full_docs.py` to your repository root:
 
 ```bash
-# Refresh GitHub CLI with required permissions
-gh auth refresh -s workflow,repo,write:packages,admin:repo_hook
+# If you have the file locally
+cp generate_full_docs.py /path/to/iLuminara-Core/
+
+# Or create it directly
+cat << 'EOF' > generate_full_docs.py
+# [Paste the complete script content here]
+EOF
 ```
 
-## Step 2: Copy Files to Repository
-
-Copy all files from the `repository-files/` directory to your iLuminara-Core repository:
+## Step 2: Execute the Ingestion
 
 ```bash
-# Security workflows
-cp repository-files/.github/workflows/codeql.yml .github/workflows/
-cp repository-files/.github/workflows/gitleaks.yml .github/workflows/
-cp repository-files/.gitleaks.toml .
-cp repository-files/.github/dependabot.yml .github/
-
-# Governance kernel
-cp repository-files/governance_kernel/crypto_shredder.py governance_kernel/
-
-# Configuration
-cp repository-files/config/sovereign_guardrail.yaml config/
-
-# Scripts
-cp repository-files/scripts/validate_fortress.sh scripts/
-chmod +x scripts/validate_fortress.sh
-
-# Ingestion engine
-cp repository-files/generate_full_docs.py .
+# Make script executable
 chmod +x generate_full_docs.py
-```
 
-## Step 3: Execute Total Ingestion
-
-### Run the Ingestion Engine
-
-```bash
+# Run the ingestion engine
 python3 generate_full_docs.py
 ```
-
-### What Happens
-
-The script will:
-
-1. **Crawl Everything** - Walk through every folder (governance_kernel, edge_node, infrastructure, ml_health, etc.)
-2. **Mirror Structure** - Create a replica of your code structure inside `docs/reference/`
-3. **Generate MDX Files** - Create documentation for each file with:
-   - File overview and description
-   - Dependencies and integrations
-   - Source code reference
-   - Related documentation links
-4. **Update Navigation** - Rewrite `docs.json` to include every file
-5. **Categorize Components** - Group files by category (Governance, Edge Node, Cloud Oracle, etc.)
 
 ### Expected Output
 
@@ -108,259 +56,317 @@ The script will:
 ║   Generating documentation for 800+ files                 ║
 ╚════════════════════════════════════════════════════════════╝
 
-🚀 Starting Total Repository Ingestion...
-📁 Repository: .
-📝 Documentation: docs/reference
-
-✅ governance_kernel/vector_ledger.py
-✅ governance_kernel/crypto_shredder.py
-✅ governance_kernel/ethical_engine.py
-✅ edge_node/frenasa_engine/voice_processor.py
-✅ edge_node/ai_agents/offline_agent.py
+🔍 Scanning repository: .
+✅ [1] governance_kernel/vector_ledger.py
+✅ [2] governance_kernel/crypto_shredder.py
+✅ [3] governance_kernel/ethical_engine.py
+✅ [4] edge_node/frenasa_engine/voice_processor.py
 ...
-✅ infrastructure/aerial_6g/network_config.py
-✅ ml_health/bionemo/model_trainer.py
+✅ [800] infrastructure/aerial_6g/network_config.py
 
-✨ Ingestion Complete!
-📊 Total Files: 847
-📂 Categories: 10
-   - governance_kernel: 23 files
-   - edge_node: 156 files
-   - cloud_oracle: 89 files
-   - infrastructure: 234 files
-   - ml_health: 178 files
-   - api: 45 files
-   - dashboard: 34 files
-   - scripts: 56 files
-   - config: 18 files
-   - tests: 14 files
-
+📝 Updating docs.json...
 ✅ Updated docs.json
 
-🎉 Total Repository Ingestion Complete!
-```
-
-## Step 4: Validate the Fortress
-
-### Run Fortress Validation
-
-```bash
-./scripts/validate_fortress.sh
-```
-
-This validates:
-- Security Audit Layer (CodeQL, Gitleaks, Dependabot)
-- Governance Kernel (SovereignGuardrail, Crypto Shredder)
-- Edge Node & AI Agents
-- Cloud Oracle
-- Python Dependencies
-- Environment Configuration
-- Nuclear IP Stack Status
-
-### Expected Output
-
-```
 ╔════════════════════════════════════════════════════════════╗
-║     iLuminara-Core Sovereign Health Fortress Validator     ║
+║                    INGESTION COMPLETE                      ║
 ╚════════════════════════════════════════════════════════════╝
 
-═══════════════════════════════════════════════════════════
-PHASE 1: Security Audit Layer
-═══════════════════════════════════════════════════════════
+📊 Statistics:
+   - Files documented: 800
+   - Groups created: 45
+   - Documentation root: reference/
 
-📄 Checking .github/workflows/codeql.yml... ✓ EXISTS
-   └─ SAST security scanning (GDPR Art. 32, ISO 27001 A.12.6)
-📄 Checking .github/workflows/gitleaks.yml... ✓ EXISTS
-   └─ Secret scanning (NIST SP 800-53 IA-5)
+🚀 Next steps:
+   1. Review generated documentation in reference/
+   2. Commit changes: git add . && git commit -m 'docs: total repository ingestion'
+   3. Push to repository: git push
 
-...
-
-🛡️  FORTRESS STATUS: OPERATIONAL
-✓  All critical components validated
-✓  Security audit layer active
-✓  Governance kernel operational
-✓  Nuclear IP stack initialized
-
-The Sovereign Health Fortress is ready for deployment.
+✅ The Sovereign Health Fortress documentation is complete.
 ```
 
-## Step 5: Commit and Push
+## Step 3: Review Generated Documentation
 
-### Commit All Changes
+The script creates a mirrored structure in the `reference/` directory:
+
+```
+reference/
+├── governance_kernel/
+│   ├── vector_ledger.mdx
+│   ├── crypto_shredder.mdx
+│   └── ethical_engine.mdx
+├── edge_node/
+│   ├── frenasa_engine/
+│   │   ├── voice_processor.mdx
+│   │   └── symptom_extractor.mdx
+│   └── ai_agents/
+│       ├── offline_agent.mdx
+│       └── federated_learning.mdx
+├── infrastructure/
+│   ├── aerial_6g/
+│   └── quantum_mesh/
+└── ml_health/
+    ├── bionemo/
+    └── vertex_ai/
+```
+
+## Step 4: Commit and Push
 
 ```bash
-# Stage all files
+# Stage all changes
 git add .
 
 # Commit with descriptive message
-git commit -m "feat: integrate Sovereign Health Fortress
-
-- Add CodeQL SAST security scanning
-- Add Gitleaks secret detection
-- Implement IP-02 Crypto Shredder
-- Configure SovereignGuardrail (14 legal frameworks)
-- Add Dependabot daily security updates
-- Generate complete documentation (800+ files)
-- Add fortress validation script
-
-Compliance: GDPR, KDPA, HIPAA, POPIA, EU AI Act, ISO 27001, SOC 2"
+git commit -m "docs: total repository ingestion (800+ files integrated)"
 
 # Push to repository
-git push
+git push origin main
 ```
 
-### Enable Branch Protection
+## Step 5: Verify in Mintlify
 
-```bash
-# Require PRs and passing status checks
-gh api repos/VISENDI56/iLuminara-Core/branches/main/protection \
-  --method PUT \
-  --field required_status_checks='{"strict":true,"contexts":["CodeQL","Gitleaks"]}' \
-  --field enforce_admins=true \
-  --field required_pull_request_reviews='{"required_approving_review_count":1}'
+After pushing, your Mintlify documentation will show:
+
+1. **Code Reference** tab in the navigation
+2. **45+ groups** organized by directory structure
+3. **800+ pages** with complete technical reference
+
+## What Gets Documented?
+
+### File Types
+
+- **Python** (`.py`) - Full docstrings, imports, compliance tags
+- **JavaScript** (`.js`) - Module structure and dependencies
+- **Shell Scripts** (`.sh`) - Execution context and usage
+- **Configuration** (`.json`, `.yml`, `.yaml`) - Schema and options
+- **Markdown** (`.md`) - Content and structure
+
+### Ignored Directories
+
+- `.git`, `.github`, `__pycache__`, `venv`, `node_modules`
+- `docs`, `media`, `logo`, `.pytest_cache`, `.mypy_cache`
+- `dist`, `build`, `*.egg-info`, `.vscode`, `.idea`
+
+### Ignored Files
+
+- `.DS_Store`, `package-lock.json`, `requirements.txt`
+- `.gitignore`, `.env`, `.env.example`
+
+## Generated Documentation Features
+
+Each generated MDX file includes:
+
+### 1. Metadata
+- File path and category
+- Language and syntax highlighting
+- Nuclear IP Stack tags (if applicable)
+
+### 2. Compliance Tags
+- GDPR, KDPA, HIPAA, POPIA
+- Geneva Convention, WHO IHR
+- ISO 27001, SOC 2, NIST CSF
+
+### 3. Source Code Reference
+- GitHub link to source
+- Import statements (Python)
+- Dependencies
+
+### 4. Architecture Context
+- Integration with Governance Kernel
+- Audit Trail connections
+- Golden Thread data flows
+
+### 5. Related Documentation
+- Links to architecture guides
+- API reference
+- Deployment guides
+- Security documentation
+
+## Customization
+
+### Modify File Extensions
+
+Edit `ALLOWED_EXT` in `generate_full_docs.py`:
+
+```python
+ALLOWED_EXT = {".py", ".js", ".sh", ".json", ".yml", ".yaml", ".css", ".md", ".toml", ".rs", ".go"}
 ```
 
-## Step 6: Verify Documentation
+### Add Custom Compliance Tags
 
-### Local Preview
+Edit `COMPLIANCE_TAGS`:
 
-If you have Mintlify CLI installed:
-
-```bash
-mintlify dev
+```python
+COMPLIANCE_TAGS = {
+    "vector_ledger.py": ["GDPR", "KDPA", "HIPAA", "POPIA"],
+    "your_module.py": ["Custom Framework", "Industry Standard"],
+}
 ```
 
-Open http://localhost:3000 to preview the documentation.
+### Modify Nuclear IP Components
 
-### Check Navigation
+Edit `NUCLEAR_IP_COMPONENTS`:
 
-Your documentation should now have:
-
-1. **Documentation Tab**
-   - Getting Started
-   - Architecture
-   - Governance Kernel
-   - AI Agents
-   - Deployment
-
-2. **API Reference Tab**
-   - Core API
-   - Voice Processing
-   - Outbreak Prediction
-
-3. **Security Tab**
-   - Security Stack
-   - Crypto Shredder
-   - Security Workflows
-
-4. **Code Reference Tab** (NEW - 800+ files)
-   - Governance Kernel (23 files)
-   - Edge Node (156 files)
-   - Cloud Oracle (89 files)
-   - Infrastructure (234 files)
-   - ML Health (178 files)
-   - API Services (45 files)
-   - Dashboards (34 files)
-   - Scripts (56 files)
-   - Configuration (18 files)
-   - Tests (14 files)
-
-## The Result
-
-When you open your documentation, you will see:
-
-- **Massive Sidebar** - Organized by component category
-- **Complete Coverage** - Every file has its own documentation page
-- **No Summarization** - Files physically exist, cannot be summarized away
-- **Searchable** - All 800+ files are searchable
-- **Linked** - Cross-references between components
-- **Compliance-Tagged** - Governance files show compliance frameworks
+```python
+NUCLEAR_IP_COMPONENTS = {
+    "crypto_shredder.py": "IP-02",
+    "your_innovation.py": "IP-07",
+}
+```
 
 ## Troubleshooting
 
-### Issue: Script fails with permission error
+### Issue: Script fails with encoding error
+
+**Solution:** Ensure all files are UTF-8 encoded:
 
 ```bash
-chmod +x generate_full_docs.py
-chmod +x scripts/validate_fortress.sh
+find . -name "*.py" -exec file {} \; | grep -v UTF-8
 ```
 
-### Issue: Missing dependencies
+### Issue: Navigation not updating
+
+**Solution:** Verify docs.json exists and is valid JSON:
 
 ```bash
-pip install -r requirements.txt
+python3 -m json.tool docs.json
 ```
 
-### Issue: docs.json not found
+### Issue: Too many files (>1000)
 
-The script will create it automatically. Ensure you're in the repository root.
+**Solution:** Run in batches by directory:
 
-### Issue: Too many files in navigation
+```python
+# Modify REPO_ROOT in script
+REPO_ROOT = "./governance_kernel"  # Process one directory at a time
+```
 
-This is expected! The navigation will be large. Use the search function to find specific files.
+## Advanced Usage
+
+### Dry Run Mode
+
+Test without creating files:
+
+```python
+# Add at top of generate_nav_structure()
+DRY_RUN = True
+
+if not DRY_RUN:
+    with open(doc_full_path, 'w', encoding='utf-8') as f:
+        f.write(mdx_content)
+```
+
+### Custom Templates
+
+Modify `generate_mdx_content()` to use custom templates:
+
+```python
+def generate_mdx_content(file_path: str, rel_path: str) -> str:
+    # Load custom template
+    with open('templates/custom.mdx', 'r') as f:
+        template = f.read()
+    
+    # Replace placeholders
+    return template.format(
+        filename=filename,
+        path=rel_path,
+        content=content
+    )
+```
+
+### Parallel Processing
+
+For large repositories, use multiprocessing:
+
+```python
+from multiprocessing import Pool
+
+def process_file(file_info):
+    # Process single file
+    pass
+
+with Pool(processes=8) as pool:
+    pool.map(process_file, file_list)
+```
+
+## Integration with CI/CD
+
+### GitHub Actions
+
+```yaml
+name: Update Documentation
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run ingestion
+        run: python3 generate_full_docs.py
+      - name: Commit changes
+        run: |
+          git config user.name "Documentation Bot"
+          git config user.email "bot@iluminara.health"
+          git add reference/ docs.json
+          git commit -m "docs: auto-update from ingestion" || exit 0
+          git push
+```
+
+## Validation
+
+After ingestion, validate the documentation:
+
+```bash
+# Check file count
+find reference/ -name "*.mdx" | wc -l
+
+# Validate docs.json
+python3 -m json.tool docs.json > /dev/null && echo "✅ Valid JSON"
+
+# Check for broken links
+grep -r "href=" reference/ | grep -v "http" | grep -v ".mdx"
+```
 
 ## Maintenance
 
-### Re-run Ingestion After Code Changes
+### Re-run Ingestion
+
+Safe to re-run anytime - it will overwrite existing files:
 
 ```bash
-# Delete old reference docs
-rm -rf docs/reference/
-
-# Re-run ingestion
 python3 generate_full_docs.py
-
-# Commit updates
-git add docs/
-git commit -m "docs: update code reference"
-git push
 ```
 
-### Update Security Workflows
+### Incremental Updates
 
-Security workflows run automatically:
-- **CodeQL**: Weekly on Sunday
-- **Gitleaks**: Daily at 2 AM UTC
-- **Dependabot**: Daily at 2 AM UTC
+For new files only, modify the script to check if MDX exists:
 
-## Nuclear IP Stack Status
+```python
+if os.path.exists(doc_full_path):
+    print(f"⏭️  Skipping existing: {rel_path}")
+    continue
+```
 
-After ingestion, your Nuclear IP Stack status:
+## Support
 
-| Component | Status | Description |
-|-----------|--------|-------------|
-| **IP-02: Crypto Shredder** | ✅ ACTIVE | Data dissolution implemented |
-| **IP-03: Acorn Protocol** | ⚠️ REQUIRES HARDWARE | Somatic security |
-| **IP-04: Silent Flux** | ⚠️ REQUIRES INTEGRATION | Anxiety-regulated AI |
-| **IP-05: Golden Thread** | ✅ ACTIVE | Data fusion engine |
-| **IP-06: 5DM Bridge** | ⚠️ REQUIRES MOBILE NETWORK | 14M+ node injection |
+For issues or questions:
 
-## Compliance Attestation
+1. Check the [GitHub Issues](https://github.com/VISENDI56/iLuminara-Core/issues)
+2. Review the [Documentation](https://docs.iluminara.health)
+3. Contact: support@iluminara.health
 
-Your documentation now provides continuous compliance attestation:
+## The Result
 
-- **GDPR** - SovereignGuardrail + Audit Trail (Real-time)
-- **HIPAA** - Crypto Shredder + Retention Policies (Daily)
-- **ISO 27001** - CodeQL + Gitleaks (Weekly)
-- **SOC 2** - Tamper-proof Audit (Continuous)
-- **NIST CSF** - Security Workflows (Daily)
+After ingestion, your Mintlify documentation will display:
 
-## Summary
+- **Complete visibility** into all 800+ files
+- **Organized structure** mirroring your repository
+- **Compliance tags** for regulatory frameworks
+- **Nuclear IP Stack** component identification
+- **Architecture context** for every file
+- **GitHub integration** with source links
 
-You have successfully:
-
-✅ Deployed the Security Audit Layer (CodeQL, Gitleaks, Dependabot)  
-✅ Implemented IP-02 Crypto Shredder  
-✅ Configured SovereignGuardrail (14 legal frameworks)  
-✅ Generated documentation for 800+ files  
-✅ Updated navigation structure  
-✅ Validated the Sovereign Health Fortress  
-
-**The Fortress is now built. Your repository has transitioned from code to a Sovereign Architecture.**
-
----
-
-For questions or issues, refer to:
-- [Security Stack Documentation](/security/overview)
-- [Governance Kernel Documentation](/governance/overview)
-- [Architecture Overview](/architecture/overview)
+**The Fortress is now fully documented. No file is hidden. No component is summarized away.**
