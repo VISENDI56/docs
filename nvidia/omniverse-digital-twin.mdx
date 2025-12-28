@@ -1,0 +1,516 @@
+---
+title: NVIDIA Omniverse Digital Twin
+description: Real-time 3D simulation of refugee camps and outbreak scenarios
+---
+
+## Overview
+
+The **NVIDIA Omniverse Digital Twin** provides real-time 3D visualization and simulation of refugee camps, health facilities, and outbreak scenarios using Universal Scene Description (USD) and NVIDIA's Omniverse platform.
+
+<Card
+  title="Philosophy"
+  icon="cube"
+>
+  "Digital twins transform data into actionable spatial intelligence"
+</Card>
+
+## Features
+
+<CardGroup cols={2}>
+  <Card title="3D Camp Visualization" icon="building">
+    Real-time rendering of refugee camp layouts with population density
+  </Card>
+  <Card title="Outbreak Heatmaps" icon="fire">
+    Dynamic heatmap overlays showing disease spread patterns
+  </Card>
+  <Card title="Water Source Monitoring" icon="droplet">
+    Visual tracking of water quality and contamination
+  </Card>
+  <Card title="Emergency Response Simulation" icon="truck-medical">
+    Simulate response team deployment and routing
+  </Card>
+</CardGroup>
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                  DATA SOURCES                                 │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐            │
+│  │  CBS       │  │  EMR       │  │  IoT       │            │
+│  │  Reports   │  │  Records   │  │  Sensors   │            │
+│  └────────────┘  └────────────┘  └────────────┘            │
+└──────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌──────────────────────────────────────────────────────────────┐
+│                  GOLDEN THREAD FUSION                         │
+│  - Verify and merge data streams                             │
+│  - Calculate spatial coordinates                             │
+│  - Generate time-series data                                 │
+└──────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌──────────────────────────────────────────────────────────────┐
+│                  OMNIVERSE DIGITAL TWIN                       │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │  USD Stage (Universal Scene Description)              │  │
+│  │  - Camp layout geometry                               │  │
+│  │  - Facility models                                    │  │
+│  │  - Water source markers                               │  │
+│  └────────────────────────────────────────────────────────┘  │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │  Real-time Updates                                     │  │
+│  │  - Outbreak heatmaps                                   │  │
+│  │  - Population density                                  │  │
+│  │  - Emergency response routes                           │  │
+│  └────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌──────────────────────────────────────────────────────────────┐
+│                  VISUALIZATION CLIENTS                        │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐            │
+│  │  Omniverse │  │  Web       │  │  VR/AR     │            │
+│  │  Viewer    │  │  Dashboard │  │  Headsets  │            │
+│  └────────────┘  └────────────┘  └────────────┘            │
+└──────────────────────────────────────────────────────────────┘
+```
+
+## Setup
+
+### Prerequisites
+
+```bash
+# Install NVIDIA Omniverse
+# Download from: https://www.nvidia.com/en-us/omniverse/
+
+# Install Python dependencies
+pip install omni-client-library pxr numpy
+```
+
+### Initialize Omniverse connection
+
+```python
+import omni.client
+
+# Connect to Omniverse server
+omni.client.initialize()
+
+# Set server URL
+server_url = "omniverse://localhost"
+omni.client.set_server_url(server_url)
+
+print("✅ Connected to Omniverse")
+```
+
+## Creating a digital twin
+
+### Basic setup
+
+```python
+from nvidia_omniverse.digital_twin import RefugeeCampDigitalTwin
+
+# Initialize digital twin
+twin = RefugeeCampDigitalTwin(
+    camp_name="Dadaab_Ifo",
+    omniverse_server="omniverse://localhost"
+)
+
+# Initialize USD stage
+twin.initialize_stage()
+```
+
+### Define camp layout
+
+```python
+# Define residential blocks
+blocks = [
+    {
+        "id": "C1",
+        "x": 0,
+        "y": 0,
+        "population_density": 0.8,
+        "size": 50.0
+    },
+    {
+        "id": "C2",
+        "x": 100,
+        "y": 0,
+        "population_density": 0.6,
+        "size": 50.0
+    },
+    {
+        "id": "C3",
+        "x": 0,
+        "y": 100,
+        "population_density": 0.9,
+        "size": 50.0
+    }
+]
+
+# Define health facilities
+facilities = [
+    {
+        "id": "1",
+        "type": "clinic",
+        "x": 50,
+        "y": 50,
+        "capacity": 200
+    },
+    {
+        "id": "2",
+        "type": "school",
+        "x": 150,
+        "y": 50,
+        "capacity": 500
+    }
+]
+
+# Define water sources
+water_sources = [
+    {
+        "id": "1",
+        "x": 25,
+        "y": 25,
+        "quality_score": 0.8  # Good quality
+    },
+    {
+        "id": "2",
+        "x": 75,
+        "y": 75,
+        "quality_score": 0.3  # Contaminated
+    }
+]
+
+# Create camp layout
+twin.create_camp_layout(blocks, facilities, water_sources)
+```
+
+## Real-time outbreak visualization
+
+### Update heatmap
+
+```python
+# Get case data from Golden Thread
+from edge_node.sync_protocol.golden_thread import GoldenThread
+
+gt = GoldenThread()
+cases = gt.get_cases(
+    start_date="2025-12-01",
+    end_date="2025-12-31",
+    disease="cholera"
+)
+
+# Convert to heatmap format
+case_data = [
+    {
+        "x": case.location.x,
+        "y": case.location.y,
+        "severity": case.severity
+    }
+    for case in cases
+]
+
+# Update heatmap in digital twin
+twin.update_outbreak_heatmap(
+    case_data=case_data,
+    disease="cholera"
+)
+```
+
+### Color coding
+
+| Severity | Color | Description |
+|----------|-------|-------------|
+| 0.0-0.3 | 🟡 Yellow | Low risk |
+| 0.3-0.6 | 🟠 Orange | Medium risk |
+| 0.6-0.8 | 🔴 Red | High risk |
+| 0.8-1.0 | 🟣 Purple | Critical |
+
+## Emergency response simulation
+
+### Deploy response teams
+
+```python
+# Define outbreak epicenter
+outbreak_location = (10, 10)  # Block C1
+
+# Define response teams
+response_teams = [
+    {
+        "id": "TEAM_A",
+        "start_x": 200,
+        "start_y": 200,
+        "type": "medical",
+        "capacity": 50
+    },
+    {
+        "id": "TEAM_B",
+        "start_x": 250,
+        "start_y": 200,
+        "type": "water_sanitation",
+        "capacity": 30
+    }
+]
+
+# Simulate emergency response
+twin.simulate_emergency_response(
+    outbreak_location=outbreak_location,
+    response_teams=response_teams
+)
+```
+
+### Response visualization
+
+The simulation creates:
+- 🔴 **Red sphere** at outbreak epicenter
+- 🟢 **Green cones** for response team positions
+- 🟢 **Green lines** showing response routes
+
+## Integration with iLuminara stack
+
+### Real-time data pipeline
+
+```python
+from google.cloud import pubsub_v1
+import json
+
+# Subscribe to outbreak alerts
+subscriber = pubsub_v1.SubscriberClient()
+subscription_path = subscriber.subscription_path(PROJECT_ID, "outbreak-alerts")
+
+def callback(message):
+    """Process outbreak alert and update digital twin"""
+    data = json.loads(message.data)
+    
+    # Update heatmap
+    twin.update_outbreak_heatmap(
+        case_data=[{
+            "x": data["location"]["x"],
+            "y": data["location"]["y"],
+            "severity": data["severity"]
+        }],
+        disease=data["disease"]
+    )
+    
+    message.ack()
+
+# Start listening
+subscriber.subscribe(subscription_path, callback=callback)
+```
+
+### Integration with Vertex AI predictions
+
+```python
+from ai_ml.vertex_ai_shap import ExplainableOutbreakPredictor
+
+# Get outbreak prediction
+predictor = ExplainableOutbreakPredictor(endpoint_name=ENDPOINT_NAME)
+
+result = predictor.predict_with_explanation(
+    features=camp_features,
+    feature_names=feature_names
+)
+
+# Visualize prediction in digital twin
+if result["is_high_risk"]:
+    twin.update_outbreak_heatmap(
+        case_data=[{
+            "x": camp_center_x,
+            "y": camp_center_y,
+            "severity": result["confidence"]
+        }],
+        disease="predicted_outbreak"
+    )
+```
+
+## Water quality monitoring
+
+### Real-time sensor integration
+
+```python
+# Update water source quality from IoT sensors
+def update_water_quality(sensor_data):
+    """Update water source visualization based on sensor readings"""
+    
+    for sensor in sensor_data:
+        # Find corresponding water source
+        water_source_id = sensor["source_id"]
+        quality_score = sensor["quality_score"]
+        
+        # Update in digital twin
+        twin.update_water_source_quality(
+            source_id=water_source_id,
+            quality_score=quality_score
+        )
+
+# Example sensor data
+sensor_data = [
+    {
+        "source_id": "1",
+        "quality_score": 0.8,
+        "ph": 7.2,
+        "turbidity": 2.5,
+        "e_coli": 0
+    },
+    {
+        "source_id": "2",
+        "quality_score": 0.3,
+        "ph": 6.8,
+        "turbidity": 15.0,
+        "e_coli": 150  # Contaminated
+    }
+]
+
+update_water_quality(sensor_data)
+```
+
+## Export and sharing
+
+### Export snapshot
+
+```python
+# Export current state
+twin.export_snapshot("dadaab_snapshot.json")
+
+# Snapshot includes:
+# - Camp layout metadata
+# - Current heatmap state
+# - Water source status
+# - Response team positions
+```
+
+### Share with stakeholders
+
+```python
+# Generate shareable link
+share_url = twin.generate_share_link(
+    permissions=["view"],
+    expiration_days=7
+)
+
+print(f"Share URL: {share_url}")
+
+# Send to stakeholders
+from governance_kernel.notifications import send_notification
+
+send_notification(
+    recipients=["district_health_officer@health.gov"],
+    subject="Dadaab Outbreak Visualization",
+    body=f"View real-time outbreak visualization: {share_url}"
+)
+```
+
+## Performance optimization
+
+### Level of detail (LOD)
+
+```python
+# Configure LOD for large camps
+twin.configure_lod(
+    high_detail_radius=100,  # meters
+    medium_detail_radius=500,
+    low_detail_radius=1000
+)
+```
+
+### Streaming optimization
+
+```python
+# Enable streaming for remote viewing
+twin.enable_streaming(
+    quality="high",  # high, medium, low
+    max_bitrate=10000,  # kbps
+    adaptive=True
+)
+```
+
+## Compliance and sovereignty
+
+### Data sovereignty
+
+All digital twin data respects sovereignty constraints:
+
+```python
+from governance_kernel.vector_ledger import SovereignGuardrail
+
+guardrail = SovereignGuardrail()
+
+# Validate visualization data export
+guardrail.validate_action(
+    action_type='Data_Transfer',
+    payload={
+        'data_type': 'Geospatial_Health_Data',
+        'destination': 'Omniverse_Server',
+        'jurisdiction': 'KDPA_KE'
+    },
+    jurisdiction='KDPA_KE'
+)
+```
+
+### Audit trail
+
+All digital twin operations are logged:
+
+```python
+# View audit trail
+audit_log = twin.get_audit_trail(
+    start_date="2025-12-01",
+    end_date="2025-12-31"
+)
+
+for entry in audit_log:
+    print(f"{entry['timestamp']}: {entry['action']} by {entry['user']}")
+```
+
+## Use cases
+
+### 1. Outbreak response planning
+
+Visualize outbreak spread and plan response team deployment before physical deployment.
+
+### 2. Water infrastructure planning
+
+Identify optimal locations for new water points based on population density and contamination risk.
+
+### 3. Training and education
+
+Use digital twin for training health workers on outbreak response procedures.
+
+### 4. Stakeholder communication
+
+Provide visual evidence to donors and government officials for funding decisions.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Knowledge Mesh"
+    icon="graduation-cap"
+    href="/nvidia/knowledge-mesh"
+  >
+    Education system integration
+  </Card>
+  <Card
+    title="Modulus Agro-Voltaics"
+    icon="solar-panel"
+    href="/nvidia/modulus-agro-voltaics"
+  >
+    Physics-based crop modeling
+  </Card>
+  <Card
+    title="ESRI Geospatial"
+    icon="map"
+    href="/integrations/esri-geospatial"
+  >
+    GIS integration
+  </Card>
+  <Card
+    title="Deployment"
+    icon="rocket"
+    href="/deployment/overview"
+  >
+    Deploy to production
+  </Card>
+</CardGroup>
