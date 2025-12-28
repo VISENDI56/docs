@@ -1,0 +1,219 @@
+---
+title: NVIDIA Aerial 6G ghost-mesh
+description: Software-defined RAN for zero-latency AI inference in fragmented network environments
+---
+
+## Overview
+
+While Ghost-Mode (Phase 21) uses LoRa for low-bandwidth resilience, the Planetary Nexus requires **high-bandwidth data movement in Splinternets** — fragmented internet zones where national infrastructure is unreliable or compromised.
+
+NVIDIA AI Aerial enables iLuminara to orchestrate its own **Private 5G/6G Mesh** using CUDA-accelerated radio pipelines. This ensures zero-latency synchronization for MedGemma and BioNeMo even when the national grid is down.
+
+## The connectivity challenge
+
+### Traditional connectivity assumptions
+- Reliable national telecommunications infrastructure
+- Centralized cloud compute
+- Stable internet backbone
+- Predictable latency
+
+### 2026 reality: Splinternets
+- Fragmented network zones due to geopolitical tensions
+- Infrastructure failures from climate events
+- Deliberate internet shutdowns during conflicts
+- Variable latency making real-time AI impossible
+
+## Technical architecture
+
+### Software-defined RAN (Radio Access Network)
+
+NVIDIA Aerial (pyAerial) provides a fully programmable radio stack that runs on standard GPU infrastructure:
+
+```python infrastructure/aerial/ghost_mesh.py
+import pyaerial
+
+class GhostMesh:
+    """
+    NVIDIA AI Aerial software-defined RAN for autonomous mesh networking.
+    Enables zero-latency AI inference in Splinternet environments.
+    """
+    def initialize_private_5g(self, coverage_area):
+        # CUDA-accelerated radio pipeline
+        ran = pyaerial.RadioAccessNetwork(
+            frequency_band="n77",  # 3.3-4.2 GHz
+            bandwidth="100MHz",
+            coverage_radius=coverage_area
+        )
+        
+        # AI-optimized QoS for medical inference
+        ran.configure_qos(
+            latency_target="1ms",
+            reliability="99.999%",
+            priority_traffic=["medgemma", "bionemo"]
+        )
+        
+        return ran
+```
+
+### CUDA-accelerated radio processing
+
+Traditional RAN requires specialized hardware (baseband units, radio units). NVIDIA Aerial runs the entire radio stack on GPUs:
+
+| Function | Traditional | NVIDIA Aerial |
+|----------|-------------|---------------|
+| Baseband processing | Dedicated ASIC | CUDA kernels |
+| Beamforming | Analog hardware | Digital signal processing |
+| Scheduling | Fixed algorithms | AI-optimized dynamic |
+| Deployment time | Months | Hours |
+| Cost | $100k+ per site | $0 (software) |
+
+## Ghost-mesh architecture
+
+### Autonomous mesh formation
+
+iLuminara nodes automatically discover and connect to form resilient mesh networks:
+
+```python
+# Example mesh formation
+ghost_mesh = GhostMesh()
+
+# Each node becomes a mini base station
+node = ghost_mesh.create_mesh_node(
+    node_id="village_health_center_01",
+    gps_coords=(lat, lon),
+    backhaul="satellite"  # or "fiber", "microwave", "none"
+)
+
+# Nodes automatically form mesh topology
+mesh_topology = ghost_mesh.auto_discover_neighbors(radius_km=10)
+
+# AI-optimized routing for medical data
+ghost_mesh.configure_routing(
+    priority_flows=["emergency_diagnosis", "genomic_data", "telemedicine"],
+    latency_budget="5ms_end_to_end"
+)
+```
+
+### Zero-latency AI inference
+
+The Ghost-Mesh ensures AI models can run with predictable latency even in degraded network conditions:
+
+1. **Edge inference** — MedGemma runs locally on each node
+2. **Mesh synchronization** — Model updates propagate through mesh
+3. **Distributed compute** — BioNeMo workloads distributed across nodes
+4. **Failover** — Automatic rerouting when nodes fail
+
+## Integration with existing infrastructure
+
+### LoRa fallback (Phase 21)
+
+The Ghost-Mesh complements existing LoRa Ghost-Mode:
+
+| Scenario | Network | Use case |
+|----------|---------|----------|
+| Normal operations | 5G Ghost-Mesh | High-bandwidth AI inference |
+| Degraded network | 5G Ghost-Mesh | Mesh routing around failures |
+| Complete grid failure | LoRa Ghost-Mode | Low-bandwidth emergency comms |
+
+### Satellite backhaul
+
+Ghost-Mesh nodes can use satellite connectivity for backhaul:
+- **Starlink** — Low-latency LEO constellation
+- **OneWeb** — Global coverage
+- **Kuiper** — Amazon's LEO network
+- **GEO satellites** — Traditional backup
+
+## 6G capabilities
+
+NVIDIA Aerial supports emerging 6G features:
+
+### AI-native networking
+
+The radio stack itself uses AI for optimization:
+- **Predictive beamforming** — AI predicts user movement
+- **Intelligent spectrum sharing** — Dynamic frequency allocation
+- **Anomaly detection** — Identify interference or attacks
+- **Self-healing** — Automatic recovery from failures
+
+### Terahertz frequencies
+
+6G will use sub-THz frequencies (100-300 GHz) for ultra-high bandwidth:
+- **10 Gbps+ per user** — Real-time holographic telemedicine
+- **Sub-millisecond latency** — Haptic feedback for remote surgery
+- **Massive IoT** — 1M+ devices per km²
+
+### Integrated sensing and communication
+
+6G radios double as sensors:
+- **Environmental monitoring** — Detect air quality, temperature
+- **Presence detection** — Identify people in disaster zones
+- **Vital sign monitoring** — Non-contact health screening
+
+## Use cases
+
+### Disaster response
+
+Deploy Ghost-Mesh in disaster zones where infrastructure is destroyed:
+1. Helicopter drops mesh nodes
+2. Nodes auto-configure and form network
+3. Medical teams have instant AI-powered diagnostics
+4. Genomic data syncs to global BioNeMo
+
+### Conflict zones
+
+Maintain health services during internet shutdowns:
+- Private 5G mesh operates independently of national infrastructure
+- Encrypted communications prevent surveillance
+- Zero-latency AI enables remote expert consultation
+
+### Remote villages
+
+Provide urban-quality connectivity to underserved areas:
+- Single satellite backhaul serves entire mesh
+- Each village health center becomes a mesh node
+- AI inference runs locally with mesh-wide model updates
+
+### Pandemic response
+
+Rapid deployment of high-bandwidth health infrastructure:
+- Mobile mesh nodes deployed to outbreak zones
+- Real-time genomic sequencing and analysis
+- Zero-latency coordination between response teams
+
+## Implementation cost
+
+**$0** — NVIDIA provides open-source Aerial libraries.
+
+### Hardware requirements
+
+| Component | Purpose | Cost |
+|-----------|---------|------|
+| NVIDIA GPU | Radio processing + AI inference | Existing infrastructure |
+| Software-defined radio | RF frontend | $500-2000 per node |
+| Antenna array | Beamforming | $200-1000 per node |
+| Satellite modem (optional) | Backhaul | $500-2000 per node |
+
+Total per-node cost: **$1,200-5,000** (vs. $100k+ for traditional base station)
+
+## Regulatory considerations
+
+### Spectrum licensing
+
+Private 5G networks require spectrum licenses:
+- **CBRS (US)** — 3.5 GHz shared spectrum
+- **MulteFire** — Unlicensed LTE/5G
+- **Private spectrum** — Licensed for specific organizations
+- **Emergency spectrum** — Temporary allocation during disasters
+
+### Medical device compliance
+
+Ghost-Mesh integration with medical AI requires:
+- **IEC 60601-1-2** — EMC for medical electrical equipment
+- **FCC Part 15** — Radio frequency devices
+- **CE marking** — European conformity
+
+## Next steps
+
+- [IGX safety island](/infrastructure/igx-safety-island) — Hardware-level safety guarantees
+- [Tipping point forecasting](/governance/tipping-point-forecasting) — Real-time data for predictive models
+- [TCIM traditional knowledge](/governance/tcim-traditional-knowledge) — Cultural health heritage integration

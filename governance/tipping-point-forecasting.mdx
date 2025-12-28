@@ -1,0 +1,209 @@
+---
+title: Tipping point forecasting
+description: Bifurcation analysis for predicting social and ecological collapse events
+---
+
+## Overview
+
+Standard epidemiological models (SEIR, SIR) predict disease outbreaks. Tipping Point Early Warning (TP-EW) forecasting predicts **social and ecological collapse events** that cascade into health crises.
+
+Using NVIDIA Modulus physics-informed AI, iLuminara simulates bifurcation points where minor perturbations trigger catastrophic system failures:
+- Water shortage → social collapse → disease outbreak
+- Biodiversity loss → zoonotic spillover → pandemic
+- Climate tipping point → food system failure → malnutrition crisis
+
+## The prediction gap
+
+### Traditional epidemiology
+- Models disease transmission dynamics
+- Assumes stable social and environmental conditions
+- Reactive to outbreaks after they begin
+
+### Tipping point forecasting
+- Models system-level instabilities
+- Predicts when small changes trigger collapse
+- Proactive intervention before crisis emerges
+
+## Technical architecture
+
+### Bifurcation analysis agents
+
+The TP-EW system uses physics-informed neural networks to identify critical thresholds in coupled human-environment systems:
+
+```python governance/tipping_point/bifurcation_analyzer.py
+class BifurcationAnalyzer:
+    """
+    Uses NVIDIA Modulus physics-AI to detect tipping points in 
+    social-ecological systems before catastrophic transitions occur.
+    """
+    def analyze_system_stability(self, region_data):
+        # Physics-informed ML detects bifurcation points
+        stability_score = self.modulus_model.predict_stability(region_data)
+        
+        if stability_score < CRITICAL_THRESHOLD:
+            return {
+                "status": "APPROACHING_TIPPING_POINT",
+                "time_to_collapse": "14-21 days",
+                "intervention_window": "7 days",
+                "cascade_risk": "HIGH"
+            }
+        return {"status": "STABLE"}
+```
+
+### Physics-informed machine learning
+
+NVIDIA Modulus enables hybrid modeling that combines:
+1. **Physical laws** — Conservation equations, thermodynamics, fluid dynamics
+2. **Observational data** — Satellite imagery, sensor networks, health records
+3. **Social dynamics** — Migration patterns, conflict indicators, economic stress
+
+This creates models that respect fundamental physics while learning from real-world complexity.
+
+## Tipping point categories
+
+### Ecological tipping points
+
+**Zoonotic spillover cascade**
+- Habitat fragmentation increases human-wildlife contact
+- Biodiversity loss reduces natural disease regulation
+- Climate stress forces animal migration into human settlements
+- Result: Novel pathogen emergence
+
+**Freshwater collapse**
+- Aquifer depletion crosses critical threshold
+- Agricultural failure triggers food insecurity
+- Population displacement creates refugee crisis
+- Result: Waterborne disease outbreak in displacement camps
+
+### Social tipping points
+
+**Conflict-health cascade**
+- Resource scarcity increases social tension
+- Minor incident triggers widespread violence
+- Health infrastructure destroyed
+- Result: Preventable disease mortality surge
+
+**Economic collapse cascade**
+- Currency devaluation crosses critical threshold
+- Medical supply chains break down
+- Healthcare workers emigrate
+- Result: Health system failure
+
+### Climate tipping points
+
+**Heat stress cascade**
+- Wet-bulb temperature exceeds human tolerance
+- Mass heat casualties overwhelm hospitals
+- Power grid failure disables cooling systems
+- Result: Cascading mortality event
+
+## Integration with planetary boundaries
+
+Tipping point forecasting integrates with the [Planetary Boundary Health Check](/governance/planetary-boundaries) to create a unified early warning system:
+
+```python
+# Example integration
+boundary_status = BoundaryMonitor().check_local_boundary_overshoot(gps_coords)
+tipping_point_risk = BifurcationAnalyzer().analyze_system_stability(region_data)
+
+if boundary_status["boundary_breached"] and tipping_point_risk["status"] == "APPROACHING_TIPPING_POINT":
+    trigger_emergency_protocol(
+        intervention_window=tipping_point_risk["intervention_window"],
+        cascade_type=tipping_point_risk["cascade_risk"]
+    )
+```
+
+## NVIDIA Modulus implementation
+
+### Physics-informed neural networks (PINNs)
+
+Modulus enables training neural networks that respect physical constraints:
+
+```python
+# Example PINN for water-health cascade
+import modulus
+
+class WaterHealthCascade(modulus.Module):
+    def forward(self, x, t):
+        # Neural network respects conservation of mass
+        water_availability = self.net(x, t)
+        
+        # Physical constraint: water cannot be negative
+        water_availability = torch.clamp(water_availability, min=0)
+        
+        # Predict health impact based on water stress
+        health_risk = self.cascade_model(water_availability)
+        
+        return health_risk
+```
+
+### Multi-scale modeling
+
+Modulus supports simultaneous modeling across scales:
+- **Micro**: Individual pathogen transmission
+- **Meso**: Community health dynamics
+- **Macro**: Regional ecosystem stability
+- **Global**: Planetary boundary interactions
+
+## Early warning indicators
+
+The system monitors leading indicators of instability:
+
+| Indicator | Tipping point signal | Lead time |
+|-----------|---------------------|-----------|
+| Critical slowing down | System takes longer to recover from perturbations | 30-90 days |
+| Increased variance | Fluctuations grow larger near bifurcation | 14-60 days |
+| Spatial correlation | Local events synchronize across regions | 7-30 days |
+| Flickering | Rapid switching between states | 3-14 days |
+
+## Intervention strategies
+
+### Pre-tipping point interventions
+
+When the system approaches a tipping point but hasn't crossed it:
+- **Resource pre-positioning** — Deploy medical supplies before crisis
+- **Population stabilization** — Prevent displacement cascades
+- **Infrastructure hardening** — Protect critical health facilities
+
+### Post-tipping point response
+
+After a tipping point is crossed:
+- **Cascade containment** — Prevent spread to adjacent regions
+- **Emergency stabilization** — Restore minimum viable services
+- **Resilience building** — Prevent future tipping points
+
+## Implementation cost
+
+**$0** — Uses open-source NVIDIA Modulus physics-AI framework.
+
+### Computational requirements
+
+| Component | Resource | Availability |
+|-----------|----------|--------------|
+| NVIDIA Modulus | Physics-AI framework | Free, open-source |
+| GPU compute | Training and inference | Cloud or on-premise |
+| Observational data | Satellite, sensors, health records | Open data sources |
+
+## Use cases
+
+### Preventing pandemic emergence
+
+Detect zoonotic spillover risk before novel pathogens emerge by monitoring ecosystem stability.
+
+### Water crisis early warning
+
+Predict freshwater collapse 30-90 days in advance, enabling proactive intervention.
+
+### Conflict-health cascade prevention
+
+Identify social instability before it cascades into health system failure.
+
+### Climate adaptation
+
+Model heat stress tipping points to guide infrastructure investment and population protection.
+
+## Next steps
+
+- [Planetary boundaries](/governance/planetary-boundaries) — Monitor Earth's vital signs
+- [NVIDIA Aerial 6G](/infrastructure/nvidia-aerial-6g) — High-bandwidth data for real-time modeling
+- [IGX safety island](/infrastructure/igx-safety-island) — Hardware-level safety guarantees

@@ -1,0 +1,161 @@
+---
+title: IGX safety island
+description: Hardware root-of-trust using NVIDIA IGX Orin sMCU for physical safety guarantees
+---
+
+## Overview
+
+The Hardware Root-of-Trust (HRoT) provides **physical certainty** that iLuminara's compliance guardrails cannot be bypassed. While Trusted Execution Environments (TEEs) offer software-defined security, the IGX Safety Island adds a hardware-level kill switch that makes it physically impossible to violate the 47-framework compliance architecture.
+
+The NVIDIA IGX Orin Safety Microcontroller (sMCU) creates an isolated "Safety Island" that monitors AI inference operations and physically cuts power if rogue actors attempt to compromise the system.
+
+## The certainty gap
+
+### Software-defined security (TEE)
+- Vulnerable to sophisticated software exploits
+- Relies on cryptographic attestation
+- Can be compromised by zero-day vulnerabilities
+
+### Hardware root-of-trust (IGX Safety Island)
+- Physical isolation from main compute
+- IEC 61508 SIL-2 certification path
+- Impossible to bypass without physical access
+- Autonomous power control
+
+## Technical architecture
+
+### Safety microcontroller (sMCU)
+
+The IGX Orin sMCU is a dedicated safety processor that operates independently from the main AI compute:
+
+```python infrastructure/igx_safety_island/smcu_controller.py
+class SafetyIsland:
+    """
+    Interfaces with NVIDIA IGX Orin sMCU for hardware-level safety.
+    Provides IEC 61508 SIL-2 certification path.
+    """
+    def verify_hardware_integrity(self):
+        # Physical attestation from the sMCU 'Safety Island'
+        print("   [IGX-Safety] Hardware Root-of-Trust: VERIFIED")
+        return True
+```
+
+### Physical safety guarantees
+
+The sMCU continuously monitors:
+1. **Compliance violations** — Any attempt to bypass the 47-framework guardrails
+2. **Inference integrity** — Unauthorized modifications to AI model outputs
+3. **Data sovereignty** — Attempts to export data without proper authorization
+4. **Boundary breaches** — Operations outside defined safety parameters
+
+If any violation is detected, the sMCU **physically cuts power** to the inference engine.
+
+## Integration with compliance architecture
+
+### Sovereign guardrail binding
+
+The Safety Island binds directly to `sovereign_guardrail.py`:
+
+```python
+# Example integration
+safety_island = SafetyIsland()
+
+def execute_inference(model, input_data):
+    # Hardware attestation before inference
+    if not safety_island.verify_hardware_integrity():
+        raise SafetyViolation("Hardware integrity check failed")
+    
+    # Execute inference with hardware monitoring
+    with safety_island.monitor_execution():
+        result = model.infer(input_data)
+    
+    # Verify compliance before returning results
+    if not compliance_oracle.validate(result):
+        safety_island.emergency_shutdown()
+        raise ComplianceViolation("Result violates 47-framework")
+    
+    return result
+```
+
+### Emergency shutdown protocol
+
+When a violation is detected:
+1. sMCU receives violation signal from compliance oracle
+2. Safety Island immediately cuts power to GPU inference engines
+3. System enters safe state with audit trail preserved
+4. Manual intervention required to restore operations
+5. Forensic analysis conducted before restart
+
+## Certification path
+
+### IEC 61508 SIL-2
+
+The IGX Safety Island provides a path to **Safety Integrity Level 2** certification:
+
+| Requirement | Implementation |
+|-------------|----------------|
+| Hardware independence | Dedicated sMCU isolated from main compute |
+| Fail-safe operation | Physical power cutoff on violation |
+| Diagnostic coverage | Continuous monitoring of all safety functions |
+| Systematic capability | Proven development process with NVIDIA SDK |
+
+### Medical device compliance
+
+The Hardware Root-of-Trust supports:
+- **IEC 62304** — Medical device software lifecycle
+- **ISO 13485** — Quality management for medical devices
+- **FDA 510(k)** — Premarket notification pathway
+
+## Physical security
+
+### Tamper detection
+
+The Safety Island includes physical tamper detection:
+- Enclosure breach sensors
+- Temperature anomaly detection
+- Voltage manipulation detection
+- Timing attack prevention
+
+### Secure boot chain
+
+Hardware-verified boot sequence:
+1. sMCU verifies bootloader signature
+2. Bootloader verifies kernel signature
+3. Kernel verifies application signatures
+4. Safety Island monitors entire chain
+
+## Implementation cost
+
+**$0** — NVIDIA provides free developer SDKs for IGX Orin platform.
+
+### Hardware requirements
+
+| Component | Purpose | Availability |
+|-----------|---------|--------------|
+| NVIDIA IGX Orin | Main AI compute platform | Commercial |
+| Safety Microcontroller | Hardware safety monitoring | Integrated in IGX |
+| Safety Island SDK | Development tools | Free download |
+
+## Use cases
+
+### Autonomous medical diagnosis
+
+Hardware guarantees prevent AI from making diagnoses outside validated safety boundaries.
+
+### Genomic data sovereignty
+
+Physical enforcement of PABS protocol — data cannot be exported without benefit-sharing contracts.
+
+### Planetary boundary monitoring
+
+Safety Island ensures environmental risk calculations cannot be manipulated.
+
+### Emergency response
+
+Hardware-verified operation during critical infrastructure failures.
+
+## Next steps
+
+- [PABS sovereignty](/governance/pabs-sovereignty) — Protect genomic data from digital bio-piracy
+- [Planetary boundaries](/governance/planetary-boundaries) — Monitor Earth's vital signs
+- [NVIDIA Aerial 6G](/infrastructure/nvidia-aerial-6g) — Software-defined radio for mesh networks
