@@ -64,36 +64,40 @@ NVIDIA Omniverse Digital Twin provides real-time 3D visualization and simulation
 ## Quick start
 
 ```python
-from nvidia_integrations.omniverse_digital_twin import OmniverseDigitalTwin
+from nvidia_integrations.omniverse_digital_twin import UrbanDigitalTwin
 
-# Initialize digital twin
-twin = OmniverseDigitalTwin(
-    nucleus_server="omniverse://localhost",
-    camp_name="Dadaab"
+# Initialize Camp-to-City digital twin
+twin = UrbanDigitalTwin(
+    nucleus_server="omniverse://dadaab-planning",
+    settlement_name="Dadaab",
+    mode="camp_to_city"
 )
 
-# Create camp layout
-twin.create_camp_layout({
-    "tents": 5000,
-    "clinics": 3,
-    "water_points": 10,
-    "area_km2": 50
-})
+# Load current settlement state
+twin.load_settlement_usd("dadaab_2026_baseline.usd")
 
-# Simulate disease spread
-twin.simulate_disease_spread({
-    "disease": "cholera",
-    "initial_cases": 10,
-    "r_effective": 2.3,
-    "duration_days": 30
-})
+# Simulate new infrastructure
+impact = twin.simulate_infrastructure_change(
+    new_building_usd="market_complex_design.usd",
+    location={"lat": 0.0512, "lng": 40.3129}
+)
 
-# Visualize resource allocation
-twin.visualize_resource_allocation({
-    "ors_packets": 10000,
-    "antibiotics": 5000,
-    "health_workers": 50
-})
+print(f"Flood risk change: {impact['flood_risk_delta']}")
+print(f"Social access improvement: {impact['social_access_score']}")
+print(f"Airflow impact (disease spread): {impact['airflow_coefficient']}")
+
+# Test multiple scenarios
+scenarios = twin.run_scenario_batch([
+    {"type": "clinic", "capacity": 500},
+    {"type": "school", "students": 1000},
+    {"type": "water_station", "daily_liters": 50000}
+])
+
+# Select optimal configuration
+optimal = twin.select_optimal_scenario(
+    scenarios,
+    criteria=["flood_resilience", "accessibility", "cost"]
+)
 ```
 
 ## Integration with Golden Thread
