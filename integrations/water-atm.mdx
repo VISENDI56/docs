@@ -48,30 +48,38 @@ Water-ATM Sovereignty provides IoT-triggered smart contract water distribution t
 ## Quick start
 
 ```python
-from infrastructure.water_atm import WaterATMSovereignty
+from infrastructure.water_atm import WaterATM
 
-# Initialize ATM
-atm = WaterATMSovereignty(
+# Initialize smart water dispenser
+atm = WaterATM(
     atm_id="ATM-DADAAB-001",
-    location={"lat": 0.0512, "lng": 40.3129}
+    location={"lat": 0.0512, "lng": 40.3129},
+    blockchain_network="celo_mainnet"
 )
 
-# Authenticate user
-auth_result = atm.authenticate_user({
-    "biometric_type": "fingerprint",
-    "biometric_data": fingerprint_data
-})
+# Authenticate user with ZKP
+auth_result = atm.authenticate_zkp(
+    user_zkp_proof="ZKP_PROOF_HASH_001"
+)
 
-# Dispense water
-if auth_result.authenticated:
-    atm.dispense_water(
-        user_id=auth_result.user_id,
+# Dispense water and trigger smart contract
+if auth_result.verified:
+    transaction = atm.dispense_water(
+        user_zkp=auth_result.user_zkp,
         liters=20
     )
+    
+    print(f"Valve status: {transaction.valve_status}")
+    print(f"Smart contract TX: {transaction.transaction_hash}")
+    print(f"Bio-Credits paid: {transaction.credits_paid}")
+    print(f"Provider wallet: {transaction.provider_wallet}")
 
-# Monitor quality
+# Monitor water quality in real-time
 quality = atm.monitor_water_quality()
-print(f"pH: {quality.ph}, TDS: {quality.tds_ppm}")
+print(f"pH: {quality.ph}")
+print(f"TDS: {quality.tds_ppm} ppm")
+print(f"Chlorine: {quality.chlorine_ppm} ppm")
+print(f"Safe to drink: {quality.safe}")
 ```
 
 ## Next steps
