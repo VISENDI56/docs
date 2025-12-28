@@ -1,0 +1,542 @@
+---
+title: Fortress deployment
+description: Complete deployment guide for the Sovereign Health Fortress with Nuclear IP Stack
+---
+
+## Overview
+
+This guide walks through deploying the complete iLuminara-Core **Sovereign Health Fortress** with all security layers, governance enforcement, and the Nuclear IP Stack.
+
+<Card title="Deployment Philosophy" icon="fortress">
+  "The Fortress is not deployed. It is continuously attested."
+</Card>
+
+## Deployment architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    SECURITY AUDIT LAYER                      │
+│  CodeQL (SAST) | Gitleaks (Secrets) | Dependabot (Updates) │
+└─────────────────────────────────────────────────────────────┘
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   GOVERNANCE KERNEL                          │
+│  SovereignGuardrail | Crypto Shredder | Ethical Engine      │
+└─────────────────────────────────────────────────────────────┘
+                            ▼
+┌──────────────────┬──────────────────┬──────────────────────┐
+│   EDGE NODE      │   CLOUD ORACLE   │  HARDWARE ATTESTATION│
+│  (Offline-first) │  (GCP Services)  │  (TPM, BOM Ledger)   │
+└──────────────────┴──────────────────┴──────────────────────┘
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    NUCLEAR IP STACK                          │
+│  IP-02 | IP-03 | IP-04 | IP-05 | IP-06                      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Prerequisites
+
+<Steps>
+  <Step title="System requirements">
+    - Python 3.8+
+    - Docker 20.10+
+    - Git 2.30+
+    - 8GB RAM minimum
+    - 50GB disk space
+  </Step>
+  <Step title="Cloud accounts">
+    - Google Cloud Platform account (for cloud deployment)
+    - GitHub account (for CI/CD)
+    - Domain name (optional, for production)
+  </Step>
+  <Step title="Access permissions">
+    - GitHub workflow and write permissions
+    - GCP project owner or editor role
+    - Cloud KMS admin (for crypto operations)
+  </Step>
+</Steps>
+
+## Phase 1: Security audit layer
+
+### Step 1: Elevate GitHub permissions
+
+```bash
+# Authenticate with required scopes
+gh auth refresh -s workflow,repo,write:packages,admin:repo_hook
+
+# Verify authentication
+gh auth status
+```
+
+### Step 2: Deploy security workflows
+
+Copy the security workflows to your repository:
+
+```bash
+# Create workflows directory
+mkdir -p .github/workflows
+
+# Copy CodeQL workflow
+cp repository-files/.github/workflows/codeql.yml .github/workflows/
+
+# Copy Gitleaks workflow
+cp repository-files/.github/workflows/gitleaks.yml .github/workflows/
+
+# Copy Gitleaks config
+cp repository-files/.gitleaks.toml .gitleaks.toml
+
+# Copy Dependabot config
+cp repository-files/.github/dependabot.yml .github/dependabot.yml
+```
+
+### Step 3: Enable branch protection
+
+```bash
+# Enable branch protection on main
+gh api repos/:owner/:repo/branches/main/protection \
+  --method PUT \
+  --field required_status_checks[strict]=true \
+  --field required_status_checks[contexts][]=CodeQL \
+  --field required_status_checks[contexts][]=Gitleaks \
+  --field enforce_admins=true \
+  --field required_pull_request_reviews[required_approving_review_count]=1
+```
+
+### Step 4: Verify security layer
+
+```bash
+# Commit and push workflows
+git add .github/
+git commit -m \"feat: deploy security audit layer (CodeQL, Gitleaks, Dependabot)\"
+git push
+
+# Check workflow status
+gh workflow list
+gh run list --workflow=codeql.yml
+gh run list --workflow=gitleaks.yml
+```
+
+## Phase 2: Governance kernel
+
+### Step 1: Deploy Crypto Shredder (IP-02)
+
+```bash
+# Copy Crypto Shredder implementation
+cp repository-files/governance_kernel/crypto_shredder.py governance_kernel/
+
+# Test Crypto Shredder
+python3 -c \"
+from governance_kernel.crypto_shredder import CryptoShredder, RetentionPolicy, SovereigntyZone
+
+shredder = CryptoShredder(sovereignty_zone=SovereigntyZone.KENYA)
+encrypted, key_id = shredder.encrypt_with_ephemeral_key(
+    data=b'Test data',
+    retention_policy=RetentionPolicy.HOT
+)
+print(f'✅ Crypto Shredder operational - Key ID: {key_id}')
+\"
+```
+
+### Step 2: Configure SovereignGuardrail
+
+```bash
+# Create config directory
+mkdir -p config
+
+# Copy SovereignGuardrail configuration
+cp repository-files/config/sovereign_guardrail.yaml config/
+
+# Set environment variables
+export NODE_ID=\"JOR-47\"
+export JURISDICTION=\"KDPA_KE\"
+export ENABLE_TAMPER_PROOF_AUDIT=\"true\"
+
+# Add to .bashrc or .zshrc for persistence
+echo 'export NODE_ID=\"JOR-47\"' >> ~/.bashrc
+echo 'export JURISDICTION=\"KDPA_KE\"' >> ~/.bashrc
+echo 'export ENABLE_TAMPER_PROOF_AUDIT=\"true\"' >> ~/.bashrc
+```
+
+### Step 3: Initialize governance kernel
+
+```python
+from governance_kernel.vector_ledger import SovereignGuardrail
+from governance_kernel.crypto_shredder import CryptoShredder
+from governance_kernel.ethical_engine import EthicalEngine
+
+# Initialize components
+guardrail = SovereignGuardrail(enable_tamper_proof_audit=True)
+shredder = CryptoShredder(sovereignty_zone=SovereigntyZone.KENYA)
+ethical_engine = EthicalEngine()
+
+# Test sovereignty enforcement
+try:
+    guardrail.validate_action(
+        action_type='Data_Transfer',
+        payload={'data_type': 'PHI', 'destination': 'Foreign_Cloud'},
+        jurisdiction='GDPR_EU'
+    )
+except SovereigntyViolationError as e:
+    print(f\"✅ Sovereignty enforcement active: {e}\")
+```
+
+## Phase 3: Edge node deployment
+
+### Step 1: Install dependencies
+
+```bash
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Verify critical dependencies
+python3 -c \"
+import cryptography
+import flask
+import streamlit
+import pandas
+print('✅ All dependencies installed')
+\"
+```
+
+### Step 2: Deploy FRENASA Engine
+
+```bash
+# Test voice processing
+python3 edge_node/frenasa_engine/voice_processor.py
+
+# Generate test audio
+python3 generate_test_audio.py
+
+# Process test audio
+curl -X POST http://localhost:8080/process-voice \
+  -H \"Content-Type: audio/wav\" \
+  --data-binary @swahili-symptom.wav
+```
+
+### Step 3: Deploy AI agents
+
+```bash
+# Test offline agent
+python3 -c \"
+from edge_node.ai_agents import OfflineAgent, AgentCapability
+
+agent = OfflineAgent(
+    name='Test Agent',
+    capabilities=[AgentCapability.OFFLINE_OPERATION]
+)
+print(f'✅ AI Agent operational: {agent.name}')
+\"
+```
+
+## Phase 4: Cloud oracle deployment
+
+### Step 1: Configure GCP
+
+```bash
+# Set GCP project
+export GOOGLE_CLOUD_PROJECT=\"your-project-id\"
+export GCP_REGION=\"us-central1\"
+
+# Authenticate
+gcloud auth login
+gcloud config set project $GOOGLE_CLOUD_PROJECT
+
+# Enable required APIs
+gcloud services enable \
+  run.googleapis.com \
+  bigquery.googleapis.com \
+  spanner.googleapis.com \
+  aiplatform.googleapis.com \
+  cloudkms.googleapis.com
+```
+
+### Step 2: Deploy to Cloud Run
+
+```bash
+# Make deployment script executable
+chmod +x deploy_gcp_prototype.sh
+
+# Execute deployment
+./deploy_gcp_prototype.sh
+```
+
+This script will:
+1. Deploy FRENASA AI Engine to Cloud Run
+2. Set up HSTPU Forecaster on Vertex AI
+3. Create HSML Ledger using Cloud Spanner
+4. Generate demo outbreak data in BigQuery
+5. Launch dashboard on Cloud Run
+
+### Step 3: Verify cloud deployment
+
+```bash
+# Check Cloud Run services
+gcloud run services list
+
+# Test API endpoint
+CLOUD_RUN_URL=$(gcloud run services describe iluminara-api --format='value(status.url)')
+curl $CLOUD_RUN_URL/health
+```
+
+## Phase 5: Nuclear IP Stack activation
+
+### IP-02: Crypto Shredder ✅
+
+Already deployed in Phase 2. Verify:
+
+```bash
+python3 -c \"
+from governance_kernel.crypto_shredder import CryptoShredder
+shredder = CryptoShredder()
+print('✅ IP-02 Crypto Shredder: ACTIVE')
+\"
+```
+
+### IP-03: Acorn Protocol ⚠️
+
+Requires hardware attestation (TPM). For development:
+
+```bash
+echo \"⚠️  IP-03 Acorn Protocol: REQUIRES HARDWARE\"
+echo \"   Deploy to NVIDIA Jetson Orin or TPM-enabled device\"
+```
+
+### IP-04: Silent Flux ⚠️
+
+Requires anxiety monitoring integration:
+
+```bash
+echo \"⚠️  IP-04 Silent Flux: REQUIRES INTEGRATION\"
+echo \"   Integrate with operator monitoring system\"
+```
+
+### IP-05: Golden Thread ✅
+
+Already deployed with Edge Node. Verify:
+
+```bash
+python3 -c \"
+from edge_node.sync_protocol.golden_thread import GoldenThread
+gt = GoldenThread()
+print('✅ IP-05 Golden Thread: ACTIVE')
+\"
+```
+
+### IP-06: 5DM Bridge ⚠️
+
+Requires mobile network integration:
+
+```bash
+echo \"⚠️  IP-06 5DM Bridge: REQUIRES MOBILE NETWORK\"
+echo \"   Contact mobile operators for API integration\"
+```
+
+## Phase 6: Validation
+
+### Run fortress validation
+
+```bash
+# Make validation script executable
+chmod +x scripts/validate_fortress.sh
+
+# Run validation
+./scripts/validate_fortress.sh
+```
+
+Expected output:
+
+```
+╔════════════════════════════════════════════════════════════╗
+║     iLuminara-Core Sovereign Health Fortress Validator     ║
+╚════════════════════════════════════════════════════════════╝
+
+🛡️  FORTRESS STATUS: OPERATIONAL
+✓  All critical components validated
+✓  Security audit layer active
+✓  Governance kernel operational
+✓  Nuclear IP stack initialized
+
+The Sovereign Health Fortress is ready for deployment.
+```
+
+## Phase 7: Documentation ingestion
+
+### Generate complete documentation
+
+```bash
+# Make ingestion script executable
+chmod +x generate_full_docs.py
+
+# Run total repository ingestion
+python3 generate_full_docs.py
+```
+
+This will:
+- Document all 800+ files
+- Create reference/ directory structure
+- Update docs.json navigation
+- Generate compliance tags
+- Link Nuclear IP components
+
+### Commit documentation
+
+```bash
+git add reference/ docs.json
+git commit -m \"docs: total repository ingestion (800+ files)\"
+git push
+```
+
+## Phase 8: Production hardening
+
+### Enable monitoring
+
+```bash
+# Deploy Prometheus
+docker run -d \
+  --name prometheus \
+  -p 9090:9090 \
+  -v $(pwd)/config/prometheus.yml:/etc/prometheus/prometheus.yml \
+  prom/prometheus
+
+# Deploy Grafana
+docker run -d \
+  --name grafana \
+  -p 3000:3000 \
+  grafana/grafana
+```
+
+### Configure alerts
+
+```yaml
+# config/alerts.yml
+groups:
+  - name: sovereignty
+    rules:
+      - alert: SovereigntyViolation
+        expr: sovereignty_violations_total > 0
+        for: 1m
+        annotations:
+          summary: \"Sovereignty violation detected\"
+```
+
+### Enable backup
+
+```bash
+# Backup Crypto Shredder keys
+tar -czf keys-backup-$(date +%Y%m%d).tar.gz keys/
+
+# Backup audit logs
+tar -czf audit-backup-$(date +%Y%m%d).tar.gz logs/audit.jsonl
+
+# Upload to Cloud Storage
+gsutil cp keys-backup-*.tar.gz gs://iluminara-backups/
+gsutil cp audit-backup-*.tar.gz gs://iluminara-backups/
+```
+
+## Deployment checklist
+
+<Steps>
+  <Step title=\"Security audit layer\">
+    - [ ] CodeQL workflow deployed
+    - [ ] Gitleaks workflow deployed
+    - [ ] Dependabot configured
+    - [ ] Branch protection enabled
+  </Step>
+  <Step title=\"Governance kernel\">
+    - [ ] Crypto Shredder deployed
+    - [ ] SovereignGuardrail configured
+    - [ ] Ethical Engine initialized
+    - [ ] Audit trail enabled
+  </Step>
+  <Step title=\"Edge node\">
+    - [ ] Dependencies installed
+    - [ ] FRENASA Engine operational
+    - [ ] AI Agents deployed
+    - [ ] Golden Thread active
+  </Step>
+  <Step title=\"Cloud oracle\">
+    - [ ] GCP project configured
+    - [ ] Cloud Run services deployed
+    - [ ] BigQuery datasets created
+    - [ ] Vertex AI models trained
+  </Step>
+  <Step title=\"Nuclear IP Stack\">
+    - [ ] IP-02 Crypto Shredder active
+    - [ ] IP-05 Golden Thread active
+    - [ ] IP-03, IP-04, IP-06 planned
+  </Step>
+  <Step title=\"Documentation\">
+    - [ ] Total ingestion completed
+    - [ ] 800+ files documented
+    - [ ] Navigation updated
+    - [ ] Compliance tags added
+  </Step>
+  <Step title=\"Production\">
+    - [ ] Monitoring enabled
+    - [ ] Alerts configured
+    - [ ] Backups scheduled
+    - [ ] Fortress validated
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title=\"CodeQL workflow fails\">
+    **Solution:** Ensure Python 3.8+ is available in GitHub Actions:
+    ```yaml
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.8'
+    ```
+  </Accordion>
+  <Accordion title=\"Crypto Shredder key storage error\">
+    **Solution:** Create keys directory with proper permissions:
+    ```bash
+    mkdir -p keys
+    chmod 700 keys
+    ```
+  </Accordion>
+  <Accordion title=\"GCP deployment fails\">
+    **Solution:** Verify project permissions:
+    ```bash
+    gcloud projects get-iam-policy $GOOGLE_CLOUD_PROJECT
+    ```
+  </Accordion>
+  <Accordion title=\"Documentation ingestion incomplete\">
+    **Solution:** Check for encoding issues:
+    ```bash
+    find . -name \"*.py\" -exec file {} \\; | grep -v UTF-8
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title=\"Security stack\" icon=\"shield-halved\" href=\"/security/overview\">
+    Deep dive into security architecture
+  </Card>
+  <Card title=\"Monitoring\" icon=\"chart-line\" href=\"/deployment/monitoring\">
+    Set up monitoring and alerts
+  </Card>
+  <Card title=\"Scaling\" icon=\"arrows-maximize\" href=\"/deployment/scaling\">
+    Scale to production workloads
+  </Card>
+  <Card title=\"Compliance\" icon=\"scale-balanced\" href=\"/governance/overview\">
+    Verify compliance attestation
+  </Card>
+</CardGroup>
+
+## The Fortress is deployed
+
+Your Sovereign Health Fortress is now operational with:
+
+- ✅ **Security Audit Layer** - Continuous attestation
+- ✅ **Governance Kernel** - 14 global frameworks enforced
+- ✅ **Nuclear IP Stack** - IP-02 and IP-05 active
+- ✅ **Complete Documentation** - 800+ files ingested
+- ✅ **Production Ready** - Monitoring and backups enabled
+
+**Transform preventable suffering from statistical inevitability to historical anomaly.**
