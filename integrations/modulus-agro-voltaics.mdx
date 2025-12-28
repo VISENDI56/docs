@@ -48,24 +48,37 @@ NVIDIA Modulus Agro-Voltaics uses physics-informed neural networks (PINNs) to so
 ## Quick start
 
 ```python
-from sustainability.modulus_agro_voltaics import ModulusAgroVoltaics
+from sustainability.modulus_agro_voltaics import AgroVoltaicController
 
-# Initialize system
-agro = ModulusAgroVoltaics(
+# Initialize physics-informed controller
+controller = AgroVoltaicController(
     location={"lat": 0.0512, "lng": 40.3129},
-    climate_zone="semi-arid"
+    climate_zone="semi-arid",
+    solver="modulus_pinn"
 )
 
-# Optimize panel placement
-result = agro.optimize_panel_placement({
-    "field_dimensions": {"length_m": 100, "width_m": 50},
-    "crop_type": "maize",
-    "target_energy_kwh": 10000
-})
+# Optimize panel tilt for current conditions
+optimization = controller.optimize_tilt(
+    ambient_temp=35.2,
+    crop_type="spinach",
+    soil_moisture=0.15,
+    time_of_day="10:30"
+)
 
-print(f"Optimal configuration: {result.panel_layout}")
-print(f"Expected crop yield: {result.crop_yield_kg}")
-print(f"Water savings: {result.water_savings_liters}")
+print(f"Optimal tilt angle: {optimization.tilt_angle}°")
+print(f"Energy output: {optimization.energy_output}%")
+print(f"Crop health: {optimization.crop_health}")
+print(f"Micro-climate humidity: {optimization.humidity}%")
+
+# Run daily optimization cycle
+daily_schedule = controller.generate_daily_schedule(
+    crop_type="tomatoes",
+    energy_target_kwh=50,
+    crop_growth_stage="flowering"
+)
+
+for hour, config in daily_schedule.items():
+    print(f"{hour}:00 - Tilt: {config.tilt}°, Shade: {config.shade_percent}%")
 ```
 
 ## Next steps
