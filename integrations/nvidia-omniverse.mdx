@@ -1,0 +1,374 @@
+---
+title: NVIDIA Omniverse Digital Twin
+description: Physics-accurate 3D simulation of refugee camps and health facilities
+---
+
+## Overview
+
+iLuminara integrates **NVIDIA Omniverse** to create physics-accurate digital twins of refugee camps, health facilities, and outbreak scenarios for training, planning, and crisis simulation.
+
+<Card
+  title="Technology Stack"
+  icon="cube"
+>
+  NVIDIA Omniverse • USD (Universal Scene Description) • PhysX • RTX Rendering
+</Card>
+
+## Use cases
+
+<CardGroup cols={2}>
+  <Card title="Camp layout optimization" icon="map">
+    Simulate optimal placement of health facilities, water points, and isolation units
+  </Card>
+  <Card title="Outbreak simulation" icon="virus">
+    Model disease transmission through camp populations with physics-based agent behavior
+  </Card>
+  <Card title="Emergency response training" icon="user-helmet-safety">
+    Train CHVs and medical staff in virtual environments before deployment
+  </Card>
+  <Card title="Resource allocation" icon="boxes-stacked">
+    Optimize supply chain logistics and medical resource distribution
+  </Card>
+</CardGroup>
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    NVIDIA OMNIVERSE                           │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │  USD Scene (Universal Scene Description)              │  │
+│  │  - Dadaab Refugee Camp (200,000 population)           │  │
+│  │  - Health facilities (clinics, isolation units)       │  │
+│  │  - Water points, sanitation facilities                │  │
+│  │  - Agent population (CHVs, patients, staff)           │  │
+│  └────────────────────────────────────────────────────────┘  │
+│                            ▼                                  │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │  PhysX Simulation Engine                              │  │
+│  │  - Agent pathfinding and movement                     │  │
+│  │  - Collision detection                                │  │
+│  │  - Fluid dynamics (water, sewage)                     │  │
+│  │  - Particle systems (disease transmission)            │  │
+│  └────────────────────────────────────────────────────────┘  │
+│                            ▼                                  │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │  RTX Rendering                                        │  │
+│  │  - Photorealistic visualization                       │  │
+│  │  - Real-time ray tracing                              │  │
+│  │  - VR/AR support                                      │  │
+│  └────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────┘
+                            ▼
+┌──────────────────────────────────────────────────────────────┐
+│                    iLuminara Integration                      │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │  Real-time Data Sync                                  │  │
+│  │  - CBS reports → Agent health status                  │  │
+│  │  - EMR records → Facility occupancy                   │  │
+│  │  - Golden Thread → Outbreak hotspots                  │  │
+│  └────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────┘
+```
+
+## Implementation
+
+### 1. Install NVIDIA Omniverse
+
+```bash
+# Download Omniverse Launcher
+wget https://install.launcher.omniverse.nvidia.com/installers/omniverse-launcher-linux.AppImage
+
+# Install Omniverse Kit
+./omniverse-launcher-linux.AppImage
+
+# Install required extensions
+omniverse-kit install omni.physx
+omniverse-kit install omni.usd
+omniverse-kit install omni.kit.viewport
+```
+
+### 2. Create USD scene
+
+```python
+from pxr import Usd, UsdGeom, Gf
+
+# Create new USD stage
+stage = Usd.Stage.CreateNew("dadaab_camp.usd")
+
+# Define camp boundaries (2km x 3km)
+camp_geom = UsdGeom.Mesh.Define(stage, "/World/DadaabCamp")
+camp_geom.CreatePointsAttr([
+    Gf.Vec3f(0, 0, 0),
+    Gf.Vec3f(2000, 0, 0),
+    Gf.Vec3f(2000, 0, 3000),
+    Gf.Vec3f(0, 0, 3000)
+])
+
+# Add health clinic
+clinic = UsdGeom.Cube.Define(stage, "/World/DadaabCamp/Clinic")
+clinic.AddTranslateOp().Set(Gf.Vec3d(1000, 0, 1500))
+clinic.AddScaleOp().Set(Gf.Vec3f(50, 10, 30))
+
+# Add water point
+water_point = UsdGeom.Sphere.Define(stage, "/World/DadaabCamp/WaterPoint")
+water_point.AddTranslateOp().Set(Gf.Vec3d(500, 0, 1000))
+water_point.AddScaleOp().Set(Gf.Vec3f(10, 10, 10))
+
+# Save stage
+stage.Save()
+```
+
+### 3. Integrate with iLuminara data
+
+```python
+from omni.isaac.core import World
+from edge_node.sync_protocol.golden_thread import GoldenThread
+import numpy as np
+
+# Initialize Omniverse world
+world = World(stage_units_in_meters=1.0)
+
+# Load iLuminara data
+gt = GoldenThread()
+outbreak_data = gt.get_outbreak_hotspots(location="Dadaab")
+
+# Create agent population
+for hotspot in outbreak_data:
+    # Spawn infected agents at hotspot location
+    agent_position = np.array([
+        hotspot['location']['lat'] * 1000,  # Convert to meters
+        0,
+        hotspot['location']['lng'] * 1000
+    ])
+    
+    # Create agent with disease status
+    agent = world.scene.add_agent(
+        name=f"agent_{hotspot['patient_id']}",
+        position=agent_position,
+        health_status=hotspot['diagnosis'],
+        infection_probability=hotspot['transmission_risk']
+    )
+
+# Run simulation
+world.reset()
+for i in range(1000):  # 1000 simulation steps
+    world.step(render=True)
+    
+    # Update agent health based on proximity
+    agents = world.scene.get_all_agents()
+    for agent in agents:
+        nearby_agents = world.scene.get_agents_within_radius(
+            agent.position, radius=2.0  # 2 meter social distance
+        )
+        
+        # Calculate infection risk
+        if agent.health_status == "healthy":
+            infection_risk = sum([
+                a.infection_probability for a in nearby_agents
+                if a.health_status == "infected"
+            ])
+            
+            if np.random.random() < infection_risk:
+                agent.health_status = "infected"
+                
+                # Report to iLuminara
+                gt.submit_simulation_event({
+                    "agent_id": agent.name,
+                    "event_type": "infection",
+                    "timestamp": world.current_time,
+                    "location": agent.position.tolist()
+                })
+```
+
+### 4. Outbreak visualization
+
+```python
+import omni.ui as ui
+from omni.kit.viewport.utility import get_active_viewport
+
+# Create heatmap overlay
+viewport = get_active_viewport()
+
+def render_outbreak_heatmap():
+    # Get outbreak data from iLuminara
+    hotspots = gt.get_outbreak_hotspots(location="Dadaab")
+    
+    # Render heatmap
+    for hotspot in hotspots:
+        intensity = hotspot['case_count'] / hotspot['population']
+        color = (1.0, 1.0 - intensity, 1.0 - intensity, 0.5)  # Red gradient
+        
+        viewport.draw_circle(
+            center=hotspot['location'],
+            radius=hotspot['radius'],
+            color=color
+        )
+
+# Update heatmap every second
+ui.Timer(1.0, render_outbreak_heatmap, repeat=True)
+```
+
+## Training scenarios
+
+### Cholera outbreak response
+
+```python
+from omni.isaac.core.tasks import BaseTask
+
+class CholeraOutbreakTask(BaseTask):
+    def __init__(self):
+        super().__init__(name="CholeraOutbreak")
+        self.outbreak_started = False
+        self.cases = 0
+        
+    def set_up_scene(self, scene):
+        # Load Dadaab camp scene
+        scene.add_default_ground_plane()
+        scene.load_usd("dadaab_camp.usd")
+        
+        # Spawn 200,000 agents
+        for i in range(200000):
+            agent = scene.add_agent(
+                name=f"resident_{i}",
+                position=self.random_camp_position(),
+                health_status="healthy"
+            )
+    
+    def pre_step(self, time_step_index, simulation_time):
+        # Start outbreak at t=100
+        if simulation_time > 100 and not self.outbreak_started:
+            self.start_outbreak()
+            self.outbreak_started = True
+    
+    def start_outbreak(self):
+        # Infect patient zero near water point
+        patient_zero = self.scene.get_agent("resident_12345")
+        patient_zero.health_status = "infected"
+        patient_zero.infection_probability = 0.8
+        
+        print("🦠 Cholera outbreak started - Patient Zero infected")
+    
+    def post_step(self, time_step_index, simulation_time):
+        # Count cases
+        self.cases = len([
+            a for a in self.scene.get_all_agents()
+            if a.health_status == "infected"
+        ])
+        
+        # Report to iLuminara
+        if self.cases > 0:
+            gt.submit_simulation_event({
+                "scenario": "cholera_outbreak",
+                "simulation_time": simulation_time,
+                "total_cases": self.cases,
+                "attack_rate": self.cases / 200000
+            })
+```
+
+## VR/AR integration
+
+```python
+from omni.kit.xr import XRSession
+
+# Enable VR mode
+xr_session = XRSession()
+xr_session.enable_vr()
+
+# CHV training scenario
+def chv_training_scenario():
+    # Spawn trainee in camp
+    trainee = world.scene.add_agent(
+        name="chv_trainee",
+        position=[1000, 0, 1500],
+        role="community_health_volunteer"
+    )
+    
+    # Present patient with symptoms
+    patient = world.scene.add_agent(
+        name="patient_001",
+        position=[1005, 0, 1500],
+        symptoms=["fever", "diarrhea", "vomiting"],
+        severity=8
+    )
+    
+    # Voice interaction
+    patient.speak("I have severe diarrhea and vomiting for 2 days")
+    
+    # Wait for trainee response
+    trainee_response = xr_session.get_voice_input()
+    
+    # Evaluate response
+    if "cholera" in trainee_response.lower():
+        print("✅ Correct diagnosis!")
+        trainee.score += 10
+    else:
+        print("❌ Incorrect - Review cholera symptoms")
+```
+
+## Performance optimization
+
+### LOD (Level of Detail) system
+
+```python
+from omni.kit.viewport.utility import get_active_viewport
+
+viewport = get_active_viewport()
+camera_position = viewport.get_camera_position()
+
+for agent in world.scene.get_all_agents():
+    distance = np.linalg.norm(agent.position - camera_position)
+    
+    if distance < 10:
+        agent.set_lod(level=3)  # High detail
+    elif distance < 50:
+        agent.set_lod(level=2)  # Medium detail
+    elif distance < 200:
+        agent.set_lod(level=1)  # Low detail
+    else:
+        agent.set_lod(level=0)  # Culled
+```
+
+### GPU acceleration
+
+```python
+import omni.physx as physx
+
+# Enable GPU acceleration
+physx.get_physx_interface().enable_gpu_dynamics(True)
+physx.get_physx_interface().set_gpu_max_rigid_contact_count(1024 * 1024)
+physx.get_physx_interface().set_gpu_max_rigid_patch_count(80 * 1024)
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Knowledge Mesh"
+    icon="graduation-cap"
+    href="/integrations/knowledge-mesh"
+  >
+    AI-powered education system
+  </Card>
+  <Card
+    title="NVIDIA Modulus"
+    icon="solar-panel"
+    href="/integrations/nvidia-modulus"
+  >
+    Physics-ML for agro-voltaics
+  </Card>
+  <Card
+    title="ESRI Geospatial"
+    icon="map"
+    href="/integrations/esri-geospatial"
+  >
+    ArcGIS integration
+  </Card>
+  <Card
+    title="Deployment"
+    icon="rocket"
+    href="/deployment/overview"
+  >
+    Deploy digital twin to production
+  </Card>
+</CardGroup>
