@@ -64,6 +64,364 @@ iLuminara integrates **Google Cloud Vertex AI** with **SHAP (SHapley Additive ex
 │  │     - Batch prediction                                │  │
 │  └──────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
+
+## Basic usage
+
+### Initialize explainer
+
+```python
+from cloud_oracle.vertex_ai_shap import VertexAIExplainer
+
+explainer = VertexAIExplainer(
+    project_id="iluminara-core",
+    location="us-central1",
+    high_risk_threshold=0.7,  # Confidence threshold for high-risk
+    enable_compliance=True     # Enable SovereignGuardrail validation
+)
+```
+
+### Make prediction with explanation
+
+```python
+result = explainer.predict_with_explanation(
+    endpoint_id="projects/123/locations/us-central1/endpoints/456",
+    instances=[{
+        "fever": 1,
+        "cough": 1,
+        "diarrhea": 0,
+        "vomiting": 0,
+        "age": 35,
+        "location_risk": 0.8
+    }],
+    feature_names=["fever", "cough", "diarrhea", "vomiting", "age", "location_risk"],
+    jurisdiction="EU_AI_ACT"
+)
+
+# Access results
+for r in result['results']:
+    print(f"Prediction: {r['prediction']}")
+    print(f"Confidence: {r['confidence_score']:.2%}")
+    
+    if r['is_high_risk']:
+        print(f"⚠️ HIGH-RISK INFERENCE")
+        print(f"Rationale: {r['explanation']['decision_rationale']}")
+        print(f"Top features: {r['explanation']['top_features']}")
+    
+    print(f"Compliance: {r['compliance_status']}")
+```
+
+## SHAP explanation methods
+
+### TreeExplainer
+
+For tree-based models (XGBoost, LightGBM, Random Forest):
+
+```python
+import shap
+
+# Fast and exact for tree models
+explainer = shap.TreeExplainer(model)
+shap_values = explainer.shap_values(X)
+```
+
+### KernelExplainer
+
+Model-agnostic explainer (works with any model):
+
+```python
+import shap
+
+# Slower but works with any model
+explainer = shap.KernelExplainer(model.predict, X_train)
+shap_values = explainer.shap_values(X_test)
+```
+
+### DeepExplainer
+
+For deep learning models (TensorFlow, PyTorch):
+
+```python
+import shap
+
+# Optimized for neural networks
+explainer = shap.DeepExplainer(model, X_train)
+shap_values = explainer.shap_values(X_test)
+```
+
+## Explanation output
+
+### Feature importance
+
+```json
+{
+  "feature_importance": {
+    "fever": 0.35,
+    "location_risk": 0.28,
+    "age": 0.15,
+    "cough": 0.12,
+    "diarrhea": 0.05,
+    "vomiting": 0.05
+  }
+}
+```
+
+### Top features
+
+```json
+{
+  "top_features": [
+    {
+      "feature": "fever",
+      "importance": 0.35,
+      "direction": "positive"
+    },
+    {
+      "feature": "location_risk",
+      "importance": 0.28,
+      "direction": "positive"
+    },
+    {
+      "feature": "age",
+      "importance": 0.15,
+      "direction": "negative"
+    }
+  ]
+}
+```
+
+### Decision rationale
+
+```
+fever=1 increases risk by 35%; location_risk=0.8 increases risk by 28%; age=35 decreases risk by 15%
+```
+
+## Compliance validation
+
+Every high-risk inference is automatically validated:
+
+```python
+from governance_kernel.vector_ledger import SovereignGuardrail
+
+guardrail = SovereignGuardrail()
+
+# Automatic validation for high-risk inferences
+guardrail.validate_action(
+    action_type='High_Risk_Inference',
+    payload={
+        'inference': prediction,
+        'explanation': shap_explanation,
+        'confidence_score': 0.95,
+        'evidence_chain': ['fever', 'location_risk', 'age'],
+        'human_oversight': True
+    },
+    jurisdiction='EU_AI_ACT'
+)
+```
+
+## Training explainable models
+
+### AutoML with explainability
+
+```python
+# Train explainable model
+model_id = explainer.train_explainable_model(
+    dataset_id="projects/123/locations/us-central1/datasets/456",
+    target_column="disease_risk",
+    feature_columns=["fever", "cough", "age", "location_risk"],
+    model_type="classification"
+)
+
+print(f"✅ Explainable model trained: {model_id}")
+```
+
+### Custom model with SHAP
+
+```python
+from google.cloud import aiplatform
+import shap
+
+# Train custom model
+model = train_custom_model(X_train, y_train)
+
+# Create SHAP explainer
+explainer = shap.TreeExplainer(model)
+
+# Deploy to Vertex AI
+endpoint = aiplatform.Endpoint.create(display_name="explainable_endpoint")
+model_vertex = aiplatform.Model.upload(
+    display_name="explainable_model",
+    artifact_uri="gs://bucket/model",
+    serving_container_image_uri="gcr.io/cloud-aiplatform/prediction/tf2-cpu.2-8:latest"
+)
+endpoint.deploy(model_vertex)
+```
+
+## Batch prediction with explanations
+
+Process large datasets with SHAP explanations:
+
+```python
+job_id = explainer.batch_predict_with_explanation(
+    endpoint_id="projects/123/locations/us-central1/endpoints/456",
+    bq_source_uri="bq://project.dataset.input_table",
+    bq_destination_uri="bq://project.dataset.output_table",
+    feature_names=["fever", "cough", "age", "location_risk"]
+)
+
+print(f"✅ Batch job created: {job_id}")
+```
+
+## Visualization
+
+### SHAP waterfall plot
+
+```python
+import shap
+import matplotlib.pyplot as plt
+
+# Generate SHAP values
+shap_values = explainer.shap_values(X)
+
+# Waterfall plot for single prediction
+shap.waterfall_plot(shap.Explanation(
+    values=shap_values[0],
+    base_values=explainer.expected_value,
+    data=X[0],
+    feature_names=feature_names
+))
+plt.show()
+```
+
+### SHAP summary plot
+
+```python
+# Summary plot for all predictions
+shap.summary_plot(shap_values, X, feature_names=feature_names)
+plt.show()
+```
+
+### SHAP force plot
+
+```python
+# Force plot for single prediction
+shap.force_plot(
+    explainer.expected_value,
+    shap_values[0],
+    X[0],
+    feature_names=feature_names
+)
+```
+
+## Performance considerations
+
+### Computation time
+
+| Method | Speed | Accuracy | Use Case |
+|--------|-------|----------|----------|
+| TreeExplainer | Fast | Exact | Tree models |
+| KernelExplainer | Slow | Approximate | Any model |
+| DeepExplainer | Medium | Approximate | Neural networks |
+
+### Optimization tips
+
+1. **Use TreeExplainer for tree models** - Exact and fast
+2. **Cache explainers** - Reuse for multiple predictions
+3. **Batch processing** - Process multiple instances together
+4. **Sample background data** - Use subset for KernelExplainer
+
+```python
+# Cache explainer
+explainer = shap.TreeExplainer(model)
+
+# Batch processing
+shap_values = explainer.shap_values(X_batch)
+
+# Sample background data
+background = shap.sample(X_train, 100)
+explainer = shap.KernelExplainer(model.predict, background)
+```
+
+## Integration with dashboard
+
+Display explanations in the iLuminara dashboard:
+
+```python
+import streamlit as st
+import shap
+
+# Streamlit SHAP visualization
+st.title("AI Explanation Dashboard")
+
+# Generate explanation
+shap_values = explainer.shap_values(X)
+
+# Display waterfall plot
+st.pyplot(shap.waterfall_plot(shap.Explanation(
+    values=shap_values[0],
+    base_values=explainer.expected_value,
+    data=X[0],
+    feature_names=feature_names
+)))
+
+# Display feature importance
+st.bar_chart(feature_importance)
+
+# Display decision rationale
+st.write(f"**Decision Rationale:** {rationale}")
+```
+
+## Compliance reporting
+
+Generate compliance reports for audits:
+
+```python
+def generate_compliance_report(results):
+    """Generate compliance report for high-risk inferences"""
+    
+    report = {
+        'total_inferences': len(results),
+        'high_risk_inferences': sum(1 for r in results if r['is_high_risk']),
+        'explained_inferences': sum(1 for r in results if r['explanation']),
+        'compliance_rate': sum(1 for r in results if r['compliance_status'] == 'APPROVED') / len(results),
+        'frameworks': ['EU_AI_ACT', 'GDPR_ART_22', 'NIST_AI_RMF'],
+        'timestamp': datetime.utcnow().isoformat()
+    }
+    
+    return report
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="AI agents"
+    icon="brain-circuit"
+    href="/ai-agents/overview"
+  >
+    Deploy autonomous surveillance agents
+  </Card>
+  <Card
+    title="Governance"
+    icon="shield-check"
+    href="/governance/overview"
+  >
+    Configure compliance enforcement
+  </Card>
+  <Card
+    title="Deploy to GCP"
+    icon="cloud"
+    href="/deployment/gcp"
+  >
+    Production deployment guide
+  </Card>
+  <Card
+    title="47 frameworks"
+    icon="globe"
+    href="/governance/47-frameworks"
+  >
+    Complete compliance matrix
+  </Card>
+</CardGroup>
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                    SHAP EXPLAINER                            │
