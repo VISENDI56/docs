@@ -1,11 +1,11 @@
 ---
 title: Vertex AI + SHAP integration
-description: Right to Explanation for high-risk clinical AI inferences
+description: Right to Explanation for high-risk clinical AI decisions
 ---
 
 ## Overview
 
-Every high-risk clinical inference (confidence > 0.7) automatically triggers SHAP analysis to comply with EU AI Act §6 and GDPR Art. 22.
+Every high-risk clinical inference in iLuminara requires explainability through SHAP (SHapley Additive exPlanations) analysis, ensuring compliance with EU AI Act §6 and GDPR Art. 22.
 
 <Card
   title="Compliance"
@@ -20,193 +20,174 @@ Every high-risk clinical inference (confidence > 0.7) automatically triggers SHA
 ┌─────────────────────────────────────┐
 │      MOBILE HEALTH APP              │
 │  - Symptom collection               │
-│  - Patient data                     │
+│  - Location data                    │
 └─────────────────────────────────────┘
               │
               ▼
 ┌─────────────────────────────────────┐
-│      VERTEX AI ENDPOINT             │
-│  - Model prediction                 │
-│  - Confidence scoring               │
+│      VERTEX AI MODEL                │
+│  - Outbreak risk prediction         │
+│  - Confidence score                 │
 └─────────────────────────────────────┘
               │
-              ▼ (if confidence > 0.7)
+              ▼
 ┌─────────────────────────────────────┐
 │      SHAP EXPLAINER                 │
-│  - Feature contributions            │
+│  - Feature importance               │
 │  - Decision rationale               │
 │  - Evidence chain                   │
 └─────────────────────────────────────┘
               │
               ▼
 ┌─────────────────────────────────────┐
-│      CLINICAL REVIEW                │
-│  - Human-readable report            │
-│  - Compliance attestation           │
+│      SOVEREIGNGUARDRAIL             │
+│  - Compliance validation            │
+│  - Audit logging                    │
 └─────────────────────────────────────┘
-```
-
-## Basic usage
-
-```python
-from integrations.vertex_ai_shap import VertexAIExplainer
-
-# Initialize explainer
-explainer = VertexAIExplainer(
-    project_id="iluminara-health",
-    location="us-central1",
-    high_risk_threshold=0.7
-)
-
-# Example: Malaria diagnosis prediction
-instances = [
-    {
-        "fever": 1.0,
-        "chills": 1.0,
-        "headache": 0.8,
-        "nausea": 0.6,
-        "fatigue": 0.9,
-        "age": 35,
-        "location_risk": 0.7
-    }
-]
-
-feature_names = ["fever", "chills", "headache", "nausea", "fatigue", "age", "location_risk"]
-
-# Make prediction with automatic explanation
-result = explainer.predict_with_explanation(
-    endpoint_id="projects/123/locations/us-central1/endpoints/456",
-    instances=instances,
-    feature_names=feature_names
-)
-
-# Check compliance
-print(f"High-Risk: {result['high_risk']}")
-print(f"Compliance: {result['compliance_status']}")
-```
-
-## Response format
-
-```json
-{
-  "predictions": [0.92],
-  "confidence_scores": [0.92],
-  "high_risk": true,
-  "compliance_status": "COMPLIANT",
-  "explanations": [
-    {
-      "instance_id": 0,
-      "feature_contributions": {
-        "fever": 0.25,
-        "chills": 0.18,
-        "location_risk": 0.15,
-        "fatigue": 0.12,
-        "headache": 0.10,
-        "nausea": 0.08,
-        "age": 0.04
-      },
-      "base_value": 0.15,
-      "prediction": 0.92,
-      "top_features": [
-        ["fever", 0.25],
-        ["chills", 0.18],
-        ["location_risk", 0.15],
-        ["fatigue", 0.12],
-        ["headache", 0.10]
-      ]
-    }
-  ],
-  "timestamp": "2025-12-26T10:00:00.000Z"
-}
 ```
 
 ## High-risk threshold
 
-The system automatically triggers SHAP explanation when confidence exceeds the threshold:
+Any prediction with confidence ≥ 70% triggers mandatory SHAP explanation:
 
-| Threshold | Description | Use Case |
-|-----------|-------------|----------|
-| 0.5 | Low threshold | Research, non-critical decisions |
-| 0.7 | Standard (default) | Clinical decision support |
-| 0.9 | High threshold | Life-critical interventions |
+| Confidence | Risk Level | Explanation Required |
+|------------|------------|---------------------|
+| 0-40% | Low | Optional |
+| 40-70% | Medium | Recommended |
+| 70-100% | High | **Mandatory** |
 
-```python
-# Configure threshold
-explainer = VertexAIExplainer(
-    project_id="iluminara-health",
-    high_risk_threshold=0.9  # Only explain very high confidence
-)
-```
-
-## Clinical explanation report
-
-Generate human-readable reports for clinical review:
+## Basic usage
 
 ```python
-# Generate report
-report = explainer.generate_explanation_report(
-    result=result,
-    patient_id="PAT_12345"
+from integrations.vertex_ai_shap import OutbreakRiskPredictor
+
+# Initialize predictor
+predictor = OutbreakRiskPredictor(
+    project_id="iluminara-core",
+    model_endpoint="projects/123/locations/us-central1/endpoints/456",
+    location="us-central1"
 )
 
-print(report)
-```
-
-**Output:**
-
-```
-============================================================
-CLINICAL AI EXPLANATION REPORT
-============================================================
-
-Patient ID: PAT_12345
-Timestamp: 2025-12-26T10:00:00.000Z
-High-Risk Inference: YES
-Compliance Status: COMPLIANT
-
-PREDICTIONS:
-  Instance 0: 0.92 (confidence: 92.00%)
-
-FEATURE CONTRIBUTIONS (SHAP Analysis):
-
-  Instance 0:
-    Base Value: 0.1500
-    Prediction: 0.9200
-
-    Top Contributing Features:
-      ↑ fever: +0.2500
-      ↑ chills: +0.1800
-      ↑ location_risk: +0.1500
-      ↑ fatigue: +0.1200
-      ↑ headache: +0.1000
-
-============================================================
-COMPLIANCE ATTESTATION:
-  ✓ EU AI Act §6 (High-Risk AI Systems)
-  ✓ GDPR Art. 22 (Right to Explanation)
-  ✓ HIPAA §164.312(b) (Audit Controls)
-============================================================
-```
-
-## Compliance validation
-
-Validate that explanations meet regulatory requirements:
-
-```python
-# Validate explanation
-is_compliant, missing_fields = explainer.validate_explanation_compliance(
-    explanation=result['explanations'][0]
+# Predict outbreak risk with explanation
+result = predictor.predict_outbreak_risk(
+    case_count=150,
+    population=100000,
+    attack_rate=0.0015,
+    r_effective=2.5,
+    days_since_first_case=14,
+    location="Dadaab Refugee Camp"
 )
 
-if is_compliant:
-    print("✅ Explanation meets compliance requirements")
+# Check compliance
+if result["compliance_validation"]["compliant"]:
+    print("✅ Compliant with EU AI Act §6 and GDPR Art. 22")
 else:
-    print(f"❌ Missing fields: {missing_fields}")
+    print("❌ Non-compliant - Missing required explanations")
 ```
+
+## Response format
+
+### High-risk prediction (≥70% confidence)
+
+```json
+{
+  "prediction": 0.85,
+  "confidence_score": 0.85,
+  "is_high_risk": true,
+  "timestamp": "2025-12-28T20:00:00.000Z",
+  "model_endpoint": "projects/123/locations/us-central1/endpoints/456",
+  "compliance": {
+    "eu_ai_act": "§6 (High-Risk AI)",
+    "gdpr": "Art. 22 (Right to Explanation)"
+  },
+  "shap_values": {
+    "values": [[0.15, 0.08, 0.42, 0.12, 0.08]],
+    "base_value": 0.5,
+    "feature_names": [
+      "case_count",
+      "population",
+      "attack_rate",
+      "r_effective",
+      "days_since_first_case"
+    ],
+    "method": "SHAP (SHapley Additive exPlanations)"
+  },
+  "feature_importance": [
+    {
+      "feature": "attack_rate",
+      "importance": 0.42,
+      "contribution": "positive"
+    },
+    {
+      "feature": "case_count",
+      "importance": 0.15,
+      "contribution": "positive"
+    },
+    {
+      "feature": "r_effective",
+      "importance": 0.12,
+      "contribution": "positive"
+    }
+  ],
+  "decision_rationale": "Prediction: 85.00% confidence. Key factors: attack_rate increases risk, case_count increases risk, r_effective increases risk",
+  "location": "Dadaab Refugee Camp",
+  "compliance_validation": {
+    "compliant": true,
+    "requirements_met": {
+      "confidence_score": true,
+      "evidence_chain": true,
+      "feature_contributions": true,
+      "decision_rationale": true
+    },
+    "frameworks": {
+      "EU_AI_ACT": "§6 compliant",
+      "GDPR": "Art. 22 compliant"
+    }
+  }
+}
+```
+
+## Explanation requirements
+
+For high-risk predictions, the system must provide:
+
+<Steps>
+  <Step title="Confidence score">
+    Numerical confidence value (0.0 to 1.0)
+  </Step>
+  <Step title="Evidence chain">
+    Ranked list of contributing features
+  </Step>
+  <Step title="Feature contributions">
+    SHAP values showing positive/negative impact
+  </Step>
+  <Step title="Decision rationale">
+    Human-readable explanation of the decision
+  </Step>
+</Steps>
+
+## SHAP methods
+
+iLuminara supports multiple SHAP explainer types:
+
+<AccordionGroup>
+  <Accordion title="TreeExplainer">
+    For tree-based models (XGBoost, Random Forest). Fast and exact.
+  </Accordion>
+  <Accordion title="KernelExplainer">
+    Model-agnostic explainer. Works with any model but slower.
+  </Accordion>
+  <Accordion title="DeepExplainer">
+    For deep learning models (TensorFlow, PyTorch). Optimized for neural networks.
+  </Accordion>
+  <Accordion title="LinearExplainer">
+    For linear models. Extremely fast, exact explanations.
+  </Accordion>
+</AccordionGroup>
 
 ## Integration with SovereignGuardrail
 
-All predictions are validated against sovereignty constraints:
+All high-risk inferences are validated against compliance requirements:
 
 ```python
 from governance_kernel.vector_ledger import SovereignGuardrail
@@ -217,87 +198,130 @@ guardrail = SovereignGuardrail()
 guardrail.validate_action(
     action_type='High_Risk_Inference',
     payload={
-        'explanation': result['explanations'][0],
-        'confidence_score': result['confidence_scores'][0],
-        'evidence_chain': result['explanations'][0]['top_features'],
-        'consent_token': 'VALID_TOKEN',
-        'consent_scope': 'diagnosis'
+        'actor': 'ml_system',
+        'resource': 'outbreak_prediction',
+        'explanation': result['shap_values'],
+        'confidence_score': result['confidence_score'],
+        'evidence_chain': result['feature_importance'],
+        'consent_token': 'valid_token',
+        'consent_scope': 'public_health_surveillance'
     },
     jurisdiction='EU_AI_ACT'
 )
 ```
 
-## Audit trail
+## Deployment to Vertex AI
 
-All high-risk inferences are automatically logged:
+### 1. Train model with explainability
 
 ```python
-# View audit log
-for entry in explainer.audit_log:
-    print(f"{entry['timestamp']}: {entry['compliance_status']}")
+from google.cloud import aiplatform
+
+# Initialize Vertex AI
+aiplatform.init(project="iluminara-core", location="us-central1")
+
+# Create training job with explainability
+job = aiplatform.AutoMLTabularTrainingJob(
+    display_name="outbreak-risk-model",
+    optimization_prediction_type="classification",
+    optimization_objective="maximize-au-prc"
+)
+
+# Train with explainability enabled
+model = job.run(
+    dataset=dataset,
+    target_column="outbreak_risk",
+    training_fraction_split=0.8,
+    validation_fraction_split=0.1,
+    test_fraction_split=0.1,
+    model_display_name="outbreak-risk-v1",
+    disable_early_stopping=False,
+    export_evaluated_data_items=True,
+    # Enable explainability
+    model_type="CLOUD",
+)
 ```
 
-**Audit log format:**
+### 2. Deploy model endpoint
 
-```json
-{
-  "timestamp": "2025-12-26T10:00:00.000Z",
-  "endpoint_id": "projects/123/locations/us-central1/endpoints/456",
-  "confidence": 0.92,
-  "high_risk": true,
-  "compliance_status": "COMPLIANT",
-  "framework": "EU_AI_ACT_6"
-}
-```
-
-## Deployment
-
-### Install dependencies
-
-```bash
-pip install shap google-cloud-aiplatform numpy
-```
-
-### Configure Vertex AI
-
-```bash
-# Set project
-export GOOGLE_CLOUD_PROJECT=iluminara-health
-
-# Authenticate
-gcloud auth application-default login
-
-# Enable Vertex AI API
-gcloud services enable aiplatform.googleapis.com
-```
-
-### Deploy model to Vertex AI
-
-```bash
-# Upload model
-gcloud ai models upload \
-  --region=us-central1 \
-  --display-name=malaria-classifier \
-  --artifact-uri=gs://iluminara-models/malaria-v1
-
-# Create endpoint
-gcloud ai endpoints create \
-  --region=us-central1 \
-  --display-name=malaria-endpoint
-
+```python
 # Deploy model to endpoint
-gcloud ai endpoints deploy-model ENDPOINT_ID \
-  --region=us-central1 \
-  --model=MODEL_ID \
-  --display-name=malaria-deployment
+endpoint = model.deploy(
+    machine_type="n1-standard-4",
+    min_replica_count=1,
+    max_replica_count=10,
+    accelerator_type=None,
+    accelerator_count=0,
+    traffic_split={"0": 100},
+    deployed_model_display_name="outbreak-risk-v1",
+    explanation_metadata=aiplatform.explain.ExplanationMetadata(
+        inputs={
+            "case_count": {"input_tensor_name": "case_count"},
+            "population": {"input_tensor_name": "population"},
+            "attack_rate": {"input_tensor_name": "attack_rate"},
+            "r_effective": {"input_tensor_name": "r_effective"},
+            "days_since_first_case": {"input_tensor_name": "days_since_first_case"}
+        },
+        outputs={"outbreak_risk": {"output_tensor_name": "outbreak_risk"}}
+    ),
+    explanation_parameters=aiplatform.explain.ExplanationParameters(
+        {"sampled_shapley_attribution": {"path_count": 10}}
+    )
+)
+
+print(f"✅ Model deployed to endpoint: {endpoint.resource_name}")
+```
+
+### 3. Configure explainer
+
+```python
+from integrations.vertex_ai_shap import VertexAIExplainer
+
+explainer = VertexAIExplainer(
+    project_id="iluminara-core",
+    location="us-central1",
+    model_endpoint=endpoint.resource_name,
+    high_risk_threshold=0.7
+)
+```
+
+## Testing
+
+```python
+# Test prediction with explanation
+instances = [{
+    "case_count": 150,
+    "population": 100000,
+    "attack_rate": 0.0015,
+    "r_effective": 2.5,
+    "days_since_first_case": 14
+}]
+
+feature_names = [
+    "case_count",
+    "population",
+    "attack_rate",
+    "r_effective",
+    "days_since_first_case"
+]
+
+explanation = explainer.predict_with_explanation(
+    instances=instances,
+    feature_names=feature_names,
+    model_type="tabular"
+)
+
+# Validate compliance
+compliance = explainer.validate_compliance(explanation)
+assert compliance["compliant"], "Explanation must be compliant"
 ```
 
 ## Performance considerations
 
-- **SHAP calculation**: ~2-5 seconds per instance
-- **Background data**: Use 100-500 samples for KernelExplainer
-- **Caching**: Cache SHAP explainer for repeated predictions
-- **Batch processing**: Process multiple instances together
+- **SHAP calculation time**: 100-500ms per prediction
+- **Model inference time**: 50-100ms
+- **Total latency**: 150-600ms (acceptable for non-real-time use cases)
+- **Caching**: Cache SHAP values for identical inputs
 
 ## Next steps
 
@@ -307,27 +331,27 @@ gcloud ai endpoints deploy-model ENDPOINT_ID \
     icon="mobile"
     href="/integrations/bio-interface"
   >
-    Integrate with mobile health apps
+    Integrate mobile health apps
   </Card>
   <Card
-    title="Governance kernel"
+    title="SovereignGuardrail"
     icon="shield-check"
     href="/governance/overview"
   >
-    Configure compliance enforcement
+    Configure compliance validation
   </Card>
   <Card
     title="Golden Thread"
     icon="link"
     href="/architecture/golden-thread"
   >
-    Fuse CBS and EMR data streams
+    Fuse multi-source data
   </Card>
   <Card
     title="Deployment"
     icon="rocket"
     href="/deployment/gcp"
   >
-    Deploy to Google Cloud Platform
+    Deploy to production
   </Card>
 </CardGroup>
