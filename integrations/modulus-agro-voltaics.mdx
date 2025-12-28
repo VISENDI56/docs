@@ -81,6 +81,41 @@ for hour, config in daily_schedule.items():
     print(f"{hour}:00 - Tilt: {config.tilt}°, Shade: {config.shade_percent}%")
 ```
 
+## Real-world scenario (Dadaab 2026)
+
+**Scenario:** A 5-hectare plot in Hagadera camp needs to produce both electricity for a health clinic and fresh vegetables for 2,000 residents.
+
+**Challenge:** Traditional solar farms produce energy but no food. Traditional farms produce food but require grid electricity for irrigation pumps. The settlement cannot afford both.
+
+**Solution:** Modulus Agro-Voltaics optimizes dual land use:
+
+1. **Physics modeling:** Modulus solves radiative transfer equations for Dadaab's latitude and climate
+2. **Panel design:** 3-meter-high solar panels with 40% ground coverage
+3. **Crop selection:** Spinach, tomatoes, and peppers (shade-tolerant, high-nutrition)
+4. **Dynamic control:** Panels tilt throughout the day to balance energy and crop needs
+5. **Water integration:** Reduced evaporation under panels cuts water usage by 30%
+
+**Result:** 
+- **Energy:** 150 kWh/day (powers clinic + cold storage)
+- **Food:** 8 tons of vegetables/year (feeds 2,000 people)
+- **Water savings:** 40,000 liters/month
+
+## Physics-informed optimization
+
+Modulus solves the radiative transfer equation to optimize panel tilt:
+
+```
+∂I(λ,Ω)/∂s = -σ_ext(λ)I(λ,Ω) + σ_sca(λ)∫P(Ω,Ω')I(λ,Ω')dΩ' + ε(λ)B(λ,T)
+```
+
+Where:
+- `I(λ,Ω)` = Radiance at wavelength λ in direction Ω
+- `σ_ext` = Extinction coefficient (panel shading)
+- `σ_sca` = Scattering coefficient (diffuse light)
+- `ε(λ)B(λ,T)` = Thermal emission from soil
+
+This ensures crops receive optimal photosynthetically active radiation (PAR) while maximizing panel efficiency.
+
 ## Next steps
 
 <CardGroup cols={2}>
@@ -89,5 +124,11 @@ for hour, config in daily_schedule.items():
   </Card>
   <Card title="Water-ATM" icon="droplet" href="/integrations/water-atm">
     Water distribution integration
+  </Card>
+  <Card title="Use case matrix" icon="table" href="/architecture/use-case-matrix">
+    Real-world applications
+  </Card>
+  <Card title="Omniverse" icon="cube" href="/integrations/nvidia-omniverse">
+    Urban planning integration
   </Card>
 </CardGroup>
