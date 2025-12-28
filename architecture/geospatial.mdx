@@ -1,0 +1,112 @@
+---
+title: ESRI Geospatial Layer
+description: The eyes—spatial intelligence for offline-first humanitarian operations
+---
+
+The ESRI Geospatial Layer provides spatial intelligence and real-time earth observation capabilities for disconnected environments.
+
+## GeoGhost (Offline Spatial Inference)
+
+### Deep Learning Packages (.dlpk)
+
+AI models (like YOLOv8 or Mask R-CNN) trained in ArcGIS Pro are packaged into a single file containing:
+- Model architecture
+- Trained weights
+- Pre-processing logic
+
+### ArcGIS Runtime SDK (Native)
+
+Runs directly on the edge device's metal (C++ core with Python bindings). Handles:
+- **Vector tile rendering** (.vtpk)
+- **Map package loading** (.mmpk)
+- No browser or web server required
+
+**Key Capability:** Full GIS functionality in completely disconnected environments.
+
+```python
+class GeoGhost:
+    """
+    Offline spatial inference for edge deployment.
+    """
+    def analyze_offline(self, location, dlpk_model):
+        # Load deep learning package
+        model = self.load_dlpk(dlpk_model)
+        
+        # Load offline map tiles
+        basemap = self.load_vtpk(location)
+        
+        # Run inference
+        features = model.detect(basemap)
+        
+        return features
+```
+
+## STAC Ingestion (Real-Time Earth Observation)
+
+### Cloud-Native Geospatial
+
+Instead of downloading huge TIF files, uses **HTTP Range Requests** to stream only the pixels needed for the specific area of interest (AOI).
+
+### Dynamic Tiling
+
+Generates map tiles on-the-fly from raw satellite data using **Dask** for parallel processing.
+
+**Architecture:**
+1. Query STAC catalog for relevant imagery
+2. Stream only required pixels via HTTP range requests
+3. Process in parallel using Dask
+4. Generate tiles dynamically
+5. Cache for offline use
+
+### Use Cases
+
+- **Flood monitoring:** Real-time water extent mapping
+- **Vegetation health:** NDVI analysis for food security
+- **Infrastructure damage:** Post-disaster assessment
+- **Population movement:** Settlement expansion tracking
+
+## Spatial Intelligence Pipeline
+
+```python
+class STACIngestion:
+    """
+    Real-time earth observation via STAC protocol.
+    """
+    def ingest_satellite_data(self, aoi, time_range):
+        # Query STAC catalog
+        items = self.stac_client.search(
+            bbox=aoi,
+            datetime=time_range,
+            collections=['sentinel-2']
+        )
+        
+        # Stream only required pixels
+        pixels = self.stream_pixels(items, aoi)
+        
+        # Parallel processing with Dask
+        tiles = self.dask_process(pixels)
+        
+        # Cache for offline use
+        self.cache_tiles(tiles)
+        
+        return tiles
+```
+
+## Integration with AI Layers
+
+### BioNeMo + Geospatial
+Track disease vectors (mosquito breeding sites) via satellite imagery and target interventions.
+
+### cuOpt + Geospatial
+Route optimization using real-time terrain and infrastructure data.
+
+### Modulus + Geospatial
+Flood prediction models using elevation data and weather patterns.
+
+## Key Differentiators
+
+- **Offline-first:** Full GIS capabilities without connectivity
+- **Cloud-native:** Efficient streaming of satellite data
+- **AI-ready:** Deep learning packages for edge inference
+- **Real-time:** Dynamic tile generation from live satellite feeds
+- **Humanitarian-focused:** Optimized for crisis response and refugee operations
