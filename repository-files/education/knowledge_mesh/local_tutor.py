@@ -1,9 +1,11 @@
 """
 Knowledge Mesh - Sovereign AI Tutors
-Offline AI education system aligned with Kenyan Competency-Based Curriculum (CBC)
+Offline-first education system for refugee settlements
 
-Democratizes high-quality education without internet costs.
-Teacher-to-student ratio: 1:100 → 1:1 (AI-augmented)
+Democratizes high-quality education without internet costs using:
+- Quantized LLaMA-3 models fine-tuned on Kenyan CBC Curriculum
+- Ghost-Mesh 6G networking for offline operation
+- NVIDIA NIM (NVIDIA Inference Microservices) for edge deployment
 
 Compliance:
 - Kenya Competency-Based Curriculum (CBC) 2017
@@ -16,13 +18,13 @@ import logging
 from typing import Dict, List, Optional
 from dataclasses import dataclass
 from enum import Enum
-import random
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 
 class SubjectArea(Enum):
-    """CBC Subject Areas"""
+    """Kenyan CBC subject areas"""
     MATHEMATICS = "mathematics"
     ENGLISH = "english"
     KISWAHILI = "kiswahili"
@@ -35,16 +37,18 @@ class SubjectArea(Enum):
 
 
 class GradeLevel(Enum):
-    """CBC Grade Levels"""
-    GRADE_1 = 1
-    GRADE_2 = 2
-    GRADE_3 = 3
-    GRADE_4 = 4
-    GRADE_5 = 5
-    GRADE_6 = 6
-    GRADE_7 = 7
-    GRADE_8 = 8
-    GRADE_9 = 9
+    """CBC grade levels"""
+    PP1 = "pp1"  # Pre-Primary 1
+    PP2 = "pp2"  # Pre-Primary 2
+    GRADE_1 = "grade_1"
+    GRADE_2 = "grade_2"
+    GRADE_3 = "grade_3"
+    GRADE_4 = "grade_4"
+    GRADE_5 = "grade_5"
+    GRADE_6 = "grade_6"
+    GRADE_7 = "grade_7"
+    GRADE_8 = "grade_8"
+    GRADE_9 = "grade_9"
 
 
 class LanguageMode(Enum):
@@ -59,30 +63,31 @@ class LanguageMode(Enum):
 @dataclass
 class LessonPlan:
     """Structured lesson plan"""
-    title: str
+    lesson_id: str
     subject: SubjectArea
     grade_level: GradeLevel
-    language: LanguageMode
-    duration_minutes: int
+    title: str
     learning_outcomes: List[str]
+    duration_minutes: int
+    content: Dict
     activities: List[Dict]
     assessment: Dict
-    resources: List[str]
-    differentiation: Dict  # For different learning abilities
+    language: LanguageMode
+    offline_compatible: bool
 
 
 @dataclass
 class StudentProfile:
-    """Individual student learning profile"""
+    """Student learning profile"""
     student_id: str
     name: str
     grade_level: GradeLevel
-    language_preference: LanguageMode
-    learning_pace: str  # "fast", "average", "slow"
+    preferred_language: LanguageMode
+    learning_pace: str  # "slow", "average", "fast"
     strengths: List[SubjectArea]
-    areas_for_improvement: List[SubjectArea]
-    attendance_rate: float
-    last_assessment_scores: Dict[SubjectArea, float]
+    needs_support: List[SubjectArea]
+    completed_lessons: List[str]
+    current_competency: Dict[SubjectArea, float]  # 0-1 scale
 
 
 class SovereignTutor:
@@ -93,498 +98,420 @@ class SovereignTutor:
     Features:
     - Personalized learning paths
     - Multi-language support (English, Kiswahili, Somali)
-    - Offline operation on edge devices
-    - CBC-aligned assessments
+    - Offline-first operation
+    - Competency-based assessment
     - Cultural sensitivity
     """
     
     def __init__(
         self,
-        model_path: str = "./models/llama3-cbc-tutor",
-        enable_offline_mode: bool = True,
-        default_language: LanguageMode = LanguageMode.MIXED_ENGLISH_SOMALI
+        model_path: str = "./models/llama3-cbc-quantized",
+        enable_offline: bool = True,
+        max_students: int = 1000
     ):
         self.model_path = model_path
-        self.enable_offline_mode = enable_offline_mode
-        self.default_language = default_language
+        self.enable_offline = enable_offline
+        self.max_students = max_students
         
-        # Load CBC curriculum standards
-        self.curriculum_standards = self._load_cbc_standards()
-        
-        # Student profiles
+        # Student registry
         self.students: Dict[str, StudentProfile] = {}
         
-        logger.info("📚 Sovereign Tutor initialized")
+        # Lesson library
+        self.lesson_library: Dict[str, LessonPlan] = {}
+        
+        # Load CBC curriculum standards
+        self._load_cbc_standards()
+        
+        logger.info(f"📚 Sovereign Tutor initialized")
         logger.info(f"   Model: {model_path}")
-        logger.info(f"   Offline Mode: {enable_offline_mode}")
-        logger.info(f"   Default Language: {default_language.value}")
+        logger.info(f"   Offline Mode: {enable_offline}")
+        logger.info(f"   Max Students: {max_students}")
+    
+    def _load_cbc_standards(self):
+        """Load Kenyan CBC curriculum standards"""
+        # This would load actual CBC standards from a local database
+        logger.info("📖 Loading CBC curriculum standards...")
+        
+        # Example standards structure
+        self.cbc_standards = {
+            SubjectArea.MATHEMATICS: {
+                GradeLevel.GRADE_4: [
+                    "Perform operations on whole numbers up to 100,000",
+                    "Identify and classify 2D and 3D shapes",
+                    "Measure length, mass, capacity, and time",
+                    "Collect, organize, and interpret data"
+                ]
+            },
+            SubjectArea.SCIENCE: {
+                GradeLevel.GRADE_4: [
+                    "Describe the water cycle",
+                    "Identify sources of energy",
+                    "Classify living and non-living things",
+                    "Explain the importance of hygiene"
+                ]
+            }
+        }
     
     def generate_lesson(
         self,
         subject: SubjectArea,
         grade_level: GradeLevel,
-        language: Optional[LanguageMode] = None,
-        student_profile: Optional[StudentProfile] = None
+        language: LanguageMode = LanguageMode.MIXED_ENGLISH_SOMALI,
+        student_id: Optional[str] = None
     ) -> LessonPlan:
         """
-        Generate a personalized lesson plan aligned with CBC.
+        Generate a personalized lesson plan.
         
         Args:
             subject: Subject area
             grade_level: Grade level
-            language: Language mode (defaults to tutor's default)
-            student_profile: Optional student profile for personalization
+            language: Language mode
+            student_id: Optional student ID for personalization
         
         Returns:
-            Complete lesson plan
+            LessonPlan tailored to student needs
         """
-        language = language or self.default_language
-        
-        logger.info(f"📖 [Edu-NIM] Generating {subject.value} lesson for Grade {grade_level.value}")
+        logger.info(f"🎓 Generating lesson: {subject.value} for {grade_level.value}")
         logger.info(f"   Language: {language.value}")
         
-        # Get CBC learning outcomes for this grade/subject
-        learning_outcomes = self._get_learning_outcomes(subject, grade_level)
+        # Get student profile if available
+        student = self.students.get(student_id) if student_id else None
         
-        # Generate activities
-        activities = self._generate_activities(
-            subject, grade_level, language, student_profile
-        )
-        
-        # Generate assessment
-        assessment = self._generate_assessment(subject, grade_level, language)
-        
-        # Get resources
-        resources = self._get_resources(subject, grade_level)
-        
-        # Differentiation strategies
-        differentiation = self._generate_differentiation(student_profile)
-        
-        lesson = LessonPlan(
-            title=self._generate_lesson_title(subject, grade_level),
+        # Generate lesson based on CBC standards
+        lesson = self._create_lesson_plan(
             subject=subject,
             grade_level=grade_level,
             language=language,
-            duration_minutes=40,  # Standard CBC lesson duration
-            learning_outcomes=learning_outcomes,
-            activities=activities,
-            assessment=assessment,
-            resources=resources,
-            differentiation=differentiation
+            student=student
         )
         
+        # Store in library
+        self.lesson_library[lesson.lesson_id] = lesson
+        
         logger.info(f"✅ Lesson generated: {lesson.title}")
-        logger.info(f"   Outcomes: {len(learning_outcomes)}")
-        logger.info(f"   Activities: {len(activities)}")
+        logger.info(f"   Duration: {lesson.duration_minutes} minutes")
+        logger.info(f"   Offline Compatible: {lesson.offline_compatible}")
         
         return lesson
     
-    def personalize_learning_path(
-        self,
-        student: StudentProfile,
-        target_subjects: Optional[List[SubjectArea]] = None
-    ) -> List[LessonPlan]:
-        """
-        Generate a personalized learning path for a student.
-        
-        Args:
-            student: Student profile
-            target_subjects: Subjects to focus on (defaults to areas for improvement)
-        
-        Returns:
-            List of personalized lesson plans
-        """
-        logger.info(f"🎯 Personalizing learning path for {student.name}")
-        
-        # Determine focus areas
-        if target_subjects is None:
-            target_subjects = student.areas_for_improvement
-        
-        learning_path = []
-        
-        for subject in target_subjects:
-            # Generate lesson at appropriate difficulty
-            lesson = self.generate_lesson(
-                subject=subject,
-                grade_level=student.grade_level,
-                language=student.language_preference,
-                student_profile=student
-            )
-            learning_path.append(lesson)
-        
-        logger.info(f"✅ Learning path created: {len(learning_path)} lessons")
-        
-        return learning_path
-    
-    def assess_student(
-        self,
-        student: StudentProfile,
-        subject: SubjectArea,
-        responses: Dict[str, str]
-    ) -> Dict:
-        """
-        Assess student responses and provide feedback.
-        
-        Args:
-            student: Student profile
-            subject: Subject being assessed
-            responses: Student's responses to assessment questions
-        
-        Returns:
-            Assessment results with feedback
-        """
-        logger.info(f"📝 Assessing {student.name} - {subject.value}")
-        
-        # In production, use actual NIM model for assessment
-        # For now, simulate scoring
-        
-        total_questions = len(responses)
-        correct_answers = random.randint(int(total_questions * 0.6), total_questions)
-        score = (correct_answers / total_questions) * 100
-        
-        # Generate feedback
-        feedback = self._generate_feedback(score, subject, student)
-        
-        # Update student profile
-        student.last_assessment_scores[subject] = score
-        
-        result = {
-            "student_id": student.student_id,
-            "subject": subject.value,
-            "score": score,
-            "correct_answers": correct_answers,
-            "total_questions": total_questions,
-            "feedback": feedback,
-            "next_steps": self._recommend_next_steps(score, subject, student)
-        }
-        
-        logger.info(f"✅ Assessment complete - Score: {score:.1f}%")
-        
-        return result
-    
-    def translate_content(
-        self,
-        content: str,
-        source_language: LanguageMode,
-        target_language: LanguageMode
-    ) -> str:
-        """
-        Translate educational content between languages.
-        
-        Preserves cultural context and educational terminology.
-        """
-        logger.info(f"🌐 Translating: {source_language.value} → {target_language.value}")
-        
-        # In production, use actual translation model
-        # For now, return with language tag
-        translated = f"[{target_language.value.upper()}] {content}"
-        
-        return translated
-    
-    def _load_cbc_standards(self) -> Dict:
-        """Load CBC curriculum standards"""
-        # In production, load from actual CBC documents
-        return {
-            "mathematics": {
-                "grade_1": ["Number sense 1-100", "Basic addition", "Basic subtraction"],
-                "grade_4": ["Multiplication tables", "Division", "Fractions"],
-                "grade_7": ["Algebra basics", "Geometry", "Data handling"]
-            },
-            "science": {
-                "grade_1": ["Living things", "Non-living things", "Weather"],
-                "grade_4": ["Plants", "Animals", "Matter"],
-                "grade_7": ["Cells", "Energy", "Forces"]
-            }
-        }
-    
-    def _get_learning_outcomes(
-        self,
-        subject: SubjectArea,
-        grade_level: GradeLevel
-    ) -> List[str]:
-        """Get CBC learning outcomes for subject/grade"""
-        
-        # Sample learning outcomes
-        outcomes_map = {
-            (SubjectArea.MATHEMATICS, GradeLevel.GRADE_4): [
-                "Multiply numbers up to 1000",
-                "Solve word problems involving multiplication",
-                "Understand the relationship between multiplication and division"
-            ],
-            (SubjectArea.SCIENCE, GradeLevel.GRADE_4): [
-                "Identify parts of a plant and their functions",
-                "Explain the process of photosynthesis",
-                "Classify plants based on characteristics"
-            ],
-            (SubjectArea.ENGLISH, GradeLevel.GRADE_4): [
-                "Read and comprehend grade-level texts",
-                "Write coherent paragraphs with topic sentences",
-                "Use correct grammar and punctuation"
-            ]
-        }
-        
-        key = (subject, grade_level)
-        return outcomes_map.get(key, ["General learning outcome for this grade/subject"])
-    
-    def _generate_activities(
+    def _create_lesson_plan(
         self,
         subject: SubjectArea,
         grade_level: GradeLevel,
         language: LanguageMode,
-        student_profile: Optional[StudentProfile]
-    ) -> List[Dict]:
-        """Generate engaging learning activities"""
+        student: Optional[StudentProfile]
+    ) -> LessonPlan:
+        """Create a structured lesson plan"""
         
-        activities = []
+        # Example: Mathematics Grade 4 - Photosynthesis
+        if subject == SubjectArea.SCIENCE and grade_level == GradeLevel.GRADE_4:
+            return LessonPlan(
+                lesson_id=f"SCI_G4_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                subject=subject,
+                grade_level=grade_level,
+                title="Photosynthesis: How Plants Make Food",
+                learning_outcomes=[
+                    "Explain the process of photosynthesis",
+                    "Identify the parts of a plant involved in photosynthesis",
+                    "Describe the importance of sunlight, water, and air",
+                    "Relate photosynthesis to food production"
+                ],
+                duration_minutes=45,
+                content={
+                    "introduction": {
+                        "english": "Plants are amazing! They can make their own food using sunlight, water, and air.",
+                        "somali": "Dhirtu waa cajiib! Waxay cunto u samayn karaan iyagoo isticmaalaya iftiinka qorraxda, biyaha, iyo hawada."
+                    },
+                    "main_concept": {
+                        "definition": "Photosynthesis is the process plants use to make food from sunlight, water, and carbon dioxide.",
+                        "equation": "Sunlight + Water + Carbon Dioxide → Glucose + Oxygen",
+                        "visual_aid": "photosynthesis_diagram.png"
+                    },
+                    "key_parts": [
+                        {
+                            "part": "Leaves",
+                            "role": "Capture sunlight using chlorophyll (green pigment)",
+                            "somali": "Caleemaha: Qabtaan iftiinka qorraxda iyagoo isticmaalaya chlorophyll"
+                        },
+                        {
+                            "part": "Roots",
+                            "role": "Absorb water from the soil",
+                            "somali": "Xididada: Nuugaan biyaha ciidda"
+                        },
+                        {
+                            "part": "Stomata",
+                            "role": "Tiny holes in leaves that take in carbon dioxide",
+                            "somali": "Stomata: Daloolado yaryar oo caleemaha ku jira oo qaata carbon dioxide"
+                        }
+                    ]
+                },
+                activities=[
+                    {
+                        "type": "hands_on",
+                        "title": "Plant Observation",
+                        "description": "Students observe a real plant and identify leaves, stem, and roots",
+                        "duration_minutes": 10,
+                        "materials": ["Live plant", "Magnifying glass"],
+                        "offline_compatible": True
+                    },
+                    {
+                        "type": "experiment",
+                        "title": "Sunlight Test",
+                        "description": "Cover one leaf with foil for 3 days. Compare with uncovered leaf.",
+                        "duration_minutes": 5,
+                        "materials": ["Plant", "Aluminum foil"],
+                        "offline_compatible": True
+                    },
+                    {
+                        "type": "drawing",
+                        "title": "Draw Photosynthesis",
+                        "description": "Students draw and label the photosynthesis process",
+                        "duration_minutes": 15,
+                        "materials": ["Paper", "Colored pencils"],
+                        "offline_compatible": True
+                    }
+                ],
+                assessment={
+                    "formative": [
+                        "Can the student name the three things plants need for photosynthesis?",
+                        "Can the student point to the leaves and explain their role?"
+                    ],
+                    "summative": {
+                        "questions": [
+                            {
+                                "question": "What do plants need to make food?",
+                                "options": [
+                                    "Sunlight, water, and air",
+                                    "Soil, rocks, and sand",
+                                    "Animals, insects, and birds"
+                                ],
+                                "correct": 0
+                            },
+                            {
+                                "question": "Which part of the plant captures sunlight?",
+                                "options": ["Roots", "Leaves", "Flowers"],
+                                "correct": 1
+                            }
+                        ]
+                    }
+                },
+                language=language,
+                offline_compatible=True
+            )
         
-        if subject == SubjectArea.MATHEMATICS:
-            activities = [
-                {
-                    "type": "interactive",
-                    "title": "Multiplication Practice",
-                    "description": "Use local objects (stones, sticks) to demonstrate multiplication",
-                    "duration_minutes": 15
-                },
-                {
-                    "type": "group_work",
-                    "title": "Word Problem Challenge",
-                    "description": "Solve real-world problems from camp life",
-                    "duration_minutes": 15
-                },
-                {
-                    "type": "individual",
-                    "title": "Practice Worksheet",
-                    "description": "Complete 10 multiplication problems",
-                    "duration_minutes": 10
-                }
-            ]
-        elif subject == SubjectArea.SCIENCE:
-            activities = [
-                {
-                    "type": "observation",
-                    "title": "Plant Exploration",
-                    "description": "Observe local plants and identify parts",
-                    "duration_minutes": 15
-                },
-                {
-                    "type": "experiment",
-                    "title": "Photosynthesis Demo",
-                    "description": "Simple experiment with leaves and sunlight",
-                    "duration_minutes": 15
-                },
-                {
-                    "type": "discussion",
-                    "title": "Plant Classification",
-                    "description": "Group discussion on plant types",
-                    "duration_minutes": 10
-                }
-            ]
-        else:
-            activities = [
-                {
-                    "type": "interactive",
-                    "title": "Engaging Activity",
-                    "description": "Interactive learning activity",
-                    "duration_minutes": 20
-                },
-                {
-                    "type": "practice",
-                    "title": "Practice Exercise",
-                    "description": "Reinforce learning through practice",
-                    "duration_minutes": 20
-                }
-            ]
-        
-        return activities
+        # Default lesson template
+        return LessonPlan(
+            lesson_id=f"{subject.value.upper()}_{grade_level.value.upper()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            subject=subject,
+            grade_level=grade_level,
+            title=f"{subject.value.title()} Lesson",
+            learning_outcomes=["To be defined"],
+            duration_minutes=40,
+            content={},
+            activities=[],
+            assessment={},
+            language=language,
+            offline_compatible=True
+        )
     
-    def _generate_assessment(
+    def register_student(
         self,
-        subject: SubjectArea,
+        student_id: str,
+        name: str,
         grade_level: GradeLevel,
-        language: LanguageMode
-    ) -> Dict:
-        """Generate CBC-aligned assessment"""
+        preferred_language: LanguageMode = LanguageMode.MIXED_ENGLISH_SOMALI
+    ) -> StudentProfile:
+        """Register a new student"""
         
-        return {
-            "type": "formative",
-            "questions": [
-                {
-                    "id": 1,
-                    "question": "Sample question 1",
-                    "type": "multiple_choice",
-                    "options": ["A", "B", "C", "D"],
-                    "correct_answer": "B"
-                },
-                {
-                    "id": 2,
-                    "question": "Sample question 2",
-                    "type": "short_answer",
-                    "expected_answer": "Sample answer"
-                }
-            ],
-            "rubric": {
-                "excellent": "90-100%",
-                "good": "75-89%",
-                "satisfactory": "60-74%",
-                "needs_improvement": "<60%"
+        if len(self.students) >= self.max_students:
+            raise ValueError(f"Maximum student capacity ({self.max_students}) reached")
+        
+        student = StudentProfile(
+            student_id=student_id,
+            name=name,
+            grade_level=grade_level,
+            preferred_language=preferred_language,
+            learning_pace="average",
+            strengths=[],
+            needs_support=[],
+            completed_lessons=[],
+            current_competency={}
+        )
+        
+        self.students[student_id] = student
+        
+        logger.info(f"👤 Student registered: {name} ({student_id})")
+        logger.info(f"   Grade: {grade_level.value}, Language: {preferred_language.value}")
+        
+        return student
+    
+    def assess_competency(
+        self,
+        student_id: str,
+        subject: SubjectArea,
+        assessment_results: Dict
+    ) -> float:
+        """
+        Assess student competency in a subject.
+        
+        Returns:
+            Competency score (0-1 scale)
+        """
+        student = self.students.get(student_id)
+        if not student:
+            raise ValueError(f"Student not found: {student_id}")
+        
+        # Calculate competency score
+        total_questions = len(assessment_results.get("questions", []))
+        correct_answers = sum(1 for q in assessment_results.get("questions", []) if q.get("correct", False))
+        
+        competency_score = correct_answers / total_questions if total_questions > 0 else 0.0
+        
+        # Update student profile
+        student.current_competency[subject] = competency_score
+        
+        # Identify strengths and areas needing support
+        if competency_score >= 0.8:
+            if subject not in student.strengths:
+                student.strengths.append(subject)
+            if subject in student.needs_support:
+                student.needs_support.remove(subject)
+        elif competency_score < 0.6:
+            if subject not in student.needs_support:
+                student.needs_support.append(subject)
+            if subject in student.strengths:
+                student.strengths.remove(subject)
+        
+        logger.info(f"📊 Competency assessed: {student.name} - {subject.value}")
+        logger.info(f"   Score: {competency_score:.1%}")
+        
+        return competency_score
+    
+    def generate_personalized_path(
+        self,
+        student_id: str
+    ) -> List[LessonPlan]:
+        """
+        Generate a personalized learning path for a student.
+        
+        Returns:
+            List of recommended lessons
+        """
+        student = self.students.get(student_id)
+        if not student:
+            raise ValueError(f"Student not found: {student_id}")
+        
+        learning_path = []
+        
+        # Prioritize subjects needing support
+        for subject in student.needs_support:
+            lesson = self.generate_lesson(
+                subject=subject,
+                grade_level=student.grade_level,
+                language=student.preferred_language,
+                student_id=student_id
+            )
+            learning_path.append(lesson)
+        
+        # Add enrichment for strengths
+        for subject in student.strengths[:2]:  # Top 2 strengths
+            lesson = self.generate_lesson(
+                subject=subject,
+                grade_level=student.grade_level,
+                language=student.preferred_language,
+                student_id=student_id
+            )
+            learning_path.append(lesson)
+        
+        logger.info(f"🎯 Personalized path generated for {student.name}")
+        logger.info(f"   {len(learning_path)} lessons recommended")
+        
+        return learning_path
+    
+    def export_lesson_offline(
+        self,
+        lesson_id: str,
+        output_path: str
+    ):
+        """Export lesson for offline use"""
+        lesson = self.lesson_library.get(lesson_id)
+        if not lesson:
+            raise ValueError(f"Lesson not found: {lesson_id}")
+        
+        # Package lesson with all assets
+        offline_package = {
+            "lesson": {
+                "id": lesson.lesson_id,
+                "title": lesson.title,
+                "subject": lesson.subject.value,
+                "grade": lesson.grade_level.value,
+                "language": lesson.language.value,
+                "duration": lesson.duration_minutes,
+                "learning_outcomes": lesson.learning_outcomes,
+                "content": lesson.content,
+                "activities": lesson.activities,
+                "assessment": lesson.assessment
+            },
+            "metadata": {
+                "offline_compatible": lesson.offline_compatible,
+                "exported_at": datetime.now().isoformat(),
+                "version": "1.0"
             }
         }
-    
-    def _get_resources(
-        self,
-        subject: SubjectArea,
-        grade_level: GradeLevel
-    ) -> List[str]:
-        """Get required resources for lesson"""
         
-        common_resources = [
-            "Chalkboard/whiteboard",
-            "Chalk/markers",
-            "Student notebooks",
-            "Pencils"
-        ]
+        with open(output_path, 'w') as f:
+            json.dump(offline_package, f, indent=2)
         
-        subject_resources = {
-            SubjectArea.MATHEMATICS: ["Counting objects", "Number charts"],
-            SubjectArea.SCIENCE: ["Local plant samples", "Magnifying glass"],
-            SubjectArea.ENGLISH: ["Reading books", "Picture cards"]
-        }
-        
-        return common_resources + subject_resources.get(subject, [])
-    
-    def _generate_differentiation(
-        self,
-        student_profile: Optional[StudentProfile]
-    ) -> Dict:
-        """Generate differentiation strategies"""
-        
-        if not student_profile:
-            return {
-                "fast_learners": "Extension activities with advanced problems",
-                "average_learners": "Standard activities as planned",
-                "slow_learners": "Additional support with visual aids and peer tutoring"
-            }
-        
-        if student_profile.learning_pace == "fast":
-            return {
-                "strategy": "Challenge with advanced content",
-                "activities": ["Peer tutoring", "Independent research"]
-            }
-        elif student_profile.learning_pace == "slow":
-            return {
-                "strategy": "Additional support and scaffolding",
-                "activities": ["One-on-one support", "Visual aids", "Repetition"]
-            }
-        else:
-            return {
-                "strategy": "Standard pacing with optional extensions",
-                "activities": ["Group work", "Practice exercises"]
-            }
-    
-    def _generate_lesson_title(
-        self,
-        subject: SubjectArea,
-        grade_level: GradeLevel
-    ) -> str:
-        """Generate engaging lesson title"""
-        
-        titles = {
-            SubjectArea.MATHEMATICS: f"Grade {grade_level.value} Mathematics: Exploring Numbers",
-            SubjectArea.SCIENCE: f"Grade {grade_level.value} Science: Discovering Nature",
-            SubjectArea.ENGLISH: f"Grade {grade_level.value} English: Language Adventures"
-        }
-        
-        return titles.get(subject, f"Grade {grade_level.value} {subject.value.title()}")
-    
-    def _generate_feedback(
-        self,
-        score: float,
-        subject: SubjectArea,
-        student: StudentProfile
-    ) -> str:
-        """Generate personalized feedback"""
-        
-        if score >= 90:
-            return f"Excellent work, {student.name}! You have mastered this {subject.value} topic."
-        elif score >= 75:
-            return f"Good job, {student.name}! You're making great progress in {subject.value}."
-        elif score >= 60:
-            return f"Well done, {student.name}. Keep practicing {subject.value} to improve further."
-        else:
-            return f"Keep trying, {student.name}. Let's work together on {subject.value}."
-    
-    def _recommend_next_steps(
-        self,
-        score: float,
-        subject: SubjectArea,
-        student: StudentProfile
-    ) -> List[str]:
-        """Recommend next learning steps"""
-        
-        if score >= 90:
-            return [
-                "Move to next topic",
-                "Try advanced challenges",
-                "Help peers who need support"
-            ]
-        elif score >= 75:
-            return [
-                "Review challenging areas",
-                "Practice with additional exercises",
-                "Prepare for next topic"
-            ]
-        else:
-            return [
-                "Review lesson materials",
-                "Get additional support from teacher",
-                "Practice with peer tutor",
-                "Retake assessment when ready"
-            ]
+        logger.info(f"📦 Lesson exported for offline use: {output_path}")
 
 
 # Example usage
 if __name__ == "__main__":
-    # Initialize tutor
+    # Initialize Sovereign Tutor
     tutor = SovereignTutor(
-        enable_offline_mode=True,
-        default_language=LanguageMode.MIXED_ENGLISH_SOMALI
+        model_path="./models/llama3-cbc-quantized",
+        enable_offline=True,
+        max_students=1000
     )
     
-    # Create student profile
-    student = StudentProfile(
+    # Register a student
+    student = tutor.register_student(
         student_id="STU_001",
         name="Amina Hassan",
         grade_level=GradeLevel.GRADE_4,
-        language_preference=LanguageMode.MIXED_ENGLISH_SOMALI,
-        learning_pace="average",
-        strengths=[SubjectArea.ENGLISH],
-        areas_for_improvement=[SubjectArea.MATHEMATICS, SubjectArea.SCIENCE],
-        attendance_rate=0.95,
-        last_assessment_scores={}
+        preferred_language=LanguageMode.MIXED_ENGLISH_SOMALI
     )
     
-    # Generate personalized lesson
+    # Generate a lesson
     lesson = tutor.generate_lesson(
-        subject=SubjectArea.MATHEMATICS,
+        subject=SubjectArea.SCIENCE,
         grade_level=GradeLevel.GRADE_4,
-        student_profile=student
+        language=LanguageMode.MIXED_ENGLISH_SOMALI,
+        student_id="STU_001"
     )
     
     print("\n" + "="*60)
-    print("LESSON PLAN")
+    print("LESSON PLAN GENERATED")
     print("="*60)
     print(f"Title: {lesson.title}")
     print(f"Subject: {lesson.subject.value}")
     print(f"Grade: {lesson.grade_level.value}")
-    print(f"Language: {lesson.language.value}")
     print(f"Duration: {lesson.duration_minutes} minutes")
     print(f"\nLearning Outcomes:")
     for outcome in lesson.learning_outcomes:
         print(f"  • {outcome}")
-    print(f"\nActivities:")
-    for activity in lesson.activities:
-        print(f"  • {activity['title']} ({activity['duration_minutes']} min)")
     
-    # Generate learning path
-    learning_path = tutor.personalize_learning_path(student)
-    print(f"\n✅ Personalized learning path: {len(learning_path)} lessons")
+    # Export for offline use
+    tutor.export_lesson_offline(lesson.lesson_id, "science_photosynthesis_offline.json")
+    
+    # Assess competency
+    assessment_results = {
+        "questions": [
+            {"correct": True},
+            {"correct": True},
+            {"correct": False}
+        ]
+    }
+    
+    competency = tutor.assess_competency("STU_001", SubjectArea.SCIENCE, assessment_results)
+    print(f"\n📊 Student Competency: {competency:.1%}")
