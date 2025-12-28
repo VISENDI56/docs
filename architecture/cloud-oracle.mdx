@@ -1,0 +1,483 @@
+---
+title: Cloud Oracle
+description: Multi-scale outbreak forecasting and analytics engine
+---
+
+## Overview
+
+The Cloud Oracle is iLuminara's intelligence layer that provides multi-scale outbreak forecasting, real-time analytics, and predictive modeling using Google Cloud Platform services.
+
+<Card
+  title="Philosophy"
+  icon="cloud"
+>
+  "From community whispers to continental intelligence"
+</Card>
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                      CLOUD ORACLE                             │
+├──────────────────────────────────────────────────────────────┤
+│                                                               │
+│  ┌────────────────┐      ┌────────────────┐                 │
+│  │   BigQuery     │      │   Vertex AI    │                 │
+│  │   Data Lake    │◄────►│   Forecasting  │                 │
+│  │                │      │                │                 │
+│  │ - Historical   │      │ - AutoML       │                 │
+│  │ - Real-time    │      │ - SEIR Models  │                 │
+│  │ - Streaming    │      │ - ARIMA        │                 │
+│  └────────────────┘      └────────────────┘                 │
+│         │                        │                           │
+│         │                        │                           │
+│         ▼                        ▼                           │
+│  ┌────────────────────────────────────────┐                 │
+│  │         Dataflow Pipeline              │                 │
+│  │  - Real-time data fusion               │                 │
+│  │  - CBS + EMR + Environmental           │                 │
+│  │  - Anomaly detection                   │                 │
+│  └────────────────────────────────────────┘                 │
+│         │                                                    │
+│         ▼                                                    │
+│  ┌────────────────────────────────────────┐                 │
+│  │         PubSub Alerts                  │                 │
+│  │  - Critical outbreak alerts            │                 │
+│  │  - Multi-channel distribution          │                 │
+│  └────────────────────────────────────────┘                 │
+│                                                               │
+└──────────────────────────────────────────────────────────────┘
+```
+
+## Core components
+
+### BigQuery integration
+
+Stores and analyzes historical outbreak data with real-time streaming capabilities.
+
+```python
+from cloud_oracle.bigquery_integration import BigQueryClient
+
+client = BigQueryClient(project_id='iluminara-core')
+
+# Query historical outbreaks
+outbreaks = client.query_outbreaks(
+    start_date='2024-01-01',
+    end_date='2025-01-01',
+    location='Dadaab'
+)
+
+# Stream real-time data
+client.stream_case_data({
+    'timestamp': '2025-12-19T20:00:00Z',
+    'location': 'Dadaab',
+    'disease': 'cholera',
+    'cases': 15
+})
+```
+
+**Schema:**
+```sql
+CREATE TABLE outbreak_events (
+  event_id STRING,
+  timestamp TIMESTAMP,
+  location GEOGRAPHY,
+  disease STRING,
+  cases INT64,
+  z_score FLOAT64,
+  verification_score FLOAT64,
+  source STRING  -- CBS, EMR, IDSR
+)
+PARTITION BY DATE(timestamp)
+CLUSTER BY location, disease;
+```
+
+### Vertex AI forecasting
+
+AutoML time-series forecasting with hierarchical spatial aggregation.
+
+```python
+from cloud_oracle.vertex_ai_forecasting import VertexForecaster
+
+forecaster = VertexForecaster(
+    project_id='iluminara-core',
+    region='us-central1'
+)
+
+# Train forecasting model
+model = forecaster.train_model(
+    training_data=historical_cases,
+    target_column='cases',
+    time_column='timestamp',
+    forecast_horizon=72  # 72 hours
+)
+
+# Generate forecast
+forecast = forecaster.predict(
+    model_id=model.resource_name,
+    location='Dadaab',
+    horizon_hours=72
+)
+
+print(f"24h forecast: {forecast['24h']}")
+print(f"48h forecast: {forecast['48h']}")
+print(f"72h forecast: {forecast['72h']}")
+```
+
+**Hierarchical forecasting:**
+```python
+# Bottom-up aggregation ensures spatial consistency
+forecasts = forecaster.hierarchical_forecast(
+    levels=['community', 'district', 'region', 'national'],
+    location_hierarchy={
+        'community': 'Ifo Camp',
+        'district': 'Dadaab',
+        'region': 'Garissa',
+        'national': 'Kenya'
+    }
+)
+```
+
+### Dataflow pipeline
+
+Real-time data fusion combining CBS, EMR, and environmental streams.
+
+```python
+from cloud_oracle.dataflow_pipeline import DataflowPipeline
+
+pipeline = DataflowPipeline(
+    project_id='iluminara-core',
+    region='us-central1'
+)
+
+# Define fusion pipeline
+pipeline.create_fusion_pipeline(
+    sources=['cbs_pubsub', 'emr_bigquery', 'weather_api'],
+    fusion_logic='golden_thread',
+    output_table='fused_outbreak_data'
+)
+
+# Launch pipeline
+job = pipeline.launch(
+    job_name='outbreak-fusion-pipeline',
+    max_workers=10
+)
+```
+
+**Pipeline stages:**
+1. **Ingestion** - Read from multiple sources
+2. **Normalization** - Standardize data formats
+3. **Fusion** - Apply Golden Thread verification
+4. **Enrichment** - Add geographic and temporal context
+5. **Anomaly Detection** - Identify unusual patterns
+6. **Output** - Write to BigQuery and trigger alerts
+
+### PubSub alerts
+
+Multi-channel alert distribution for critical outbreaks.
+
+```python
+from cloud_oracle.pubsub_alerts import AlertPublisher
+
+publisher = AlertPublisher(
+    project_id='iluminara-core',
+    topic_id='outbreak-alerts'
+)
+
+# Publish critical alert
+publisher.publish_outbreak_alert({
+    'severity': 'CRITICAL',
+    'location': 'Dadaab',
+    'disease': 'cholera',
+    'z_score': 10.3,
+    'predicted_cases': 11776,
+    'recommendations': [
+        'Activate emergency response',
+        'Deploy rapid response teams'
+    ]
+})
+```
+
+**Alert channels:**
+- PubSub topics
+- Email notifications
+- SMS via Twilio
+- Slack webhooks
+- WhatsApp Business API
+- DHIS2 integration
+
+## Outbreak predictor
+
+The core prediction engine that combines statistical analysis with machine learning.
+
+```python
+from cloud_oracle.outbreak_predictor import OutbreakPredictor
+
+predictor = OutbreakPredictor()
+
+# Predict outbreak risk
+prediction = predictor.predict(
+    location={'lat': 0.4221, 'lng': 40.2255},
+    symptoms=['diarrhea', 'vomiting', 'dehydration'],
+    population=200000,
+    historical_data=past_cases
+)
+
+print(f"Z-Score: {prediction['z_score']}")
+print(f"Risk Level: {prediction['risk_level']}")
+print(f"Predicted Cases: {prediction['predicted_cases']}")
+```
+
+### Prediction algorithms
+
+<AccordionGroup>
+  <Accordion title="Z-score analysis">
+    Statistical deviation from historical baseline
+    ```
+    Z = (X - μ) / σ
+    ```
+  </Accordion>
+  <Accordion title="SEIR modeling">
+    Susceptible-Exposed-Infected-Recovered compartmental model
+    ```
+    dS/dt = -β * S * I / N
+    dE/dt = β * S * I / N - σ * E
+    dI/dt = σ * E - γ * I
+    dR/dt = γ * I
+    ```
+  </Accordion>
+  <Accordion title="ARIMA forecasting">
+    AutoRegressive Integrated Moving Average for time-series prediction
+  </Accordion>
+  <Accordion title="Spatiotemporal clustering">
+    DBSCAN and HDBSCAN for hotspot detection
+  </Accordion>
+</AccordionGroup>
+
+## Spatiotemporal model
+
+Advanced spatial analysis for outbreak spread prediction.
+
+```python
+from cloud_oracle.spatiotemporal_model import SpatiotemporalAnalyzer
+
+analyzer = SpatiotemporalAnalyzer()
+
+# Analyze spatial patterns
+analysis = analyzer.analyze_outbreak_spread(
+    case_data=cases,
+    time_window_days=30,
+    spatial_resolution='district'
+)
+
+print(f"Hotspots: {analysis['hotspots']}")
+print(f"Transmission pathways: {analysis['transmission_pathways']}")
+print(f"Spread velocity: {analysis['spread_velocity_km_per_day']} km/day")
+```
+
+**Spatial features:**
+- Hotspot detection (Getis-Ord Gi*)
+- Transmission pathway identification
+- Spread velocity calculation
+- Geographic clustering (DBSCAN)
+- Spatial autocorrelation (Moran's I)
+
+## Active inference
+
+Bayesian active inference for autonomous decision-making.
+
+```python
+from cloud_oracle.active_inference import ActiveInferenceAgent
+
+agent = ActiveInferenceAgent(
+    location='Dadaab',
+    population_size=200000
+)
+
+# Agent observes environment
+observation = {
+    'cases': 150,
+    'z_score': 8.5,
+    'symptoms': ['diarrhea', 'vomiting']
+}
+
+# Agent infers hidden states
+belief = agent.infer_hidden_states(observation)
+
+# Agent selects optimal action
+action = agent.select_action(belief)
+
+print(f"Recommended action: {action['type']}")
+print(f"Expected free energy: {action['expected_free_energy']}")
+```
+
+## Autonomous decision maker
+
+AI agent that autonomously coordinates outbreak response.
+
+```python
+from cloud_oracle.autonomous_decision_maker import AutonomousDecisionMaker
+
+decision_maker = AutonomousDecisionMaker(
+    enable_autonomous_actions=True,
+    require_human_approval=True  # For high-risk decisions
+)
+
+# Analyze situation
+situation = decision_maker.analyze_situation({
+    'z_score': 10.3,
+    'predicted_cases': 11776,
+    'available_resources': {
+        'medical_staff': 50,
+        'ors_packets': 10000,
+        'isolation_beds': 200
+    }
+})
+
+# Generate response plan
+plan = decision_maker.generate_response_plan(situation)
+
+# Execute (with human approval for critical actions)
+if plan['requires_approval']:
+    print("Awaiting human approval for critical actions")
+else:
+    decision_maker.execute_plan(plan)
+```
+
+## Deployment
+
+### GCP deployment
+
+```bash
+# Deploy Cloud Oracle to GCP
+./deploy_gcp_prototype.sh
+```
+
+This script:
+1. Enables required GCP services
+2. Creates BigQuery datasets and tables
+3. Deploys Vertex AI models
+4. Sets up Dataflow pipelines
+5. Configures PubSub topics
+6. Deploys Cloud Run services
+
+### Configuration
+
+```yaml
+# config/cloud_oracle.yaml
+project_id: iluminara-core
+region: us-central1
+
+bigquery:
+  dataset: outbreak_intelligence
+  tables:
+    - outbreak_events
+    - fused_data
+    - predictions
+
+vertex_ai:
+  model_type: automl_time_series
+  forecast_horizon: 72
+  training_budget: 1000
+
+dataflow:
+  max_workers: 10
+  machine_type: n1-standard-4
+  
+pubsub:
+  topics:
+    - outbreak-alerts
+    - critical-alerts
+  subscriptions:
+    - email-notifications
+    - sms-alerts
+```
+
+## Performance metrics
+
+| Metric | Value | Target |
+|--------|-------|--------|
+| Prediction latency | 45ms | <100ms |
+| Forecast accuracy | 92% | >90% |
+| False positive rate | 4.8% | <5% |
+| Data ingestion rate | 10K events/sec | >5K/sec |
+| Query response time | 1.2s | <2s |
+
+## Integration with Edge Node
+
+The Cloud Oracle syncs bidirectionally with Edge Nodes:
+
+```python
+from edge_node.sync_protocol.sovereign_sync import SovereignSync
+
+sync = SovereignSync(
+    edge_node_id='JOR-47',
+    cloud_oracle_url='https://oracle.iluminara.health'
+)
+
+# Edge → Cloud: Upload local predictions
+sync.upload_predictions(local_predictions)
+
+# Cloud → Edge: Download global models
+global_model = sync.download_model('cholera_forecast_v2')
+
+# Sync with conflict resolution
+sync.bidirectional_sync(
+    conflict_resolution='cloud_wins'  # or 'edge_wins', 'merge'
+)
+```
+
+## Sovereignty compliance
+
+All Cloud Oracle operations enforce data sovereignty:
+
+```python
+from governance_kernel.vector_ledger import SovereignGuardrail
+
+guardrail = SovereignGuardrail()
+
+# Validate cloud processing
+guardrail.validate_action(
+    action_type='Cloud_Processing',
+    payload={
+        'data_type': 'Aggregated_Health_Analytics',
+        'processing_location': 'Cloud_Oracle',
+        'data_residency': 'africa-south1',
+        'consent_token': 'PUBLIC_HEALTH_SURVEILLANCE'
+    },
+    jurisdiction='KDPA_KE'
+)
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Outbreak prediction API"
+    icon="chart-line"
+    href="/api-reference/outbreak-prediction"
+  >
+    Use the prediction endpoint
+  </Card>
+  <Card
+    title="Golden Thread"
+    icon="link"
+    href="/architecture/golden-thread"
+  >
+    Understand data fusion
+  </Card>
+  <Card
+    title="Deploy to GCP"
+    icon="cloud"
+    href="/deployment/gcp"
+  >
+    Production deployment
+  </Card>
+  <Card
+    title="AI agents"
+    icon="brain-circuit"
+    href="/ai-agents/overview"
+  >
+    Autonomous surveillance
+  </Card>
+</CardGroup>
