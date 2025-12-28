@@ -1,0 +1,194 @@
+---
+title: Humanitarian & Economic Layer
+description: The soul—equity, dignity, and economic sovereignty for the dispossessed
+---
+
+The Humanitarian & Economic Layer transforms iLuminara from a technical system into a force for human dignity and economic justice.
+
+## Shirika Equity Engine
+
+### Multi-Objective Optimization
+
+Uses algorithms like **NSGA-II (Non-dominated Sorting Genetic Algorithm II)** to find the "Pareto Frontier" of resource distribution—solutions where you cannot make the host community better off without making the refugees worse off (and vice versa).
+
+**Goal:** Mathematical fairness that prevents conflict.
+
+```python
+class ShirikaEquityEngine:
+    """
+    Multi-objective optimization for conflict-free resource allocation.
+    """
+    def optimize_distribution(self, resources, populations):
+        # Define objectives
+        objectives = [
+            self.maximize_host_satisfaction,
+            self.maximize_refugee_satisfaction,
+            self.minimize_environmental_impact
+        ]
+        
+        # Find Pareto frontier using NSGA-II
+        solutions = self.nsga2(objectives, resources, populations)
+        
+        # Select Nash equilibrium point
+        optimal = self.select_nash_equilibrium(solutions)
+        
+        return optimal
+```
+
+### Key Metrics
+
+- **Gini Coefficient:** Measures inequality
+- **Nash Equilibrium:** Game-theoretic fairness
+- **Pareto Efficiency:** No waste in allocation
+
+## ReFi Tokenomics (Bio-Credits)
+
+### Smart Contracts Architecture
+
+Self-executing code on a private, permissioned ledger (**Hyperledger Besu**).
+
+**Solidity/Vyper contracts:**
+- Mint bio-credits for verified environmental actions
+- Transfer credits for goods/services
+- Burn credits for external currency exchange
+
+### Oracle Integration
+
+The contract listens to the **IoT Sentinel**. When the sensor detects "Water Quality = Safe," the Oracle triggers the contract to mint and transfer "Bio-Credits" to the CHV's wallet automatically.
+
+```solidity
+contract BioCredit {
+    mapping(address => uint256) public balances;
+    
+    function mintForWaterQuality(address chv, uint256 quality) external {
+        require(msg.sender == oracleAddress, "Only oracle");
+        require(quality >= SAFE_THRESHOLD, "Water not safe");
+        
+        uint256 credits = calculateCredits(quality);
+        balances[chv] += credits;
+        
+        emit CreditsMinted(chv, credits, "WaterQuality");
+    }
+}
+```
+
+### Economic Sovereignty
+
+- **No external dependency:** Credits generated locally
+- **Transparent:** All transactions auditable
+- **Programmable:** Rules encoded in smart contracts
+- **Inclusive:** No bank account required
+
+## ZKP Identity (Privacy Vault)
+
+### zk-SNARKs Architecture
+
+**Zero-Knowledge Succinct Non-Interactive Argument of Knowledge**
+
+**Roles:**
+- **Prover (Patient):** Generates a proof that "I have attribute X" (e.g., Age > 18)
+- **Verifier (Clinic):** Mathematically verifies the proof is true without ever learning the input (Age)
+
+### Circuit Compilation
+
+The logic (e.g., eligibility rules) is compiled into a specific arithmetic circuit that the proof is run against.
+
+```python
+class ZKPIdentity:
+    """
+    Zero-knowledge proofs for privacy-preserving identity.
+    """
+    def prove_eligibility(self, patient_data, requirement):
+        # Compile eligibility circuit
+        circuit = self.compile_circuit(requirement)
+        
+        # Generate proof (patient side)
+        proof = self.generate_proof(patient_data, circuit)
+        
+        # Verify proof (clinic side)
+        is_eligible = self.verify_proof(proof, circuit)
+        
+        # Clinic learns eligibility, not data
+        return is_eligible
+```
+
+### Use Cases
+
+- **Age verification:** Prove age > 18 without revealing birthdate
+- **Medical eligibility:** Prove vaccination status without revealing records
+- **Identity verification:** Prove identity without revealing biometrics
+- **Credential verification:** Prove qualifications without revealing documents
+
+## TCIM Adapter (Traditional Knowledge)
+
+### Knowledge Graph Mapping
+
+Uses **RDF (Resource Description Framework)** to map local traditional concepts (e.g., "Muarubaini plant") to biomedical ontologies (e.g., "Azadirachta indica" → "Anti-inflammatory").
+
+This allows the AI to "reason" across both knowledge systems.
+
+```python
+class TCIMAdapter:
+    """
+    Bridge between traditional and biomedical knowledge.
+    """
+    def map_traditional_remedy(self, local_name):
+        # Query knowledge graph
+        botanical = self.kg.query(f"SELECT ?plant WHERE {{
+            ?plant tcim:localName '{local_name}' .
+        }}")
+        
+        # Map to biomedical properties
+        properties = self.kg.query(f"SELECT ?property WHERE {{
+            {botanical} bio:hasProperty ?property .
+        }}")
+        
+        return {
+            'botanical': botanical,
+            'properties': properties,
+            'evidence_level': self.assess_evidence(botanical)
+        }
+```
+
+### Respectful Integration
+
+- **Preserves traditional knowledge:** Not replaced, integrated
+- **Evidence-based:** Maps to scientific validation where available
+- **Community-driven:** Local healers contribute to knowledge graph
+- **Culturally sensitive:** Respects intellectual property and sacred knowledge
+
+## Trustless Aid Supply Chain
+
+### Atomic Physical-Digital Swaps
+
+**IoT Sentinel + Smart Contracts:** The "Water ATM" or "Medicine Locker" physically cannot open unless the Bio-Credit transaction is verified on the blockchain.
+
+**Result:** Corruption becomes physically impossible.
+
+```python
+class TrustlessAid:
+    """
+    Atomic swaps between physical goods and digital credits.
+    """
+    def dispense_aid(self, recipient_wallet, item_id):
+        # Verify credits
+        if not self.verify_credits(recipient_wallet, item_id):
+            raise InsufficientCredits()
+        
+        # Deduct credits (blockchain)
+        self.deduct_credits(recipient_wallet, item_id)
+        
+        # Unlock physical dispenser (IoT)
+        self.iot_sentinel.unlock(item_id)
+        
+        # Log for audit trail
+        self.log_transaction(recipient_wallet, item_id)
+```
+
+## Key Differentiators
+
+- **Mathematical fairness:** Pareto-optimal resource allocation
+- **Economic sovereignty:** Local currency generation
+- **Privacy-preserving:** Zero-knowledge identity
+- **Culturally respectful:** Traditional knowledge integration
+- **Corruption-proof:** Atomic physical-digital swaps
