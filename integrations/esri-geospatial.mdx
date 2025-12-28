@@ -1,0 +1,85 @@
+---
+title: ESRI Geospatial Layer
+description: Real-time disease mapping and spatial analysis with ArcGIS
+---
+
+## Overview
+
+ESRI Geospatial Layer provides real-time disease mapping, hotspot detection, and resource allocation optimization using ESRI ArcGIS, integrated with iLuminara's Golden Thread data fusion.
+
+<Card
+  title="Implementation"
+  icon="map"
+>
+  Complete implementation in `repository-files/geospatial/esri_layer.py`
+</Card>
+
+## Key capabilities
+
+<CardGroup cols={2}>
+  <Card title="Disease mapping" icon="map-pin">
+    Real-time outbreak visualization
+  </Card>
+  <Card title="Hotspot detection" icon="fire">
+    Spatial statistics analysis
+  </Card>
+  <Card title="Resource optimization" icon="route">
+    Network analysis
+  </Card>
+  <Card title="Multi-scale" icon="layer-group">
+    Community to national analysis
+  </Card>
+</CardGroup>
+
+## Quick start
+
+```python
+from geospatial.esri_layer import ESRIGeospatialLayer
+
+# Initialize layer
+esri = ESRIGeospatialLayer(arcgis_api_key="your_api_key")
+
+# Create disease map
+disease_map = esri.create_disease_map([
+    {"lat": 0.0512, "lng": 40.3129, "cases": 10},
+    {"lat": 0.0520, "lng": 40.3135, "cases": 15}
+])
+
+# Detect hotspots
+hotspots = esri.detect_hotspots(case_data)
+print(f"Hotspots detected: {len(hotspots)}")
+
+# Optimize resource allocation
+allocation = esri.optimize_resource_allocation(
+    resources={"ambulances": 5, "health_workers": 20},
+    demand=demand_data
+)
+```
+
+## Integration with Golden Thread
+
+```python
+from edge_node.sync_protocol.golden_thread import GoldenThread
+
+gt = GoldenThread()
+
+# Get verified outbreak data
+fused_data = gt.fuse_data_streams(
+    cbs_signal={"location": "Dadaab", "symptom": "cholera"},
+    emr_record={"location": "Dadaab", "diagnosis": "cholera"}
+)
+
+# Create map with verified data
+esri.create_disease_map(fused_data.to_geojson())
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Implementation" icon="file-code" href="/IMPLEMENTATION_COMPLETE">
+    Complete implementation
+  </Card>
+  <Card title="Omniverse" icon="cube" href="/integrations/nvidia-omniverse">
+    3D visualization integration
+  </Card>
+</CardGroup>
