@@ -1,71 +1,83 @@
 ---
 title: GeoGhost Native Implementation
-description: ESRI ArcGIS Maps SDK for Native Apps with offline-first GeoGhost sovereignty
+description: ESRI ArcGIS Maps SDK for offline-first spatial omniscience
 ---
 
 ## Overview
 
-The GeoGhost Native implementation provides **offline-first spatial omniscience** using the ESRI ArcGIS Maps SDK for Native Apps. This architecture moves GIS from the browser to device metal (C++ core wrapped in Qt/Kotlin), enabling total situational awareness even when the global internet is severed.
-
-## Core capabilities
-
-- **Offline-first** - Render massive Vector Tile Packages (.vtpk) and Mobile Map Packages (.mmpk) locally
-- **Peer-to-peer sync** - Gossip protocol for decentralized map updates
-- **Physics integration** - Feed NVIDIA Modulus for real-time runoff simulations
-- **Zero-latency visualization** - GPU-accelerated graphic overlays
+The GeoGhost Native implementation provides **offline-first GIS capabilities** using the ESRI ArcGIS Maps SDK for Native Apps. This enables total situational awareness even when the global internet is severed, with peer-to-peer synchronization and GPU-accelerated physics simulations.
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                    GEOGHOST NATIVE STACK                      │
-└──────────────────────────────────────────────────────────────┘
-                            │
-        ┌───────────────────┼───────────────────┐
-        │                   │                   │
-   ┌────▼────┐      ┌──────▼──────┐    ┌──────▼──────┐
-   │  ESRI   │      │  Offline    │    │  P2P Sync   │\n   │ Runtime │      │  Packages   │    │  Protocol   │
-   │  C++    │      │ .vtpk/.mmpk │    │  (Gossip)   │
-   └────┬────┘      └──────┬──────┘    └──────┬──────┘
-        │                  │                  │
-        └──────────────────┼──────────────────┘
-                    ▼
-         ┌────────────────────────┐
-         │   NVIDIA MODULUS       │
-         │  Physics Simulation    │
-         └────────────────────────┘
-```
+GeoGhost moves the GIS core from the browser to the device's metal (C++ core wrapped in Qt/Kotlin), enabling:
+
+- **Offline vector tile packages** (.vtpk)
+- **Mobile map packages** (.mmpk)
+- **Peer-to-peer gossip synchronization**
+- **GPU physics simulation** (NVIDIA Modulus integration)
 
 ## Installation
 
-### Dependencies
+### Python SDK
 
 ```bash
-# Install ArcGIS Maps SDK for Native Apps
-pip install arcgis-maps-sdk>=200.5.0
+# Install ArcGIS Maps SDK for Python
+pip install arcgis>=200.5.0
+pip install arcgis-learn>=2.4.0
 
-# Install Qt for cross-platform UI (optional)
-pip install PyQt6>=6.5.0
-
-# Verify installation
-python -c "import arcgis; print(arcgis.__version__)"
+# Install dependencies
+pip install numpy>=1.24.0
+pip install pandas>=2.0.0
 ```
 
-### Download offline packages
+### Qt/C++ SDK (for native apps)
+
+```bash
+# Download from ESRI
+# https://developers.arcgis.com/qt/
+
+# Install Qt dependencies
+sudo apt-get install qt6-base-dev
+sudo apt-get install qt6-positioning-dev
+```
+
+## Core components
+
+<CardGroup cols={2}>
+  <Card title="Offline packages" icon="box">
+    .vtpk and .mmpk for disconnected operation
+  </Card>
+  <Card title="P2P sync" icon="arrows-rotate">
+    Wi-Fi Direct gossip protocol
+  </Card>
+  <Card title="Physics simulation" icon="atom">
+    GPU-accelerated flood modeling
+  </Card>
+  <Card title="Real-time overlay" icon="layer-group">
+    Zero-latency risk visualization
+  </Card>
+</CardGroup>
+
+## Offline map packages
+
+### Creating vector tile packages
 
 ```python
 from arcgis.gis import GIS
-from arcgis.mapping import WebMap
+from arcgis.mapping import VectorTileLayer
+import os
 
-class OfflinePackageManager:
-    """Manage offline map packages for GeoGhost."""
+class OfflineMapBuilder:
+    def __init__(self, portal_url=None, username=None, password=None):
+        # Connect to ArcGIS Online or Portal
+        if portal_url:
+            self.gis = GIS(portal_url, username, password)
+        else:
+            self.gis = GIS()  # Anonymous access
     
-    def __init__(self, portal_url="https://www.arcgis.com"):
-        self.gis = GIS(portal_url)
-    
-    def download_vtpk(self, extent, output_path):
+    def create_vtpk(self, extent, output_path):
         """
-        Download Vector Tile Package for offline use.
+        Create vector tile package for offline use
         
         Args:
             extent: (xmin, ymin, xmax, ymax) in WGS84
@@ -77,580 +89,725 @@ class OfflinePackageManager:
             item_type="Vector Tile Service"
         )[0]
         
+        # Create vector tile layer
+        vtl = VectorTileLayer.fromitem(basemap)
+        
         # Export to VTPK
-        vtpk = basemap.export_tiles(
-            extent=extent,
+        vtpk_item = vtl.export_tiles(
+            area=extent,
             export_by="LevelID",
-            levels=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-            tile_package=True,
-            export_extent=extent
+            levels="0-16",  # Zoom levels
+            tile_package=True
         )
         
         # Download
-        vtpk.download(output_path)
-        print(f"Downloaded VTPK to {output_path}")
+        vtpk_item.download(save_path=output_path)
+        
+        return output_path
     
-    def create_mmpk(self, webmap_id, extent, output_path):
+    def create_mmpk(self, extent, layers, output_path):
         """
-        Create Mobile Map Package with all layers.
+        Create mobile map package with multiple layers
         
         Args:
-            webmap_id: ArcGIS Online web map ID
             extent: (xmin, ymin, xmax, ymax)
+            layers: List of layer URLs
             output_path: Path to save .mmpk file
         """
-        # Get web map
-        webmap = WebMap(self.gis.content.get(webmap_id))
+        from arcgis.mapping import WebMap
         
-        # Package for offline use
-        mmpk = webmap.offline_areas.create(
+        # Create web map
+        webmap = WebMap()
+        
+        # Add basemap
+        webmap.basemap = "topo-vector"
+        
+        # Add operational layers
+        for layer_url in layers:
+            webmap.add_layer({"url": layer_url})
+        
+        # Export to MMPK
+        mmpk_item = webmap.offline_areas.create(
             area=extent,
             item_properties={
-                "title": "Dadaab Offline Map",
-                "snippet": "Offline map for Dadaab refugee complex"
+                "title": "Kalobeyei Offline Map",
+                "snippet": "Offline map for Kalobeyei refugee settlement"
             }
         )
         
         # Download
-        mmpk.download(output_path)
-        print(f"Created MMPK at {output_path}")
+        mmpk_item.download(save_path=output_path)
+        
+        return output_path
 
+# Example usage
+builder = OfflineMapBuilder()
 
-# Example: Download Dadaab region
-manager = OfflinePackageManager()
+# Kalobeyei extent (Kenya)
+kalobeyei_extent = (34.8, 3.3, 34.9, 3.4)
 
-# Dadaab extent (Kenya)
-dadaab_extent = (40.3, -0.1, 40.5, 0.1)
+# Create VTPK
+vtpk_path = builder.create_vtpk(
+    extent=kalobeyei_extent,
+    output_path="/data/maps/kalobeyei.vtpk"
+)
 
-manager.download_vtpk(
-    extent=dadaab_extent,
-    output_path="/data/maps/dadaab.vtpk"
+# Create MMPK with health facilities
+mmpk_path = builder.create_mmpk(
+    extent=kalobeyei_extent,
+    layers=[
+        "https://services.arcgis.com/health_facilities",
+        "https://services.arcgis.com/water_points"
+    ],
+    output_path="/data/maps/kalobeyei.mmpk"
 )
 ```
 
-## Native map rendering
-
-### Qt-based map viewer
+### Loading offline maps
 
 ```python
-from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget
-from PyQt6.QtCore import QUrl
-from arcgis.mapping import Map, Basemap
-from arcgis.geometry import Envelope
+from arcgis.mapping import Map
+from arcgis.gis import GIS
 
-class GeoGhostMapViewer(QMainWindow):
-    """Native map viewer with offline support."""
-    
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("GeoGhost - Offline Map Viewer")
-        self.setGeometry(100, 100, 1200, 800)
-        
-        # Initialize map
+class OfflineMapViewer:
+    def __init__(self, mmpk_path):
+        self.gis = GIS()  # Offline mode
         self.map = Map()
-        self.setup_offline_basemap()
-        
-        # Setup UI
-        self.init_ui()
+        self.mmpk_path = mmpk_path
     
-    def setup_offline_basemap(self):
-        """Load offline VTPK as basemap."""
-        # Load local VTPK
-        vtpk_path = "/data/maps/dadaab.vtpk"
-        basemap = Basemap.from_vtpk(vtpk_path)
+    def load_offline_map(self):
+        # Load mobile map package
+        from arcgis.mapping import MobileMapPackage
         
-        self.map.basemap = basemap
+        mmpk = MobileMapPackage(self.mmpk_path)
         
-        # Set initial extent to Dadaab
-        dadaab_extent = Envelope(
-            xmin=40.3, ymin=-0.1,
-            xmax=40.5, ymax=0.1,
-            spatial_reference={"wkid": 4326}
-        )
-        self.map.extent = dadaab_extent
+        # Get first map
+        offline_map = mmpk.maps[0]
+        
+        # Display
+        self.map = offline_map
+        
+        return self.map
     
-    def init_ui(self):
-        """Initialize user interface."""
-        # Create central widget
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
+    def query_features(self, layer_name, where_clause="1=1"):
+        # Query features from offline layer
+        layer = self.map.layers[layer_name]
         
-        # Add map view
-        # Note: Actual Qt integration requires ArcGIS Runtime SDK for Qt
-        # This is a simplified example
-    
-    def add_health_facilities(self, facilities):
-        """Add health facility markers to map."""
-        from arcgis.features import FeatureLayer
+        features = layer.query(where=where_clause)
         
-        for facility in facilities:
-            # Add point graphic
-            point = {
-                "geometry": {
-                    "x": facility["lon"],
-                    "y": facility["lat"],
-                    "spatialReference": {"wkid": 4326}
-                },
-                "attributes": {
-                    "name": facility["name"],
-                    "type": facility["type"]
-                }
-            }
-            
-            self.map.add_graphic(point)
-    
-    def add_cholera_risk_overlay(self, risk_zones):
-        """Overlay cholera risk zones."""
-        from arcgis.geometry import Polygon
-        
-        for zone in risk_zones:
-            polygon = Polygon(zone["coordinates"])
-            
-            # Add polygon with risk-based color
-            risk_level = zone["risk_level"]
-            color = self.get_risk_color(risk_level)
-            
-            self.map.add_graphic({
-                "geometry": polygon,
-                "symbol": {
-                    "type": "simple-fill",
-                    "color": color,
-                    "outline": {"color": [255, 0, 0], "width": 2}
-                }
-            })
-    
-    def get_risk_color(self, risk_level):
-        """Get color based on risk level."""
-        colors = {
-            "low": [0, 255, 0, 100],      # Green, semi-transparent
-            "medium": [255, 255, 0, 100], # Yellow
-            "high": [255, 0, 0, 100]      # Red
-        }
-        return colors.get(risk_level, [128, 128, 128, 100])
+        return features.features
 
+# Example usage
+viewer = OfflineMapViewer("/data/maps/kalobeyei.mmpk")
+offline_map = viewer.load_offline_map()
 
-# Run application
-if __name__ == "__main__":
-    app = QApplication([])
-    viewer = GeoGhostMapViewer()
-    viewer.show()
-    app.exec()
+# Query health facilities
+health_facilities = viewer.query_features(
+    layer_name="health_facilities",
+    where_clause="status='operational'"
+)
 ```
 
-## Peer-to-peer sync protocol
+## Peer-to-peer synchronization
 
-### Gossip-based map synchronization
+### Gossip protocol implementation
 
 ```python
 import socket
 import json
 import threading
+import time
 from datetime import datetime
 
-class GeoGhostSyncProtocol:
-    """Peer-to-peer gossip protocol for map data synchronization."""
-    
-    def __init__(self, node_id, port=5555):
+class GeoGossipProtocol:
+    def __init__(self, node_id, port=5000):
         self.node_id = node_id
         self.port = port
-        self.peers = []
+        self.peers = {}
         self.local_data = {}
         self.running = False
     
     def start(self):
-        """Start sync protocol."""
+        # Start listening for peers
         self.running = True
         
-        # Start discovery thread
-        threading.Thread(target=self._discover_peers, daemon=True).start()
+        # Discovery thread
+        self.discovery_thread = threading.Thread(
+            target=self._discover_peers
+        )
+        self.discovery_thread.start()
         
-        # Start sync thread
-        threading.Thread(target=self._sync_loop, daemon=True).start()
-        
-        # Start server thread
-        threading.Thread(target=self._serve, daemon=True).start()
+        # Sync thread
+        self.sync_thread = threading.Thread(
+            target=self._sync_loop
+        )
+        self.sync_thread.start()
     
     def _discover_peers(self):
-        """Discover nearby peers via mDNS/Bonjour."""
-        # Simplified: In production, use Zeroconf library
+        # Broadcast presence on local network
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        
         while self.running:
-            # Broadcast presence
-            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-            
+            # Broadcast announcement
             message = json.dumps({
-                "type": "discovery",
+                "type": "announce",
                 "node_id": self.node_id,
-                "port": self.port
+                "port": self.port,
+                "timestamp": datetime.now().isoformat()
             })
             
-            sock.sendto(message.encode(), ('<broadcast>', self.port))
-            sock.close()
+            sock.sendto(
+                message.encode(),
+                ('<broadcast>', self.port)
+            )
             
-            time.sleep(30)  # Broadcast every 30 seconds
+            time.sleep(30)  # Announce every 30 seconds
     
     def _sync_loop(self):
-        """Continuously sync with peers."""
-        while self.running:
-            for peer in self.peers:
-                try:
-                    self._sync_with_peer(peer)
-                except Exception as e:
-                    print(f"Sync failed with {peer}: {e}")
-            
-            time.sleep(60)  # Sync every minute
-    
-    def _sync_with_peer(self, peer):
-        """Sync data with a specific peer."""
-        # Connect to peer
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((peer["ip"], peer["port"]))
-        
-        # Send our data hashes
-        hashes = {k: self._hash(v) for k, v in self.local_data.items()}
-        sock.send(json.dumps({
-            "type": "sync_request",
-            "hashes": hashes
-        }).encode())
-        
-        # Receive peer's missing data
-        response = sock.recv(4096).decode()
-        data = json.loads(response)
-        
-        # Update local data
-        for key, value in data.get("updates", {}).items():
-            if key not in self.local_data or self._hash(value) != hashes.get(key):
-                self.local_data[key] = value
-                print(f"Updated {key} from peer {peer['node_id']}")
-        
-        sock.close()
-    
-    def _serve(self):
-        """Serve sync requests from peers."""
-        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server.bind(('0.0.0.0', self.port))
-        server.listen(5)
+        # Listen for sync requests
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.bind(('', self.port))
         
         while self.running:
-            client, addr = server.accept()
-            threading.Thread(
-                target=self._handle_sync_request,
-                args=(client,),
-                daemon=True
-            ).start()
-    
-    def _handle_sync_request(self, client):
-        """Handle incoming sync request."""
-        data = client.recv(4096).decode()
-        request = json.loads(data)
-        
-        if request["type"] == "sync_request":
-            peer_hashes = request["hashes"]
+            try:
+                data, addr = sock.recvfrom(4096)
+                message = json.loads(data.decode())
+                
+                if message["type"] == "announce":
+                    # Add peer
+                    self.peers[message["node_id"]] = {
+                        "address": addr[0],
+                        "port": message["port"],
+                        "last_seen": datetime.now()
+                    }
+                
+                elif message["type"] == "sync_request":
+                    # Send local data
+                    self._send_data(addr)
+                
+                elif message["type"] == "sync_data":
+                    # Merge received data
+                    self._merge_data(message["data"])
             
-            # Find data peer is missing
-            updates = {}
-            for key, value in self.local_data.items():
-                local_hash = self._hash(value)
-                if peer_hashes.get(key) != local_hash:
-                    updates[key] = value
-            
-            # Send updates
-            response = json.dumps({"updates": updates})
-            client.send(response.encode())
-        
-        client.close()
+            except Exception as e:
+                print(f"Sync error: {e}")
     
-    def _hash(self, data):
-        """Simple hash function for data comparison."""
-        import hashlib
-        return hashlib.sha256(json.dumps(data).encode()).hexdigest()
-    
-    def add_feature(self, feature_id, feature_data):
-        """Add new feature to local data."""
-        self.local_data[feature_id] = {
-            "data": feature_data,
-            "timestamp": datetime.now().isoformat(),
-            "node_id": self.node_id
-        }
-
-
-# Example usage
-sync = GeoGhostSyncProtocol(node_id="chv_001")
-sync.start()
-
-# Add epidemiological data
-sync.add_feature("cholera_case_001", {
-    "type": "cholera_case",
-    "location": {"lat": -0.05, "lon": 40.4},
-    "date": "2026-01-15",
-    "confirmed": True
-})
-```
-
-## Physics integration
-
-### NVIDIA Modulus runoff simulation
-
-```python
-from arcgis.raster import Raster
-from modulus.sym.hydra import instantiate_arch
-from modulus.sym.solver import Solver
-import numpy as np
-
-class HydrologicalSimulator:
-    """Integrate GeoGhost terrain data with Modulus physics."""
-    
-    def __init__(self):
-        self.solver = Solver()
-    
-    def load_terrain(self, dem_path):
-        """Load Digital Elevation Model from offline package."""
-        dem = Raster(dem_path)
+    def _send_data(self, peer_addr):
+        # Send local data to peer
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         
-        # Extract elevation data
-        elevation = dem.read()
-        
-        return elevation
-    
-    def simulate_runoff(self, elevation, rainfall_mm):
-        """
-        Simulate water runoff using physics-informed ML.
-        
-        Args:
-            elevation: 2D array of elevation data (meters)
-            rainfall_mm: Rainfall amount in millimeters
-        
-        Returns:
-            Runoff flow paths and accumulation
-        """
-        # Calculate slope
-        slope = self._calculate_slope(elevation)
-        
-        # Run Modulus physics simulation
-        runoff = self.solver.solve_runoff(
-            elevation=elevation,
-            slope=slope,
-            rainfall=rainfall_mm,
-            soil_type="sandy_loam"
-        )
-        
-        return runoff
-    
-    def _calculate_slope(self, elevation):
-        """Calculate terrain slope from elevation."""
-        # Gradient in x and y directions
-        dy, dx = np.gradient(elevation)
-        
-        # Slope magnitude
-        slope = np.sqrt(dx**2 + dy**2)
-        
-        return slope
-    
-    def predict_cholera_risk(self, runoff, population_density):
-        """Predict cholera risk based on runoff and population."""
-        # Areas with high runoff + high population = high risk
-        risk = runoff * population_density
-        
-        # Normalize to 0-1
-        risk = (risk - risk.min()) / (risk.max() - risk.min())
-        
-        return risk
-
-
-# Example usage
-simulator = HydrologicalSimulator()
-
-# Load terrain from offline package
-elevation = simulator.load_terrain("/data/maps/dadaab_dem.tif")
-
-# Simulate 50mm rainfall event
-runoff = simulator.simulate_runoff(elevation, rainfall_mm=50)
-
-# Predict cholera risk
-population = load_population_density()
-risk = simulator.predict_cholera_risk(runoff, population)
-
-# Visualize on map
-viewer = GeoGhostMapViewer()
-viewer.add_cholera_risk_overlay(risk)
-```
-
-## Sync-enabled feature services
-
-### Offline data collection
-
-```python
-from arcgis.features import FeatureLayer, FeatureSet
-from arcgis.geometry import Point
-
-class OfflineDataCollector:
-    """Collect epidemiological data offline with sync capability."""
-    
-    def __init__(self, feature_service_url):
-        self.feature_layer = FeatureLayer(feature_service_url)
-        self.offline_edits = []
-    
-    def collect_case(self, case_data):
-        """Collect case data offline."""
-        # Create feature
-        feature = {
-            "geometry": Point({
-                "x": case_data["lon"],
-                "y": case_data["lat"],
-                "spatialReference": {"wkid": 4326}
-            }),
-            "attributes": {
-                "case_id": case_data["case_id"],
-                "disease": case_data["disease"],
-                "date": case_data["date"],
-                "age": case_data["age"],
-                "gender": case_data["gender"]
-            }
-        }
-        
-        # Store offline
-        self.offline_edits.append({
-            "action": "add",
-            "feature": feature,
+        message = json.dumps({
+            "type": "sync_data",
+            "node_id": self.node_id,
+            "data": self.local_data,
             "timestamp": datetime.now().isoformat()
         })
         
-        print(f"Collected case {case_data['case_id']} offline")
+        sock.sendto(message.encode(), peer_addr)
     
-    def sync_when_online(self):
-        """Sync offline edits when connection available."""
-        if not self.offline_edits:
-            return
+    def _merge_data(self, peer_data):
+        # Merge peer data with local data
+        for key, value in peer_data.items():
+            if key not in self.local_data:
+                # New data
+                self.local_data[key] = value
+            else:
+                # Conflict resolution: last-write-wins
+                if value["timestamp"] > self.local_data[key]["timestamp"]:
+                    self.local_data[key] = value
+    
+    def add_feature(self, feature_id, geometry, attributes):
+        # Add new feature to local data
+        self.local_data[feature_id] = {
+            "geometry": geometry,
+            "attributes": attributes,
+            "timestamp": datetime.now().isoformat(),
+            "node_id": self.node_id
+        }
+    
+    def stop(self):
+        self.running = False
+        self.discovery_thread.join()
+        self.sync_thread.join()
+
+# Example usage
+gossip = GeoGossipProtocol(node_id="chv_001")
+gossip.start()
+
+# Add epidemiological data
+gossip.add_feature(
+    feature_id="cholera_case_001",
+    geometry={"x": 34.85, "y": 3.35},
+    attributes={
+        "case_type": "cholera",
+        "date": "2026-01-15",
+        "status": "confirmed"
+    }
+)
+```
+
+### Sync-enabled feature services
+
+```python
+from arcgis.features import FeatureLayer
+from arcgis.gis import GIS
+import sqlite3
+
+class SyncEnabledFeatureService:
+    def __init__(self, feature_service_url, local_db_path):
+        self.gis = GIS()
+        self.feature_layer = FeatureLayer(feature_service_url)
+        self.local_db = sqlite3.connect(local_db_path)
+        self._init_local_db()
+    
+    def _init_local_db(self):
+        # Create local replica of feature service
+        cursor = self.local_db.cursor()
         
-        # Separate by action type
-        adds = [e["feature"] for e in self.offline_edits if e["action"] == "add"]
-        updates = [e["feature"] for e in self.offline_edits if e["action"] == "update"]
-        deletes = [e["feature"] for e in self.offline_edits if e["action"] == "delete"]
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS features (
+                objectid INTEGER PRIMARY KEY,
+                geometry TEXT,
+                attributes TEXT,
+                timestamp TEXT,
+                sync_status TEXT
+            )
+        ''')
         
-        # Apply edits
-        result = self.feature_layer.edit_features(
-            adds=adds,
-            updates=updates,
-            deletes=deletes
+        self.local_db.commit()
+    
+    def sync_down(self):
+        # Download features from service
+        features = self.feature_layer.query()
+        
+        cursor = self.local_db.cursor()
+        
+        for feature in features.features:
+            cursor.execute('''
+                INSERT OR REPLACE INTO features
+                (objectid, geometry, attributes, timestamp, sync_status)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (
+                feature.attributes['OBJECTID'],
+                json.dumps(feature.geometry),
+                json.dumps(feature.attributes),
+                datetime.now().isoformat(),
+                'synced'
+            ))
+        
+        self.local_db.commit()
+    
+    def sync_up(self):
+        # Upload local changes to service
+        cursor = self.local_db.cursor()
+        
+        # Get unsynced features
+        cursor.execute('''
+            SELECT objectid, geometry, attributes
+            FROM features
+            WHERE sync_status = 'pending'
+        ''')
+        
+        pending = cursor.fetchall()
+        
+        # Upload to service
+        for objectid, geometry, attributes in pending:
+            feature = {
+                "geometry": json.loads(geometry),
+                "attributes": json.loads(attributes)
+            }
+            
+            self.feature_layer.edit_features(updates=[feature])
+            
+            # Mark as synced
+            cursor.execute('''
+                UPDATE features
+                SET sync_status = 'synced'
+                WHERE objectid = ?
+            ''', (objectid,))
+        
+        self.local_db.commit()
+    
+    def add_feature_offline(self, geometry, attributes):
+        # Add feature while offline
+        cursor = self.local_db.cursor()
+        
+        cursor.execute('''
+            INSERT INTO features
+            (geometry, attributes, timestamp, sync_status)
+            VALUES (?, ?, ?, ?)
+        ''', (
+            json.dumps(geometry),
+            json.dumps(attributes),
+            datetime.now().isoformat(),
+            'pending'
+        ))
+        
+        self.local_db.commit()
+```
+
+## GPU physics simulation
+
+### Flood modeling with NVIDIA Modulus
+
+```python
+from arcgis.raster import Raster
+from arcgis.gis import GIS
+import numpy as np
+
+class FloodSimulator:
+    def __init__(self, dem_path, modulus_model):
+        self.dem = Raster(dem_path)
+        self.modulus_model = modulus_model
+    
+    def simulate_flood(self, rainfall_mm, duration_hours):
+        # Get elevation data
+        elevation = self.dem.read()
+        
+        # Run physics simulation on GPU
+        flood_depth = self.modulus_model.simulate(
+            elevation=elevation,
+            rainfall=rainfall_mm,
+            duration=duration_hours
         )
         
-        if result["addResults"]:
-            print(f"Synced {len(adds)} new cases")
-            self.offline_edits = []  # Clear after successful sync
+        return flood_depth
+    
+    def identify_risk_zones(self, flood_depth, threshold=0.5):
+        # Identify areas with flood depth > threshold
+        risk_zones = np.where(flood_depth > threshold, 1, 0)
         
-        return result
+        return risk_zones
+    
+    def overlay_on_map(self, map_widget, flood_depth):
+        # Create raster overlay
+        from arcgis.raster import Raster
+        
+        # Convert flood depth to raster
+        flood_raster = Raster.from_numpy_array(
+            flood_depth,
+            extent=self.dem.extent
+        )
+        
+        # Add to map with transparency
+        map_widget.add_layer(flood_raster, {
+            "opacity": 0.6,
+            "renderer": {
+                "type": "stretch",
+                "colorRamp": {
+                    "type": "algorithmic",
+                    "fromColor": [255, 255, 0, 255],
+                    "toColor": [255, 0, 0, 255]
+                }
+            }
+        })
 
+# Example usage
+from modulus.sym.hydra import instantiate_arch
+from modulus.sym.solver import Solver
 
-# Example: CHV collecting cholera cases offline
-collector = OfflineDataCollector(
-    feature_service_url="https://services.arcgis.com/cholera_cases"
+# Load Modulus model
+modulus_model = Solver.load("flood_model.pth")
+
+# Initialize simulator
+simulator = FloodSimulator(
+    dem_path="/data/elevation/kalobeyei_dem.tif",
+    modulus_model=modulus_model
 )
 
-# Collect cases offline
-collector.collect_case({
-    "case_id": "CHO_001",
-    "disease": "cholera",
-    "lat": -0.05,
-    "lon": 40.4,
-    "date": "2026-01-15",
-    "age": 35,
-    "gender": "M"
-})
+# Simulate 100mm rainfall over 6 hours
+flood_depth = simulator.simulate_flood(
+    rainfall_mm=100,
+    duration_hours=6
+)
 
-# Later, when Wi-Fi Direct connection available
-collector.sync_when_online()
+# Identify risk zones
+risk_zones = simulator.identify_risk_zones(flood_depth, threshold=0.5)
+
+# Overlay on map
+from arcgis.mapping import Map
+map_widget = Map()
+simulator.overlay_on_map(map_widget, flood_depth)
+```
+
+### Real-time runoff simulation
+
+```python
+import cupy as cp
+from arcgis.raster import Raster
+
+class RunoffSimulator:
+    def __init__(self, dem_raster, soil_raster):
+        self.dem = dem_raster
+        self.soil = soil_raster
+        
+        # Load data to GPU
+        self.elevation_gpu = cp.array(self.dem.read())
+        self.soil_type_gpu = cp.array(self.soil.read())
+    
+    def calculate_runoff(self, rainfall_intensity):
+        # Calculate slope
+        slope = self._calculate_slope_gpu(self.elevation_gpu)
+        
+        # Calculate infiltration rate based on soil type
+        infiltration = self._calculate_infiltration_gpu(
+            self.soil_type_gpu
+        )
+        
+        # Calculate runoff
+        runoff = cp.maximum(
+            rainfall_intensity - infiltration,
+            0
+        )
+        
+        # Apply slope factor
+        runoff *= (1 + slope / 10)
+        
+        return cp.asnumpy(runoff)
+    
+    def _calculate_slope_gpu(self, elevation):
+        # Calculate slope using GPU
+        dy, dx = cp.gradient(elevation)
+        slope = cp.sqrt(dx**2 + dy**2)
+        
+        return slope
+    
+    def _calculate_infiltration_gpu(self, soil_type):
+        # Infiltration rates by soil type
+        infiltration_map = {
+            1: 50,   # Sand (mm/hr)
+            2: 25,   # Loam
+            3: 10,   # Clay
+            4: 5     # Rock
+        }
+        
+        # Map soil types to infiltration rates
+        infiltration = cp.zeros_like(soil_type, dtype=cp.float32)
+        
+        for soil_id, rate in infiltration_map.items():
+            infiltration[soil_type == soil_id] = rate
+        
+        return infiltration
+    
+    def trace_flow_path(self, start_point):
+        # Trace water flow from start point
+        elevation = self.elevation_gpu
+        
+        path = [start_point]
+        current = start_point
+        
+        while True:
+            # Find steepest descent
+            neighbors = self._get_neighbors(current)
+            
+            if not neighbors:
+                break
+            
+            # Get elevations
+            elevations = [
+                elevation[n[0], n[1]] for n in neighbors
+            ]
+            
+            # Find lowest neighbor
+            min_idx = cp.argmin(cp.array(elevations))
+            next_point = neighbors[int(min_idx)]
+            
+            # Check if we're going downhill
+            if elevation[next_point[0], next_point[1]] >= elevation[current[0], current[1]]:
+                break
+            
+            path.append(next_point)
+            current = next_point
+        
+        return path
+    
+    def _get_neighbors(self, point):
+        # Get 8-connected neighbors
+        y, x = point
+        neighbors = []
+        
+        for dy in [-1, 0, 1]:
+            for dx in [-1, 0, 1]:
+                if dy == 0 and dx == 0:
+                    continue
+                
+                ny, nx = y + dy, x + dx
+                
+                if (0 <= ny < self.elevation_gpu.shape[0] and
+                    0 <= nx < self.elevation_gpu.shape[1]):
+                    neighbors.append((ny, nx))
+        
+        return neighbors
 ```
 
 ## Real-time visualization
 
-### GPU-accelerated graphic overlays
+### Zero-latency graphic overlay
 
 ```python
 from arcgis.mapping import Map
-from arcgis.geometry import Polygon, Polyline
-import numpy as np
+from arcgis.geometry import Point, Polyline
+import threading
 
-class RealTimeOverlayEngine:
-    """Zero-latency visualization of simulation results."""
-    
-    def __init__(self, map_view):
-        self.map = map_view
+class RealtimeOverlay:
+    def __init__(self, map_widget):
+        self.map = map_widget
         self.graphics_layer = self.map.add_graphics_layer()
+        self.update_thread = None
+        self.running = False
     
-    def visualize_runoff(self, runoff_data, elevation):
-        """Visualize runoff simulation results in real-time."""
-        # Convert runoff data to flow paths
-        flow_paths = self._extract_flow_paths(runoff_data)
-        
-        # Add polylines for each flow path
-        for path in flow_paths:
-            polyline = Polyline(path["coordinates"])
+    def start_realtime_updates(self, data_source, update_interval=1.0):
+        # Start real-time update thread
+        self.running = True
+        self.update_thread = threading.Thread(
+            target=self._update_loop,
+            args=(data_source, update_interval)
+        )
+        self.update_thread.start()
+    
+    def _update_loop(self, data_source, interval):
+        while self.running:
+            # Get latest data
+            data = data_source.get_latest()
             
-            # Color by flow intensity
-            intensity = path["intensity"]
-            color = self._intensity_to_color(intensity)
+            # Update graphics
+            self._update_graphics(data)
             
-            self.graphics_layer.add_graphic({
-                "geometry": polyline,
-                "symbol": {
-                    "type": "simple-line",
-                    "color": color,
-                    "width": max(1, intensity * 5)
-                }
-            })
+            # Wait for next update
+            time.sleep(interval)
     
-    def visualize_risk_zones(self, risk_data):
-        """Visualize cholera risk zones."""
-        # Convert risk raster to polygons
-        risk_polygons = self._raster_to_polygons(risk_data)
+    def _update_graphics(self, data):
+        # Clear existing graphics
+        self.graphics_layer.clear()
         
-        for polygon in risk_polygons:
-            self.graphics_layer.add_graphic({
-                "geometry": Polygon(polygon["coordinates"]),
-                "symbol": {
-                    "type": "simple-fill",
-                    "color": self._risk_to_color(polygon["risk_level"]),
-                    "outline": {"color": [255, 0, 0], "width": 1}
-                }
-            })
+        # Add new graphics
+        for feature in data:
+            if feature["type"] == "point":
+                self._add_point(feature)
+            elif feature["type"] == "line":
+                self._add_line(feature)
+            elif feature["type"] == "polygon":
+                self._add_polygon(feature)
     
-    def _extract_flow_paths(self, runoff_data):
-        """Extract flow paths from runoff simulation."""
-        # Simplified: In production, use D8 flow direction algorithm
-        paths = []
-        # ... flow path extraction logic
-        return paths
-    
-    def _intensity_to_color(self, intensity):
-        """Map flow intensity to color."""
-        # Blue gradient: light blue (low) to dark blue (high)
-        blue = int(255 * (1 - intensity))
-        return [0, 0, blue, 200]
-    
-    def _risk_to_color(self, risk_level):
-        """Map risk level to color."""
-        colors = {
-            "low": [0, 255, 0, 100],
-            "medium": [255, 255, 0, 100],
-            "high": [255, 0, 0, 100]
+    def _add_point(self, feature):
+        # Add point graphic
+        point = Point({
+            "x": feature["x"],
+            "y": feature["y"],
+            "spatialReference": {"wkid": 4326}
+        })
+        
+        symbol = {
+            "type": "esriSMS",
+            "style": "esriSMSCircle",
+            "color": feature.get("color", [255, 0, 0, 255]),
+            "size": feature.get("size", 10)
         }
-        return colors.get(risk_level, [128, 128, 128, 100])
+        
+        self.graphics_layer.add({
+            "geometry": point,
+            "symbol": symbol,
+            "attributes": feature.get("attributes", {})
+        })
+    
+    def add_risk_overlay(self, risk_data, risk_type):
+        # Add risk visualization overlay
+        color_map = {
+            "cholera": [0, 0, 255, 128],      # Blue
+            "flood": [0, 255, 255, 128],      # Cyan
+            "heat": [255, 0, 0, 128],         # Red
+            "radiation": [255, 255, 0, 128]   # Yellow
+        }
+        
+        color = color_map.get(risk_type, [128, 128, 128, 128])
+        
+        for zone in risk_data:
+            self._add_polygon({
+                "rings": zone["geometry"],
+                "color": color,
+                "attributes": {
+                    "risk_type": risk_type,
+                    "risk_level": zone["risk_level"]
+                }
+            })
+    
+    def stop(self):
+        self.running = False
+        if self.update_thread:
+            self.update_thread.join()
 ```
 
-## Performance metrics
+## Performance optimization
 
-### Offline rendering
+### Spatial indexing
 
-- **VTPK load time**: <2 seconds for 1GB package
-- **Map pan/zoom**: 60 FPS on IGX Orin
-- **Graphic overlay**: <16ms per frame
-- **Feature query**: <100ms for 10,000 features
+```python
+from rtree import index
+import json
 
-### Sync protocol
-
-- **Peer discovery**: <5 seconds
-- **Data sync**: <1 second for 1MB of features
-- **Conflict resolution**: Automatic (last-write-wins)
+class SpatialIndex:
+    def __init__(self):
+        self.idx = index.Index()
+        self.features = {}
+        self.next_id = 0
+    
+    def add_feature(self, geometry, attributes):
+        # Add feature to spatial index
+        bounds = self._get_bounds(geometry)
+        
+        feature_id = self.next_id
+        self.next_id += 1
+        
+        # Insert into R-tree
+        self.idx.insert(feature_id, bounds)
+        
+        # Store feature
+        self.features[feature_id] = {
+            "geometry": geometry,
+            "attributes": attributes
+        }
+        
+        return feature_id
+    
+    def query_bbox(self, xmin, ymin, xmax, ymax):
+        # Query features within bounding box
+        feature_ids = list(self.idx.intersection((xmin, ymin, xmax, ymax)))
+        
+        results = [
+            self.features[fid] for fid in feature_ids
+        ]
+        
+        return results
+    
+    def query_nearest(self, x, y, k=10):
+        # Find k nearest features
+        feature_ids = list(self.idx.nearest((x, y, x, y), k))
+        
+        results = [
+            self.features[fid] for fid in feature_ids
+        ]
+        
+        return results
+    
+    def _get_bounds(self, geometry):
+        # Calculate bounding box
+        if geometry["type"] == "Point":
+            x, y = geometry["coordinates"]
+            return (x, y, x, y)
+        
+        elif geometry["type"] == "LineString":
+            coords = geometry["coordinates"]
+            xs = [c[0] for c in coords]
+            ys = [c[1] for c in coords]
+            return (min(xs), min(ys), max(xs), max(ys))
+        
+        elif geometry["type"] == "Polygon":
+            coords = geometry["coordinates"][0]
+            xs = [c[0] for c in coords]
+            ys = [c[1] for c in coords]
+            return (min(xs), min(ys), max(xs), max(ys))
+```
 
 ## Deployment checklist
 
@@ -658,30 +815,36 @@ class RealTimeOverlayEngine:
   <Step title="Install ArcGIS SDK">
     Install ESRI ArcGIS Maps SDK for Native Apps
   </Step>
-  <Step title="Download offline packages">
-    Create and download .vtpk and .mmpk for target regions
+  <Step title="Create offline packages">
+    Generate .vtpk and .mmpk for target regions
   </Step>
-  <Step title="Setup sync protocol">
-    Deploy peer-to-peer gossip synchronization
+  <Step title="Setup P2P sync">
+    Configure Wi-Fi Direct gossip protocol
   </Step>
-  <Step title="Integrate Modulus">
-    Connect terrain data to NVIDIA Modulus physics engine
+  <Step title="Deploy Modulus">
+    Install NVIDIA Modulus for physics simulation
   </Step>
-  <Step title="Test offline rendering">
-    Verify map rendering without internet connection
+  <Step title="Test offline mode">
+    Verify map rendering without internet
   </Step>
-  <Step title="Test P2P sync">
-    Verify data synchronization between two devices
+  <Step title="Enable real-time overlay">
+    Configure zero-latency risk visualization
   </Step>
 </Steps>
 
 ## Related documentation
 
 <CardGroup cols={2}>
-  <Card title="Nuclear Stack Overview" icon="atom" href="/architecture/nuclear-stack">
-    Complete architectural thesis
+  <Card title="Spatial Omniscience Stack" icon="map" href="/architecture/spatial-omniscience">
+    Architecture overview
   </Card>
-  <Card title="Spatial Omniscience" icon="map" href="/architecture/spatial-omniscience">
-    GeoGhost architecture details
+  <Card title="ESRI Integration" icon="globe" href="/integrations/esri-geospatial">
+    GeoAI and spatial analysis
+  </Card>
+  <Card title="Nuclear Stack" icon="atom" href="/architecture/nuclear-stack">
+    Complete system integration
+  </Card>
+  <Card title="Deployment" icon="rocket" href="/deployment/overview">
+    Production deployment
   </Card>
 </CardGroup>
