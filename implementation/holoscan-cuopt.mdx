@@ -5,215 +5,257 @@ description: NVIDIA Holoscan SDK and cuOpt for kinetic orchestration and logisti
 
 ## Overview
 
-This implementation guide covers the deployment of **NVIDIA Holoscan SDK (Production Branch 25h1)** for medical-grade sensor orchestration and **NVIDIA cuOpt** for GPU-accelerated logistics optimization. Together, these form the Kinetic & Sensory Stack's operational backbone.
+This implementation guide covers the deployment of **NVIDIA Holoscan SDK (Production Branch 25h1)** for medical-grade sensor orchestration and **NVIDIA cuOpt** for GPU-accelerated vehicle routing and logistics optimization.
 
-## Holoscan SDK (Production Branch 25h1)
+## Holoscan SDK (Kinetic & Sensory Stack)
 
-### Core capabilities
+### Architecture
 
-- **Dynamic Flow Control** - Autonomous sensor stream throttling based on thermal limits
-- **Medical-grade precision** - FDA-compliant data pipelines
-- **Edge-native** - Runs on NVIDIA IGX Orin with real-time guarantees
-- **Modular operators** - Composable data processing pipelines
+Holoscan SDK provides the central nervous system for iLuminara, processing real-world sensor data with medical-grade precision and dynamic flow control.
 
 ### Installation
 
 ```bash
 # Install Holoscan SDK Production Branch 25h1
-pip install holoscan-sdk>=2.6.0
+pip install holoscan>=2.6.0
 
-# Verify installation
-python -c "import holoscan; print(holoscan.__version__)"
+# Install dependencies
+pip install numpy>=1.24.0
+pip install opencv-python>=4.8.0
 ```
 
-### Basic Holoscan application
+### Core components
+
+<CardGroup cols={2}>
+  <Card title="Dynamic Flow Control" icon="gauge">
+    Bandwidth-aware sensor stream prioritization
+  </Card>
+  <Card title="Medical-grade precision" icon="stethoscope">
+    Real-time ultrasound and diagnostic imaging
+  </Card>
+  <Card title="Edge orchestration" icon="microchip">
+    IGX Orin hardware acceleration
+  </Card>
+  <Card title="Thermal management" icon="temperature-half">
+    Adaptive throttling for harsh environments
+  </Card>
+</CardGroup>
+
+## Holoscan application structure
+
+### Basic sensor pipeline
 
 ```python
 from holoscan.core import Application, Operator, OperatorSpec
 from holoscan.operators import VideoStreamReplayerOp, FormatConverterOp
 import numpy as np
 
-class UltrasoundProcessor(Operator):
-    """Process ultrasound video stream with dynamic flow control."""
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.frame_count = 0
-        self.thermal_limit = 85  # Celsius
-    
-    def setup(self, spec: OperatorSpec):
-        spec.input("input")
-        spec.output("output")
-    
-    def compute(self, op_input, op_output, context):
-        # Get input frame
-        frame = op_input.receive("input")
-        
-        # Check thermal status
-        temp = self.read_thermal_sensor()
-        
-        if temp > self.thermal_limit:
-            # Throttle: Skip every other frame
-            if self.frame_count % 2 == 0:
-                self.frame_count += 1
-                return
-        
-        # Process frame
-        processed = self.process_ultrasound(frame)
-        
-        # Send output
-        op_output.emit(processed, "output")
-        self.frame_count += 1
-    
-    def read_thermal_sensor(self):
-        # Read IGX Orin thermal sensor
-        with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
-            temp = int(f.read()) / 1000  # Convert millidegrees to Celsius
-        return temp
-    
-    def process_ultrasound(self, frame):
-        # Apply medical imaging filters
-        # Example: Contrast enhancement
-        enhanced = np.clip(frame * 1.2, 0, 255).astype(np.uint8)
-        return enhanced
-
-
-class MedicalImagingApp(Application):
-    """Holoscan application for medical imaging pipeline."""
+class SensorOrchestrator(Application):
+    def __init__(self):
+        super().__init__()
+        self.sensor_streams = {}
+        self.bandwidth_limit = 100  # Mbps
     
     def compose(self):
-        # Video source
-        source = VideoStreamReplayerOp(
+        # Video stream input (ultrasound)
+        video_in = VideoStreamReplayerOp(
             self,
-            name="ultrasound_source",
-            directory="/data/ultrasound_streams",
-            basename="stream",
+            name="ultrasound_input",
+            directory="/data/ultrasound",
+            basename="ultrasound",
             frame_rate=30
         )
         
         # Format converter
-        converter = FormatConverterOp(
+        format_converter = FormatConverterOp(
             self,
             name="format_converter",
             in_dtype="rgb888",
             out_dtype="rgba8888"
         )
         
-        # Custom processor
-        processor = UltrasoundProcessor(
+        # Custom processing operator
+        processor = DiagnosticProcessor(
             self,
-            name="ultrasound_processor"
+            name="diagnostic_processor"
         )
         
         # Connect operators
-        self.add_flow(source, converter)
-        self.add_flow(converter, processor)
+        self.add_flow(video_in, format_converter, {("output", "source_video")})
+        self.add_flow(format_converter, processor, {("tensor", "input")})
 
+class DiagnosticProcessor(Operator):
+    def __init__(self, fragment, name):
+        super().__init__(fragment, name)
+    
+    def setup(self, spec: OperatorSpec):
+        spec.input("input")
+        spec.output("output")
+    
+    def compute(self, op_input, op_output, context):
+        # Get input tensor
+        input_tensor = op_input.receive("input")
+        
+        # Process diagnostic data
+        processed = self.process_diagnostic(input_tensor)
+        
+        # Output result
+        op_output.emit(processed, "output")
+    
+    def process_diagnostic(self, tensor):
+        # AI-powered diagnostic analysis
+        # Placeholder for actual processing
+        return tensor
 
 # Run application
 if __name__ == "__main__":
-    app = MedicalImagingApp()
+    app = SensorOrchestrator()
     app.run()
 ```
 
 ### Dynamic flow control
 
 ```python
-from holoscan.core import Operator, OperatorSpec
+from holoscan.core import Application, Operator
 import psutil
 
-class AdaptiveFlowController(Operator):
-    """Dynamically adjust data flow based on system resources."""
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.bandwidth_limit_mbps = 100
-        self.current_bandwidth = 0
+class DynamicFlowController(Operator):
+    def __init__(self, fragment, name):
+        super().__init__(fragment, name)
+        self.bandwidth_limit = 100  # Mbps
+        self.thermal_limit = 85  # Celsius
     
     def setup(self, spec: OperatorSpec):
-        spec.input("sensor_data")
-        spec.output("throttled_data")
-        spec.param("priority", 1)  # 1=high, 2=medium, 3=low
+        spec.input("sensor_streams")
+        spec.output("prioritized_streams")
     
     def compute(self, op_input, op_output, context):
-        # Get sensor data
-        data = op_input.receive("sensor_data")
+        # Get all sensor streams
+        streams = op_input.receive("sensor_streams")
         
-        # Check available bandwidth
-        net_io = psutil.net_io_counters()
-        self.current_bandwidth = net_io.bytes_sent / 1e6  # MB/s
+        # Check system resources
+        cpu_temp = self.get_cpu_temperature()
+        network_bandwidth = self.get_network_bandwidth()
         
-        # Check thermal status
-        temp = self.read_thermal()
+        # Prioritize streams based on constraints
+        prioritized = self.prioritize_streams(
+            streams=streams,
+            cpu_temp=cpu_temp,
+            bandwidth=network_bandwidth
+        )
         
-        # Determine throttling strategy
-        if temp > 85 or self.current_bandwidth > self.bandwidth_limit_mbps:
-            # High priority data only
-            if data.priority == 1:
-                op_output.emit(data, "throttled_data")
-        else:
-            # All data passes through
-            op_output.emit(data, "throttled_data")
+        # Emit prioritized streams
+        op_output.emit(prioritized, "prioritized_streams")
     
-    def read_thermal(self):
-        temps = psutil.sensors_temperatures()
-        if 'coretemp' in temps:
-            return max([t.current for t in temps['coretemp']])
-        return 0
+    def prioritize_streams(self, streams, cpu_temp, bandwidth):
+        # Priority order: critical diagnostics > routine monitoring
+        priority_map = {
+            "ultrasound": 1,
+            "ecg": 2,
+            "temperature": 3,
+            "environmental": 4
+        }
+        
+        # Throttle if thermal limit exceeded
+        if cpu_temp > self.thermal_limit:
+            # Reduce frame rate for non-critical streams
+            for stream in streams:
+                if priority_map.get(stream["type"], 5) > 2:
+                    stream["frame_rate"] *= 0.5
+        
+        # Throttle if bandwidth constrained
+        if bandwidth > self.bandwidth_limit:
+            # Compress or drop low-priority streams
+            streams = [s for s in streams if priority_map.get(s["type"], 5) <= 3]
+        
+        # Sort by priority
+        streams.sort(key=lambda s: priority_map.get(s["type"], 5))
+        
+        return streams
+    
+    def get_cpu_temperature(self):
+        # Read CPU temperature (IGX Orin specific)
+        try:
+            with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
+                temp = int(f.read()) / 1000.0
+            return temp
+        except:
+            return 50.0  # Default
+    
+    def get_network_bandwidth(self):
+        # Measure current network usage
+        net_io = psutil.net_io_counters()
+        return net_io.bytes_sent / 1e6  # Convert to Mbps
 ```
 
-### Multi-sensor orchestration
+### Multi-sensor fusion
 
 ```python
-from holoscan.core import Application
-from holoscan.operators import VideoStreamReplayerOp
+from holoscan.core import Application, Operator
+import numpy as np
 
-class MultiSensorClinic(Application):
-    """Orchestrate multiple medical sensors in Ghost-Mode mesh."""
+class SensorFusion(Operator):
+    def __init__(self, fragment, name):
+        super().__init__(fragment, name)
+        self.sensor_buffer = {}
     
-    def compose(self):
-        # Ultrasound sensor
-        ultrasound = VideoStreamReplayerOp(
-            self, name="ultrasound",
-            directory="/data/ultrasound",
-            frame_rate=30
-        )
+    def setup(self, spec: OperatorSpec):
+        spec.input("ultrasound")
+        spec.input("ecg")
+        spec.input("temperature")
+        spec.output("fused_data")
+    
+    def compute(self, op_input, op_output, context):
+        # Receive data from multiple sensors
+        ultrasound = op_input.receive("ultrasound")
+        ecg = op_input.receive("ecg")
+        temperature = op_input.receive("temperature")
         
-        # ECG sensor
-        ecg = VideoStreamReplayerOp(
-            self, name="ecg",
-            directory="/data/ecg",
-            frame_rate=250  # 250 Hz sampling
-        )
+        # Synchronize timestamps
+        synced_data = self.synchronize_sensors({
+            "ultrasound": ultrasound,
+            "ecg": ecg,
+            "temperature": temperature
+        })
         
-        # Environmental sensors
-        env = VideoStreamReplayerOp(
-            self, name="environmental",
-            directory="/data/environmental",
-            frame_rate=1  # 1 Hz sampling
-        )
+        # Fuse sensor data
+        fused = self.fuse_data(synced_data)
         
-        # Flow controller
-        controller = AdaptiveFlowController(
-            self, name="flow_controller"
-        )
+        # Emit fused result
+        op_output.emit(fused, "fused_data")
+    
+    def synchronize_sensors(self, sensor_data):
+        # Align sensor data by timestamp
+        timestamps = [data["timestamp"] for data in sensor_data.values()]
+        reference_time = min(timestamps)
         
-        # Connect high-priority sensors
-        self.add_flow(ultrasound, controller, {("output", "sensor_data")})
-        self.add_flow(ecg, controller, {("output", "sensor_data")})
+        synced = {}
+        for sensor, data in sensor_data.items():
+            # Interpolate to reference time
+            synced[sensor] = self.interpolate_to_time(
+                data, reference_time
+            )
         
-        # Environmental data is lower priority
-        self.add_flow(env, controller, {("output", "sensor_data")})
+        return synced
+    
+    def fuse_data(self, synced_data):
+        # Combine sensor modalities
+        fused = {
+            "timestamp": synced_data["ultrasound"]["timestamp"],
+            "cardiac_output": self.calculate_cardiac_output(
+                synced_data["ultrasound"],
+                synced_data["ecg"]
+            ),
+            "vital_signs": {
+                "heart_rate": synced_data["ecg"]["heart_rate"],
+                "temperature": synced_data["temperature"]["value"]
+            }
+        }
+        
+        return fused
 ```
 
-## NVIDIA cuOpt
-
-### Core capabilities
-
-- **GPU-accelerated VRP** - Vehicle Routing Problem solver
-- **Millisecond optimization** - Real-time fleet re-routing
-- **Constraint handling** - Time windows, capacity, priorities
-- **Agentic integration** - Natural language command parsing
+## cuOpt (Logistics Optimization)
 
 ### Installation
 
@@ -221,172 +263,203 @@ class MultiSensorClinic(Application):
 # Install cuOpt client
 pip install cuopt-client>=25.08
 
-# Verify installation
-python -c "import cuopt; print(cuopt.__version__)"
+# Install dependencies
+pip install pandas>=2.0.0
+pip install geopandas>=0.13.0
 ```
 
-### Basic VRP optimization
+### Vehicle routing problem (VRP)
 
 ```python
 from cuopt import VehicleRoutingProblem, Solver
 import numpy as np
 
 class DroneFleetOptimizer:
-    """Optimize drone delivery routes using cuOpt."""
-    
-    def __init__(self, num_drones=5):
-        self.num_drones = num_drones
+    def __init__(self):
         self.solver = Solver(device="cuda")
+        self.fleet = []
+        self.delivery_points = []
     
-    def optimize_routes(self, deliveries, depot_location):
-        """
-        Optimize delivery routes for drone fleet.
-        
-        Args:
-            deliveries: List of (lat, lon, priority, time_window)
-            depot_location: (lat, lon) of clinic depot
-        
-        Returns:
-            Optimized routes for each drone
-        """
+    def add_drone(self, drone_id, capacity, start_location):
+        self.fleet.append({
+            "id": drone_id,
+            "capacity": capacity,
+            "location": start_location
+        })
+    
+    def add_delivery(self, location, payload_weight, priority):
+        self.delivery_points.append({
+            "location": location,
+            "weight": payload_weight,
+            "priority": priority
+        })
+    
+    def optimize_routes(self):
         # Create VRP
         vrp = VehicleRoutingProblem(
-            num_vehicles=self.num_drones,
-            vehicle_capacity=10,  # kg
-            locations=[depot_location] + [d[:2] for d in deliveries],
-            depot_location=depot_location
+            num_vehicles=len(self.fleet),
+            vehicle_capacity=[d["capacity"] for d in self.fleet],
+            locations=[d["location"] for d in self.delivery_points],
+            depot_location=self.fleet[0]["location"]
         )
         
-        # Add time windows
-        for i, delivery in enumerate(deliveries):
-            vrp.add_time_window(
-                location_id=i+1,
-                earliest=delivery[3][0],
-                latest=delivery[3][1]
-            )
+        # Add constraints
+        vrp.add_time_windows(
+            self.calculate_time_windows()
+        )
         
-        # Add priorities
-        for i, delivery in enumerate(deliveries):
-            vrp.add_priority(
-                location_id=i+1,
-                priority=delivery[2]
-            )
+        vrp.add_priorities(
+            [d["priority"] for d in self.delivery_points]
+        )
         
         # Solve on GPU
         solution = self.solver.solve(vrp)
         
-        return solution.routes
-
-
-# Example usage
-optimizer = DroneFleetOptimizer(num_drones=5)
-
-deliveries = [
-    # (lat, lon, priority, (earliest, latest))
-    (0.5, 0.5, 1, (0, 3600)),      # High priority, 1 hour window
-    (1.0, 1.0, 2, (0, 7200)),      # Medium priority, 2 hour window
-    (1.5, 0.5, 1, (0, 1800)),      # High priority, 30 min window
-    (0.5, 1.5, 3, (0, 14400)),     # Low priority, 4 hour window
-]
-
-depot = (0.0, 0.0)
-
-routes = optimizer.optimize_routes(deliveries, depot)
-
-for drone_id, route in enumerate(routes):
-    print(f"Drone {drone_id}: {route}")
+        return self.format_solution(solution)
+    
+    def calculate_time_windows(self):
+        # Calculate delivery time windows based on priority
+        windows = []
+        for delivery in self.delivery_points:
+            if delivery["priority"] == "urgent":
+                windows.append((0, 30))  # 30 minutes
+            elif delivery["priority"] == "high":
+                windows.append((0, 120))  # 2 hours
+            else:
+                windows.append((0, 480))  # 8 hours
+        
+        return windows
+    
+    def format_solution(self, solution):
+        # Format solution for drone fleet
+        routes = []
+        for vehicle_id, route in enumerate(solution.routes):
+            routes.append({
+                "drone_id": self.fleet[vehicle_id]["id"],
+                "waypoints": route,
+                "total_distance": solution.distances[vehicle_id],
+                "estimated_time": solution.times[vehicle_id]
+            })
+        
+        return routes
 ```
 
-### Agentic cuOpt with NeMo
+### Agentic cuOpt (Natural language routing)
 
 ```python
-from cuopt import VehicleRoutingProblem, Solver
-from nemo_agent import NeMoAgent
+from cuopt import Solver, VehicleRoutingProblem
+from nvidia_nemo import NeMoAgent
+import re
 
 class AgenticDispatcher:
-    """Natural language drone fleet dispatcher."""
-    
     def __init__(self):
         self.solver = Solver(device="cuda")
-        self.nemo_agent = NeMoAgent(model="nemo-canary")
+        self.nemo_agent = NeMoAgent(model="nemo-agent-1.0")
         self.fleet_state = {}
     
     def parse_command(self, natural_language_command):
-        """
-        Parse natural language command into VRP constraints.
+        # Use NeMo to parse natural language
+        parsed = self.nemo_agent.parse(natural_language_command)
         
-        Example: "Re-route the drone fleet to Sector 4 to avoid flash flooding"
-        """
-        # Use NeMo to extract intent and entities
-        intent = self.nemo_agent.extract_intent(natural_language_command)
-        entities = self.nemo_agent.extract_entities(natural_language_command)
+        # Extract routing constraints
+        constraints = {
+            "avoid_zones": self.extract_avoid_zones(parsed),
+            "priority_locations": self.extract_priorities(parsed),
+            "time_constraints": self.extract_time_constraints(parsed)
+        }
         
-        if intent == "reroute":
-            # Extract constraints
-            avoid_zones = entities.get("avoid_zones", [])
-            target_sector = entities.get("target_sector")
-            
-            # Generate new VRP with constraints
-            vrp = self.create_vrp_with_constraints(
-                avoid_zones=avoid_zones,
-                target_sector=target_sector
-            )
-            
-            # Solve in milliseconds
-            solution = self.solver.solve(vrp)
-            
-            return solution
+        return constraints
     
-    def create_vrp_with_constraints(self, avoid_zones, target_sector):
-        """Create VRP with dynamic constraints."""
+    def execute_command(self, command):
+        # Parse natural language command
+        constraints = self.parse_command(command)
+        
+        # Create VRP with constraints
+        vrp = self.create_vrp_with_constraints(constraints)
+        
+        # Solve
+        solution = self.solver.solve(vrp)
+        
+        # Generate natural language response
+        response = self.generate_response(solution)
+        
+        return {
+            "solution": solution,
+            "response": response
+        }
+    
+    def extract_avoid_zones(self, parsed):
+        # Extract zones to avoid from parsed command
+        avoid_zones = []
+        
+        if "avoid" in parsed:
+            # Example: "avoid Sector 4"
+            zones = re.findall(r"Sector (\d+)", parsed["text"])
+            avoid_zones = [f"sector_{z}" for z in zones]
+        
+        return avoid_zones
+    
+    def create_vrp_with_constraints(self, constraints):
+        # Create VRP with natural language constraints
         vrp = VehicleRoutingProblem(
-            num_vehicles=5,
-            vehicle_capacity=10
+            num_vehicles=len(self.fleet_state),
+            vehicle_capacity=[v["capacity"] for v in self.fleet_state.values()],
+            locations=self.get_delivery_locations(),
+            depot_location=(0, 0)
         )
         
-        # Add avoidance zones
-        for zone in avoid_zones:
-            vrp.add_forbidden_zone(zone)
+        # Add avoid zones as constraints
+        if constraints["avoid_zones"]:
+            vrp.add_forbidden_zones(constraints["avoid_zones"])
         
-        # Prioritize target sector
-        if target_sector:
-            vrp.add_sector_priority(target_sector, priority=1)
+        # Add priority constraints
+        if constraints["priority_locations"]:
+            vrp.add_priorities(constraints["priority_locations"])
         
         return vrp
-
+    
+    def generate_response(self, solution):
+        # Generate natural language response
+        response = f"Optimized routes for {len(solution.routes)} vehicles. "
+        response += f"Total distance: {sum(solution.distances):.2f} km. "
+        response += f"Estimated completion: {max(solution.times):.0f} minutes."
+        
+        return response
 
 # Example usage
 dispatcher = AgenticDispatcher()
 
 # Natural language command
-command = "Re-route the drone fleet to Sector 4 to avoid flash flooding in Sector 2"
+command = "Re-route the drone fleet to avoid Sector 4 due to flash flooding"
 
-# Parse and execute
-solution = dispatcher.parse_command(command)
-print(f"New routes: {solution.routes}")
+# Execute
+result = dispatcher.execute_command(command)
+print(result["response"])
 ```
 
-### Real-time re-routing
+### Real-time re-optimization
 
 ```python
+from cuopt import Solver, VehicleRoutingProblem
+import threading
 import time
-from threading import Thread
 
-class RealTimeFleetManager:
-    """Continuously optimize fleet routes based on changing conditions."""
-    
+class RealtimeOptimizer:
     def __init__(self):
         self.solver = Solver(device="cuda")
-        self.current_routes = {}
+        self.current_solution = None
         self.running = False
     
-    def start_monitoring(self):
-        """Start real-time monitoring and optimization."""
+    def start_optimization_loop(self, update_interval=60):
+        # Start continuous optimization
         self.running = True
-        Thread(target=self._optimization_loop).start()
+        self.optimization_thread = threading.Thread(
+            target=self._optimization_loop,
+            args=(update_interval,)
+        )
+        self.optimization_thread.start()
     
-    def _optimization_loop(self):
-        """Continuous optimization loop."""
+    def _optimization_loop(self, interval):
         while self.running:
             # Get current fleet state
             fleet_state = self.get_fleet_state()
@@ -394,177 +467,174 @@ class RealTimeFleetManager:
             # Get pending deliveries
             pending = self.get_pending_deliveries()
             
-            # Check for disruptions
-            disruptions = self.check_disruptions()
+            # Re-optimize
+            vrp = self.create_vrp(fleet_state, pending)
+            solution = self.solver.solve(vrp)
             
-            if disruptions or pending:
-                # Re-optimize routes
-                new_routes = self.optimize_with_disruptions(
-                    fleet_state, pending, disruptions
-                )
-                
-                # Update fleet
-                self.update_fleet_routes(new_routes)
+            # Update routes
+            self.update_fleet_routes(solution)
             
-            # Sleep for 1 second
-            time.sleep(1)
+            # Store solution
+            self.current_solution = solution
+            
+            # Wait for next interval
+            time.sleep(interval)
     
-    def optimize_with_disruptions(self, fleet_state, pending, disruptions):
-        """Optimize routes considering current state and disruptions."""
-        vrp = VehicleRoutingProblem(
-            num_vehicles=len(fleet_state),
-            vehicle_capacity=10
-        )
+    def handle_emergency(self, emergency_location, priority="critical"):
+        # Immediate re-optimization for emergency
+        fleet_state = self.get_fleet_state()
         
-        # Add current vehicle positions as starting points
-        for vehicle_id, position in fleet_state.items():
-            vrp.set_vehicle_start(vehicle_id, position)
-        
-        # Add pending deliveries
-        for delivery in pending:
-            vrp.add_location(delivery["location"])
-        
-        # Add disruption constraints
-        for disruption in disruptions:
-            if disruption["type"] == "road_closure":
-                vrp.add_forbidden_edge(
-                    disruption["from"],
-                    disruption["to"]
-                )
-            elif disruption["type"] == "weather":
-                vrp.add_forbidden_zone(disruption["zone"])
-        
-        # Solve
-        solution = self.solver.solve(vrp)
-        return solution.routes
-```
-
-### Reverse logistics optimization
-
-```python
-from cuopt import VehicleRoutingProblem, Solver
-
-class ReverseLogisticsOptimizer:
-    """Optimize collection routes for circular economy."""
-    
-    def __init__(self):
-        self.solver = Solver(device="cuda")
-    
-    def optimize_collection(self, assets_to_collect, collection_depot):
-        """
-        Optimize routes for collecting failed devices.
-        
-        Args:
-            assets_to_collect: List of (location, asset_type, condition)
-            collection_depot: (lat, lon) of harvesting node
-        
-        Returns:
-            Optimized collection routes
-        """
-        # Create VRP
-        vrp = VehicleRoutingProblem(
-            num_vehicles=3,
-            vehicle_capacity=50,  # Number of devices
-            locations=[collection_depot] + [a[0] for a in assets_to_collect],
-            depot_location=collection_depot
-        )
-        
-        # Add asset priorities based on salvage value
-        for i, asset in enumerate(assets_to_collect):
-            salvage_value = self.calculate_salvage_value(
-                asset[1],  # asset_type
-                asset[2]   # condition
-            )
-            vrp.add_priority(i+1, priority=int(salvage_value))
-        
-        # Solve
-        solution = self.solver.solve(vrp)
-        
-        return solution.routes
-    
-    def calculate_salvage_value(self, asset_type, condition):
-        """Calculate salvage value for prioritization."""
-        base_values = {
-            "smartphone": 15,
-            "laptop": 45,
-            "tablet": 25,
-            "solar_lantern": 5
+        # Add emergency delivery
+        emergency_delivery = {
+            "location": emergency_location,
+            "priority": priority,
+            "time_window": (0, 15)  # 15 minutes
         }
         
-        base = base_values.get(asset_type, 10)
-        return base * condition  # condition is 0.0 to 1.0
+        # Re-optimize immediately
+        vrp = self.create_vrp(fleet_state, [emergency_delivery])
+        solution = self.solver.solve(vrp)
+        
+        # Update routes immediately
+        self.update_fleet_routes(solution)
+        
+        return solution
+    
+    def stop(self):
+        self.running = False
+        self.optimization_thread.join()
 ```
 
-## Integration example
+## Integration with Holoscan
 
-### Complete kinetic orchestration system
+### Combined sensor + logistics pipeline
 
 ```python
-from holoscan.core import Application
-from cuopt import Solver
+from holoscan.core import Application, Operator
+from cuopt import Solver, VehicleRoutingProblem
 
-class KineticOrchestrationSystem(Application):
-    """Integrated Holoscan + cuOpt system for clinic operations."""
-    
+class IntegratedOrchestrator(Application):
     def __init__(self):
         super().__init__()
         self.cuopt_solver = Solver(device="cuda")
-        self.drone_fleet = []
     
     def compose(self):
-        # Sensor orchestration
-        ultrasound = VideoStreamReplayerOp(
-            self, name="ultrasound",
-            directory="/data/ultrasound"
+        # Sensor input
+        sensor_input = SensorOrchestrator(self, name="sensors")
+        
+        # Diagnostic processor
+        diagnostics = DiagnosticProcessor(self, name="diagnostics")
+        
+        # Logistics optimizer
+        logistics = LogisticsOptimizer(
+            self,
+            name="logistics",
+            solver=self.cuopt_solver
         )
         
-        flow_controller = AdaptiveFlowController(
-            self, name="flow_controller"
-        )
-        
-        # Connect sensor pipeline
-        self.add_flow(ultrasound, flow_controller)
+        # Connect pipeline
+        self.add_flow(sensor_input, diagnostics)
+        self.add_flow(diagnostics, logistics)
+
+class LogisticsOptimizer(Operator):
+    def __init__(self, fragment, name, solver):
+        super().__init__(fragment, name)
+        self.solver = solver
     
-    def optimize_logistics(self, deliveries):
-        """Optimize drone deliveries using cuOpt."""
+    def setup(self, spec: OperatorSpec):
+        spec.input("diagnostic_results")
+        spec.output("delivery_routes")
+    
+    def compute(self, op_input, op_output, context):
+        # Receive diagnostic results
+        diagnostics = op_input.receive("diagnostic_results")
+        
+        # Determine required medical supplies
+        supplies = self.determine_supplies(diagnostics)
+        
+        # Optimize delivery routes
+        routes = self.optimize_delivery(supplies)
+        
+        # Emit routes
+        op_output.emit(routes, "delivery_routes")
+    
+    def determine_supplies(self, diagnostics):
+        # Map diagnostics to required supplies
+        supplies = []
+        
+        if diagnostics.get("cholera_detected"):
+            supplies.append({
+                "item": "oral_rehydration_salts",
+                "quantity": 100,
+                "priority": "urgent"
+            })
+        
+        if diagnostics.get("malaria_detected"):
+            supplies.append({
+                "item": "antimalarial_drugs",
+                "quantity": 50,
+                "priority": "high"
+            })
+        
+        return supplies
+    
+    def optimize_delivery(self, supplies):
+        # Create VRP for supply delivery
         vrp = VehicleRoutingProblem(
-            num_vehicles=len(self.drone_fleet),
-            vehicle_capacity=10
+            num_vehicles=5,
+            vehicle_capacity=[100] * 5,
+            locations=[s["location"] for s in supplies],
+            depot_location=(0, 0)
         )
         
-        solution = self.cuopt_solver.solve(vrp)
-        return solution.routes
-    
-    def run_integrated_system(self):
-        """Run both sensor orchestration and logistics optimization."""
-        # Start Holoscan sensor pipeline
-        self.run()
+        # Solve
+        solution = self.solver.solve(vrp)
         
-        # Continuously optimize logistics
-        while True:
-            pending_deliveries = self.get_pending_deliveries()
-            if pending_deliveries:
-                routes = self.optimize_logistics(pending_deliveries)
-                self.dispatch_drones(routes)
-            
-            time.sleep(1)
+        return solution.routes
 ```
 
-## Performance benchmarks
+## Performance optimization
 
-### Holoscan throughput
+### GPU acceleration
 
-- **Ultrasound processing**: 30 FPS at 1080p
-- **Multi-sensor orchestration**: 10 sensors simultaneously
-- **Dynamic throttling**: <10ms latency overhead
-- **Thermal management**: Maintains <85°C under load
+```python
+import cupy as cp
+from cuopt import Solver
 
-### cuOpt optimization speed
-
-- **Small VRP (10 locations)**: <1ms
-- **Medium VRP (100 locations)**: <10ms
-- **Large VRP (1000 locations)**: <100ms
-- **Real-time re-routing**: <5ms per update
+class GPUAcceleratedSolver:
+    def __init__(self):
+        self.solver = Solver(device="cuda")
+        
+        # Pre-allocate GPU memory
+        self.distance_matrix_gpu = None
+        self.time_matrix_gpu = None
+    
+    def precompute_matrices(self, locations):
+        # Compute distance matrix on GPU
+        n = len(locations)
+        locations_gpu = cp.array(locations)
+        
+        # Pairwise distances
+        diff = locations_gpu[:, None, :] - locations_gpu[None, :, :]
+        distances = cp.sqrt(cp.sum(diff ** 2, axis=2))
+        
+        # Store on GPU
+        self.distance_matrix_gpu = distances
+        
+        # Compute time matrix (distance / speed)
+        speed = 50  # km/h
+        self.time_matrix_gpu = distances / speed
+    
+    def solve_with_precomputed(self, vrp):
+        # Use precomputed matrices
+        vrp.set_distance_matrix(self.distance_matrix_gpu)
+        vrp.set_time_matrix(self.time_matrix_gpu)
+        
+        # Solve
+        solution = self.solver.solve(vrp)
+        
+        return solution
+```
 
 ## Deployment checklist
 
@@ -573,32 +643,38 @@ class KineticOrchestrationSystem(Application):
     Install NVIDIA Holoscan SDK Production Branch 25h1
   </Step>
   <Step title="Install cuOpt">
-    Install NVIDIA cuOpt client library
+    Install NVIDIA cuOpt client for GPU-accelerated routing
   </Step>
   <Step title="Configure IGX Orin">
-    Setup NVIDIA IGX Orin hardware with thermal sensors
+    Setup IGX Orin hardware for edge deployment
   </Step>
   <Step title="Deploy sensor pipeline">
-    Create Holoscan application for medical sensors
+    Configure Holoscan application for sensor orchestration
   </Step>
-  <Step title="Setup cuOpt solver">
-    Initialize GPU-accelerated VRP solver
+  <Step title="Setup logistics optimizer">
+    Deploy cuOpt solver for vehicle routing
   </Step>
   <Step title="Test dynamic flow control">
-    Verify sensor throttling under thermal stress
+    Verify bandwidth-aware stream prioritization
   </Step>
-  <Step title="Test logistics optimization">
-    Verify millisecond re-routing capability
+  <Step title="Enable agentic dispatcher">
+    Configure NeMo agent for natural language routing
   </Step>
 </Steps>
 
 ## Related documentation
 
 <CardGroup cols={2}>
-  <Card title="Nuclear Stack Overview" icon="atom" href="/architecture/nuclear-stack">
-    Complete architectural thesis
+  <Card title="Kinetic & Sensory Stack" icon="brain-circuit" href="/architecture/kinetic-sensory">
+    Architecture overview
   </Card>
-  <Card title="Kinetic & Sensory integration" icon="brain-circuit" href="/integrations/nvidia-kinetic-sensory">
-    Integration guide
+  <Card title="Nuclear Stack" icon="atom" href="/architecture/nuclear-stack">
+    Complete system integration
+  </Card>
+  <Card title="NVIDIA Integration" icon="microchip" href="/integrations/nvidia-kinetic-sensory">
+    Hardware integration guide
+  </Card>
+  <Card title="Deployment" icon="rocket" href="/deployment/overview">
+    Production deployment
   </Card>
 </CardGroup>
