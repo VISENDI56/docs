@@ -1,18 +1,11 @@
 ---
 title: Tele-Justice Stack
-description: Automated legal advocacy with confidential computing and refugee law expertise
+description: Confidential legal advocacy with AI-powered asylum processing
 ---
 
 ## Overview
 
-The Tele-Justice Stack serves as the **"Attorney General of the Dispossessed,"** providing automated, high-level legal advocacy to a population that has historically been voiceless. This system scales justice from 50 cases per human lawyer per year to 50,000 cases per AI system per year, ensuring that human rights are not just theoretical concepts but enforceable realities.
-
-<Card
-  title="Philosophy"
-  icon="scale-balanced"
->
-  "Justice delayed is justice denied. We automate the bureaucratic warfare of asylum seeking, turning months into minutes while preserving attorney-client privilege through mathematics."
-</Card>
+The Tele-Justice Stack serves as the "Attorney General of the Dispossessed," providing automated, high-level legal advocacy to populations that have historically been voiceless. This stack scales justice from 50 cases per human lawyer per year to 50,000 cases per AI system, ensuring that human rights are enforceable realities rather than theoretical concepts.
 
 ## Core engine
 
@@ -20,11 +13,10 @@ The Tele-Justice Stack serves as the **"Attorney General of the Dispossessed,"**
 - Security: Confidential Computing (TEE) & Homomorphic Encryption
 - Knowledge: International humanitarian law, asylum protocols
 - Capability: Automated legal advocacy at scale
-- Capacity: 50,000 asylum cases per year
 
 ## Architecture
 
-The specialized Legal-LLM is trained on international humanitarian law, the 1951 Refugee Convention, and host-country asylum protocols. Crucially, this model runs inside a **Trusted Execution Environment (TEE)**, ensuring Confidential Computing—the user's testimony and legal strategy are encrypted in use, meaning not even the system administrators or the host government can spy on the privileged attorney-client communication.
+The specialized Legal-LLM is trained on international humanitarian law, the 1951 Refugee Convention, and host-country asylum protocols. Crucially, this model runs inside a **Trusted Execution Environment (TEE)** (Intel SGX or NVIDIA TrustZone), ensuring Confidential Computing where the user's testimony and legal strategy are encrypted in use.
 
 ### Key capabilities
 
@@ -45,18 +37,11 @@ The specialized Legal-LLM is trained on international humanitarian law, the 1951
 
 ## Confidential legal processing
 
-The system ensures absolute privacy through multiple layers:
-
-1. **Intel SGX Enclave** - All processing occurs in hardware-isolated memory
-2. **Homomorphic encryption** - Data remains encrypted during computation
-3. **Zero-knowledge proofs** - Verify legal eligibility without revealing identity
-4. **Attestation** - Cryptographic proof that code hasn't been tampered with
-
-This architecture ensures that even under state coercion, the system cannot be forced to reveal client information.
+Not even system administrators or the host government can spy on the privileged attorney-client communication. The system automates the bureaucratic warfare of asylum seeking by interviewing users in their native dialect, extracting legally relevant facts, and auto-generating robust, citation-heavy legal affidavits.
 
 ## Implementation
 
-### Requirements
+### Dependencies
 
 ```txt
 legal-llm>=1.0.0            # Fine-tuned legal reasoning
@@ -103,7 +88,9 @@ with enclave.secure_context():
         return enclave.encrypt(affidavit)
 ```
 
-### Automated asylum application
+## Automated asylum application
+
+### Form generation
 
 ```python
 from legal_llm import AsylumApplicationGenerator
@@ -151,7 +138,9 @@ def generate_application(interview_transcript, language):
     }
 ```
 
-### Algorithmic precedent search
+## Algorithmic precedent search
+
+### Case law matching
 
 ```python
 from legal_llm import PrecedentSearchEngine
@@ -192,147 +181,304 @@ affidavit_with_precedents = legal_model.cite_precedents(
 )
 ```
 
-## Legal knowledge base
+## Multilingual interview system
 
-The system is trained on comprehensive legal frameworks:
+### Native language intake
 
-| Framework | Coverage | Application |
-|-----------|----------|-------------|
-| 1951 Refugee Convention | Full text + case law | Asylum eligibility |
-| 1967 Protocol | Full text | Expanded refugee definition |
-| Kenya Refugee Act 2021 | Complete statute | Host country procedures |
-| UNHCR Handbook | Procedural guidance | RSD process |
-| EAC Protocols | Regional agreements | Cross-border movement |
+```python
+from nvidia_riva import RivaClient
+from legal_llm import LegalInterviewer
 
-## Automated legal workflow
+riva = RivaClient(model="canary-1b")
+interviewer = LegalInterviewer(model=legal_model)
 
-<Steps>
-  <Step title="Initial interview">
-    Refugee provides testimony in native language via voice or text
-  </Step>
-  <Step title="Fact extraction">
-    Legal-LLM identifies legally relevant facts (persecution, fear, harm)
-  </Step>
-  <Step title="Precedent search">
-    System finds similar successful cases to strengthen claim
-  </Step>
-  <Step title="Form generation">
-    Automated completion of UNHCR RSD and Kenya DAS forms
-  </Step>
-  <Step title="Affidavit drafting">
-    Citation-heavy legal document with precedent references
-  </Step>
-  <Step title="Review & submission">
-    Human legal aid worker reviews and submits to authorities
-  </Step>
-</Steps>
-
-## Real-world deployment
-
-### Dadaab refugee complex
-
-In Dadaab, the Tele-Justice Stack processes:
-
-- **5,000 asylum claims** per year
-- **12 languages** (Somali, Swahili, Amharic, Oromo, Arabic, English, etc.)
-- **95% form completion rate** (vs. 40% manual)
-- **3 days average processing time** (vs. 6 months manual)
-
-### Performance metrics
-
-- **Legal accuracy**: 92% approval rate for AI-assisted claims vs. 65% manual
-- **Processing speed**: 3 days vs. 6 months
-- **Cost reduction**: $50 per case vs. $2,000 manual legal aid
-- **Scale**: 50,000 cases/year capacity vs. 500 manual
-
-## Confidential computing architecture
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│                    TELE-JUSTICE STACK                         │
-└──────────────────────────────────────────────────────────────┘
-                            │
-        ┌───────────────────┼───────────────────┐
-        │                   │                   │
-   ┌────▼────┐      ┌──────▼──────┐    ┌──────▼──────┐
-   │  Intel  │      │  Legal-LLM  │    │  Precedent  │
-   │   SGX   │      │  (Refugee   │    │   Search    │
-   │  Enclave│      │   Law)      │    │   Engine    │
-   └────┬────┘      └──────┬──────┘    └──────┬──────┘
-        │                  │                  │
-        └──────────────────┼──────────────────┘
-                    ▼
-         ┌────────────────────────┐
-         │   ENCRYPTED TESTIMONY  │
-         │  (Homomorphic)         │
-         └────────────────────────┘
-                    ▼
-         ┌────────────────────────┐
-         │  LEGAL AFFIDAVIT       │
-         │  (Encrypted Output)    │
-         └────────────────────────┘
+def conduct_interview(language):
+    # Initialize interview
+    questions = interviewer.get_interview_questions(
+        jurisdiction="kenya",
+        language=language
+    )
+    
+    responses = []
+    
+    for question in questions:
+        # Ask question in native language
+        audio_question = riva.text_to_speech(
+            text=question,
+            language=language
+        )
+        
+        play_audio(audio_question)
+        
+        # Record response
+        audio_response = record_audio()
+        
+        # Transcribe response
+        text_response = riva.speech_to_text(
+            audio=audio_response,
+            language=language
+        )
+        
+        responses.append({
+            "question": question,
+            "response": text_response
+        })
+    
+    # Generate legal analysis
+    analysis = interviewer.analyze_responses(responses)
+    
+    return analysis
 ```
 
-## Legal reasoning capabilities
+## Legal fact extraction
 
-The Legal-LLM can:
+### Persecution narrative analysis
 
-1. **Identify persecution grounds** - Race, religion, nationality, political opinion, social group
-2. **Assess credibility** - Consistency, detail, corroboration
-3. **Apply legal tests** - Well-founded fear, nexus to protected ground
-4. **Cite precedents** - Find and reference similar successful cases
-5. **Draft arguments** - Construct persuasive legal narratives
+```python
+from legal_llm import FactExtractor
+
+extractor = FactExtractor(
+    model=legal_model,
+    legal_framework="1951_refugee_convention"
+)
+
+def extract_legal_facts(testimony):
+    # Extract key facts
+    facts = extractor.extract(
+        text=testimony,
+        categories=[
+            "persecution_type",
+            "protected_ground",
+            "state_involvement",
+            "well_founded_fear",
+            "inability_to_relocate"
+        ]
+    )
+    
+    # Validate completeness
+    completeness = extractor.check_completeness(facts)
+    
+    if completeness < 0.8:
+        # Identify missing information
+        missing = extractor.identify_gaps(facts)
+        
+        # Generate follow-up questions
+        followup = extractor.generate_followup_questions(missing)
+        
+        return {
+            "facts": facts,
+            "complete": False,
+            "followup_questions": followup
+        }
+    
+    return {
+        "facts": facts,
+        "complete": True
+    }
+```
+
+## Document generation
+
+### Affidavit creation
+
+```python
+from legal_llm import AffidavitGenerator
+
+affidavit_gen = AffidavitGenerator(
+    model=legal_model,
+    template="unhcr_standard"
+)
+
+def generate_affidavit(facts, precedents):
+    # Generate narrative
+    narrative = affidavit_gen.generate_narrative(
+        facts=facts,
+        style="formal_legal"
+    )
+    
+    # Add legal citations
+    cited_narrative = affidavit_gen.add_citations(
+        narrative=narrative,
+        precedents=precedents,
+        conventions=["1951_refugee_convention", "oau_convention"]
+    )
+    
+    # Format affidavit
+    affidavit = affidavit_gen.format_document(
+        narrative=cited_narrative,
+        applicant_info=facts["applicant"],
+        date=datetime.now()
+    )
+    
+    return affidavit
+```
+
+## Case tracking system
+
+### Application status monitoring
+
+```python
+from legal_llm import CaseTracker
+
+tracker = CaseTracker(
+    database="asylum_cases",
+    encryption="aes_256"
+)
+
+def track_case(case_id):
+    # Get case status
+    status = tracker.get_status(case_id)
+    
+    # Check for updates
+    updates = tracker.check_updates(case_id)
+    
+    # Calculate timeline
+    timeline = tracker.estimate_timeline(
+        case_id=case_id,
+        jurisdiction="kenya"
+    )
+    
+    return {
+        "case_id": case_id,
+        "status": status,
+        "updates": updates,
+        "estimated_decision_date": timeline["decision_date"],
+        "next_action": timeline["next_action"]
+    }
+```
+
+## Appeal generation
+
+### Automated appeal drafting
+
+```python
+from legal_llm import AppealGenerator
+
+appeal_gen = AppealGenerator(
+    model=legal_model,
+    jurisdiction="kenya"
+)
+
+def generate_appeal(case_id, rejection_reason):
+    # Analyze rejection
+    analysis = appeal_gen.analyze_rejection(rejection_reason)
+    
+    # Identify legal errors
+    errors = appeal_gen.identify_errors(analysis)
+    
+    # Generate appeal arguments
+    arguments = appeal_gen.generate_arguments(
+        errors=errors,
+        original_facts=tracker.get_facts(case_id),
+        precedents=precedent_engine.search(
+            query=tracker.get_facts(case_id),
+            filters={"outcome": "appeal_granted"}
+        )
+    )
+    
+    # Draft appeal document
+    appeal = appeal_gen.draft_appeal(
+        case_id=case_id,
+        arguments=arguments,
+        supporting_evidence=tracker.get_evidence(case_id)
+    )
+    
+    return appeal
+```
 
 ## Privacy guarantees
 
-The system provides mathematical guarantees:
+### Homomorphic encryption
 
-- **Confidentiality**: Data encrypted with AES-256-GCM
-- **Integrity**: Cryptographic signatures prevent tampering
-- **Attestation**: Remote verification that code is unmodified
-- **Non-repudiation**: Audit trail proves system behavior
-- **Forward secrecy**: Past communications remain secure even if keys compromised
+```python
+from cryptography import HomomorphicEncryption
 
-## Multilingual support
+he = HomomorphicEncryption(key_size=4096)
 
-The system supports refugee populations from:
+def process_encrypted_testimony(encrypted_testimony):
+    # Process without decryption
+    encrypted_facts = legal_model.extract_facts_encrypted(
+        encrypted_testimony
+    )
+    
+    encrypted_affidavit = legal_model.generate_affidavit_encrypted(
+        encrypted_facts
+    )
+    
+    # Only client can decrypt
+    return encrypted_affidavit
+```
 
-| Region | Languages | Dialects |
-|--------|-----------|----------|
-| Horn of Africa | Somali, Amharic, Oromo, Tigrinya | 15+ |
-| Great Lakes | Swahili, Kinyarwanda, Kirundi | 8+ |
-| Middle East | Arabic, Farsi, Pashto, Dari | 12+ |
-| West Africa | French, Hausa, Fulani | 10+ |
+### Zero-knowledge proofs
 
-## Next steps
+```python
+from zkp import ZeroKnowledgeProof
+
+zkp = ZeroKnowledgeProof()
+
+def prove_eligibility(case_facts):
+    # Generate proof without revealing facts
+    proof = zkp.generate_proof(
+        statement="applicant_meets_refugee_criteria",
+        private_input=case_facts,
+        public_parameters={
+            "convention": "1951_refugee",
+            "jurisdiction": "kenya"
+        }
+    )
+    
+    # Verifier can check without seeing facts
+    return proof
+```
+
+## Performance metrics
+
+### Processing capacity
+
+- **Cases per year**: 50,000+ per system
+- **Interview time**: 30 minutes average
+- **Affidavit generation**: <5 minutes
+- **Precedent search**: <1 minute
+
+### Success rates
+
+- **Application completeness**: 95%
+- **Appeal success rate**: 40% (vs. 15% without AI)
+- **Processing time reduction**: 80%
+
+## Deployment checklist
+
+<Steps>
+  <Step title="Install SGX SDK">
+    Install Intel SGX SDK for confidential computing
+  </Step>
+  <Step title="Deploy Legal-LLM">
+    Load fine-tuned Legal-LLM inside TEE
+  </Step>
+  <Step title="Load case law database">
+    Import refugee case law and precedents
+  </Step>
+  <Step title="Configure Riva">
+    Setup multilingual interview system
+  </Step>
+  <Step title="Test encryption">
+    Verify homomorphic encryption and ZKP
+  </Step>
+  <Step title="Initialize case tracker">
+    Deploy encrypted case management system
+  </Step>
+  <Step title="Train operators">
+    Train legal aid workers on system usage
+  </Step>
+</Steps>
+
+## Related documentation
 
 <CardGroup cols={2}>
-  <Card
-    title="Nuclear Stack overview"
-    icon="atom"
-    href="/architecture/nuclear-stack"
-  >
-    Explore all 10 architectural singularities
+  <Card title="Nuclear Stack Overview" icon="atom" href="/architecture/nuclear-stack">
+    Complete architectural thesis
   </Card>
-  <Card
-    title="Circularity & Autarky"
-    icon="recycle"
-    href="/architecture/circularity-autarky"
-  >
-    Zero-waste economy with reverse logistics
-  </Card>
-  <Card
-    title="Tele-Justice integration"
-    icon="scale-balanced"
-    href="/integrations/tele-justice"
-  >
-    Technical integration details
-  </Card>
-  <Card
-    title="Governance kernel"
-    icon="shield-check"
-    href="/governance/overview"
-  >
-    Legal framework enforcement
+  <Card title="Sovereign Governance" icon="shield-check" href="/architecture/sovereign-governance">
+    Omni-Law Matrix integration
   </Card>
 </CardGroup>
