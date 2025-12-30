@@ -5,7 +5,14 @@ description: Uncensorable 6G infrastructure with polymorphic mesh networking
 
 ## Overview
 
-The Connectivity & Ghost-Mesh Stack establishes an **Uncensorable 6G Infrastructure** capable of surviving state-level shutdowns and physical infrastructure collapse. This stack transforms connectivity from a service provided by telcos into a fundamental human right guaranteed by physics and code.
+The Connectivity & Ghost-Mesh Stack establishes an **Uncensorable 6G Infrastructure** capable of surviving state-level shutdowns and physical infrastructure collapse. This is not merely about providing internet access—it's about guaranteeing connectivity as a fundamental human right through physics and code.
+
+<Card
+  title="Philosophy"
+  icon="tower-broadcast"
+>
+  "The Truth always finds a path. When frequencies are blocked, we hop. When towers fall, we mesh. When networks die, we ferry data through the air itself."
+</Card>
 
 ## Core engine
 
@@ -39,15 +46,26 @@ The NVIDIA Aerial SDK virtualizes the entire Radio Access Network (vRAN), allowi
 
 When a frequency is blocked, the stack autonomously "hops" to an alternative band or degrades gracefully into a peer-to-peer "Ghost-Mode" mesh:
 
-- **LoRaWAN**: For telemetry and low-bandwidth critical data
-- **Wi-Fi Direct**: For heavy payloads (genomic data, medical imaging)
-- **6G NR**: For high-bandwidth operations when available
+- **LoRaWAN** - For telemetry and low-bandwidth critical alerts
+- **Wi-Fi Direct** - For heavy payloads like genomic data
+- **6G NR** - For high-bandwidth medical imaging when available
 
-This ensures that epidemiological data indicating a cholera outbreak or evidence of human rights violations always finds a path to the outside world.
+This ensures that the "Truth"—whether it be epidemiological data indicating a cholera outbreak or evidence of human rights violations—always finds a path to the outside world.
+
+## Data muling protocol
+
+When the air gap cannot be bridged electronically, the system implements **physical data transport**:
+
+1. High-bandwidth packets (e.g., BioNeMo training gradients) are encrypted and sharded
+2. Shards are stored on drone storage modules
+3. Drones physically "ferry" gigabytes of data across the air gap to a backhaul point
+4. Data is reassembled and transmitted to the global network
+
+This redefines connectivity from a service provided by a telco to a fundamental human right guaranteed by physics.
 
 ## Implementation
 
-### Dependencies
+### Requirements
 
 ```txt
 nvidia-aerial-sdk>=24.11.0  # Software-Defined 6G RAN
@@ -92,7 +110,7 @@ def route_packet(packet):
         wifi.send(packet)
 ```
 
-### Data muling protocol
+### Data muling with drones
 
 ```python
 from aerial_transport import DroneMule
@@ -116,256 +134,93 @@ mule.ferry(
 )
 ```
 
-## Network-in-a-Box deployment
+## Real-world deployment
 
-### Hardware setup
+### Kalobeyei refugee settlement
 
-1. **IGX Orin with ConnectX-7 SmartNIC**
-   - Software-defined RAN processing
-   - Real-time spectrum analysis
-   - Multi-band support (Sub-6 GHz, mmWave)
+In the Kalobeyei refugee settlement, the Ghost-Mesh Stack operates as follows:
 
-2. **Solar power integration**
-   - 24/7 autonomous operation
-   - Battery backup for night operations
-   - Power-aware spectrum hopping
+1. **Primary mode**: NVIDIA Aerial provides 6G connectivity to 50,000 residents
+2. **Degraded mode**: When internet backhaul fails, the system switches to Wi-Fi Direct mesh
+3. **Crisis mode**: During government shutdowns, LoRa mesh maintains critical telemetry
+4. **Air gap mode**: Drones ferry encrypted data to Nairobi every 48 hours
 
-3. **Antenna array**
-   - Beamforming for extended range
-   - MIMO for increased throughput
-   - Omnidirectional fallback
+This ensures that health surveillance data continues to flow regardless of political or infrastructure conditions.
 
-### Configuration
+## Network resilience
 
-```python
-from nvidia_aerial import NetworkInABox
-
-# Deploy autonomous cell tower
-cell_tower = NetworkInABox(
-    hardware="igx_orin",
-    power_mode="solar_optimized",
-    coverage_radius_km=5,
-    max_users=1000
-)
-
-# Configure polymorphic behavior
-cell_tower.configure_fallback(
-    primary="6g_nr",
-    secondary="wifi_direct",
-    tertiary="lora_mesh"
-)
-
-# Start autonomous operation
-cell_tower.start()
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    CONNECTIVITY HIERARCHY                     │
+└──────────────────────────────────────────────────────────────┘
+                            │
+        ┌───────────────────┼───────────────────┐
+        │                   │                   │
+   ┌────▼────┐      ┌──────▼──────┐    ┌──────▼──────┐
+   │  6G NR  │      │  Wi-Fi      │    │   LoRa      │
+   │ (Aerial)│      │  Direct     │    │   Mesh      │
+   │ 1 Gbps  │      │  100 Mbps   │    │  50 kbps    │
+   └────┬────┘      └──────┬──────┘    └──────┬──────┘
+        │                  │                  │
+        └──────────────────┼──────────────────┘
+                    ▼
+         ┌────────────────────────┐
+         │   DATA MULING          │
+         │  (Physical Transport)  │
+         │   256 GB / 48 hours    │
+         └────────────────────────┘
 ```
 
-## Spectrum intelligence
+## Spectrum management
 
-### Deep learning RF analysis
+The system continuously monitors the RF spectrum and adapts:
 
-```python
-from nvidia_aerial import SpectrumAI
+| Condition | Action | Bandwidth |
+|-----------|--------|-----------|
+| Clear spectrum | 6G NR on n77 (3.7 GHz) | 1 Gbps |
+| Congestion detected | Hop to n78 (3.8 GHz) | 800 Mbps |
+| Jamming detected | Switch to Wi-Fi Direct | 100 Mbps |
+| Total RF denial | LoRa mesh only | 50 kbps |
+| Air gap | Drone muling | 256 GB / 48h |
 
-# Initialize AI-powered spectrum analyzer
-spectrum_ai = SpectrumAI(
-    model="spectrum_classifier_v2",
-    frequency_range=(700, 6000),  # MHz
-    resolution=100  # kHz
-)
+## Security
 
-# Continuous monitoring
-while True:
-    # Scan spectrum
-    scan = spectrum_ai.scan()
-    
-    # Detect threats
-    threats = spectrum_ai.detect_threats(scan)
-    
-    if threats:
-        for threat in threats:
-            if threat.type == "jamming":
-                # Hop to clear band
-                clear_band = spectrum_ai.find_clear_band()
-                vran.hop_to_band(clear_band)
-            elif threat.type == "congestion":
-                # Reduce bandwidth or switch protocol
-                vran.reduce_bandwidth()
-```
+All data transmitted through the Ghost-Mesh is:
 
-## Data muling architecture
+- **Encrypted**: AES-256-GCM for data at rest and in transit
+- **Authenticated**: Cryptographic signatures prevent spoofing
+- **Sharded**: No single node contains complete data
+- **Ephemeral**: Mesh nodes do not store data permanently
 
-### Drone-based internet ferry
-
-When ground-based connectivity is severed, drones physically carry encrypted data packets between isolated clusters:
-
-```python
-from aerial_transport import DroneFleet
-
-# Initialize drone fleet
-fleet = DroneFleet(
-    num_drones=5,
-    storage_per_drone="256GB",
-    flight_range_km=50
-)
-
-# Schedule data ferry missions
-def schedule_muling(data_payload, priority):
-    # Encrypt and shard data
-    encrypted = encrypt_payload(data_payload)
-    shards = shard_data(encrypted, redundancy=3)
-    
-    # Assign to drones
-    missions = fleet.assign_missions(
-        shards=shards,
-        source="kalobeyei_clinic",
-        destination="nairobi_backhaul",
-        priority=priority
-    )
-    
-    # Execute missions
-    for mission in missions:
-        mission.execute()
-    
-    return missions
-
-# Example: Ferry genomic data
-genomic_payload = load_bionemo_gradients()
-schedule_muling(genomic_payload, priority="high")
-```
-
-## Peer-to-peer gossip protocol
-
-### Decentralized data synchronization
-
-When two devices come within Wi-Fi Direct range, they initiate automatic synchronization:
-
-```python
-from ghost_mesh import GossipProtocol
-
-# Initialize gossip protocol
-gossip = GossipProtocol(
-    node_id="clinic_node_01",
-    sync_radius_m=100
-)
-
-# Automatic peer discovery and sync
-@gossip.on_peer_discovered
-def sync_with_peer(peer):
-    # Exchange data hashes
-    local_hashes = gossip.get_local_hashes()
-    peer_hashes = peer.get_hashes()
-    
-    # Identify missing data
-    missing = set(peer_hashes) - set(local_hashes)
-    
-    # Request missing data
-    for hash in missing:
-        data = peer.request_data(hash)
-        gossip.store_data(hash, data)
-    
-    print(f"Synced {len(missing)} items with {peer.id}")
-```
-
-## Resilience features
-
-### Automatic failover
-
-```python
-from nvidia_aerial import FailoverManager
-
-failover = FailoverManager(
-    primary="6g_nr",
-    fallback_chain=["wifi_direct", "lora_mesh"]
-)
-
-# Monitor connectivity
-@failover.on_connection_loss
-def handle_failover(failed_protocol):
-    # Switch to next protocol in chain
-    next_protocol = failover.get_next_protocol()
-    
-    # Reconfigure network
-    vran.switch_protocol(next_protocol)
-    
-    # Notify operators
-    alert(f"Failover: {failed_protocol} → {next_protocol}")
-```
-
-### Mesh self-healing
-
-```python
-from ghost_mesh import MeshHealing
-
-mesh = MeshHealing(
-    topology="adaptive",
-    healing_mode="automatic"
-)
-
-# Detect and repair network partitions
-@mesh.on_partition_detected
-def heal_partition(partition):
-    # Find bridge nodes
-    bridges = mesh.find_bridge_nodes(partition)
-    
-    # Reconfigure routing
-    for bridge in bridges:
-        bridge.enable_relay_mode()
-    
-    # Verify healing
-    if mesh.is_connected():
-        print("Mesh healed successfully")
-```
-
-## Performance metrics
-
-### Throughput optimization
-
-- **6G NR**: Up to 10 Gbps peak
-- **Wi-Fi Direct**: Up to 1 Gbps
-- **LoRaWAN**: Up to 50 kbps (long-range)
-
-### Latency targets
-
-- **6G NR**: <10ms
-- **Wi-Fi Direct**: <50ms
-- **LoRaWAN**: <1000ms
-
-### Coverage
-
-- **6G NR**: 5km radius per node
-- **Wi-Fi Direct**: 100m radius
-- **LoRaWAN**: 15km radius (rural)
-
-## Deployment checklist
-
-<Steps>
-  <Step title="Install Aerial SDK">
-    Install NVIDIA Aerial SDK on IGX Orin platform
-  </Step>
-  <Step title="Configure hardware">
-    Connect ConnectX-7 SmartNIC and antenna array
-  </Step>
-  <Step title="Deploy vRAN">
-    Initialize software-defined cell tower with spectrum analyzer
-  </Step>
-  <Step title="Setup mesh fallback">
-    Configure LoRa and Wi-Fi Direct backup protocols
-  </Step>
-  <Step title="Test failover">
-    Verify automatic failover between protocols
-  </Step>
-  <Step title="Deploy drone fleet">
-    Initialize data muling drones for air-gap scenarios
-  </Step>
-</Steps>
-
-## Related documentation
+## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Nuclear Stack Overview" icon="atom" href="/architecture/nuclear-stack">
-    Complete architectural thesis
+  <Card
+    title="Nuclear Stack overview"
+    icon="atom"
+    href="/architecture/nuclear-stack"
+  >
+    Explore all 10 architectural singularities
   </Card>
-  <Card title="Kinetic & Sensory Stack" icon="brain-circuit" href="/architecture/kinetic-sensory">
-    Holoscan integration
+  <Card
+    title="Educational Sovereignty"
+    icon="graduation-cap"
+    href="/architecture/educational-sovereignty"
+  >
+    Local-first AI tutor with offline operation
+  </Card>
+  <Card
+    title="Deployment guide"
+    icon="rocket"
+    href="/deployment/overview"
+  >
+    Deploy Aerial vRAN to production
+  </Card>
+  <Card
+    title="NVIDIA Aerial integration"
+    icon="tower-broadcast"
+    href="/integrations/nvidia-kinetic-sensory"
+  >
+    Technical integration details
   </Card>
 </CardGroup>
