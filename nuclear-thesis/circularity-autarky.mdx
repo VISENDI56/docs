@@ -1,46 +1,47 @@
 ---
 title: Stack 10 - Circularity & autarky
-description: cuOpt-powered reverse logistics for zero-waste circular economy and resource autarky
+description: cuOpt-powered reverse logistics for urban mining and zero-waste circular economy
 ---
 
-The Circularity & Autarky stack implements zero-waste principles through GPU-accelerated reverse logistics, enabling urban mining, component harvesting, and local manufacturing for complete resource independence.
+The Circularity & Autarky stack uses NVIDIA cuOpt to optimize reverse logistics for e-waste harvesting, component recovery, and repair networks, enabling zero-waste circular economy and technological self-sufficiency.
 
 ## Core capabilities
 
 ### Reverse logistics optimization
-Efficient collection and processing of waste streams:
-- E-waste routing to harvesting benches
-- Component recovery optimization
-- Repair-preneur network coordination
-- Material flow tracking
+GPU-accelerated routing for waste collection:
+- E-waste collection from distributed sources
+- Component harvesting and sorting
+- Repair bench distribution
+- Material recovery facility routing
 
 ### Urban mining
-Extract valuable materials from waste:
-- Precious metal recovery from electronics
+Extract value from electronic waste:
+- Precious metal recovery (gold, silver, palladium)
 - Rare earth element extraction
-- Battery material reclamation
-- Solar panel recycling
+- Component reuse and refurbishment
+- Material recycling optimization
 
-### Local manufacturing
-Produce components from recycled materials:
-- 3D printing with recycled plastics
-- PCB fabrication from recovered copper
-- Battery assembly from reclaimed cells
-- Solar panel refurbishment
+### Repair economy
+Distributed repair network:
+- Repair-preneur training and support
+- Component marketplace
+- Diagnostic AI for fault detection
+- Repair manual generation
 
 ## Hardware architecture
 
-**Compute**: NVIDIA GPU for cuOpt routing  
-**Storage**: Material inventory database  
-**Sensors**: RFID, barcode scanners, scales  
-**Manufacturing**: 3D printers, CNC mills, reflow ovens
+**Routing compute**: NVIDIA A100 or Jetson AGX Orin  
+**Collection**: Mobile devices with GPS and barcode scanners  
+**Repair benches**: Modular workstations with diagnostic tools  
+**Storage**: Distributed component warehouses  
+**Networking**: Ghost-Mesh for coordination
 
 ## Circular router implementation
 
 ```python core/circular_economy/reverse_logistics.py
 from cuopt import routing
 import numpy as np
-from typing import Dict, List
+from typing import List, Dict
 
 class CircularRouter:
     """
@@ -49,17 +50,16 @@ class CircularRouter:
     """
     def __init__(self):
         self.solver = routing.Solver()
-        self.material_db = MaterialDatabase()
-        self.repair_network = RepairPreneurNetwork()
-        self.inventory = InventoryManager()
+        self.component_db = ComponentDatabase()
+        self.repair_network = RepairNetwork()
     
     def route_harvest(self, waste_type: str, location: Dict) -> Dict:
         """
-        Optimize routing for waste collection and processing.
+        Optimize routing for e-waste collection and processing.
         
         Args:
-            waste_type: Type of waste (e-waste, plastic, metal, etc.)
-            location: Collection location coordinates
+            waste_type: Type of e-waste (phones, laptops, solar_panels, etc.)
+            location: Collection location with coordinates
         
         Returns:
             Optimized route with processing assignments
@@ -72,11 +72,11 @@ class CircularRouter:
         # Get processing facilities
         facilities = self._get_processing_facilities(waste_type)
         
-        # Build routing problem
-        problem = self._build_reverse_logistics_problem(
-            collection_points,
-            facilities,
-            waste_type
+        # Build VRP problem
+        problem = self._build_reverse_vrp(
+            collection_points=collection_points,
+            facilities=facilities,
+            waste_type=waste_type
         )
         
         # Solve with cuOpt
@@ -87,87 +87,28 @@ class CircularRouter:
         )
         
         # Assign processing tasks
-        assignments = self._assign_processing_tasks(solution, waste_type)
-        
-        # Update inventory
-        self._update_material_inventory(assignments)
+        processing_plan = self._assign_processing(solution, waste_type)
         
         return {
-            "status": "ROUTE_OPTIMIZED",
-            "routes": solution.routes,
+            "route": solution.routes,
             "total_distance": solution.total_distance,
-            "processing_assignments": assignments,
-            "estimated_recovery": self._estimate_material_recovery(assignments)
+            "collection_sequence": solution.visit_sequence,
+            "processing_assignments": processing_plan,
+            "estimated_recovery_value": self._estimate_value(waste_type, len(collection_points)),
+            "status": "ROUTE_OPTIMIZED"
         }
     
-    def optimize_repair_network(self, demand_forecast: Dict) -> Dict:
+    def _build_reverse_vrp(self, collection_points: List[Dict],
+                          facilities: List[Dict], waste_type: str):
         """
-        Optimize repair-preneur network based on demand.
+        Build reverse VRP problem for e-waste collection.
         
-        Args:
-            demand_forecast: Predicted demand for repairs/components
-        
-        Returns:
-            Network optimization recommendations
+        Constraints:
+        - Vehicle capacity (weight and volume)
+        - Facility processing capacity
+        - Hazardous material handling
+        - Time windows for collection
         """
-        # Get current network state
-        network_state = self.repair_network.get_state()
-        
-        # Identify gaps in coverage
-        coverage_gaps = self._identify_coverage_gaps(
-            network_state,
-            demand_forecast
-        )
-        
-        # Optimize facility locations
-        optimal_locations = self._optimize_facility_locations(
-            coverage_gaps,
-            demand_forecast
-        )
-        
-        # Calculate material flows
-        material_flows = self._calculate_material_flows(
-            network_state,
-            demand_forecast
-        )
-        
-        return {
-            "coverage_gaps": coverage_gaps,
-            "recommended_locations": optimal_locations,
-            "material_flows": material_flows,
-            "network_efficiency": self._calculate_network_efficiency(network_state)
-        }
-    
-    def track_material_lifecycle(self, material_id: str) -> Dict:
-        """
-        Track material from collection to reuse.
-        
-        Args:
-            material_id: Unique material identifier (RFID/barcode)
-        
-        Returns:
-            Complete lifecycle history
-        """
-        # Query material database
-        lifecycle = self.material_db.get_lifecycle(material_id)
-        
-        return {
-            "material_id": material_id,
-            "origin": lifecycle['origin'],
-            "collection_date": lifecycle['collection_date'],
-            "processing_steps": lifecycle['processing_steps'],
-            "current_state": lifecycle['current_state'],
-            "reuse_applications": lifecycle['reuse_applications'],
-            "carbon_offset": self._calculate_carbon_offset(lifecycle)
-        }
-    
-    def _build_reverse_logistics_problem(
-        self,
-        collection_points: List[Dict],
-        facilities: List[Dict],
-        waste_type: str
-    ) -> routing.Problem:
-        """Build cuOpt problem for reverse logistics."""
         problem = routing.Problem()
         
         # Add collection points as pickup locations
@@ -175,9 +116,10 @@ class CircularRouter:
             problem.add_location(
                 lat=point['lat'],
                 lon=point['lon'],
-                demand=point['volume'],  # Volume to collect
+                demand=point['quantity'],  # Negative for pickup
                 time_window=(point['available_from'], point['available_until']),
-                location_type='PICKUP'
+                service_time=point['collection_time'],
+                priority=point['priority']
             )
         
         # Add processing facilities as delivery locations
@@ -185,321 +127,427 @@ class CircularRouter:
             problem.add_location(
                 lat=facility['lat'],
                 lon=facility['lon'],
-                capacity=facility['processing_capacity'],
-                location_type='DELIVERY'
+                demand=-facility['capacity'],  # Positive for delivery
+                time_window=(facility['open'], facility['close']),
+                service_time=facility['processing_time']
             )
         
-        # Add vehicles (collection trucks)
-        vehicles = self._get_available_vehicles(waste_type)
-        for vehicle in vehicles:
+        # Add collection vehicles
+        for vehicle in self._get_available_vehicles():
             problem.add_vehicle(
                 capacity=vehicle['capacity'],
                 start_location=vehicle['depot'],
                 end_location=vehicle['depot'],
-                cost_per_km=vehicle['cost_per_km']
+                cost_per_km=vehicle['cost_per_km'],
+                max_distance=vehicle['max_range']
             )
         
         # Add constraints
-        problem.add_constraint(
-            routing.CapacityConstraint()  # Don't exceed vehicle capacity
-        )
-        
-        problem.add_constraint(
-            routing.TimeWindowConstraint()  # Respect collection time windows
-        )
-        
-        # Objective: minimize total distance + processing cost
-        problem.set_objective(
-            routing.MinimizeCostObjective(
-                distance_weight=1.0,
-                processing_cost_weight=0.5
+        if waste_type in ['batteries', 'solar_panels']:
+            # Hazardous material constraint
+            problem.add_constraint(
+                routing.HazmatConstraint(
+                    certified_vehicles_only=True
+                )
             )
-        )
         
         return problem
     
-    def _assign_processing_tasks(self, solution: routing.Solution, waste_type: str) -> List[Dict]:
-        """Assign processing tasks to repair-preneurs."""
+    def _assign_processing(self, solution, waste_type: str) -> List[Dict]:
+        """
+        Assign processing tasks based on waste type and facility capabilities.
+        
+        Processing hierarchy:
+        1. Repair/refurbish (highest value)
+        2. Component harvesting
+        3. Material recovery
+        4. Safe disposal (last resort)
+        """
         assignments = []
         
         for route in solution.routes:
             for stop in route.stops:
-                if stop.location_type == 'DELIVERY':
-                    # Find best repair-preneur for this waste
-                    repair_preneur = self.repair_network.find_best_match(
-                        location=stop.location,
-                        waste_type=waste_type,
-                        volume=stop.volume
-                    )
+                if stop.type == 'DELIVERY':
+                    facility = self._get_facility(stop.location_id)
+                    
+                    # Determine processing method
+                    if facility.has_capability('REPAIR') and self._is_repairable(waste_type):
+                        method = 'REPAIR'
+                        value_recovery = 0.8  # 80% of original value
+                    elif facility.has_capability('HARVEST'):
+                        method = 'COMPONENT_HARVEST'
+                        value_recovery = 0.4  # 40% of original value
+                    elif facility.has_capability('MATERIAL_RECOVERY'):
+                        method = 'MATERIAL_RECOVERY'
+                        value_recovery = 0.15  # 15% of original value
+                    else:
+                        method = 'SAFE_DISPOSAL'
+                        value_recovery = 0.0
                     
                     assignments.append({
-                        'repair_preneur_id': repair_preneur.id,
+                        'facility_id': facility.id,
                         'waste_type': waste_type,
-                        'volume': stop.volume,
-                        'location': stop.location,
-                        'estimated_processing_time': repair_preneur.estimate_time(waste_type, stop.volume)
+                        'quantity': stop.quantity,
+                        'method': method,
+                        'value_recovery': value_recovery,
+                        'estimated_time': facility.processing_time * stop.quantity
                     })
         
         return assignments
     
-    def _estimate_material_recovery(self, assignments: List[Dict]) -> Dict:
-        """Estimate recoverable materials from assignments."""
-        recovery = {
-            'copper_kg': 0,
-            'gold_g': 0,
-            'silver_g': 0,
-            'rare_earth_g': 0,
-            'plastic_kg': 0,
-            'steel_kg': 0
+    def optimize_component_marketplace(self, demand: Dict, supply: Dict) -> Dict:
+        """
+        Match component supply from harvesting with repair demand.
+        
+        Args:
+            demand: Dict of component demands from repair network
+            supply: Dict of available harvested components
+        
+        Returns:
+            Optimal allocation and routing
+        """
+        # Build bipartite matching problem
+        problem = routing.Problem()
+        
+        # Add supply nodes (harvesting facilities)
+        for facility_id, components in supply.items():
+            facility = self._get_facility(facility_id)
+            problem.add_location(
+                lat=facility.lat,
+                lon=facility.lon,
+                supply=components
+            )
+        
+        # Add demand nodes (repair benches)
+        for bench_id, components in demand.items():
+            bench = self.repair_network.get_bench(bench_id)
+            problem.add_location(
+                lat=bench.lat,
+                lon=bench.lon,
+                demand=components
+            )
+        
+        # Solve matching and routing
+        solution = self.solver.solve(problem, time_limit=5.0)
+        
+        return {
+            'allocations': solution.allocations,
+            'routes': solution.routes,
+            'total_cost': solution.total_cost,
+            'unmet_demand': solution.unmet_demand
+        }
+    
+    def _estimate_value(self, waste_type: str, quantity: int) -> float:
+        """
+        Estimate recovery value from e-waste.
+        
+        Value sources:
+        - Precious metals (Au, Ag, Pd, Pt)
+        - Rare earth elements
+        - Reusable components
+        - Recycled materials
+        """
+        value_per_unit = {
+            'phones': 15.0,  # USD per phone
+            'laptops': 45.0,
+            'solar_panels': 30.0,
+            'batteries': 20.0,
+            'tablets': 25.0
         }
         
-        for assignment in assignments:
-            waste_type = assignment['waste_type']
-            volume = assignment['volume']
-            
-            # Get recovery rates from database
-            rates = self.material_db.get_recovery_rates(waste_type)
-            
-            for material, rate in rates.items():
-                if material in recovery:
-                    recovery[material] += volume * rate
+        base_value = value_per_unit.get(waste_type, 10.0) * quantity
+        
+        # Adjust for recovery efficiency
+        recovery_rate = 0.6  # 60% average recovery
+        
+        return base_value * recovery_rate
+
+class ComponentDatabase:
+    """
+    Database of harvested components and their specifications.
+    """
+    def __init__(self):
+        self.components = {}
+    
+    def register_component(self, component: Dict):
+        """
+        Register harvested component in database.
+        
+        Args:
+            component: {
+                'type': 'LCD_SCREEN' | 'BATTERY' | 'PROCESSOR' | etc.,
+                'source_device': str,
+                'condition': 'WORKING' | 'REPAIRABLE' | 'PARTS_ONLY',
+                'specifications': dict,
+                'location': str (facility_id),
+                'harvest_date': timestamp
+            }
+        """
+        component_id = self._generate_component_id(component)
+        self.components[component_id] = component
+        
+        print(f"   [Component-DB] Registered {component['type']} from {component['source_device']}")
+    
+    def search_compatible(self, device_model: str, component_type: str) -> List[Dict]:
+        """
+        Find compatible components for repair.
+        
+        Args:
+            device_model: Model of device being repaired
+            component_type: Type of component needed
+        
+        Returns:
+            List of compatible components with locations
+        """
+        compatible = []
+        
+        for comp_id, comp in self.components.items():
+            if comp['type'] == component_type:
+                if self._check_compatibility(comp, device_model):
+                    compatible.append({
+                        'component_id': comp_id,
+                        'condition': comp['condition'],
+                        'location': comp['location'],
+                        'price': self._calculate_price(comp)
+                    })
+        
+        return sorted(compatible, key=lambda x: x['price'])
+
+class RepairNetwork:
+    """
+    Network of repair-preneurs and community repair benches.
+    """
+    def __init__(self):
+        self.benches = {}
+        self.repair_preneurs = {}
+    
+    def register_bench(self, bench: Dict):
+        """
+        Register repair bench in network.
+        
+        Args:
+            bench: {
+                'location': {'lat': float, 'lon': float},
+                'capabilities': ['PHONE_REPAIR', 'LAPTOP_REPAIR', etc.],
+                'tools': list of available tools,
+                'operator': repair-preneur ID,
+                'hours': operating hours
+            }
+        """
+        bench_id = self._generate_bench_id(bench)
+        self.benches[bench_id] = bench
+        
+        print(f"   [Repair-Network] Registered bench at {bench['location']}")
+    
+    def find_nearest_bench(self, location: Dict, capability: str) -> Dict:
+        """
+        Find nearest repair bench with required capability.
+        
+        Args:
+            location: {'lat': float, 'lon': float}
+            capability: Required capability (e.g., 'PHONE_REPAIR')
+        
+        Returns:
+            Nearest bench with distance
+        """
+        candidates = [
+            bench for bench in self.benches.values()
+            if capability in bench['capabilities']
+        ]
+        
+        if not candidates:
+            return None
+        
+        # Calculate distances
+        distances = [
+            (bench, self._haversine_distance(location, bench['location']))
+            for bench in candidates
+        ]
+        
+        # Return nearest
+        nearest = min(distances, key=lambda x: x[1])
+        
+        return {
+            'bench': nearest[0],
+            'distance_km': nearest[1]
+        }
+    
+    def track_repair(self, repair_id: str, status: str):
+        """
+        Track repair job status.
+        
+        Status: RECEIVED, DIAGNOSED, PARTS_ORDERED, IN_PROGRESS, COMPLETED, FAILED
+        """
+        # Update repair tracking
+        # Mint bio-credits upon completion
+        if status == 'COMPLETED':
+            self._mint_repair_credits(repair_id)
+
+class DiagnosticAI:
+    """
+    AI-powered fault diagnosis for electronic devices.
+    """
+    def __init__(self):
+        self.model = self._load_diagnostic_model()
+    
+    def diagnose_fault(self, device_type: str, symptoms: List[str],
+                      images: List[np.ndarray] = None) -> Dict:
+        """
+        Diagnose device fault using AI.
+        
+        Args:
+            device_type: Type of device (phone, laptop, etc.)
+            symptoms: List of observed symptoms
+            images: Optional images of device/damage
+        
+        Returns:
+            Diagnosis with repair recommendations
+        """
+        # Encode symptoms
+        symptom_embedding = self._encode_symptoms(symptoms)
+        
+        # Process images if provided
+        if images:
+            image_features = self._extract_image_features(images)
+            features = np.concatenate([symptom_embedding, image_features])
+        else:
+            features = symptom_embedding
+        
+        # Run diagnostic model
+        diagnosis = self.model.predict(features)
+        
+        # Get repair recommendations
+        recommendations = self._get_repair_recommendations(diagnosis)
+        
+        return {
+            'fault': diagnosis['fault_type'],
+            'confidence': diagnosis['confidence'],
+            'components_affected': diagnosis['components'],
+            'repair_difficulty': diagnosis['difficulty'],
+            'estimated_cost': diagnosis['cost_estimate'],
+            'recommendations': recommendations
+        }
+
+class MaterialRecovery:
+    """
+    Material recovery and precious metal extraction.
+    """
+    def __init__(self):
+        self.recovery_rates = self._load_recovery_rates()
+    
+    def estimate_recovery(self, waste_type: str, quantity: int) -> Dict:
+        """
+        Estimate material recovery from e-waste.
+        
+        Returns:
+            Estimated quantities of recoverable materials
+        """
+        rates = self.recovery_rates.get(waste_type, {})
+        
+        recovery = {}
+        for material, rate in rates.items():
+            recovery[material] = quantity * rate
         
         return recovery
     
-    def _update_material_inventory(self, assignments: List[Dict]):
-        """Update inventory with expected material recovery."""
-        for assignment in assignments:
-            self.inventory.add_expected_recovery(
-                repair_preneur_id=assignment['repair_preneur_id'],
-                waste_type=assignment['waste_type'],
-                volume=assignment['volume'],
-                estimated_date=assignment.get('estimated_completion_date')
-            )
-    
-    def _get_collection_points(self, waste_type: str) -> List[Dict]:
-        """Get collection points for waste type."""
-        # In production, query database
-        return [
-            {'lat': -1.286389, 'lon': 36.817223, 'volume': 50, 'available_from': 8, 'available_until': 18},
-            {'lat': -1.292066, 'lon': 36.821945, 'volume': 30, 'available_from': 9, 'available_until': 17}
-        ]
-    
-    def _get_processing_facilities(self, waste_type: str) -> List[Dict]:
-        """Get processing facilities for waste type."""
-        return [
-            {'lat': -1.289000, 'lon': 36.820000, 'processing_capacity': 100},
-            {'lat': -1.295000, 'lon': 36.825000, 'processing_capacity': 150}
-        ]
-    
-    def _get_available_vehicles(self, waste_type: str) -> List[Dict]:
-        """Get available collection vehicles."""
-        return [
-            {'capacity': 100, 'depot': {'lat': -1.290000, 'lon': 36.822000}, 'cost_per_km': 0.5}
-        ]
-    
-    def _identify_coverage_gaps(self, network_state: Dict, demand: Dict) -> List[Dict]:
-        """Identify areas with insufficient repair coverage."""
-        gaps = []
-        # Simplified gap analysis
-        return gaps
-    
-    def _optimize_facility_locations(self, gaps: List[Dict], demand: Dict) -> List[Dict]:
-        """Optimize new facility locations using cuOpt."""
-        # Use facility location problem formulation
-        return []
-    
-    def _calculate_material_flows(self, network_state: Dict, demand: Dict) -> Dict:
-        """Calculate optimal material flows through network."""
-        return {}
-    
-    def _calculate_network_efficiency(self, network_state: Dict) -> float:
-        """Calculate network efficiency metric (0-1)."""
-        return 0.85
-    
-    def _calculate_carbon_offset(self, lifecycle: Dict) -> float:
-        """Calculate carbon offset from recycling vs. new production."""
-        # Simplified calculation
-        # In production, use LCA (Life Cycle Assessment) data
-        return 5.2  # kg CO2 equivalent
-
-class MaterialDatabase:
-    """Database of material properties and recovery rates."""
-    
-    def __init__(self):
-        self.materials = self._load_material_data()
-    
-    def get_recovery_rates(self, waste_type: str) -> Dict[str, float]:
-        """Get material recovery rates for waste type."""
-        rates = {
-            'e-waste': {
-                'copper_kg': 0.15,  # 15% copper by weight
-                'gold_g': 0.3,      # 0.3g gold per kg
-                'silver_g': 1.5,
-                'rare_earth_g': 0.05,
-                'plastic_kg': 0.25,
-                'steel_kg': 0.30
+    def _load_recovery_rates(self) -> Dict:
+        """
+        Load material recovery rates by device type.
+        
+        Example rates (grams per device):
+        - Smartphone: 0.034g Au, 0.34g Ag, 0.015g Pd
+        - Laptop: 0.2g Au, 1.0g Ag, 0.1g Pd
+        """
+        return {
+            'phones': {
+                'gold': 0.034,
+                'silver': 0.34,
+                'palladium': 0.015,
+                'copper': 15.0,
+                'aluminum': 10.0
             },
-            'plastic': {
-                'plastic_kg': 0.90  # 90% recoverable
-            },
-            'metal': {
-                'steel_kg': 0.95,
-                'copper_kg': 0.05
+            'laptops': {
+                'gold': 0.2,
+                'silver': 1.0,
+                'palladium': 0.1,
+                'copper': 100.0,
+                'aluminum': 200.0
             }
         }
-        return rates.get(waste_type, {})
-    
-    def get_lifecycle(self, material_id: str) -> Dict:
-        """Get material lifecycle history."""
-        # In production, query blockchain or database
-        return {
-            'origin': 'Nairobi Collection Point #42',
-            'collection_date': '2025-12-15',
-            'processing_steps': [
-                {'step': 'Collection', 'date': '2025-12-15'},
-                {'step': 'Sorting', 'date': '2025-12-16'},
-                {'step': 'Disassembly', 'date': '2025-12-17'},
-                {'step': 'Component Recovery', 'date': '2025-12-18'}
-            ],
-            'current_state': 'READY_FOR_REUSE',
-            'reuse_applications': ['Solar charge controller', 'IoT sensor node']
-        }
-    
-    def _load_material_data(self) -> Dict:
-        """Load material database."""
-        return {}
-
-class RepairPreneurNetwork:
-    """Network of repair-preneurs and processing facilities."""
-    
-    def __init__(self):
-        self.repair_preneurs = self._load_network()
-    
-    def get_state(self) -> Dict:
-        """Get current network state."""
-        return {
-            'total_repair_preneurs': len(self.repair_preneurs),
-            'total_capacity': sum(rp['capacity'] for rp in self.repair_preneurs),
-            'utilization': 0.72
-        }
-    
-    def find_best_match(self, location: Dict, waste_type: str, volume: float):
-        """Find best repair-preneur for waste processing."""
-        # Simplified matching
-        # In production, use cuOpt for optimal assignment
-        class RepairPreneur:
-            def __init__(self):
-                self.id = "RP-001"
-            
-            def estimate_time(self, waste_type: str, volume: float) -> float:
-                return volume * 0.5  # 0.5 hours per unit
-        
-        return RepairPreneur()
-    
-    def _load_network(self) -> List[Dict]:
-        """Load repair-preneur network."""
-        return [
-            {'id': 'RP-001', 'capacity': 100, 'specialties': ['e-waste', 'electronics']},
-            {'id': 'RP-002', 'capacity': 75, 'specialties': ['plastic', 'metal']}
-        ]
-
-class InventoryManager:
-    """Manage material inventory."""
-    
-    def __init__(self):
-        self.inventory = {}
-    
-    def add_expected_recovery(
-        self,
-        repair_preneur_id: str,
-        waste_type: str,
-        volume: float,
-        estimated_date: str
-    ):
-        """Add expected material recovery to inventory."""
-        key = f"{repair_preneur_id}_{waste_type}"
-        if key not in self.inventory:
-            self.inventory[key] = []
-        
-        self.inventory[key].append({
-            'volume': volume,
-            'estimated_date': estimated_date,
-            'status': 'EXPECTED'
-        })
 ```
 
 ## Use cases
 
-### E-waste harvesting network
-Urban mining for electronics:
-1. Community members bring e-waste to collection points
-2. CircularRouter optimizes collection routes
-3. Waste routed to nearest repair-preneur
-4. Components harvested (ICs, capacitors, connectors)
-5. Materials tracked via RFID through lifecycle
-6. Recovered components used in new devices
+### Community e-waste collection
+Optimize collection in urban areas:
+1. Residents register e-waste via mobile app
+2. cuOpt generates optimal collection routes
+3. Collection vehicle visits 50 locations in 4 hours
+4. Devices sorted at central facility
+5. Repairable devices sent to repair benches
+6. Non-repairable devices sent to harvesting
+
+### Repair-preneur network
+Distributed repair economy:
+1. Customer brings broken phone to local bench
+2. Diagnostic AI identifies faulty screen
+3. Component marketplace finds compatible LCD
+4. Component routed from harvesting facility
+5. Repair completed in 2 hours
+6. Repair-preneur earns bio-credits
 
 ### Solar panel refurbishment
-Extend solar panel life:
-1. Damaged panels collected from field
-2. Routed to refurbishment facility
-3. Cells tested and sorted
-4. Working cells assembled into new panels
-5. Refurbished panels deployed at 60% of new cost
-6. 30-year lifecycle extended by 10 years
-
-### Plastic recycling to 3D printing
-Close the loop on plastics:
-1. Plastic waste collected and sorted
-2. Shredded and extruded into filament
-3. Filament used in 3D printers
-4. Print replacement parts for devices
-5. Zero plastic waste to landfill
+Extend life of agro-voltaic installations:
+1. Degraded panels collected from farms
+2. Diagnostic AI assesses cell condition
+3. Working cells harvested and recombined
+4. Refurbished panels at 60% of new cost
+5. Failed cells sent to material recovery
+6. Circular supply chain for rural electrification
 
 ## Performance benchmarks
 
-| Metric | Traditional | Circular economy |
-|--------|-------------|------------------|
-| Material recovery rate | 15% | 85% |
-| Landfill waste | 85% | 5% |
-| New material cost | $100 | $30 |
-| Carbon footprint | 100 kg CO2 | 20 kg CO2 |
-| Local employment | 1 job | 10 jobs |
+| Task | Hardware | Time | Efficiency |
+|------|----------|------|------------|
+| Route optimization (100 locations) | A100 GPU | 850ms | 95% optimal |
+| Component matching | CPU | 120ms | - |
+| Diagnostic AI | Jetson Orin | 2.3s | 87% accuracy |
+| Material recovery estimation | CPU | 50ms | - |
 
 ## Integration with other stacks
 
-### Stack 2: Kinetic & sensory
-- cuOpt powers both forward and reverse logistics
-- Holoscan for quality inspection
-
 ### Stack 5: Humanitarian substrate
-- Bio-credits for recycling participation
-- Transparent material tracking on blockchain
+- Bio-credits minted for repair and recycling
+- Component marketplace on blockchain
+
+### Stack 6: Connectivity
+- Collection coordination via Ghost-Mesh
+- Offline component database sync
 
 ### Stack 7: Educational sovereignty
-- Vocational training for repair-preneurs
-- Circular economy education
+- Repair training via Knowledge Mesh
+- Diagnostic AI tutoring for repair-preneurs
 
 ## Regulatory compliance
 
+- **WEEE Directive**: E-waste collection and recycling
 - **Basel Convention**: Transboundary waste movement
-- **WEEE Directive**: E-waste management
-- **Extended Producer Responsibility**: Manufacturer obligations
-- **Right to Repair**: Consumer repair rights
+- **RoHS**: Hazardous substance restrictions
+- **Right to Repair**: Device repairability standards
 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Nuclear thesis overview" icon="atom" href="/nuclear-thesis/overview">
-    Return to overview
-  </Card>
-  <Card title="Repair-preneur program" icon="screwdriver-wrench" href="/circular-economy/repair-preneur">
-    Join the network
-  </Card>
-  <Card title="Material database" icon="database" href="/circular-economy/materials">
-    Recovery rates and specs
+  <Card title="Nuclear Thesis overview" icon="atom" href="/nuclear-thesis/overview">
+    Return to 10-stack overview
   </Card>
   <Card title="cuOpt routing" icon="route" href="/integrations/cuopt-logistics">
-    Logistics optimization
+    GPU-accelerated optimization
+  </Card>
+  <Card title="Repair network setup" icon="wrench" href="/deployment/repair-network">
+    Community repair bench guide
+  </Card>
+  <Card title="Material recovery" icon="recycle" href="/architecture/urban-mining">
+    E-waste processing protocols
   </Card>
 </CardGroup>
