@@ -1,0 +1,800 @@
+---
+title: Security best practices
+description: Comprehensive security guidelines for production iLuminara deployments
+---
+
+iLuminara implements defense-in-depth security with zero-trust architecture, confidential computing, and comprehensive audit trails.
+
+## Security architecture
+
+### Zero-trust model
+
+Never trust, always verify:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│              Zero-Trust Architecture                    │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  External Request                                       │
+│       │                                                  │
+│       ▼                                                  │
+│  ┌─────────────────────────────────────┐               │
+│  │  1. Authentication (mTLS + JWT)     │               │
+│  └─────────────────────────────────────┘               │
+│       │                                                  │
+│       ▼                                                  │
+│  ┌─────────────────────────────────────┐               │
+│  │  2. Authorization (RBAC + ABAC)     │               │
+│  └─────────────────────────────────────┘               │
+│       │                                                  │
+│       ▼                                                  │
+│  ┌─────────────────────────────────────┐               │
+│  │  3. Compliance Check (Omni-Law)     │               │
+│  └─────────────────────────────────────┘               │
+│       │                                                  │
+│       ▼                                                  │
+│  ┌─────────────────────────────────────┐               │
+│  │  4. Rate Limiting                   │               │
+│  └─────────────────────────────────────┘               │
+│       │                                                  │
+│       ▼                                                  │
+│  ┌─────────────────────────────────────┐               │
+│  │  5. Encryption (TLS 1.3)            │               │
+│  └─────────────────────────────────────┘               │
+│       │                                                  │
+│       ▼                                                  │
+│  Service Execution                                      │
+│       │                                                  │
+│       ▼                                                  │
+│  ┌─────────────────────────────────────┐               │
+│  │  6. Audit Logging (Blockchain)      │               │
+│  └─────────────────────────────────────┘               │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+## Authentication & authorization
+
+### Mutual TLS (mTLS)
+
+All service-to-service communication uses mTLS:
+
+```yaml
+# Service mesh configuration (Istio)
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: iluminara
+spec:
+  mtls:
+    mode: STRICT  # Require mTLS for all traffic
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: nim-inference
+  namespace: iluminara
+spec:
+  host: nim-inference.iluminara.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL  # Use Istio-managed certificates
+```
+
+### JWT authentication
+
+API authentication using JSON Web Tokens:
+
+```python
+from fastapi import FastAPI, Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import jwt
+from datetime import datetime, timedelta
+
+app = FastAPI()
+security = HTTPBearer()
+
+SECRET_KEY = "your-secret-key"  # In production, use secrets manager
+ALGORITHM = "HS256"
+
+def create_access_token(data: dict, expires_delta: timedelta = None):
+    """Create JWT access token."""
+    to_encode = data.copy()
+    
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    
+    return encoded_jwt
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Verify JWT token."""
+    token = credentials.credentials
+    
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("sub")
+        
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+@app.post("/v1/inference")
+async def inference(request: dict, token_data: dict = Depends(verify_token)):
+    """Protected inference endpoint."""
+    user_id = token_data['sub']
+    
+    # Check user permissions
+    if not has_permission(user_id, 'inference:execute'):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    # Process inference
+    result = process_inference(request)
+    
+    return result
+```
+
+### Role-Based Access Control (RBAC)
+
+```yaml k8s/rbac.yaml
+# Service account for NIM inference
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nim-inference
+  namespace: iluminara
+---
+# Role with specific permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: nim-inference-role
+  namespace: iluminara
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+# Bind role to service account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: nim-inference-binding
+  namespace: iluminara
+subjects:
+  - kind: ServiceAccount
+    name: nim-inference
+    namespace: iluminara
+roleRef:
+  kind: Role
+  name: nim-inference-role
+  apiGroup: rbac.authorization.k8s.io
+```
+
+## Encryption
+
+### Data at rest
+
+Encrypt all stored data:
+
+```python
+from cryptography.fernet import Fernet
+import os
+
+class EncryptedStorage:
+    """Encrypted storage for sensitive data."""
+    
+    def __init__(self, key_path="/secrets/encryption-key"):
+        # Load encryption key from secure location
+        with open(key_path, 'rb') as f:
+            self.key = f.read()
+        
+        self.cipher = Fernet(self.key)
+    
+    def encrypt_file(self, file_path):
+        """Encrypt file in place."""
+        with open(file_path, 'rb') as f:
+            plaintext = f.read()
+        
+        ciphertext = self.cipher.encrypt(plaintext)
+        
+        with open(file_path + '.enc', 'wb') as f:
+            f.write(ciphertext)
+        
+        # Securely delete plaintext
+        os.remove(file_path)
+    
+    def decrypt_file(self, encrypted_path):
+        """Decrypt file."""
+        with open(encrypted_path, 'rb') as f:
+            ciphertext = f.read()
+        
+        plaintext = self.cipher.decrypt(ciphertext)
+        
+        return plaintext
+```
+
+### Data in transit
+
+All network communication uses TLS 1.3:
+
+```python
+import ssl
+import requests
+
+# Create SSL context with strong settings
+ssl_context = ssl.create_default_context()
+ssl_context.minimum_version = ssl.TLSVersion.TLSv1_3
+ssl_context.check_hostname = True
+ssl_context.verify_mode = ssl.CERT_REQUIRED
+
+# Use with requests
+response = requests.get(
+    "https://api.iluminara.org/v1/data",
+    verify=True,  # Verify SSL certificate
+    timeout=10
+)
+```
+
+### Data in use (Confidential Computing)
+
+Process sensitive data in hardware-encrypted enclaves:
+
+```python
+class ConfidentialProcessor:
+    """
+    Process sensitive data in Intel SGX or AMD SEV enclave.
+    Data is encrypted even during processing.
+    """
+    def __init__(self):
+        self.enclave = self._initialize_enclave()
+    
+    def process_sensitive_data(self, encrypted_data):
+        """
+        Process data inside enclave.
+        Data never exists in plaintext outside enclave.
+        """
+        # Decrypt inside enclave
+        with self.enclave.secure_context():
+            plaintext = self.enclave.decrypt(encrypted_data)
+            
+            # Process data
+            result = self._process(plaintext)
+            
+            # Encrypt result
+            encrypted_result = self.enclave.encrypt(result)
+        
+        # Return encrypted result
+        return encrypted_result
+    
+    def get_attestation(self):
+        """
+        Get remote attestation proof.
+        Proves code is running in genuine enclave.
+        """
+        return self.enclave.generate_attestation()
+```
+
+## Secrets management
+
+### Kubernetes secrets
+
+```yaml k8s/secrets.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-credentials
+  namespace: iluminara
+type: Opaque
+stringData:
+  username: iluminara
+  password: <strong-password>
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: api-keys
+  namespace: iluminara
+type: Opaque
+stringData:
+  openai-api-key: sk-...
+  aws-access-key: AKIA...
+```
+
+### External secrets operator
+
+```yaml
+apiVersion: external-secrets.io/v1beta1
+kind: SecretStore
+metadata:
+  name: aws-secrets-manager
+  namespace: iluminara
+spec:
+  provider:
+    aws:
+      service: SecretsManager
+      region: us-east-1
+      auth:
+        jwt:
+          serviceAccountRef:
+            name: external-secrets
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: database-credentials
+  namespace: iluminara
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: aws-secrets-manager
+    kind: SecretStore
+  target:
+    name: db-credentials
+    creationPolicy: Owner
+  data:
+    - secretKey: password
+      remoteRef:
+        key: iluminara/database/password
+```
+
+## Network security
+
+### Network policies
+
+```yaml k8s/network-policy.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: nim-inference-policy
+  namespace: iluminara
+spec:
+  podSelector:
+    matchLabels:
+      app: nim-inference
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Only allow traffic from API gateway
+    - from:
+        - podSelector:
+            matchLabels:
+              app: api-gateway
+      ports:
+        - protocol: TCP
+          port: 8000
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow database access
+    - to:
+        - podSelector:
+            matchLabels:
+              app: timescaledb
+      ports:
+        - protocol: TCP
+          port: 5432
+```
+
+### Service mesh (Istio)
+
+```yaml
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: nim-inference-authz
+  namespace: iluminara
+spec:
+  selector:
+    matchLabels:
+      app: nim-inference
+  action: ALLOW
+  rules:
+    # Allow from API gateway
+    - from:
+        - source:
+            principals: ["cluster.local/ns/iluminara/sa/api-gateway"]
+      to:
+        - operation:
+            methods: ["POST"]
+            paths: ["/v1/inference"]
+    
+    # Allow health checks from Prometheus
+    - from:
+        - source:
+            principals: ["cluster.local/ns/monitoring/sa/prometheus"]
+      to:
+        - operation:
+            methods: ["GET"]
+            paths: ["/health", "/metrics"]
+```
+
+## Vulnerability management
+
+### Automated scanning
+
+```bash
+# Scan container images
+trivy image ghcr.io/iluminara/nim-inference:latest \
+  --severity HIGH,CRITICAL \
+  --exit-code 1
+
+# Scan Kubernetes manifests
+trivy config k8s/ \
+  --severity HIGH,CRITICAL
+
+# Scan dependencies
+snyk test --severity-threshold=high
+
+# Scan infrastructure as code
+checkov -d terraform/ --framework terraform
+```
+
+### Patch management
+
+```yaml
+# Automated dependency updates (Renovate)
+{
+  "extends": ["config:base"],
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true
+    },
+    {
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "labels": ["major-update"]
+    }
+  ],
+  "schedule": ["before 3am on Monday"],
+  "timezone": "UTC"
+}
+```
+
+## Audit logging
+
+### Blockchain-based audit trail
+
+```python
+from web3 import Web3
+import json
+import hashlib
+
+class BlockchainAuditLog:
+    """
+    Immutable audit log on Hyperledger Besu.
+    """
+    def __init__(self, node_url, contract_address):
+        self.w3 = Web3(Web3.HTTPProvider(node_url))
+        self.contract = self._load_contract(contract_address)
+    
+    def record_event(self, event_type, user_id, resource, action, metadata=None):
+        """
+        Record audit event on blockchain.
+        
+        Args:
+            event_type: Type of event (DATA_ACCESS, MODEL_INFERENCE, etc.)
+            user_id: User performing action
+            resource: Resource accessed
+            action: Action performed (READ, WRITE, DELETE)
+            metadata: Additional context
+        """
+        # Create audit entry
+        audit_entry = {
+            'timestamp': int(time.time()),
+            'event_type': event_type,
+            'user_id': user_id,
+            'resource': resource,
+            'action': action,
+            'metadata': metadata or {}
+        }
+        
+        # Hash for integrity
+        entry_hash = hashlib.sha256(
+            json.dumps(audit_entry, sort_keys=True).encode()
+        ).hexdigest()
+        
+        # Store on blockchain
+        tx = self.contract.functions.recordAuditEvent(
+            entry_hash,
+            json.dumps(audit_entry)
+        ).build_transaction({
+            'from': self.w3.eth.default_account,
+            'nonce': self.w3.eth.get_transaction_count(self.w3.eth.default_account),
+            'gas': 200000
+        })
+        
+        # Sign and send
+        signed_tx = self.w3.eth.account.sign_transaction(tx, self._get_private_key())
+        tx_hash = self.w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+        
+        # Wait for confirmation
+        receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
+        
+        return {
+            'tx_hash': tx_hash.hex(),
+            'block_number': receipt['blockNumber'],
+            'entry_hash': entry_hash
+        }
+    
+    def verify_audit_trail(self, entry_hash):
+        """
+        Verify audit entry hasn't been tampered with.
+        
+        Returns:
+            True if entry exists and is valid
+        """
+        # Query blockchain
+        entry = self.contract.functions.getAuditEvent(entry_hash).call()
+        
+        if not entry:
+            return False
+        
+        # Verify hash
+        computed_hash = hashlib.sha256(entry.encode()).hexdigest()
+        
+        return computed_hash == entry_hash
+```
+
+## Compliance automation
+
+### GDPR compliance
+
+```python
+class GDPRCompliance:
+    """
+    Automated GDPR compliance enforcement.
+    """
+    def __init__(self):
+        self.data_registry = DataRegistry()
+        self.consent_manager = ConsentManager()
+    
+    def process_data_subject_request(self, request_type, user_id):
+        """
+        Handle GDPR data subject requests.
+        
+        Request types:
+        - ACCESS: Right to access (Art. 15)
+        - RECTIFICATION: Right to rectification (Art. 16)
+        - ERASURE: Right to erasure (Art. 17)
+        - PORTABILITY: Right to data portability (Art. 20)
+        - RESTRICTION: Right to restriction (Art. 18)
+        """
+        if request_type == "ACCESS":
+            return self._export_user_data(user_id)
+        
+        elif request_type == "ERASURE":
+            return self._delete_user_data(user_id)
+        
+        elif request_type == "PORTABILITY":
+            return self._export_portable_data(user_id)
+        
+        elif request_type == "RECTIFICATION":
+            return self._update_user_data(user_id)
+        
+        elif request_type == "RESTRICTION":
+            return self._restrict_processing(user_id)
+    
+    def _delete_user_data(self, user_id):
+        """
+        Delete all user data (Right to erasure).
+        
+        Exceptions:
+        - Legal obligation to retain
+        - Public interest
+        - Legal claims
+        """
+        # Find all data for user
+        data_locations = self.data_registry.find_user_data(user_id)
+        
+        deleted = []
+        retained = []
+        
+        for location in data_locations:
+            # Check if we can delete
+            if self._can_delete(location):
+                self._delete_data(location)
+                deleted.append(location)
+            else:
+                # Must retain for legal reasons
+                retained.append({
+                    'location': location,
+                    'reason': self._get_retention_reason(location)
+                })
+        
+        # Log deletion
+        self._log_deletion(user_id, deleted, retained)
+        
+        return {
+            'deleted': deleted,
+            'retained': retained,
+            'status': 'COMPLETED'
+        }
+```
+
+## Security monitoring
+
+### Intrusion detection
+
+```python
+class IntrusionDetector:
+    """
+    Detect anomalous behavior indicating security breach.
+    """
+    def __init__(self):
+        self.baseline = self._load_baseline()
+        self.ml_model = self._load_anomaly_model()
+    
+    def analyze_request(self, request):
+        """
+        Analyze request for anomalies.
+        
+        Checks:
+        - Unusual request patterns
+        - Suspicious payloads
+        - Abnormal access patterns
+        - Known attack signatures
+        """
+        features = self._extract_features(request)
+        
+        # Check against baseline
+        if self._deviates_from_baseline(features):
+            severity = self._calculate_severity(features)
+            
+            if severity > 0.8:
+                self._trigger_alert(request, severity)
+                return "BLOCKED"
+        
+        # ML-based anomaly detection
+        anomaly_score = self.ml_model.predict(features)
+        
+        if anomaly_score > 0.9:
+            self._trigger_alert(request, anomaly_score)
+            return "BLOCKED"
+        
+        return "ALLOWED"
+    
+    def _extract_features(self, request):
+        """Extract features for anomaly detection."""
+        return {
+            'request_size': len(request.body),
+            'num_headers': len(request.headers),
+            'user_agent': request.headers.get('User-Agent'),
+            'ip_address': request.client.host,
+            'endpoint': request.url.path,
+            'method': request.method,
+            'time_of_day': datetime.now().hour
+        }
+```
+
+## Incident response
+
+### Automated response
+
+```python
+class IncidentResponder:
+    """
+    Automated incident response.
+    """
+    def __init__(self):
+        self.alertmanager = AlertmanagerClient()
+        self.kubernetes = KubernetesClient()
+    
+    def handle_incident(self, alert):
+        """
+        Handle security incident.
+        
+        Response actions:
+        - Isolate affected services
+        - Collect forensic data
+        - Notify security team
+        - Initiate recovery
+        """
+        severity = alert['labels']['severity']
+        component = alert['labels']['component']
+        
+        if severity == 'critical':
+            # Immediate response
+            self._isolate_component(component)
+            self._collect_forensics(component)
+            self._notify_security_team(alert)
+        
+        elif severity == 'high':
+            # Elevated monitoring
+            self._increase_monitoring(component)
+            self._notify_on_call(alert)
+        
+        # Log incident
+        self._log_incident(alert)
+    
+    def _isolate_component(self, component):
+        """Isolate compromised component."""
+        # Apply network policy to block traffic
+        self.kubernetes.apply_network_policy(
+            f"isolate-{component}",
+            deny_all_ingress=True,
+            deny_all_egress=True
+        )
+        
+        # Scale down to zero
+        self.kubernetes.scale_deployment(component, replicas=0)
+    
+    def _collect_forensics(self, component):
+        """Collect forensic data."""
+        # Capture pod logs
+        logs = self.kubernetes.get_logs(component)
+        
+        # Capture network traffic
+        pcap = self.kubernetes.exec_command(
+            component,
+            "tcpdump -w /tmp/capture.pcap -c 1000"
+        )
+        
+        # Store in secure location
+        self._store_forensics({
+            'component': component,
+            'logs': logs,
+            'pcap': pcap,
+            'timestamp': time.time()
+        })
+```
+
+## Security checklist
+
+### Pre-deployment
+
+- [ ] All secrets stored in secrets manager (not in code)
+- [ ] Container images scanned for vulnerabilities
+- [ ] Network policies configured
+- [ ] RBAC roles defined with least privilege
+- [ ] TLS certificates configured
+- [ ] Audit logging enabled
+- [ ] Backup and recovery tested
+
+### Post-deployment
+
+- [ ] Security monitoring active
+- [ ] Alerts configured and tested
+- [ ] Incident response plan documented
+- [ ] Penetration testing completed
+- [ ] Compliance audit passed
+- [ ] Security training completed
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Incident response" icon="siren" href="/enterprise/incident-response">
+    Handle security incidents
+  </Card>
+  <Card title="Compliance frameworks" icon="book-open" href="/governance/omni-law-frameworks">
+    47 supported frameworks
+  </Card>
+  <Card title="Penetration testing" icon="bug" href="/enterprise/penetration-testing">
+    Security testing guide
+  </Card>
+  <Card title="Disaster recovery" icon="life-ring" href="/enterprise/disaster-recovery">
+    Backup and recovery
+  </Card>
+</CardGroup>
