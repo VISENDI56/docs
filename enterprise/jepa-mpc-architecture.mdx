@@ -1,0 +1,699 @@
+---
+title: JEPA/MPC architecture
+description: World models and model-predictive control replacing reinforcement learning
+---
+
+iLuminara uses Joint-Embedding Predictive Architecture (JEPA) with Model-Predictive Control (MPC) instead of traditional reinforcement learning, enabling more sample-efficient learning and better generalization in resource-constrained environments.
+
+## Why JEPA over RL?
+
+### Problems with traditional RL
+
+**Sample inefficiency**:
+- Requires millions of environment interactions
+- Expensive in real-world scenarios (medical, agricultural)
+- Impractical for edge deployment with limited compute
+
+**Poor generalization**:
+- Overfits to training distribution
+- Fails on out-of-distribution scenarios
+- Requires retraining for new environments
+
+**Reward engineering**:
+- Difficult to specify correct reward functions
+- Reward hacking and unintended behaviors
+- Misalignment with human values
+
+### JEPA advantages
+
+**Sample efficiency**:
+- Learns world models from observation
+- No need for extensive trial-and-error
+- Transfer learning across domains
+
+**Generalization**:
+- Abstract representations generalize better
+- Handles distribution shift
+- Few-shot adaptation to new scenarios
+
+**Interpretability**:
+- Explicit world model can be inspected
+- Predictable behavior via MPC
+- Easier to debug and validate
+
+## JEPA architecture
+
+### Core components
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    JEPA World Model                      │
+│                                                          │
+│  ┌──────────────┐         ┌──────────────┐             │
+│  │   Encoder    │────────▶│  Predictor   │             │
+│  │   (Vision)   │         │  (Latent)    │             │
+│  └──────────────┘         └──────────────┘             │
+│         │                         │                     │
+│         │                         │                     │
+│         ▼                         ▼                     │
+│  ┌──────────────┐         ┌──────────────┐             │
+│  │   Context    │         │   Target     │             │
+│  │  Embedding   │────────▶│  Embedding   │             │
+│  └──────────────┘         └──────────────┘             │
+│                                  │                      │
+│                                  │                      │
+│                                  ▼                      │
+│                          ┌──────────────┐              │
+│                          │  Prediction  │              │
+│                          │     Loss     │              │
+│                          └──────────────┘              │
+└─────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────┐
+│              Model-Predictive Control (MPC)              │
+│                                                          │
+│  ┌──────────────┐         ┌──────────────┐             │
+│  │   Planner    │────────▶│  Optimizer   │             │
+│  │  (Rollout)   │         │   (Action)   │             │
+│  └──────────────┘         └──────────────┘             │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Encoder network
+Transforms observations into latent representations:
+
+```python
+import torch
+import torch.nn as nn
+
+class VisionEncoder(nn.Module):
+    """
+    Vision encoder for JEPA.
+    Transforms images into latent representations.
+    """
+    def __init__(self, latent_dim=256):
+        super().__init__()
+        
+        # Convolutional backbone
+        self.conv = nn.Sequential(
+            nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
+            
+            # ResNet-style blocks
+            self._make_layer(64, 128, 2),
+            self._make_layer(128, 256, 2),
+            self._make_layer(256, 512, 2),
+            
+            nn.AdaptiveAvgPool2d((1, 1))
+        )
+        
+        # Projection head
+        self.projection = nn.Sequential(
+            nn.Linear(512, 512),
+            nn.ReLU(),
+            nn.Linear(512, latent_dim)
+        )
+    
+    def forward(self, x):
+        """
+        Args:
+            x: Input images (B, 3, H, W)
+        
+        Returns:
+            Latent embeddings (B, latent_dim)
+        """
+        features = self.conv(x)
+        features = features.view(features.size(0), -1)
+        embeddings = self.projection(features)
+        return embeddings
+    
+    def _make_layer(self, in_channels, out_channels, num_blocks):
+        """Create ResNet-style layer."""
+        layers = []
+        layers.append(ResidualBlock(in_channels, out_channels, stride=2))
+        for _ in range(num_blocks - 1):
+            layers.append(ResidualBlock(out_channels, out_channels))
+        return nn.Sequential(*layers)
+
+class ResidualBlock(nn.Module):
+    """ResNet residual block."""
+    def __init__(self, in_channels, out_channels, stride=1):
+        super().__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels, 3, stride, 1)
+        self.bn1 = nn.BatchNorm2d(out_channels)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, 3, 1, 1)
+        self.bn2 = nn.BatchNorm2d(out_channels)
+        
+        self.shortcut = nn.Sequential()
+        if stride != 1 or in_channels != out_channels:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels, 1, stride),
+                nn.BatchNorm2d(out_channels)
+            )
+    
+    def forward(self, x):
+        out = torch.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
+        out += self.shortcut(x)
+        out = torch.relu(out)
+        return out
+```
+
+### Predictor network
+Predicts future latent states:
+
+```python
+class LatentPredictor(nn.Module):
+    """
+    Predicts future latent states from context.
+    Uses Transformer architecture for temporal modeling.
+    """
+    def __init__(self, latent_dim=256, num_heads=8, num_layers=6):
+        super().__init__()
+        
+        # Positional encoding
+        self.pos_encoding = PositionalEncoding(latent_dim)
+        
+        # Transformer encoder
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=latent_dim,
+            nhead=num_heads,
+            dim_feedforward=latent_dim * 4,
+            dropout=0.1,
+            activation='gelu'
+        )
+        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers)
+        
+        # Prediction head
+        self.predictor = nn.Sequential(
+            nn.Linear(latent_dim, latent_dim * 2),
+            nn.GELU(),
+            nn.Linear(latent_dim * 2, latent_dim)
+        )
+    
+    def forward(self, context_embeddings, target_positions):
+        """
+        Args:
+            context_embeddings: Context latents (B, T_context, D)
+            target_positions: Positions to predict (B, T_target)
+        
+        Returns:
+            Predicted target embeddings (B, T_target, D)
+        """
+        # Add positional encoding
+        context = self.pos_encoding(context_embeddings)
+        
+        # Transformer encoding
+        # Shape: (T_context, B, D)
+        context = context.transpose(0, 1)
+        encoded = self.transformer(context)
+        encoded = encoded.transpose(0, 1)
+        
+        # Predict target embeddings
+        # Use last context state to predict targets
+        last_state = encoded[:, -1:, :]  # (B, 1, D)
+        
+        predictions = []
+        for i in range(target_positions.size(1)):
+            pred = self.predictor(last_state)
+            predictions.append(pred)
+            last_state = pred  # Autoregressive prediction
+        
+        predictions = torch.cat(predictions, dim=1)  # (B, T_target, D)
+        
+        return predictions
+
+class PositionalEncoding(nn.Module):
+    """Sinusoidal positional encoding."""
+    def __init__(self, d_model, max_len=5000):
+        super().__init__()
+        
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * 
+                            (-torch.log(torch.tensor(10000.0)) / d_model))
+        
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0)
+        
+        self.register_buffer('pe', pe)
+    
+    def forward(self, x):
+        """
+        Args:
+            x: Input embeddings (B, T, D)
+        
+        Returns:
+            Embeddings with positional encoding (B, T, D)
+        """
+        return x + self.pe[:, :x.size(1), :]
+```
+
+### Training objective
+Joint-embedding predictive loss:
+
+```python
+class JEPALoss(nn.Module):
+    """
+    JEPA training loss.
+    Predicts target embeddings from context embeddings.
+    """
+    def __init__(self, temperature=0.1):
+        super().__init__()
+        self.temperature = temperature
+    
+    def forward(self, predicted_embeddings, target_embeddings):
+        """
+        Args:
+            predicted_embeddings: Predicted targets (B, T_target, D)
+            target_embeddings: Actual target embeddings (B, T_target, D)
+        
+        Returns:
+            Loss value
+        """
+        # Normalize embeddings
+        predicted = F.normalize(predicted_embeddings, dim=-1)
+        target = F.normalize(target_embeddings, dim=-1)
+        
+        # Compute similarity
+        similarity = torch.einsum('btd,btd->bt', predicted, target)
+        similarity = similarity / self.temperature
+        
+        # Contrastive loss
+        # Positive pairs: predicted and target at same position
+        # Negative pairs: predicted and target at different positions
+        
+        batch_size, num_targets = similarity.shape
+        
+        # Create labels (diagonal is positive)
+        labels = torch.arange(num_targets).unsqueeze(0).repeat(batch_size, 1)
+        labels = labels.to(similarity.device)
+        
+        # Cross-entropy loss
+        loss = F.cross_entropy(similarity, labels)
+        
+        return loss
+
+# Training loop
+def train_jepa(encoder, predictor, dataloader, num_epochs=100):
+    """
+    Train JEPA world model.
+    
+    Args:
+        encoder: Vision encoder
+        predictor: Latent predictor
+        dataloader: Video data loader
+        num_epochs: Number of training epochs
+    """
+    optimizer = torch.optim.AdamW(
+        list(encoder.parameters()) + list(predictor.parameters()),
+        lr=1e-4,
+        weight_decay=0.05
+    )
+    
+    criterion = JEPALoss(temperature=0.1)
+    
+    for epoch in range(num_epochs):
+        for batch in dataloader:
+            # batch: (B, T, C, H, W) - video frames
+            
+            # Split into context and target
+            context_frames = batch[:, :4, :, :, :]  # First 4 frames
+            target_frames = batch[:, 4:, :, :, :]   # Remaining frames
+            
+            # Encode frames
+            B, T_context, C, H, W = context_frames.shape
+            context_flat = context_frames.view(B * T_context, C, H, W)
+            context_embeddings = encoder(context_flat)
+            context_embeddings = context_embeddings.view(B, T_context, -1)
+            
+            _, T_target, _, _, _ = target_frames.shape
+            target_flat = target_frames.view(B * T_target, C, H, W)
+            target_embeddings = encoder(target_flat)
+            target_embeddings = target_embeddings.view(B, T_target, -1)
+            
+            # Predict target embeddings
+            target_positions = torch.arange(T_target).unsqueeze(0).repeat(B, 1)
+            predicted_embeddings = predictor(context_embeddings, target_positions)
+            
+            # Compute loss
+            loss = criterion(predicted_embeddings, target_embeddings.detach())
+            
+            # Backprop
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            
+            print(f"Epoch {epoch}, Loss: {loss.item():.4f}")
+```
+
+## Model-Predictive Control (MPC)
+
+### Planning with world model
+Use learned world model for planning:
+
+```python
+class MPCPlanner:
+    """
+    Model-Predictive Control using JEPA world model.
+    Plans actions by rolling out world model.
+    """
+    def __init__(self, encoder, predictor, action_dim, horizon=10):
+        self.encoder = encoder
+        self.predictor = predictor
+        self.action_dim = action_dim
+        self.horizon = horizon
+    
+    def plan(self, observation, goal, num_samples=100):
+        """
+        Plan action sequence to reach goal.
+        
+        Args:
+            observation: Current observation (C, H, W)
+            goal: Goal embedding (D,)
+            num_samples: Number of action sequences to sample
+        
+        Returns:
+            Best action sequence
+        """
+        # Encode current observation
+        obs_tensor = observation.unsqueeze(0)  # (1, C, H, W)
+        current_embedding = self.encoder(obs_tensor)  # (1, D)
+        
+        # Sample action sequences
+        action_sequences = self._sample_actions(num_samples)  # (N, H, A)
+        
+        # Rollout each sequence
+        costs = []
+        for actions in action_sequences:
+            cost = self._rollout_cost(current_embedding, actions, goal)
+            costs.append(cost)
+        
+        # Select best sequence
+        best_idx = torch.argmin(torch.tensor(costs))
+        best_actions = action_sequences[best_idx]
+        
+        # Return first action (MPC receding horizon)
+        return best_actions[0]
+    
+    def _sample_actions(self, num_samples):
+        """Sample random action sequences."""
+        return torch.randn(num_samples, self.horizon, self.action_dim)
+    
+    def _rollout_cost(self, start_embedding, actions, goal):
+        """
+        Rollout action sequence and compute cost.
+        
+        Args:
+            start_embedding: Starting state embedding (1, D)
+            actions: Action sequence (H, A)
+            goal: Goal embedding (D,)
+        
+        Returns:
+            Total cost
+        """
+        current = start_embedding
+        total_cost = 0.0
+        
+        for t in range(self.horizon):
+            # Predict next state given action
+            action = actions[t].unsqueeze(0).unsqueeze(0)  # (1, 1, A)
+            
+            # Concatenate state and action
+            state_action = torch.cat([current, action], dim=-1)
+            
+            # Predict next state
+            next_state = self.predictor(state_action, torch.tensor([[0]]))
+            
+            # Compute cost (distance to goal)
+            cost = F.mse_loss(next_state.squeeze(), goal)
+            total_cost += cost.item()
+            
+            current = next_state
+        
+        return total_cost
+
+# Cross-Entropy Method (CEM) for better optimization
+class CEMPlanner(MPCPlanner):
+    """
+    Cross-Entropy Method for action optimization.
+    More efficient than random sampling.
+    """
+    def __init__(self, encoder, predictor, action_dim, horizon=10,
+                 num_iterations=5, num_samples=100, num_elites=10):
+        super().__init__(encoder, predictor, action_dim, horizon)
+        self.num_iterations = num_iterations
+        self.num_samples = num_samples
+        self.num_elites = num_elites
+    
+    def plan(self, observation, goal):
+        """
+        Plan using CEM optimization.
+        
+        Args:
+            observation: Current observation
+            goal: Goal embedding
+        
+        Returns:
+            Optimized action sequence
+        """
+        # Encode observation
+        obs_tensor = observation.unsqueeze(0)
+        current_embedding = self.encoder(obs_tensor)
+        
+        # Initialize action distribution
+        mean = torch.zeros(self.horizon, self.action_dim)
+        std = torch.ones(self.horizon, self.action_dim)
+        
+        # CEM iterations
+        for iteration in range(self.num_iterations):
+            # Sample actions from current distribution
+            actions = torch.randn(self.num_samples, self.horizon, self.action_dim)
+            actions = actions * std + mean
+            
+            # Evaluate samples
+            costs = []
+            for action_seq in actions:
+                cost = self._rollout_cost(current_embedding, action_seq, goal)
+                costs.append(cost)
+            
+            # Select elites
+            costs = torch.tensor(costs)
+            elite_indices = torch.argsort(costs)[:self.num_elites]
+            elite_actions = actions[elite_indices]
+            
+            # Update distribution
+            mean = elite_actions.mean(dim=0)
+            std = elite_actions.std(dim=0)
+        
+        # Return best action
+        return mean[0]
+```
+
+## Application examples
+
+### Agricultural decision-making
+Optimize irrigation and fertilization:
+
+```python
+class AgricultureJEPA:
+    """
+    JEPA for agricultural decision-making.
+    Predicts crop growth and optimizes interventions.
+    """
+    def __init__(self):
+        self.encoder = VisionEncoder(latent_dim=256)
+        self.predictor = LatentPredictor(latent_dim=256)
+        self.planner = CEMPlanner(
+            self.encoder,
+            self.predictor,
+            action_dim=3,  # irrigation, fertilizer, pesticide
+            horizon=7  # 7-day planning horizon
+        )
+    
+    def optimize_irrigation(self, field_image, weather_forecast):
+        """
+        Optimize irrigation schedule.
+        
+        Args:
+            field_image: Current field state (RGB + NDVI)
+            weather_forecast: 7-day weather prediction
+        
+        Returns:
+            Irrigation schedule
+        """
+        # Encode current field state
+        current_state = self.encoder(field_image)
+        
+        # Define goal: healthy crop (high NDVI, low stress)
+        goal_state = torch.tensor([0.8, 0.2, 0.5])  # NDVI, stress, moisture
+        
+        # Plan irrigation actions
+        actions = self.planner.plan(field_image, goal_state)
+        
+        return {
+            'irrigation_mm': actions[0].item() * 10,  # Scale to mm
+            'fertilizer_kg': actions[1].item() * 5,
+            'pesticide_l': actions[2].item() * 2
+        }
+```
+
+### Medical treatment planning
+Optimize treatment protocols:
+
+```python
+class MedicalJEPA:
+    """
+    JEPA for medical treatment planning.
+    Predicts patient response and optimizes interventions.
+    """
+    def __init__(self):
+        self.encoder = MultiModalEncoder(
+            image_dim=256,
+            text_dim=768,
+            lab_dim=128
+        )
+        self.predictor = LatentPredictor(latent_dim=256)
+        self.planner = CEMPlanner(
+            self.encoder,
+            self.predictor,
+            action_dim=5,  # medication dosages
+            horizon=14  # 2-week treatment plan
+        )
+    
+    def plan_treatment(self, patient_data, target_outcome):
+        """
+        Plan treatment protocol.
+        
+        Args:
+            patient_data: {
+                'medical_images': tensor,
+                'clinical_notes': str,
+                'lab_results': dict
+            }
+            target_outcome: Desired health state
+        
+        Returns:
+            Treatment plan
+        """
+        # Encode patient state
+        current_state = self.encoder(
+            patient_data['medical_images'],
+            patient_data['clinical_notes'],
+            patient_data['lab_results']
+        )
+        
+        # Plan treatment
+        actions = self.planner.plan(current_state, target_outcome)
+        
+        return {
+            'medication_dosages': actions.tolist(),
+            'expected_outcome': self._predict_outcome(current_state, actions),
+            'confidence': self._compute_confidence(current_state, actions)
+        }
+```
+
+## Advantages over RL
+
+### Sample efficiency comparison
+
+| Method | Training samples | Real-world interactions | Edge deployment |
+|--------|-----------------|------------------------|-----------------|
+| PPO (RL) | 10M+ | 1M+ | Difficult |
+| SAC (RL) | 5M+ | 500K+ | Difficult |
+| JEPA + MPC | 100K | 0 (offline) | Easy |
+
+### Generalization
+
+**RL**: Requires retraining for new environments  
+**JEPA**: Transfer learning with few-shot adaptation
+
+```python
+# Few-shot adaptation
+def adapt_to_new_environment(jepa_model, new_data, num_shots=10):
+    """
+    Adapt JEPA to new environment with few examples.
+    
+    Args:
+        jepa_model: Pre-trained JEPA
+        new_data: Few examples from new environment
+        num_shots: Number of adaptation examples
+    
+    Returns:
+        Adapted model
+    """
+    # Freeze encoder, fine-tune predictor
+    for param in jepa_model.encoder.parameters():
+        param.requires_grad = False
+    
+    optimizer = torch.optim.Adam(jepa_model.predictor.parameters(), lr=1e-4)
+    
+    for epoch in range(10):
+        for batch in new_data[:num_shots]:
+            # Fine-tune on new data
+            loss = jepa_model.compute_loss(batch)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+    
+    return jepa_model
+```
+
+## Deployment considerations
+
+### Edge deployment
+JEPA is more suitable for edge devices:
+
+**Model size**:
+- Encoder: 50MB (quantized)
+- Predictor: 30MB (quantized)
+- Total: 80MB vs. 500MB+ for RL policies
+
+**Inference speed**:
+- Planning: 100ms on Jetson Orin
+- Real-time control at 10Hz
+
+**Memory footprint**:
+- 2GB RAM vs. 8GB+ for RL
+
+### Offline learning
+JEPA learns from offline datasets:
+
+```python
+# Train from logged data
+def train_from_logs(log_directory):
+    """
+    Train JEPA from logged interactions.
+    No online environment needed.
+    """
+    dataset = VideoDataset(log_directory)
+    dataloader = DataLoader(dataset, batch_size=32)
+    
+    encoder = VisionEncoder()
+    predictor = LatentPredictor()
+    
+    train_jepa(encoder, predictor, dataloader)
+    
+    return encoder, predictor
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Deployment strategies" icon="rocket" href="/enterprise/deployment-strategies">
+    Docker, Serverless, Kubernetes
+  </Card>
+  <Card title="Model training" icon="brain" href="/ml/model-training">
+    Training JEPA models
+  </Card>
+  <Card title="Edge optimization" icon="microchip" href="/deployment/edge-optimization">
+    Quantization and pruning
+  </Card>
+  <Card title="Observability" icon="chart-line" href="/enterprise/observability">
+    Monitoring world models
+  </Card>
+</CardGroup>
