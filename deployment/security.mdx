@@ -1,0 +1,888 @@
+---
+title: Security hardening
+description: Security best practices and hardening guidelines for iLuminara deployments
+---
+
+Comprehensive security hardening for iLuminara deployments, covering infrastructure, application, data, and network security.
+
+## Security principles
+
+### Defense in depth
+Multiple layers of security controls to protect against threats at every level.
+
+### Zero trust architecture
+Never trust, always verify - authenticate and authorize every request.
+
+### Least privilege
+Grant minimum permissions necessary for each component to function.
+
+### Encryption everywhere
+Encrypt data at rest, in transit, and in use (confidential computing).
+
+## Infrastructure security
+
+### Kubernetes security
+
+```yaml k8s/security/pod-security-policy.yaml
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: restricted
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+  readOnlyRootFilesystem: true
+```
+
+### Network policies
+
+```yaml k8s/security/network-policy.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-gateway-policy
+  namespace: iluminara
+spec:
+  podSelector:
+    matchLabels:
+      app: api-gateway
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from ingress controller only
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # Allow to JEPA service
+    - to:
+        - podSelector:
+            matchLabels:
+              app: jepa-service
+      ports:
+        - protocol: TCP
+          port: 8081
+    # Allow to PostgreSQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: jepa-service-policy
+  namespace: iluminara
+spec:
+  podSelector:
+    matchLabels:
+      app: jepa-service
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from API gateway and MPC service only
+    - from:
+        - podSelector:
+            matchLabels:
+              app: api-gateway
+        - podSelector:
+            matchLabels:
+              app: mpc-service
+      ports:
+        - protocol: TCP
+          port: 8081
+  egress:
+    # Deny all egress (no external calls)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+```
+
+### RBAC configuration
+
+```yaml k8s/security/rbac.yaml
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: iluminara-api
+  namespace: iluminara
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: iluminara-api-role
+  namespace: iluminara
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: iluminara-api-binding
+  namespace: iluminara
+subjects:
+  - kind: ServiceAccount
+    name: iluminara-api
+    namespace: iluminara
+roleRef:
+  kind: Role
+  name: iluminara-api-role
+  apiGroup: rbac.authorization.k8s.io
+```
+
+## Application security
+
+### Authentication and authorization
+
+```python services/auth/jwt_auth.py
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import JWTError, jwt
+from datetime import datetime, timedelta
+from typing import Optional
+
+security = HTTPBearer()
+
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    """Create JWT access token."""
+    to_encode = data.copy()
+    
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    
+    return encoded_jwt
+
+async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Verify JWT token."""
+    try:
+        payload = jwt.decode(
+            credentials.credentials,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+        username: str = payload.get("sub")
+        if username is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication credentials"
+            )
+        return payload
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials"
+        )
+
+# Usage in endpoint
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/api/v1/predict")
+async def predict(
+    request: PredictionRequest,
+    token: dict = Depends(verify_token)
+):
+    # Verify permissions
+    if "predict" not in token.get("permissions", []):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions"
+        )
+    
+    # Process request
+    return await process_prediction(request)
+```
+
+### Input validation
+
+```python services/validation.py
+from pydantic import BaseModel, Field, validator
+from typing import List, Optional
+
+class PredictionRequest(BaseModel):
+    """Validated prediction request."""
+    
+    observation: List[float] = Field(
+        ...,
+        min_items=1,
+        max_items=1000,
+        description="Current observation vector"
+    )
+    
+    horizon: int = Field(
+        ...,
+        ge=1,
+        le=100,
+        description="Prediction horizon"
+    )
+    
+    constraints: Optional[dict] = Field(
+        default=None,
+        description="Optional constraints"
+    )
+    
+    @validator('observation')
+    def validate_observation(cls, v):
+        """Validate observation values."""
+        if any(abs(x) > 1e6 for x in v):
+            raise ValueError("Observation values must be < 1e6")
+        return v
+    
+    @validator('constraints')
+    def validate_constraints(cls, v):
+        """Validate constraint structure."""
+        if v is not None:
+            allowed_keys = {'max_resource_usage', 'min_satisfaction', 'budget_limit'}
+            if not set(v.keys()).issubset(allowed_keys):
+                raise ValueError(f"Invalid constraint keys. Allowed: {allowed_keys}")
+        return v
+
+# Usage
+from fastapi import FastAPI, HTTPException
+
+app = FastAPI()
+
+@app.post("/api/v1/predict")
+async def predict(request: PredictionRequest):
+    try:
+        # Request is automatically validated by Pydantic
+        result = await process_prediction(request)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+```
+
+### Rate limiting
+
+```python services/rate_limiting.py
+from fastapi import FastAPI, Request, HTTPException
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+limiter = Limiter(key_func=get_remote_address)
+app = FastAPI()
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+@app.get("/api/v1/predict")
+@limiter.limit("10/minute")  # 10 requests per minute per IP
+async def predict(request: Request):
+    return await process_prediction(request)
+
+@app.get("/api/v1/batch-predict")
+@limiter.limit("1/minute")  # 1 batch request per minute
+async def batch_predict(request: Request):
+    return await process_batch_prediction(request)
+```
+
+## Data security
+
+### Encryption at rest
+
+```yaml k8s/security/encrypted-storage.yaml
+apiVersion: v1
+kind: StorageClass
+metadata:
+  name: encrypted-ssd
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  type: gp3
+  encrypted: "true"
+  kmsKeyId: "arn:aws:kms:us-east-1:123456789:key/your-key-id"
+allowVolumeExpansion: true
+```
+
+### Secrets encryption
+
+```yaml k8s/security/encryption-config.yaml
+apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfiguration
+resources:
+  - resources:
+      - secrets
+    providers:
+      - aescbc:
+          keys:
+            - name: key1
+              secret: <base64-encoded-32-byte-key>
+      - identity: {}
+```
+
+### Database encryption
+
+```yaml k8s/postgresql-encrypted.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgresql
+  namespace: iluminara
+spec:
+  template:
+    spec:
+      containers:
+      - name: postgresql
+        image: postgres:15-alpine
+        env:
+        - name: POSTGRES_INITDB_ARGS
+          value: "--data-checksums"
+        - name: POSTGRES_HOST_AUTH_METHOD
+          value: "scram-sha-256"
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+        - name: tls
+          mountPath: /etc/postgresql/tls
+          readOnly: true
+        command:
+          - postgres
+          - -c
+          - ssl=on
+          - -c
+          - ssl_cert_file=/etc/postgresql/tls/tls.crt
+          - -c
+          - ssl_key_file=/etc/postgresql/tls/tls.key
+      volumes:
+      - name: tls
+        secret:
+          secretName: postgresql-tls
+```
+
+## Network security
+
+### TLS configuration
+
+```yaml k8s/security/tls-certificate.yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: iluminara-tls
+  namespace: iluminara
+spec:
+  secretName: iluminara-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - api.iluminara.org
+    - '*.iluminara.org'
+  privateKey:
+    algorithm: RSA
+    size: 4096
+```
+
+### mTLS with service mesh
+
+```yaml k8s/security/istio-mtls.yaml
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: iluminara
+spec:
+  mtls:
+    mode: STRICT
+
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: api-gateway-authz
+  namespace: iluminara
+spec:
+  selector:
+    matchLabels:
+      app: api-gateway
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals: ["cluster.local/ns/ingress-nginx/sa/ingress-nginx"]
+    - to:
+        - operation:
+            methods: ["GET", "POST"]
+            paths: ["/api/*", "/health"]
+```
+
+## Vulnerability management
+
+### Automated scanning
+
+```yaml .github/workflows/vulnerability-scan.yml
+name: Vulnerability Scan
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Daily
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Grype scanner
+        uses: anchore/scan-action@v3
+        with:
+          path: "."
+          fail-build: true
+          severity-cutoff: high
+      
+      - name: Scan dependencies
+        run: |
+          pip install safety
+          safety check --json --output safety-report.json
+      
+      - name: Upload results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: results.sarif
+```
+
+### Patch management
+
+```bash scripts/patch-management.sh
+#!/bin/bash
+
+# Check for security updates
+echo "Checking for security updates..."
+
+# Update base images
+docker pull nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
+docker pull postgres:15-alpine
+docker pull redis:7-alpine
+
+# Rebuild images with updated bases
+docker-compose build --no-cache
+
+# Run security scan on new images
+trivy image --severity HIGH,CRITICAL iluminara/api-gateway:latest
+
+# Deploy to staging for testing
+kubectl set image deployment/api-gateway \
+  api-gateway=iluminara/api-gateway:latest \
+  -n iluminara-staging
+
+# Monitor for issues
+sleep 600
+
+# If no issues, deploy to production
+kubectl set image deployment/api-gateway \
+  api-gateway=iluminara/api-gateway:latest \
+  -n iluminara
+```
+
+## Secrets management
+
+### HashiCorp Vault integration
+
+```python services/secrets/vault_client.py
+import hvac
+from typing import Dict
+
+class VaultClient:
+    """
+    HashiCorp Vault client for secrets management.
+    """
+    def __init__(self, vault_url: str, role_id: str, secret_id: str):
+        self.client = hvac.Client(url=vault_url)
+        
+        # Authenticate with AppRole
+        self.client.auth.approle.login(
+            role_id=role_id,
+            secret_id=secret_id
+        )
+    
+    def get_secret(self, path: str) -> Dict:
+        """
+        Retrieve secret from Vault.
+        
+        Args:
+            path: Secret path (e.g., "iluminara/production/db-password")
+        
+        Returns:
+            Secret data
+        """
+        response = self.client.secrets.kv.v2.read_secret_version(
+            path=path,
+            mount_point="secret"
+        )
+        
+        return response['data']['data']
+    
+    def rotate_secret(self, path: str, new_value: str):
+        """
+        Rotate secret in Vault.
+        
+        Args:
+            path: Secret path
+            new_value: New secret value
+        """
+        self.client.secrets.kv.v2.create_or_update_secret(
+            path=path,
+            secret={'value': new_value},
+            mount_point="secret"
+        )
+
+# Usage
+vault = VaultClient(
+    vault_url="https://vault.iluminara.org",
+    role_id=os.getenv("VAULT_ROLE_ID"),
+    secret_id=os.getenv("VAULT_SECRET_ID")
+)
+
+db_password = vault.get_secret("iluminara/production/db-password")['value']
+```
+
+### Secret rotation
+
+```bash scripts/rotate-secrets.sh
+#!/bin/bash
+
+# Rotate database password
+NEW_DB_PASSWORD=$(openssl rand -base64 32)
+
+# Update in Vault
+vault kv put secret/iluminara/production/db-password value=$NEW_DB_PASSWORD
+
+# Update in database
+kubectl exec -it postgresql-0 -n iluminara -- psql -U postgres -c \
+  "ALTER USER iluminara WITH PASSWORD '$NEW_DB_PASSWORD';"
+
+# Restart pods to pick up new secret
+kubectl rollout restart deployment/api-gateway -n iluminara
+kubectl rollout restart deployment/jepa-service -n iluminara
+
+# Verify connectivity
+kubectl wait --for=condition=ready pod -l app=api-gateway -n iluminara --timeout=300s
+
+echo "Secret rotation completed"
+```
+
+## Compliance and auditing
+
+### Audit logging
+
+```python services/audit/audit_logger.py
+import logging
+import json
+from datetime import datetime
+from typing import Dict, Any
+
+class AuditLogger:
+    """
+    Audit logger for compliance and security monitoring.
+    
+    Logs all sensitive operations to immutable audit trail.
+    """
+    def __init__(self):
+        self.logger = logging.getLogger("audit")
+        self.logger.setLevel(logging.INFO)
+        
+        # Configure handler for audit logs
+        handler = logging.FileHandler("/var/log/iluminara/audit.log")
+        handler.setFormatter(logging.Formatter('%(message)s'))
+        self.logger.addHandler(handler)
+    
+    def log_access(
+        self,
+        user_id: str,
+        resource: str,
+        action: str,
+        result: str,
+        metadata: Dict[str, Any] = None
+    ):
+        """
+        Log resource access.
+        
+        Args:
+            user_id: User identifier
+            resource: Resource accessed
+            action: Action performed (READ, WRITE, DELETE, etc.)
+            result: Result (SUCCESS, DENIED, ERROR)
+            metadata: Additional context
+        """
+        audit_entry = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "event_type": "RESOURCE_ACCESS",
+            "user_id": user_id,
+            "resource": resource,
+            "action": action,
+            "result": result,
+            "metadata": metadata or {},
+            "ip_address": self._get_client_ip(),
+            "user_agent": self._get_user_agent()
+        }
+        
+        self.logger.info(json.dumps(audit_entry))
+    
+    def log_authentication(
+        self,
+        user_id: str,
+        method: str,
+        result: str,
+        failure_reason: str = None
+    ):
+        """Log authentication attempt."""
+        audit_entry = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "event_type": "AUTHENTICATION",
+            "user_id": user_id,
+            "method": method,
+            "result": result,
+            "failure_reason": failure_reason,
+            "ip_address": self._get_client_ip()
+        }
+        
+        self.logger.info(json.dumps(audit_entry))
+    
+    def log_data_export(
+        self,
+        user_id: str,
+        data_type: str,
+        destination: str,
+        compliance_check: Dict
+    ):
+        """Log data export for PABS/GDPR compliance."""
+        audit_entry = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "event_type": "DATA_EXPORT",
+            "user_id": user_id,
+            "data_type": data_type,
+            "destination": destination,
+            "compliance_check": compliance_check,
+            "approved": compliance_check.get("approved", False)
+        }
+        
+        self.logger.info(json.dumps(audit_entry))
+
+# Usage
+audit = AuditLogger()
+
+@app.get("/api/v1/patient-data/{patient_id}")
+async def get_patient_data(
+    patient_id: str,
+    token: dict = Depends(verify_token)
+):
+    # Log access attempt
+    audit.log_access(
+        user_id=token['sub'],
+        resource=f"patient_data/{patient_id}",
+        action="READ",
+        result="SUCCESS",
+        metadata={"data_type": "PHI"}
+    )
+    
+    return await fetch_patient_data(patient_id)
+```
+
+### Compliance reporting
+
+```python services/compliance/gdpr_report.py
+class GDPRComplianceReport:
+    """
+    Generate GDPR compliance reports.
+    """
+    def __init__(self, audit_log_path: str):
+        self.audit_log_path = audit_log_path
+    
+    def generate_data_processing_report(
+        self,
+        start_date: str,
+        end_date: str
+    ) -> Dict:
+        """
+        Generate Article 30 data processing report.
+        
+        Returns:
+            Report with processing activities
+        """
+        # Parse audit logs
+        activities = self._parse_audit_logs(start_date, end_date)
+        
+        # Group by processing purpose
+        by_purpose = self._group_by_purpose(activities)
+        
+        # Generate report
+        report = {
+            "report_period": {
+                "start": start_date,
+                "end": end_date
+            },
+            "processing_activities": [],
+            "data_subjects": self._count_data_subjects(activities),
+            "data_categories": self._identify_data_categories(activities),
+            "recipients": self._identify_recipients(activities),
+            "transfers": self._identify_third_country_transfers(activities)
+        }
+        
+        for purpose, acts in by_purpose.items():
+            report["processing_activities"].append({
+                "purpose": purpose,
+                "legal_basis": self._determine_legal_basis(purpose),
+                "data_categories": self._get_data_categories(acts),
+                "retention_period": self._get_retention_period(purpose),
+                "security_measures": self._get_security_measures(purpose),
+                "activity_count": len(acts)
+            })
+        
+        return report
+```
+
+## Incident response
+
+### Security incident playbook
+
+```yaml playbooks/security-incident.yml
+name: Security Incident Response
+trigger: Security alert or suspicious activity detected
+
+steps:
+  - name: Detect and alert
+    actions:
+      - Automated alert from monitoring system
+      - On-call engineer notified via PagerDuty
+      - Incident ticket created in Jira
+  
+  - name: Assess severity
+    actions:
+      - Determine incident severity (P0-P4)
+      - Identify affected systems
+      - Estimate blast radius
+      - Escalate if P0 or P1
+  
+  - name: Contain
+    actions:
+      - Isolate affected pods/nodes
+      - Block malicious IPs at firewall
+      - Revoke compromised credentials
+      - Enable additional logging
+  
+  - name: Investigate
+    actions:
+      - Collect logs and traces
+      - Analyze attack vectors
+      - Identify root cause
+      - Document timeline
+  
+  - name: Remediate
+    actions:
+      - Patch vulnerabilities
+      - Update security policies
+      - Rotate credentials
+      - Deploy fixes
+  
+  - name: Recover
+    actions:
+      - Restore from clean backups if needed
+      - Verify system integrity
+      - Resume normal operations
+      - Monitor for recurrence
+  
+  - name: Post-mortem
+    actions:
+      - Document incident details
+      - Identify lessons learned
+      - Update runbooks
+      - Implement preventive measures
+```
+
+## Security checklist
+
+### Pre-deployment
+
+- [ ] All secrets stored in Vault or Sealed Secrets
+- [ ] TLS enabled for all services
+- [ ] Network policies configured
+- [ ] RBAC roles defined with least privilege
+- [ ] Pod security policies enforced
+- [ ] Container images scanned for vulnerabilities
+- [ ] Dependencies audited for known CVEs
+- [ ] Rate limiting configured
+- [ ] Input validation implemented
+- [ ] Audit logging enabled
+
+### Post-deployment
+
+- [ ] Penetration testing completed
+- [ ] Security monitoring alerts configured
+- [ ] Incident response plan documented
+- [ ] Backup and recovery tested
+- [ ] Compliance requirements verified
+- [ ] Security training completed for team
+- [ ] Vulnerability disclosure process established
+- [ ] Regular security reviews scheduled
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Disaster recovery" icon="life-ring" href="/deployment/disaster-recovery">
+    Backup and recovery procedures
+  </Card>
+  <Card title="Compliance" icon="scale-balanced" href="/governance/compliance">
+    Regulatory compliance guide
+  </Card>
+  <Card title="Penetration testing" icon="bug" href="/security/penetration-testing">
+    Security testing procedures
+  </Card>
+  <Card title="Incident response" icon="siren" href="/deployment/incident-response">
+    Handle security incidents
+  </Card>
+</CardGroup>
