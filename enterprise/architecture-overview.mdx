@@ -1,667 +1,397 @@
 ---
 title: Enterprise architecture
-description: Production-grade architecture for iLuminara deployment at scale
+description: Scalable, production-ready architecture for iLuminara deployment at scale
 ---
 
-iLuminara's enterprise architecture is designed for resilience, scalability, and sovereignty, supporting deployments from single-node edge installations to multi-region cloud infrastructure.
+iLuminara's enterprise architecture is designed for resilience, scalability, and sovereignty across distributed edge-cloud hybrid deployments.
 
 ## Architecture principles
 
 ### Sovereignty-first design
-Every component can operate independently:
-- **Offline-first**: Full functionality without internet connectivity
-- **Data sovereignty**: All data processing occurs in-country
-- **No vendor lock-in**: Open standards and interoperable components
-- **Graceful degradation**: System remains functional when components fail
+All critical operations function without external dependencies:
+- Edge-first processing with cloud sync
+- Offline-capable by default
+- Data sovereignty enforced at hardware level
+- No vendor lock-in
 
-### Edge-cloud hybrid
-Intelligent workload distribution:
-- **Edge inference**: AI models run on Jetson devices at the edge
-- **Cloud orchestration**: Coordination and analytics in the cloud
-- **Opportunistic sync**: Data synchronization when connectivity available
-- **Local-first storage**: Critical data cached locally
+### Resilient by design
+System continues operating under adverse conditions:
+- Graceful degradation when services unavailable
+- Automatic failover and recovery
+- Multi-protocol networking (5G/LoRa/Wi-Fi/Satellite)
+- Store-and-forward for intermittent connectivity
 
-### Multi-tenancy
-Secure isolation for multiple organizations:
-- **Tenant isolation**: Cryptographic separation of data
-- **Resource quotas**: Fair resource allocation
-- **Custom policies**: Per-tenant governance rules
-- **Federated identity**: SSO integration
+### Horizontally scalable
+Linear scaling from single device to continental deployment:
+- Microservices architecture
+- Stateless services with distributed state management
+- Event-driven communication
+- Auto-scaling based on demand
+
+### Security-first
+Zero-trust architecture with defense in depth:
+- Confidential computing for sensitive workloads
+- End-to-end encryption
+- Hardware-backed attestation
+- Immutable audit trails
 
 ## System architecture
 
-### High-level overview
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Control Plane                            │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │ API Gateway  │  │ Auth Service │  │ Orchestrator │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
-└─────────────────────────────────────────────────────────────┘
-                              │
-        ┌─────────────────────┼─────────────────────┐
-        │                     │                     │
-┌───────▼────────┐   ┌────────▼────────┐   ┌───────▼────────┐
-│  Edge Cluster  │   │  Cloud Cluster  │   │  Data Plane    │
-│                │   │                 │   │                │
-│ ┌────────────┐ │   │ ┌─────────────┐│   │ ┌────────────┐ │
-│ │ Jetson AGX │ │   │ │ K8s Cluster ││   │ │ PostgreSQL │ │
-│ │ Orin       │ │   │ │             ││   │ │ TimescaleDB│ │
-│ └────────────┘ │   │ └─────────────┘│   │ └────────────┘ │
-│                │   │                 │   │                │
-│ ┌────────────┐ │   │ ┌─────────────┐│   │ ┌────────────┐ │
-│ │ Ghost-Mesh │ │   │ │ Serverless  ││   │ │ Redis      │ │
-│ │ Network    │ │   │ │ Functions   ││   │ │ Cluster    │ │
-│ └────────────┘ │   │ └─────────────┘│   │ └────────────┘ │
-└────────────────┘   └─────────────────┘   └────────────────┘
-```
-
-### Component layers
-
-#### 1. Edge layer
+### Edge tier
 Autonomous operation at the edge:
-- **Jetson devices**: AI inference, sensor processing
-- **Local storage**: SQLite, LevelDB for edge data
-- **Ghost-Mesh**: P2P networking for resilience
-- **Edge orchestration**: K3s for container management
 
-#### 2. Application layer
-Core business logic:
-- **Microservices**: Domain-driven service boundaries
-- **Event-driven**: Async communication via message queues
-- **API-first**: RESTful and GraphQL APIs
-- **Stateless design**: Horizontal scalability
+**Hardware**: Jetson Orin Nano/AGX, IGX Orin  
+**Capabilities**:
+- Local AI inference (quantized models)
+- Sensor data processing
+- Offline-first applications
+- P2P mesh networking
 
-#### 3. Data layer
-Persistent storage and caching:
-- **PostgreSQL**: Transactional data with PostGIS
-- **TimescaleDB**: Time-series sensor data
-- **Redis**: Caching and session management
-- **S3-compatible**: Object storage for media
+**Key services**:
+- Model inference (NIM)
+- Data collection and preprocessing
+- Local storage and caching
+- Ghost-Mesh coordination
 
-#### 4. AI/ML layer
-Intelligence and automation:
-- **NVIDIA Triton**: Model serving infrastructure
-- **MLflow**: Experiment tracking and model registry
-- **Kubeflow**: ML pipeline orchestration
-- **Feature store**: Centralized feature management
+### Regional tier
+Coordination and aggregation:
 
-#### 5. Observability layer
-Monitoring and debugging:
-- **Prometheus**: Metrics collection
-- **Grafana**: Visualization and dashboards
-- **Loki**: Log aggregation
-- **Jaeger**: Distributed tracing
-
-## Deployment topologies
-
-### Single-node edge deployment
-Minimal viable deployment for remote locations:
-
-**Hardware**:
-- 1x Jetson AGX Orin (64GB)
-- 1TB NVMe SSD
-- Solar + battery (500W)
-
-**Software stack**:
-- K3s (lightweight Kubernetes)
-- PostgreSQL (single instance)
-- Redis (single instance)
-- All 10 Nuclear Thesis stacks
-
-**Use cases**:
-- Rural health clinic
-- Community learning center
-- Agricultural monitoring station
-
-### Multi-node edge cluster
-Resilient edge deployment with redundancy:
-
-**Hardware**:
-- 3x Jetson AGX Orin (control plane)
-- 5x Jetson Orin Nano (worker nodes)
-- Distributed storage (Longhorn)
-- Agro-voltaic power (3kW)
-
-**Software stack**:
-- K3s HA cluster
-- PostgreSQL with replication
-- Redis Sentinel
-- Distributed tracing
-
-**Use cases**:
-- Refugee camp (5,000+ residents)
-- District hospital network
-- Regional education hub
-
-### Hybrid edge-cloud deployment
-Best of both worlds:
-
-**Edge components**:
-- Real-time inference
-- Sensor data collection
-- Local user interfaces
-- Offline operation
-
-**Cloud components**:
-- Long-term analytics
-- Model training
-- Cross-site coordination
+**Hardware**: On-premise servers or regional cloud  
+**Capabilities**:
+- Model training and fine-tuning
+- Data aggregation and analytics
+- Regional coordination
 - Backup and disaster recovery
 
-**Synchronization**:
-- Bidirectional sync when connected
-- Conflict resolution via CRDTs
-- Priority-based queuing
-- Bandwidth-aware compression
+**Key services**:
+- Training orchestration
+- Data warehouse
+- Regional API gateway
+- Federated learning coordinator
 
-### Multi-region cloud deployment
-Global scale with regional sovereignty:
+### Cloud tier
+Global coordination and management:
 
-**Architecture**:
-- Regional Kubernetes clusters (GKE, EKS, AKS)
-- Multi-region PostgreSQL (CockroachDB)
-- Global CDN (Cloudflare)
-- Cross-region replication
+**Hardware**: Multi-cloud (AWS, Azure, GCP) or sovereign cloud  
+**Capabilities**:
+- Global model distribution
+- Cross-regional analytics
+- Disaster recovery
+- Compliance and governance
 
-**Regions**:
-- Africa: Kenya (primary), South Africa (secondary)
-- Europe: Germany (GDPR compliance)
-- Asia: Singapore (APAC hub)
-- Americas: US East (backup)
+**Key services**:
+- Model registry
+- Global API gateway
+- Monitoring and observability
+- Compliance enforcement (Omni-Law)
 
-**Data residency**:
-- Data stays in region of origin
-- Cross-border transfers via PABS protocol
-- Encrypted replication for disaster recovery
-- Compliance with local regulations
+## Component architecture
 
-## Service mesh architecture
+### Core services
 
-### Istio service mesh
-Traffic management and security:
-
-```yaml
-apiVersion: networking.istio.io/v1beta1
-kind: VirtualService
-metadata:
-  name: iluminara-api
-spec:
-  hosts:
-  - api.iluminara.org
-  http:
-  - match:
-    - headers:
-        x-tenant-id:
-          exact: "tenant-001"
-    route:
-    - destination:
-        host: api-service
-        subset: v2
-      weight: 90
-    - destination:
-        host: api-service
-        subset: v1
-      weight: 10
-  - route:
-    - destination:
-        host: api-service
-        subset: v1
+#### Golden Thread
+Unified data lineage and provenance:
+```
+┌─────────────────────────────────────────┐
+│         Golden Thread Service           │
+├─────────────────────────────────────────┤
+│ • Data provenance tracking              │
+│ • Lineage graph management              │
+│ • Compliance validation                 │
+│ • Audit trail generation                │
+└─────────────────────────────────────────┘
+         │                    │
+         ▼                    ▼
+    ┌─────────┐          ┌─────────┐
+    │ Graph   │          │ Audit   │
+    │ Database│          │ Log     │
+    └─────────┘          └─────────┘
 ```
 
-**Features**:
-- **Traffic splitting**: Canary deployments and A/B testing
-- **Circuit breaking**: Fault isolation
-- **Mutual TLS**: Zero-trust networking
-- **Observability**: Automatic metrics and tracing
-
-### Service discovery
-Dynamic service registration:
-- **Consul**: Service registry and health checks
-- **DNS-based**: Standard DNS SRV records
-- **Client-side**: Load balancing at the client
-- **Health checks**: Active and passive monitoring
-
-## Data architecture
-
-### Database strategy
-
-#### Transactional data (PostgreSQL)
-Primary database for ACID transactions:
-
-```sql
--- Multi-tenant schema isolation
-CREATE SCHEMA tenant_001;
-CREATE SCHEMA tenant_002;
-
--- Row-level security
-CREATE POLICY tenant_isolation ON patients
-  USING (tenant_id = current_setting('app.tenant_id')::uuid);
-
--- Geospatial indexing
-CREATE INDEX patients_location_idx ON patients 
-  USING GIST (location);
+#### Omni-Law Matrix
+Multi-jurisdictional compliance enforcement:
+```
+┌─────────────────────────────────────────┐
+│        Omni-Law Interceptor             │
+├─────────────────────────────────────────┤
+│ • Request validation                    │
+│ • Framework selection (47 frameworks)   │
+│ • Policy enforcement                    │
+│ • Compliance reporting                  │
+└─────────────────────────────────────────┘
+         │
+         ▼
+    ┌─────────────────────────────────┐
+    │  Framework Validators           │
+    ├─────────────────────────────────┤
+    │ • GDPR    • HIPAA   • EU AI Act │
+    │ • PABS    • Nagoya  • CCPA      │
+    │ • ... (41 more)                 │
+    └─────────────────────────────────┘
 ```
 
-**Features**:
-- Multi-tenant isolation via schemas
-- Row-level security (RLS)
-- PostGIS for geospatial queries
-- Streaming replication for HA
+#### Ghost-Mesh
+Resilient networking layer:
+```
+┌─────────────────────────────────────────┐
+│         Ghost-Mesh Router               │
+├─────────────────────────────────────────┤
+│ • Protocol selection (5G/LoRa/WiFi)     │
+│ • Epidemic routing                      │
+│ • Store-and-forward                     │
+│ • Spectrum analysis                     │
+└─────────────────────────────────────────┘
+         │
+         ▼
+    ┌─────────────────────────────────┐
+    │  Protocol Adapters              │
+    ├─────────────────────────────────┤
+    │ • Aerial SDK (5G/6G)            │
+    │ • LoRa concentrator             │
+    │ • Wi-Fi Direct                  │
+    │ • Satellite (Starlink)          │
+    └─────────────────────────────────┘
+```
 
-#### Time-series data (TimescaleDB)
+### AI/ML services
+
+#### Model serving (NVIDIA NIM)
+Optimized inference at scale:
+```
+┌─────────────────────────────────────────┐
+│         NIM Inference Service           │
+├─────────────────────────────────────────┤
+│ • Model loading and caching             │
+│ • Request batching                      │
+│ • Dynamic quantization                  │
+│ • Multi-GPU scheduling                  │
+└─────────────────────────────────────────┘
+         │
+         ▼
+    ┌─────────────────────────────────┐
+    │  Model Repository               │
+    ├─────────────────────────────────┤
+    │ • Llama-3 8B (Education)        │
+    │ • BioNeMo Evo 2 (Genomics)      │
+    │ • Legal-LLM (Tele-Justice)      │
+    │ • Custom fine-tuned models      │
+    └─────────────────────────────────┘
+```
+
+#### Training orchestration
+Distributed training and federated learning:
+```
+┌─────────────────────────────────────────┐
+│      Training Orchestrator              │
+├─────────────────────────────────────────┤
+│ • Job scheduling                        │
+│ • Resource allocation                   │
+│ • Federated aggregation                 │
+│ • Model versioning                      │
+└─────────────────────────────────────────┘
+         │
+         ▼
+    ┌─────────────────────────────────┐
+    │  Training Workers               │
+    ├─────────────────────────────────┤
+    │ • Edge: Jetson Orin             │
+    │ • Regional: A100 clusters       │
+    │ • Cloud: Multi-GPU instances    │
+    └─────────────────────────────────┘
+```
+
+### Data services
+
+#### Time-series database
 Sensor and telemetry data:
-
-```sql
--- Hypertable for sensor data
-CREATE TABLE sensor_readings (
-  time TIMESTAMPTZ NOT NULL,
-  sensor_id UUID NOT NULL,
-  metric_name TEXT NOT NULL,
-  value DOUBLE PRECISION,
-  metadata JSONB
-);
-
-SELECT create_hypertable('sensor_readings', 'time');
-
--- Continuous aggregates
-CREATE MATERIALIZED VIEW sensor_hourly
-WITH (timescaledb.continuous) AS
-SELECT 
-  time_bucket('1 hour', time) AS hour,
-  sensor_id,
-  metric_name,
-  avg(value) as avg_value,
-  max(value) as max_value,
-  min(value) as min_value
-FROM sensor_readings
-GROUP BY hour, sensor_id, metric_name;
+```
+┌─────────────────────────────────────────┐
+│         TimescaleDB / InfluxDB          │
+├─────────────────────────────────────────┤
+│ • High-frequency sensor data            │
+│ • Downsampling and aggregation          │
+│ • Retention policies                    │
+│ • Real-time queries                     │
+└─────────────────────────────────────────┘
 ```
 
-**Features**:
-- Automatic partitioning by time
-- Continuous aggregates for analytics
-- Data retention policies
-- Compression for old data
-
-#### Document store (MongoDB)
-Flexible schema for evolving data:
-
-```javascript
-// Medical records with flexible schema
-db.medical_records.insertOne({
-  patient_id: "uuid",
-  tenant_id: "tenant-001",
-  record_type: "consultation",
-  timestamp: ISODate(),
-  data: {
-    chief_complaint: "Fever",
-    vitals: {
-      temperature: 38.5,
-      blood_pressure: "120/80"
-    },
-    diagnosis: ["Malaria"],
-    treatment: ["Artemether-lumefantrine"]
-  },
-  attachments: [
-    { type: "image", url: "s3://..." },
-    { type: "lab_result", url: "s3://..." }
-  ]
-});
-
-// Geospatial queries
-db.medical_records.createIndex({ "location": "2dsphere" });
-db.medical_records.find({
-  location: {
-    $near: {
-      $geometry: { type: "Point", coordinates: [36.8219, -1.2921] },
-      $maxDistance: 5000  // 5km radius
-    }
-  }
-});
+#### Graph database
+Relationships and provenance:
+```
+┌─────────────────────────────────────────┐
+│              Neo4j                      │
+├─────────────────────────────────────────┤
+│ • Data lineage graphs                   │
+│ • Knowledge graphs                      │
+│ • Relationship queries                  │
+│ • Graph algorithms                      │
+└─────────────────────────────────────────┘
 ```
 
-### Caching strategy
-
-#### Multi-layer caching
-
+#### Blockchain
+Immutable audit and transactions:
 ```
-┌─────────────┐
-│   Browser   │  ← Service Worker cache (offline-first)
-└──────┬──────┘
-       │
-┌──────▼──────┐
-│     CDN     │  ← Edge caching (Cloudflare)
-└──────┬──────┘
-       │
-┌──────▼──────┐
-│  API Cache  │  ← Redis (application-level)
-└──────┬──────┘
-       │
-┌──────▼──────┐
-│  Database   │  ← Query result cache
-└─────────────┘
+┌─────────────────────────────────────────┐
+│         Hyperledger Besu                │
+├─────────────────────────────────────────┤
+│ • Bio-credit transactions               │
+│ • Material passports                    │
+│ • Audit trails                          │
+│ • Smart contracts                       │
+└─────────────────────────────────────────┘
 ```
 
-**Cache invalidation**:
-- Event-driven invalidation
-- TTL-based expiration
-- Cache tags for bulk invalidation
-- Stale-while-revalidate pattern
+## Communication patterns
+
+### Synchronous (REST/gRPC)
+Real-time request-response:
+- User-facing APIs
+- Service-to-service calls (low latency)
+- Health checks and status queries
+
+### Asynchronous (Message Queue)
+Decoupled event processing:
+- Kafka/RabbitMQ for event streaming
+- Job queues for background processing
+- Pub/sub for notifications
+
+### Epidemic (Ghost-Mesh)
+Delay-tolerant networking:
+- Store-and-forward messaging
+- Gossip protocols for state sync
+- Opportunistic data transfer
+
+## Deployment patterns
+
+### Edge deployment
+Single-device autonomous operation:
+```yaml
+Edge Node:
+  Hardware: Jetson Orin Nano
+  Services:
+    - NIM inference (quantized models)
+    - Local data collection
+    - Ghost-Mesh client
+    - Offline storage
+  Connectivity: Intermittent
+  Power: Solar + battery
+```
+
+### Regional deployment
+Coordinated edge cluster:
+```yaml
+Regional Hub:
+  Hardware: On-premise server cluster
+  Services:
+    - Training orchestration
+    - Regional API gateway
+    - Data aggregation
+    - Model distribution
+  Edge Nodes: 10-100 devices
+  Connectivity: Reliable regional network
+```
+
+### Global deployment
+Multi-region coordination:
+```yaml
+Global Infrastructure:
+  Cloud: Multi-cloud (AWS + Azure + GCP)
+  Services:
+    - Global API gateway
+    - Model registry
+    - Cross-region analytics
+    - Disaster recovery
+  Regions: 5-10 regional hubs
+  Edge Nodes: 1000+ devices
+```
+
+## High availability
+
+### Redundancy
+Multiple layers of redundancy:
+- **Edge**: Peer-to-peer failover via Ghost-Mesh
+- **Regional**: Active-active cluster with load balancing
+- **Cloud**: Multi-region with automatic failover
+
+### Backup and recovery
+Comprehensive backup strategy:
+- **Edge**: Local backup to SD card, sync to regional hub
+- **Regional**: Daily backups to cloud, 30-day retention
+- **Cloud**: Cross-region replication, point-in-time recovery
+
+### Disaster recovery
+Recovery time objectives (RTO) and recovery point objectives (RPO):
+- **Critical services**: RTO < 1 hour, RPO < 15 minutes
+- **Standard services**: RTO < 4 hours, RPO < 1 hour
+- **Archival data**: RTO < 24 hours, RPO < 24 hours
 
 ## Security architecture
 
-### Zero-trust networking
+### Zero-trust model
 Never trust, always verify:
+- Mutual TLS for all service communication
+- JWT tokens with short expiration
+- Service mesh with policy enforcement
+- Network segmentation
 
-```yaml
-# Network policy: deny all by default
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: default-deny-all
-spec:
-  podSelector: {}
-  policyTypes:
-  - Ingress
-  - Egress
-
-# Allow specific service communication
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: api-to-database
-spec:
-  podSelector:
-    matchLabels:
-      app: api-service
-  policyTypes:
-  - Egress
-  egress:
-  - to:
-    - podSelector:
-        matchLabels:
-          app: postgresql
-    ports:
-    - protocol: TCP
-      port: 5432
-```
-
-### Secrets management
-Secure credential storage:
-
-**HashiCorp Vault**:
-```bash
-# Store database credentials
-vault kv put secret/database/postgres \
-  username=iluminara \
-  password=<generated>
-
-# Dynamic secrets for PostgreSQL
-vault write database/roles/readonly \
-  db_name=iluminara \
-  creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; \
-    GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" \
-  default_ttl="1h" \
-  max_ttl="24h"
-```
-
-**Kubernetes secrets**:
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: database-credentials
-type: Opaque
-stringData:
-  username: iluminara
-  password: ${VAULT_SECRET}
-```
+### Confidential computing
+Hardware-enforced security:
+- Intel SGX / AMD SEV for sensitive workloads
+- Encrypted memory and storage
+- Remote attestation
+- Sealed storage
 
 ### Encryption
+End-to-end encryption:
+- **At rest**: AES-256 for all stored data
+- **In transit**: TLS 1.3 for all network communication
+- **In use**: Confidential computing for sensitive processing
 
-#### Data at rest
-- **Database**: Transparent Data Encryption (TDE)
-- **Object storage**: Server-side encryption (SSE-KMS)
-- **Backups**: Encrypted with customer-managed keys
-- **Logs**: Encrypted before shipping to aggregator
-
-#### Data in transit
-- **TLS 1.3**: All network communication
-- **Mutual TLS**: Service-to-service authentication
-- **Certificate rotation**: Automated via cert-manager
-- **Perfect forward secrecy**: Ephemeral key exchange
-
-#### Data in use
-- **Confidential computing**: Intel SGX / AMD SEV for sensitive workloads
-- **Homomorphic encryption**: Computation on encrypted data
-- **Secure enclaves**: Isolated execution environments
-
-## Disaster recovery
-
-### Backup strategy
-
-**3-2-1 rule**:
-- **3 copies**: Production + 2 backups
-- **2 media types**: Disk + object storage
-- **1 offsite**: Different geographic region
-
-**Backup schedule**:
-```yaml
-# PostgreSQL continuous archiving
-archive_mode = on
-archive_command = 'aws s3 cp %p s3://iluminara-backups/wal/%f'
-
-# Daily full backups
-0 2 * * * pg_basebackup -D /backup/$(date +\%Y\%m\%d) -Ft -z -P
-
-# Hourly incremental backups
-0 * * * * pg_dump --format=custom --file=/backup/incremental/$(date +\%Y\%m\%d\%H).dump iluminara
-```
-
-### Recovery procedures
-
-**Recovery Time Objective (RTO)**: 4 hours  
-**Recovery Point Objective (RPO)**: 15 minutes
-
-**Disaster scenarios**:
-
-1. **Database corruption**:
-   - Restore from latest backup
-   - Replay WAL logs
-   - Verify data integrity
-   - Switch DNS to restored instance
-
-2. **Region failure**:
-   - Failover to secondary region
-   - Promote read replica to primary
-   - Update DNS records
-   - Notify users of degraded service
-
-3. **Ransomware attack**:
-   - Isolate affected systems
-   - Restore from immutable backups
-   - Scan for malware
-   - Rotate all credentials
-
-## Performance optimization
+## Scalability
 
 ### Horizontal scaling
-Scale out for increased capacity:
+Add capacity by adding nodes:
+- Stateless services scale linearly
+- Load balancing across instances
+- Auto-scaling based on metrics
+- No single point of failure
 
-```yaml
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: api-service-hpa
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: api-service
-  minReplicas: 3
-  maxReplicas: 50
-  metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 70
-  - type: Resource
-    resource:
-      name: memory
-      target:
-        type: Utilization
-        averageUtilization: 80
-  - type: Pods
-    pods:
-      metric:
-        name: http_requests_per_second
-      target:
-        type: AverageValue
-        averageValue: "1000"
-```
+### Vertical scaling
+Increase capacity per node:
+- GPU scaling for AI workloads
+- Memory scaling for data processing
+- Storage scaling for data retention
 
-### Database optimization
+### Performance targets
+Expected performance at scale:
 
-**Connection pooling**:
-```python
-# PgBouncer configuration
-[databases]
-iluminara = host=postgresql port=5432 dbname=iluminara
-
-[pgbouncer]
-pool_mode = transaction
-max_client_conn = 1000
-default_pool_size = 25
-reserve_pool_size = 5
-```
-
-**Query optimization**:
-```sql
--- Analyze query performance
-EXPLAIN (ANALYZE, BUFFERS) 
-SELECT * FROM patients WHERE location <-> point(36.8219, -1.2921) < 5000;
-
--- Create appropriate indexes
-CREATE INDEX CONCURRENTLY patients_location_gist 
-  ON patients USING GIST(location);
-
--- Partition large tables
-CREATE TABLE sensor_readings_2025_01 PARTITION OF sensor_readings
-  FOR VALUES FROM ('2025-01-01') TO ('2025-02-01');
-```
-
-### CDN and edge caching
-
-**Cloudflare Workers**:
-```javascript
-addEventListener('fetch', event => {
-  event.respondWith(handleRequest(event.request))
-})
-
-async function handleRequest(request) {
-  const cache = caches.default
-  
-  // Check cache first
-  let response = await cache.match(request)
-  
-  if (!response) {
-    // Fetch from origin
-    response = await fetch(request)
-    
-    // Cache for 1 hour
-    const headers = new Headers(response.headers)
-    headers.set('Cache-Control', 'public, max-age=3600')
-    
-    response = new Response(response.body, {
-      status: response.status,
-      statusText: response.statusText,
-      headers: headers
-    })
-    
-    event.waitUntil(cache.put(request, response.clone()))
-  }
-  
-  return response
-}
-```
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| API latency (p95) | < 200ms | Regional gateway |
+| Inference latency | < 100ms | Edge NIM |
+| Message throughput | > 10k/sec | Kafka cluster |
+| Concurrent users | > 100k | Global deployment |
+| Data ingestion | > 1M events/sec | Time-series DB |
 
 ## Cost optimization
 
-### Resource efficiency
+### Edge-first processing
+Minimize cloud costs:
+- Process data at edge when possible
+- Only sync aggregated data to cloud
+- Cache frequently accessed data locally
 
-**Right-sizing**:
-- Monitor actual resource usage
-- Adjust requests/limits based on metrics
-- Use vertical pod autoscaler
-- Consolidate underutilized workloads
+### Spot instances
+Use spot/preemptible instances for non-critical workloads:
+- Training jobs
+- Batch processing
+- Development environments
 
-**Spot instances**:
-```yaml
-# Use spot instances for batch workloads
-apiVersion: v1
-kind: Pod
-metadata:
-  name: batch-job
-spec:
-  nodeSelector:
-    node.kubernetes.io/instance-type: spot
-  tolerations:
-  - key: "spot"
-    operator: "Equal"
-    value: "true"
-    effect: "NoSchedule"
-```
-
-**Storage optimization**:
-- Lifecycle policies for object storage
-- Compression for time-series data
-- Deduplication for backups
-- Tiered storage (hot/warm/cold)
-
-## Compliance and governance
-
-### Regulatory compliance
-
-**GDPR**:
-- Data minimization
-- Right to erasure
-- Data portability
-- Consent management
-
-**HIPAA**:
-- Access controls
-- Audit logging
-- Encryption
-- Business associate agreements
-
-**Local regulations**:
-- Kenya Data Protection Act
-- South Africa POPIA
-- Nigeria NDPR
-
-### Audit logging
-
-```json
-{
-  "timestamp": "2025-12-31T10:00:00Z",
-  "event_type": "DATA_ACCESS",
-  "user_id": "user-123",
-  "tenant_id": "tenant-001",
-  "resource": "patient/456",
-  "action": "READ",
-  "ip_address": "192.168.1.100",
-  "user_agent": "iLuminara-Mobile/1.0",
-  "result": "SUCCESS",
-  "metadata": {
-    "accessed_fields": ["name", "dob", "medical_history"],
-    "purpose": "TREATMENT"
-  }
-}
-```
+### Resource right-sizing
+Match resources to workload:
+- Auto-scaling to match demand
+- Scheduled scaling for predictable patterns
+- Resource quotas to prevent waste
 
 ## Next steps
 
@@ -670,12 +400,12 @@ spec:
     World models replacing RL
   </Card>
   <Card title="Deployment strategies" icon="rocket" href="/enterprise/deployment-strategies">
-    Docker, Serverless, Kubernetes
+    Docker, Kubernetes, Serverless
   </Card>
   <Card title="Observability" icon="chart-line" href="/enterprise/observability">
-    Monitoring and debugging
+    Monitoring and alerting
   </Card>
-  <Card title="CI/CD pipelines" icon="code-branch" href="/enterprise/cicd-security">
-    Automation and security
+  <Card title="CI/CD pipeline" icon="code-branch" href="/enterprise/cicd-pipeline">
+    Automated testing and deployment
   </Card>
 </CardGroup>
