@@ -1,481 +1,865 @@
 ---
-title: Observability
-description: Monitoring, metrics, and alerting for production iLuminara deployments
+title: Observability and monitoring
+description: Comprehensive monitoring, logging, and tracing for production iLuminara deployments
 ---
 
-Comprehensive observability enables proactive monitoring, rapid troubleshooting, and continuous optimization of iLuminara deployments through metrics collection, visualization, and intelligent alerting.
+iLuminara implements full-stack observability using the three pillars: metrics, logs, and traces. This enables rapid debugging, performance optimization, and proactive incident response.
 
 ## Observability stack
 
-### Architecture
+### Architecture overview
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                   iLuminara Services                     │
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐        │
-│  │    JEPA    │  │  Omni-Law  │  │ Ghost-Mesh │        │
-│  │  Planning  │  │ Validation │  │  Routing   │        │
-│  └──────┬─────┘  └──────┬─────┘  └──────┬─────┘        │
-│         │ metrics        │ metrics        │ metrics      │
-└─────────┼────────────────┼────────────────┼──────────────┘
-          │                │                │
-          ▼                ▼                ▼
-┌─────────────────────────────────────────────────────────┐
-│                      Prometheus                          │
-│  ┌────────────────────────────────────────────────────┐ │
-│  │  Time-series database (15s scrape interval)        │ │
-│  └────────────────────────────────────────────────────┘ │
-└─────────────────────────┬───────────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────┐
-│                       Grafana                            │
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐        │
-│  │  Planning  │  │ Compliance │  │ Networking │        │
-│  │ Dashboard  │  │ Dashboard  │  │ Dashboard  │        │
-│  └────────────┘  └────────────┘  └────────────┘        │
-└─────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────┐
-│                    Alertmanager                          │
-│  ┌────────────────────────────────────────────────────┐ │
-│  │  Slack, Email, PagerDuty, SMS                      │ │
-│  └────────────────────────────────────────────────────┘ │
+│                   Application Layer                      │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐              │
+│  │ API      │  │ Worker   │  │ ML Model │              │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘              │
+│       │             │              │                     │
+│       │ metrics     │ logs         │ traces             │
+│       ▼             ▼              ▼                     │
+├───────┴─────────────┴──────────────┴─────────────────────┤
+│                  Collection Layer                        │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐              │
+│  │Prometheus│  │  Loki    │  │  Jaeger  │              │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘              │
+│       │             │              │                     │
+│       └─────────────┴──────────────┘                     │
+│                     │                                    │
+│                     ▼                                    │
+│  ┌──────────────────────────────────────┐               │
+│  │           Grafana                     │               │
+│  │  (Unified Visualization)              │               │
+│  └──────────────────────────────────────┘               │
 └─────────────────────────────────────────────────────────┘
 ```
 
-## Prometheus configuration
+## Metrics (Prometheus)
 
-### Scrape configuration
+### Application metrics
+
+Instrument code with Prometheus client:
+
+```python
+from prometheus_client import Counter, Histogram, Gauge, generate_latest
+from fastapi import FastAPI, Response
+import time
+
+app = FastAPI()
+
+# Define metrics
+http_requests_total = Counter(
+    'http_requests_total',
+    'Total HTTP requests',
+    ['method', 'endpoint', 'status']
+)
+
+http_request_duration_seconds = Histogram(
+    'http_request_duration_seconds',
+    'HTTP request duration',
+    ['method', 'endpoint']
+)
+
+active_connections = Gauge(
+    'active_connections',
+    'Number of active connections'
+)
+
+model_inference_duration = Histogram(
+    'model_inference_duration_seconds',
+    'Model inference duration',
+    ['model_name', 'model_version']
+)
+
+database_query_duration = Histogram(
+    'database_query_duration_seconds',
+    'Database query duration',
+    ['query_type']
+)
+
+# Middleware for automatic instrumentation
+@app.middleware("http")
+async def metrics_middleware(request, call_next):
+    active_connections.inc()
+    
+    start_time = time.time()
+    response = await call_next(request)
+    duration = time.time() - start_time
+    
+    # Record metrics
+    http_requests_total.labels(
+        method=request.method,
+        endpoint=request.url.path,
+        status=response.status_code
+    ).inc()
+    
+    http_request_duration_seconds.labels(
+        method=request.method,
+        endpoint=request.url.path
+    ).observe(duration)
+    
+    active_connections.dec()
+    
+    return response
+
+# Metrics endpoint
+@app.get("/metrics")
+def metrics():
+    return Response(generate_latest(), media_type="text/plain")
+
+# Example instrumented function
+@database_query_duration.labels(query_type='SELECT').time()
+def get_patient(patient_id: str):
+    # Database query
+    return {"patient_id": patient_id}
+
+# Model inference instrumentation
+def run_inference(model_name: str, input_data):
+    with model_inference_duration.labels(
+        model_name=model_name,
+        model_version="v1.0"
+    ).time():
+        # Run model inference
+        result = model.predict(input_data)
+        return result
+```
+
+### Prometheus configuration
 
 ```yaml
-# infrastructure/observability/prometheus.yml
+# prometheus.yml
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
   external_labels:
     cluster: 'iluminara-prod'
-    environment: 'production'
+    region: 'kenya-nairobi'
 
-scrape_configs:
-  # iLuminara Core API
-  - job_name: 'iluminara_core'
-    static_configs:
-      - targets: ['localhost:8000']
-    metrics_path: '/metrics'
-    scrape_interval: 10s
-  
-  # JEPA Planning Engine
-  - job_name: 'jepa_planner'
-    static_configs:
-      - targets: ['localhost:8001']
-    metrics_path: '/metrics'
-  
-  # Omni-Law Governance
-  - job_name: 'omni_law'
-    static_configs:
-      - targets: ['localhost:8002']
-    metrics_path: '/metrics'
-  
-  # Ghost-Mesh Networking
-  - job_name: 'ghost_mesh'
-    static_configs:
-      - targets: ['localhost:8003']
-    metrics_path: '/metrics'
-  
-  # Node Exporter (system metrics)
-  - job_name: 'node'
-    static_configs:
-      - targets: ['localhost:9100']
-  
-  # NVIDIA GPU metrics
-  - job_name: 'nvidia_gpu'
-    static_configs:
-      - targets: ['localhost:9445']
-
-# Alerting rules
-rule_files:
-  - 'alerts/*.yml'
-
-# Alertmanager configuration
+# Alerting configuration
 alerting:
   alertmanagers:
     - static_configs:
-        - targets: ['localhost:9093']
+        - targets:
+            - alertmanager:9093
+
+# Load rules
+rule_files:
+  - "alerts/*.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Kubernetes service discovery
+  - job_name: 'kubernetes-pods'
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      # Only scrape pods with prometheus.io/scrape annotation
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      
+      # Use custom port if specified
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        target_label: __address__
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+      
+      # Add pod metadata as labels
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: kubernetes_namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: kubernetes_pod_name
+  
+  # Node exporter for system metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets:
+          - 'node-exporter:9100'
+  
+  # PostgreSQL exporter
+  - job_name: 'postgresql'
+    static_configs:
+      - targets:
+          - 'postgres-exporter:9187'
+  
+  # Redis exporter
+  - job_name: 'redis'
+    static_configs:
+      - targets:
+          - 'redis-exporter:9121'
+  
+  # NVIDIA GPU metrics
+  - job_name: 'nvidia-dcgm'
+    static_configs:
+      - targets:
+          - 'dcgm-exporter:9400'
 ```
 
-### Metrics instrumentation
-
-```python
-# core/observability/metrics.py
-from prometheus_client import Counter, Histogram, Gauge, Summary
-import time
-
-# JEPA Planning metrics
-jepa_planning_latency = Histogram(
-    'jepa_planning_latency_seconds',
-    'Time spent planning action',
-    buckets=[0.01, 0.05, 0.1, 0.5, 1.0, 5.0]
-)
-
-jepa_world_model_uncertainty = Gauge(
-    'jepa_world_model_uncertainty',
-    'World model prediction uncertainty',
-    ['state_type']
-)
-
-jepa_energy_minimized = Histogram(
-    'jepa_energy_minimized',
-    'Energy value of selected trajectory',
-    buckets=[0, 10, 50, 100, 500, 1000]
-)
-
-jepa_rl_fallback_total = Counter(
-    'jepa_rl_fallback_total',
-    'Number of times RL fallback was triggered'
-)
-
-# Omni-Law metrics
-omni_law_validation_latency = Histogram(
-    'omni_law_validation_latency_seconds',
-    'Time spent validating compliance',
-    ['framework'],
-    buckets=[0.001, 0.005, 0.01, 0.05, 0.1]
-)
-
-omni_law_violations_total = Counter(
-    'omni_law_violations_total',
-    'Total compliance violations detected',
-    ['framework', 'severity']
-)
-
-omni_law_frameworks_checked = Gauge(
-    'omni_law_frameworks_checked',
-    'Number of frameworks checked per validation'
-)
-
-# Ghost-Mesh metrics
-ghost_mesh_connectivity_ratio = Gauge(
-    'ghost_mesh_connectivity_ratio',
-    'Ratio of reachable peers',
-    ['protocol']
-)
-
-ghost_mesh_message_latency = Histogram(
-    'ghost_mesh_message_latency_seconds',
-    'Message delivery latency',
-    ['protocol'],
-    buckets=[0.1, 0.5, 1.0, 5.0, 10.0, 30.0]
-)
-
-ghost_mesh_bandwidth_mbps = Gauge(
-    'ghost_mesh_bandwidth_mbps',
-    'Available bandwidth',
-    ['protocol']
-)
-
-# System metrics
-gpu_utilization_percent = Gauge(
-    'gpu_utilization_percent',
-    'GPU utilization percentage',
-    ['gpu_id']
-)
-
-gpu_memory_used_bytes = Gauge(
-    'gpu_memory_used_bytes',
-    'GPU memory used in bytes',
-    ['gpu_id']
-)
-
-# Example instrumentation
-class InstrumentedJEPAPlanner:
-    def __init__(self, planner):
-        self.planner = planner
-    
-    @jepa_planning_latency.time()
-    def plan_action(self, state, horizon=10):
-        # Record uncertainty
-        uncertainty = self.planner.world_model.uncertainty(state)
-        jepa_world_model_uncertainty.labels(state_type='drone').set(uncertainty)
-        
-        # Plan action
-        action = self.planner.plan_action(state, horizon)
-        
-        # Record if RL fallback was triggered
-        if action == "TRIGGER_RL_ADAPTATION":
-            jepa_rl_fallback_total.inc()
-        
-        return action
-```
-
-## Grafana dashboards
-
-### JEPA planning dashboard
-
-```json
-{
-  "dashboard": {
-    "title": "JEPA Planning Metrics",
-    "panels": [
-      {
-        "title": "Planning Latency",
-        "targets": [
-          {
-            "expr": "histogram_quantile(0.95, rate(jepa_planning_latency_seconds_bucket[5m]))",
-            "legendFormat": "p95"
-          },
-          {
-            "expr": "histogram_quantile(0.99, rate(jepa_planning_latency_seconds_bucket[5m]))",
-            "legendFormat": "p99"
-          }
-        ],
-        "type": "graph"
-      },
-      {
-        "title": "World Model Uncertainty",
-        "targets": [
-          {
-            "expr": "jepa_world_model_uncertainty",
-            "legendFormat": "{{state_type}}"
-          }
-        ],
-        "type": "graph",
-        "alert": {
-          "conditions": [
-            {
-              "evaluator": {
-                "params": [0.8],
-                "type": "gt"
-              },
-              "query": {
-                "params": ["A", "5m", "now"]
-              }
-            }
-          ],
-          "message": "High world model uncertainty detected"
-        }
-      },
-      {
-        "title": "RL Fallback Rate",
-        "targets": [
-          {
-            "expr": "rate(jepa_rl_fallback_total[5m])",
-            "legendFormat": "fallbacks/sec"
-          }
-        ],
-        "type": "graph"
-      },
-      {
-        "title": "Energy Minimized Distribution",
-        "targets": [
-          {
-            "expr": "rate(jepa_energy_minimized_bucket[5m])",
-            "legendFormat": "{{le}}"
-          }
-        ],
-        "type": "heatmap"
-      }
-    ]
-  }
-}
-```
-
-### Omni-Law compliance dashboard
-
-```json
-{
-  "dashboard": {
-    "title": "Omni-Law Compliance",
-    "panels": [
-      {
-        "title": "Validation Latency by Framework",
-        "targets": [
-          {
-            "expr": "histogram_quantile(0.95, rate(omni_law_validation_latency_seconds_bucket[5m]))",
-            "legendFormat": "{{framework}}"
-          }
-        ],
-        "type": "graph"
-      },
-      {
-        "title": "Violations by Framework",
-        "targets": [
-          {
-            "expr": "sum(rate(omni_law_violations_total[1h])) by (framework)",
-            "legendFormat": "{{framework}}"
-          }
-        ],
-        "type": "bar"
-      },
-      {
-        "title": "Critical Violations",
-        "targets": [
-          {
-            "expr": "sum(rate(omni_law_violations_total{severity=\"CRITICAL\"}[5m]))",
-            "legendFormat": "critical/min"
-          }
-        ],
-        "type": "stat",
-        "alert": {
-          "conditions": [
-            {
-              "evaluator": {
-                "params": [0],
-                "type": "gt"
-              }
-            }
-          ],
-          "message": "Critical compliance violation detected"
-        }
-      }
-    ]
-  }
-}
-```
-
-### Ghost-Mesh connectivity dashboard
-
-```json
-{
-  "dashboard": {
-    "title": "Ghost-Mesh Connectivity",
-    "panels": [
-      {
-        "title": "Connectivity Ratio by Protocol",
-        "targets": [
-          {
-            "expr": "ghost_mesh_connectivity_ratio",
-            "legendFormat": "{{protocol}}"
-          }
-        ],
-        "type": "graph",
-        "yaxis": {
-          "min": 0,
-          "max": 1
-        }
-      },
-      {
-        "title": "Message Latency",
-        "targets": [
-          {
-            "expr": "histogram_quantile(0.95, rate(ghost_mesh_message_latency_seconds_bucket[5m]))",
-            "legendFormat": "{{protocol}} p95"
-          }
-        ],
-        "type": "graph"
-      },
-      {
-        "title": "Bandwidth by Protocol",
-        "targets": [
-          {
-            "expr": "ghost_mesh_bandwidth_mbps",
-            "legendFormat": "{{protocol}}"
-          }
-        ],
-        "type": "graph"
-      }
-    ]
-  }
-}
-```
-
-## Alerting rules
-
-### Critical alerts
+### Alert rules
 
 ```yaml
-# infrastructure/observability/alerts/critical.yml
+# alerts/application.yml
 groups:
-  - name: critical
+  - name: application
     interval: 30s
     rules:
-      # High world model uncertainty
-      - alert: HighWorldModelUncertainty
-        expr: jepa_world_model_uncertainty > 0.8
+      # High error rate
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m])) by (endpoint)
+          /
+          sum(rate(http_requests_total[5m])) by (endpoint)
+          > 0.05
         for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High world model uncertainty detected"
-          description: "World model uncertainty is {{ $value }}, triggering RL fallback"
-      
-      # Compliance violations
-      - alert: CriticalComplianceViolation
-        expr: rate(omni_law_violations_total{severity="CRITICAL"}[5m]) > 0
-        for: 1m
         labels:
           severity: critical
         annotations:
-          summary: "Critical compliance violation"
-          description: "Framework {{ $labels.framework }} detected critical violation"
+          summary: "High error rate on {{ $labels.endpoint }}"
+          description: "Error rate is {{ $value | humanizePercentage }} on {{ $labels.endpoint }}"
       
-      # Ghost-Mesh connectivity loss
-      - alert: GhostMeshConnectivityLoss
-        expr: ghost_mesh_connectivity_ratio < 0.3
+      # High latency
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, endpoint)
+          ) > 1.0
         for: 10m
         labels:
           severity: warning
         annotations:
-          summary: "Ghost-Mesh connectivity degraded"
-          description: "Connectivity ratio is {{ $value }} for {{ $labels.protocol }}"
+          summary: "High latency on {{ $labels.endpoint }}"
+          description: "P95 latency is {{ $value }}s on {{ $labels.endpoint }}"
       
-      # GPU out of memory
-      - alert: GPUOutOfMemory
-        expr: gpu_memory_used_bytes / gpu_memory_total_bytes > 0.95
-        for: 5m
-        labels:
-          severity: critical
-        annotations:
-          summary: "GPU {{ $labels.gpu_id }} out of memory"
-          description: "GPU memory usage is {{ $value | humanizePercentage }}"
-      
-      # Planning latency spike
-      - alert: PlanningLatencySpike
-        expr: histogram_quantile(0.95, rate(jepa_planning_latency_seconds_bucket[5m])) > 1.0
+      # Database connection pool exhaustion
+      - alert: DatabasePoolExhausted
+        expr: |
+          pg_stat_database_numbackends / pg_settings_max_connections > 0.8
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Planning latency spike"
-          description: "p95 planning latency is {{ $value }}s"
+          summary: "Database connection pool nearly exhausted"
+          description: "{{ $value | humanizePercentage }} of connections in use"
+      
+      # GPU utilization
+      - alert: LowGPUUtilization
+        expr: |
+          avg(DCGM_FI_DEV_GPU_UTIL) < 20
+        for: 1h
+        labels:
+          severity: info
+        annotations:
+          summary: "Low GPU utilization"
+          description: "GPU utilization is {{ $value }}% - consider scaling down"
+      
+      # Model inference latency
+      - alert: SlowModelInference
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(model_inference_duration_seconds_bucket[5m])) by (le, model_name)
+          ) > 5.0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow model inference for {{ $labels.model_name }}"
+          description: "P95 inference time is {{ $value }}s"
 ```
 
-### Alertmanager configuration
+## Logging (Loki)
+
+### Structured logging
+
+```python
+import logging
+import json
+from pythonjsonlogger import jsonlogger
+
+# Configure structured logging
+logger = logging.getLogger()
+logHandler = logging.StreamHandler()
+
+formatter = jsonlogger.JsonFormatter(
+    '%(timestamp)s %(level)s %(name)s %(message)s %(trace_id)s %(span_id)s'
+)
+logHandler.setFormatter(formatter)
+logger.addHandler(logHandler)
+logger.setLevel(logging.INFO)
+
+# Usage
+logger.info(
+    "Patient record created",
+    extra={
+        "patient_id": "patient-123",
+        "tenant_id": "tenant-001",
+        "user_id": "user-456",
+        "trace_id": "abc123",
+        "span_id": "def456"
+    }
+)
+
+# Output:
+# {
+#   "timestamp": "2025-12-31T10:00:00Z",
+#   "level": "INFO",
+#   "name": "api.patients",
+#   "message": "Patient record created",
+#   "patient_id": "patient-123",
+#   "tenant_id": "tenant-001",
+#   "user_id": "user-456",
+#   "trace_id": "abc123",
+#   "span_id": "def456"
+# }
+```
+
+### Loki configuration
 
 ```yaml
-# infrastructure/observability/alertmanager.yml
+# loki-config.yaml
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+
+ingester:
+  lifecycler:
+    ring:
+      kvstore:
+        store: inmemory
+      replication_factor: 1
+  chunk_idle_period: 5m
+  chunk_retain_period: 30s
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: boltdb-shipper
+      object_store: s3
+      schema: v11
+      index:
+        prefix: loki_index_
+        period: 24h
+
+storage_config:
+  boltdb_shipper:
+    active_index_directory: /loki/index
+    cache_location: /loki/cache
+    shared_store: s3
+  
+  aws:
+    s3: s3://us-east-1/iluminara-logs
+    s3forcepathstyle: true
+
+limits_config:
+  enforce_metric_name: false
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h  # 1 week
+  ingestion_rate_mb: 10
+  ingestion_burst_size_mb: 20
+
+chunk_store_config:
+  max_look_back_period: 720h  # 30 days
+
+table_manager:
+  retention_deletes_enabled: true
+  retention_period: 720h  # 30 days
+```
+
+### Promtail for log shipping
+
+```yaml
+# promtail-config.yaml
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Kubernetes pod logs
+  - job_name: kubernetes-pods
+    kubernetes_sd_configs:
+      - role: pod
+    
+    relabel_configs:
+      # Add namespace label
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+      
+      # Add pod name label
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+      
+      # Add container name label
+      - source_labels: [__meta_kubernetes_pod_container_name]
+        target_label: container
+      
+      # Add app label
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        target_label: app
+    
+    pipeline_stages:
+      # Parse JSON logs
+      - json:
+          expressions:
+            level: level
+            timestamp: timestamp
+            message: message
+            trace_id: trace_id
+      
+      # Extract labels
+      - labels:
+          level:
+          trace_id:
+      
+      # Parse timestamp
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+```
+
+### LogQL queries
+
+```promql
+# Find errors in last hour
+{namespace="iluminara-prod", level="ERROR"} |= "error" | json
+
+# Count errors by endpoint
+sum by (endpoint) (
+  count_over_time({namespace="iluminara-prod", level="ERROR"}[1h])
+)
+
+# Find slow database queries
+{namespace="iluminara-prod", app="api-gateway"} 
+  |= "database_query_duration" 
+  | json 
+  | duration > 1s
+
+# Trace-based log correlation
+{namespace="iluminara-prod"} 
+  | json 
+  | trace_id="abc123"
+```
+
+## Distributed tracing (Jaeger)
+
+### OpenTelemetry instrumentation
+
+```python
+from opentelemetry import trace
+from opentelemetry.exporter.jaeger.thrift import JaegerExporter
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+from opentelemetry.instrumentation.redis import RedisInstrumentor
+
+# Initialize tracer
+trace.set_tracer_provider(TracerProvider())
+tracer = trace.get_tracer(__name__)
+
+# Configure Jaeger exporter
+jaeger_exporter = JaegerExporter(
+    agent_host_name="jaeger-agent",
+    agent_port=6831,
+)
+
+trace.get_tracer_provider().add_span_processor(
+    BatchSpanProcessor(jaeger_exporter)
+)
+
+# Auto-instrument FastAPI
+FastAPIInstrumentor.instrument_app(app)
+
+# Auto-instrument SQLAlchemy
+SQLAlchemyInstrumentor().instrument(engine=db_engine)
+
+# Auto-instrument Redis
+RedisInstrumentor().instrument()
+
+# Manual instrumentation
+@app.post("/api/patients")
+async def create_patient(patient_data: dict):
+    with tracer.start_as_current_span("create_patient") as span:
+        # Add attributes
+        span.set_attribute("patient.age", patient_data.get("age"))
+        span.set_attribute("patient.gender", patient_data.get("gender"))
+        
+        # Validate data
+        with tracer.start_as_current_span("validate_patient_data"):
+            validate(patient_data)
+        
+        # Save to database
+        with tracer.start_as_current_span("database.insert") as db_span:
+            db_span.set_attribute("db.operation", "INSERT")
+            db_span.set_attribute("db.table", "patients")
+            
+            patient_id = db.insert_patient(patient_data)
+        
+        # Send notification
+        with tracer.start_as_current_span("send_notification"):
+            send_email(patient_id)
+        
+        span.set_attribute("patient.id", patient_id)
+        
+        return {"patient_id": patient_id}
+```
+
+### Trace context propagation
+
+```python
+from opentelemetry.propagate import inject, extract
+import httpx
+
+# Inject trace context into outgoing requests
+async def call_external_service(url: str, data: dict):
+    headers = {}
+    inject(headers)  # Inject trace context
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.post(url, json=data, headers=headers)
+        return response.json()
+
+# Extract trace context from incoming requests
+@app.middleware("http")
+async def trace_context_middleware(request, call_next):
+    # Extract trace context from headers
+    context = extract(request.headers)
+    
+    # Attach to current span
+    token = context.attach()
+    
+    try:
+        response = await call_next(request)
+        return response
+    finally:
+        context.detach(token)
+```
+
+## Dashboards (Grafana)
+
+### System overview dashboard
+
+```json
+{
+  "dashboard": {
+    "title": "iLuminara System Overview",
+    "panels": [
+      {
+        "title": "Request Rate",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total[5m])) by (endpoint)",
+            "legendFormat": "{{endpoint}}"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "Error Rate",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m]))",
+            "legendFormat": "Error Rate"
+          }
+        ],
+        "type": "graph",
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [0.01],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "name": "High Error Rate Alert"
+        }
+      },
+      {
+        "title": "P95 Latency",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, endpoint))",
+            "legendFormat": "{{endpoint}}"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "Active Connections",
+        "targets": [
+          {
+            "expr": "active_connections",
+            "legendFormat": "Connections"
+          }
+        ],
+        "type": "graph"
+      }
+    ]
+  }
+}
+```
+
+### ML model performance dashboard
+
+```json
+{
+  "dashboard": {
+    "title": "ML Model Performance",
+    "panels": [
+      {
+        "title": "Inference Latency by Model",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(model_inference_duration_seconds_bucket[5m])) by (le, model_name))",
+            "legendFormat": "{{model_name}}"
+          }
+        ]
+      },
+      {
+        "title": "GPU Utilization",
+        "targets": [
+          {
+            "expr": "DCGM_FI_DEV_GPU_UTIL",
+            "legendFormat": "GPU {{gpu}}"
+          }
+        ]
+      },
+      {
+        "title": "GPU Memory Usage",
+        "targets": [
+          {
+            "expr": "DCGM_FI_DEV_FB_USED / DCGM_FI_DEV_FB_FREE * 100",
+            "legendFormat": "GPU {{gpu}}"
+          }
+        ]
+      },
+      {
+        "title": "Model Accuracy (Online)",
+        "targets": [
+          {
+            "expr": "model_prediction_accuracy",
+            "legendFormat": "{{model_name}}"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+## Custom metrics for iLuminara
+
+### Health system metrics
+
+```python
+from prometheus_client import Counter, Histogram, Gauge
+
+# Patient metrics
+patients_registered_total = Counter(
+    'patients_registered_total',
+    'Total patients registered',
+    ['tenant_id', 'registration_type']
+)
+
+consultations_total = Counter(
+    'consultations_total',
+    'Total consultations',
+    ['tenant_id', 'consultation_type']
+)
+
+# Diagnostic metrics
+diagnostic_accuracy = Gauge(
+    'diagnostic_accuracy',
+    'Diagnostic model accuracy',
+    ['model_name', 'disease_type']
+)
+
+# Supply chain metrics
+vaccine_cold_chain_temperature = Gauge(
+    'vaccine_cold_chain_temperature_celsius',
+    'Vaccine storage temperature',
+    ['location_id', 'refrigerator_id']
+)
+
+vaccine_doses_administered = Counter(
+    'vaccine_doses_administered_total',
+    'Total vaccine doses administered',
+    ['vaccine_type', 'location_id']
+)
+
+# Genomic surveillance metrics
+pathogen_sequences_analyzed = Counter(
+    'pathogen_sequences_analyzed_total',
+    'Total pathogen sequences analyzed',
+    ['pathogen_type', 'location']
+)
+
+variant_detection_latency = Histogram(
+    'variant_detection_latency_seconds',
+    'Time to detect new variant',
+    ['pathogen_type']
+)
+```
+
+### Agricultural metrics
+
+```python
+# Crop monitoring
+crop_health_index = Gauge(
+    'crop_health_index',
+    'Crop health index (0-1)',
+    ['field_id', 'crop_type']
+)
+
+soil_moisture = Gauge(
+    'soil_moisture_percent',
+    'Soil moisture percentage',
+    ['field_id', 'sensor_id']
+)
+
+irrigation_water_used = Counter(
+    'irrigation_water_used_liters',
+    'Total irrigation water used',
+    ['field_id']
+)
+
+# Agro-voltaic metrics
+solar_panel_tilt_angle = Gauge(
+    'solar_panel_tilt_angle_degrees',
+    'Current solar panel tilt angle',
+    ['installation_id']
+)
+
+energy_generated = Counter(
+    'energy_generated_kwh',
+    'Total energy generated',
+    ['installation_id']
+)
+
+microclimate_temperature = Gauge(
+    'microclimate_temperature_celsius',
+    'Micro-climate temperature under panels',
+    ['installation_id']
+)
+```
+
+## Log aggregation patterns
+
+### Correlation IDs
+
+```python
+import uuid
+from contextvars import ContextVar
+
+# Context variable for correlation ID
+correlation_id_var: ContextVar[str] = ContextVar('correlation_id', default=None)
+
+@app.middleware("http")
+async def correlation_id_middleware(request, call_next):
+    # Get or generate correlation ID
+    correlation_id = request.headers.get('X-Correlation-ID', str(uuid.uuid4()))
+    correlation_id_var.set(correlation_id)
+    
+    # Add to response headers
+    response = await call_next(request)
+    response.headers['X-Correlation-ID'] = correlation_id
+    
+    return response
+
+# Use in logging
+def log_with_correlation(message: str, **kwargs):
+    logger.info(
+        message,
+        extra={
+            "correlation_id": correlation_id_var.get(),
+            **kwargs
+        }
+    )
+```
+
+### Multi-line log parsing
+
+```yaml
+# promtail pipeline for Python tracebacks
+pipeline_stages:
+  # Detect start of multi-line log (timestamp pattern)
+  - multiline:
+      firstline: '^\d{4}-\d{2}-\d{2}'
+      max_wait_time: 3s
+  
+  # Parse JSON
+  - json:
+      expressions:
+        level: level
+        timestamp: timestamp
+        message: message
+        trace_id: trace_id
+        exception: exception
+  
+  # Extract exception details
+  - regex:
+      expression: '(?P<exception_type>\w+Error): (?P<exception_message>.*)'
+      source: exception
+  
+  # Add labels
+  - labels:
+      level:
+      exception_type:
+```
+
+## Alerting and incident response
+
+### AlertManager configuration
+
+```yaml
+# alertmanager.yml
 global:
   resolve_timeout: 5m
-  slack_api_url: ${SLACK_WEBHOOK_URL}
+  slack_api_url: 'https://hooks.slack.com/services/XXX/YYY/ZZZ'
 
 route:
-  group_by: ['alertname', 'cluster']
+  group_by: ['alertname', 'cluster', 'service']
   group_wait: 10s
   group_interval: 10s
   repeat_interval: 12h
   receiver: 'default'
   
   routes:
-    # Critical alerts go to PagerDuty
+    # Critical alerts to PagerDuty
     - match:
         severity: critical
       receiver: 'pagerduty'
       continue: true
     
-    # All alerts go to Slack
-    - match_re:
-        severity: ^(warning|critical)$
+    # Warning alerts to Slack
+    - match:
+        severity: warning
       receiver: 'slack'
+    
+    # Info alerts to email
+    - match:
+        severity: info
+      receiver: 'email'
 
 receivers:
   - name: 'default'
-    email_configs:
-      - to: 'ops@iluminara.org'
-        from: 'alertmanager@iluminara.org'
-        smarthost: 'smtp.gmail.com:587'
-  
-  - name: 'slack'
     slack_configs:
       - channel: '#iluminara-alerts'
         title: '{{ .GroupLabels.alertname }}'
@@ -483,178 +867,255 @@ receivers:
   
   - name: 'pagerduty'
     pagerduty_configs:
-      - service_key: ${PAGERDUTY_SERVICE_KEY}
+      - service_key: '<pagerduty-key>'
         description: '{{ .GroupLabels.alertname }}'
+  
+  - name: 'slack'
+    slack_configs:
+      - channel: '#iluminara-warnings'
+        title: '{{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+  
+  - name: 'email'
+    email_configs:
+      - to: 'ops@iluminara.org'
+        from: 'alerts@iluminara.org'
+        smarthost: 'smtp.gmail.com:587'
+        auth_username: 'alerts@iluminara.org'
+        auth_password: '<password>'
+
+inhibit_rules:
+  # Inhibit warning if critical is firing
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'cluster', 'service']
 ```
 
-## Real-time dashboard
+## Performance monitoring
 
-### Streamlit enterprise console
+### Application Performance Monitoring (APM)
 
 ```python
-# dashboard_pro.py
-import streamlit as st
+from opentelemetry.instrumentation.auto_instrumentation import sitecustomize
+
+# Automatic instrumentation for common libraries
+# - requests
+# - httpx
+# - psycopg2
+# - redis
+# - celery
+
+# Custom spans for business logic
+@tracer.start_as_current_span("process_medical_image")
+def process_medical_image(image_data: bytes):
+    span = trace.get_current_span()
+    
+    # Add custom attributes
+    span.set_attribute("image.size_bytes", len(image_data))
+    span.set_attribute("image.format", "DICOM")
+    
+    # Preprocessing
+    with tracer.start_as_current_span("preprocess_image"):
+        preprocessed = preprocess(image_data)
+    
+    # Model inference
+    with tracer.start_as_current_span("model_inference") as inference_span:
+        inference_span.set_attribute("model.name", "ultrasound_segmentation")
+        inference_span.set_attribute("model.version", "v1.2")
+        
+        result = model.predict(preprocessed)
+        
+        inference_span.set_attribute("prediction.confidence", result.confidence)
+    
+    # Postprocessing
+    with tracer.start_as_current_span("postprocess_result"):
+        final_result = postprocess(result)
+    
+    return final_result
+```
+
+### Database query monitoring
+
+```python
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 import time
-import requests
-from datetime import datetime
 
-st.set_page_config(
-    layout="wide",
-    page_title="iLuminara Enterprise Console",
-    page_icon="🌍"
-)
+@event.listens_for(Engine, "before_cursor_execute")
+def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+    conn.info.setdefault('query_start_time', []).append(time.time())
 
-# Initialize components
-PROMETHEUS_URL = "http://localhost:9090"
-
-st.title("🌍 iLuminara Enterprise Monitor")
-
-# Metrics containers
-metrics_row1 = st.columns(4)
-metrics_row2 = st.columns(4)
-logs_container = st.empty()
-charts_container = st.empty()
-
-def query_prometheus(query):
-    """Query Prometheus API."""
-    response = requests.get(
-        f"{PROMETHEUS_URL}/api/v1/query",
-        params={'query': query}
-    )
-    return response.json()['data']['result']
-
-# Main loop
-while True:
-    # Query metrics
-    planning_latency = query_prometheus(
-        'histogram_quantile(0.95, rate(jepa_planning_latency_seconds_bucket[5m]))'
-    )
+@event.listens_for(Engine, "after_cursor_execute")
+def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+    total_time = time.time() - conn.info['query_start_time'].pop()
     
-    world_model_uncertainty = query_prometheus(
-        'jepa_world_model_uncertainty'
-    )
+    # Record metric
+    database_query_duration.labels(
+        query_type=statement.split()[0]  # SELECT, INSERT, UPDATE, DELETE
+    ).observe(total_time)
     
-    compliance_status = query_prometheus(
-        'rate(omni_law_violations_total[5m])'
-    )
-    
-    connectivity_ratio = query_prometheus(
-        'ghost_mesh_connectivity_ratio'
-    )
-    
-    # Display metrics
-    with metrics_row1[0]:
-        st.metric(
-            "Planning Latency (p95)",
-            f"{float(planning_latency[0]['value'][1]):.0f}ms",
-            delta="-5ms"
+    # Log slow queries
+    if total_time > 1.0:
+        logger.warning(
+            "Slow query detected",
+            extra={
+                "duration": total_time,
+                "statement": statement[:200],  # Truncate long queries
+                "parameters": str(parameters)[:100]
+            }
         )
-    
-    with metrics_row1[1]:
-        uncertainty = float(world_model_uncertainty[0]['value'][1])
-        st.metric(
-            "World Model Uncertainty",
-            f"{uncertainty:.2f}",
-            delta="0.05" if uncertainty > 0.8 else None,
-            delta_color="inverse"
-        )
-    
-    with metrics_row1[2]:
-        violations = sum(float(r['value'][1]) for r in compliance_status)
-        st.metric(
-            "Compliance Violations",
-            f"{violations:.1f}/min",
-            delta=None if violations == 0 else f"+{violations:.1f}"
-        )
-    
-    with metrics_row1[3]:
-        connectivity = float(connectivity_ratio[0]['value'][1])
-        st.metric(
-            "Ghost-Mesh Connectivity",
-            f"{connectivity:.0%}",
-            delta="-10%" if connectivity < 0.5 else None
-        )
-    
-    # Logs
-    with logs_container.container():
-        st.subheader("Recent Events")
-        st.write(f"[{datetime.now().strftime('%X')}] JEPA planning completed in 42ms")
-        st.write(f"[{datetime.now().strftime('%X')}] Omni-Law validated GDPR compliance")
-        st.write(f"[{datetime.now().strftime('%X')}] Ghost-Mesh switched to LoRa mode")
-    
-    time.sleep(2)  # 2-second refresh
 ```
 
-## Log aggregation
+## SLI/SLO monitoring
 
-### Structured logging
+### Service Level Indicators
 
-```python
-# core/observability/logging.py
-import logging
-import json
-from datetime import datetime
+```yaml
+# SLI definitions
+slis:
+  - name: api_availability
+    description: "Percentage of successful API requests"
+    query: |
+      sum(rate(http_requests_total{status!~"5.."}[5m]))
+      /
+      sum(rate(http_requests_total[5m]))
+  
+  - name: api_latency
+    description: "95th percentile API latency"
+    query: |
+      histogram_quantile(0.95,
+        sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+      )
+  
+  - name: model_accuracy
+    description: "Model prediction accuracy"
+    query: |
+      avg(model_prediction_accuracy) by (model_name)
+```
 
-class StructuredLogger:
-    """Structured JSON logging for centralized aggregation."""
-    
-    def __init__(self, name):
-        self.logger = logging.getLogger(name)
-        self.logger.setLevel(logging.INFO)
-        
-        handler = logging.StreamHandler()
-        handler.setFormatter(JSONFormatter())
-        self.logger.addHandler(handler)
-    
-    def info(self, message, **kwargs):
-        self.logger.info(message, extra=kwargs)
-    
-    def error(self, message, **kwargs):
-        self.logger.error(message, extra=kwargs)
+### Service Level Objectives
 
-class JSONFormatter(logging.Formatter):
-    """Format logs as JSON."""
-    
-    def format(self, record):
-        log_data = {
-            'timestamp': datetime.utcnow().isoformat(),
-            'level': record.levelname,
-            'logger': record.name,
-            'message': record.getMessage(),
-            'module': record.module,
-            'function': record.funcName,
-            'line': record.lineno
-        }
-        
-        # Add extra fields
-        if hasattr(record, 'extra'):
-            log_data.update(record.extra)
-        
-        return json.dumps(log_data)
+```yaml
+# SLO definitions
+slos:
+  - name: api_availability_slo
+    description: "API should be available 99.9% of the time"
+    sli: api_availability
+    target: 0.999
+    window: 30d
+  
+  - name: api_latency_slo
+    description: "95% of requests should complete within 500ms"
+    sli: api_latency
+    target: 0.5  # 500ms
+    window: 30d
+  
+  - name: model_accuracy_slo
+    description: "Model accuracy should be above 90%"
+    sli: model_accuracy
+    target: 0.90
+    window: 7d
+```
 
-# Usage
-logger = StructuredLogger('jepa_planner')
-logger.info(
-    "Planning completed",
-    latency_ms=42,
-    uncertainty=0.15,
-    energy=125.3
+### Error budget alerts
+
+```yaml
+# Error budget alert
+- alert: ErrorBudgetExhausted
+  expr: |
+    (
+      1 - (
+        sum(rate(http_requests_total{status!~"5.."}[30d]))
+        /
+        sum(rate(http_requests_total[30d]))
+      )
+    ) > 0.001  # 0.1% error budget
+  labels:
+    severity: critical
+  annotations:
+    summary: "Error budget exhausted for 30-day window"
+    description: "Current error rate: {{ $value | humanizePercentage }}"
+```
+
+## Observability best practices
+
+### Golden signals
+
+Monitor the four golden signals:
+
+1. **Latency**: Time to serve requests
+2. **Traffic**: Demand on the system
+3. **Errors**: Rate of failed requests
+4. **Saturation**: Resource utilization
+
+```promql
+# Latency (P95)
+histogram_quantile(0.95,
+  sum(rate(http_request_duration_seconds_bucket[5m])) by (le, endpoint)
 )
+
+# Traffic (requests per second)
+sum(rate(http_requests_total[5m])) by (endpoint)
+
+# Errors (error rate)
+sum(rate(http_requests_total{status=~"5.."}[5m])) by (endpoint)
+/
+sum(rate(http_requests_total[5m])) by (endpoint)
+
+# Saturation (CPU utilization)
+avg(rate(container_cpu_usage_seconds_total[5m])) by (pod)
+```
+
+### RED method for services
+
+**Rate, Errors, Duration**:
+
+```promql
+# Rate
+sum(rate(http_requests_total[5m])) by (service)
+
+# Errors
+sum(rate(http_requests_total{status=~"5.."}[5m])) by (service)
+
+# Duration
+histogram_quantile(0.95,
+  sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service)
+)
+```
+
+### USE method for resources
+
+**Utilization, Saturation, Errors**:
+
+```promql
+# CPU Utilization
+avg(rate(node_cpu_seconds_total{mode!="idle"}[5m])) by (instance)
+
+# CPU Saturation (load average)
+node_load1 / count(node_cpu_seconds_total{mode="idle"}) by (instance)
+
+# Memory Utilization
+1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)
+
+# Disk I/O Saturation
+rate(node_disk_io_time_seconds_total[5m])
 ```
 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Security" icon="shield-halved" href="/enterprise/security">
-    CI/CD and compliance
+  <Card title="CI/CD and security" icon="shield-halved" href="/enterprise/cicd-security">
+    Automated pipelines and security
   </Card>
-  <Card title="Deployment" icon="rocket" href="/enterprise/deployment">
-    Production deployment
+  <Card title="Alert runbooks" icon="book-open" href="/operations/alert-runbooks">
+    Incident response procedures
   </Card>
-  <Card title="JEPA architecture" icon="brain" href="/enterprise/jepa-architecture">
-    Energy-based planning
+  <Card title="Performance tuning" icon="gauge-high" href="/operations/performance-tuning">
+    Optimization techniques
   </Card>
-  <Card title="Enterprise overview" icon="building" href="/enterprise/overview">
-    Return to overview
+  <Card title="Capacity planning" icon="chart-line" href="/operations/capacity-planning">
+    Resource forecasting
   </Card>
 </CardGroup>
