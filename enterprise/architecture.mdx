@@ -1,0 +1,413 @@
+---
+title: Enterprise architecture
+description: Production-grade architecture for iLuminara deployment at scale
+---
+
+iLuminara's enterprise architecture is designed for resilience, scalability, and sovereignty, supporting deployments from single-site installations to multi-region distributed systems.
+
+## Architecture principles
+
+### Sovereignty-first design
+Every component can operate independently:
+- **Offline-first**: Full functionality without internet connectivity
+- **Data sovereignty**: All data processing occurs locally
+- **No vendor lock-in**: Open standards and interoperable protocols
+- **Graceful degradation**: System remains functional when components fail
+
+### Edge-native computing
+Computation happens where data is generated:
+- **NVIDIA Jetson edge devices**: AI inference at the edge
+- **Local data processing**: Minimize data movement
+- **Federated learning**: Train models without centralizing data
+- **P2P synchronization**: Ghost-Mesh for peer coordination
+
+### Modular microservices
+Loosely coupled services with clear boundaries:
+- **Domain-driven design**: Services aligned with business capabilities
+- **API-first**: Well-defined interfaces between services
+- **Polyglot architecture**: Right tool for each job
+- **Independent deployment**: Services can be updated independently
+
+## System architecture
+
+### High-level overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Edge Layer (Jetson)                       │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │   BioNeMo    │  │   Holoscan   │  │   Modulus    │          │
+│  │   Evo 2      │  │   Pipeline   │  │   Physics    │          │
+│  └──────────────┘  └──────────────┘  └──────────────┘          │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Application Layer (K8s)                       │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │  API Gateway │  │  Auth Service│  │  Omni-Law    │          │
+│  │  (Kong)      │  │  (Keycloak)  │  │  Validator   │          │
+│  └──────────────┘  └──────────────┘  └──────────────┘          │
+│                                                                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │  Knowledge   │  │  Tele-Justice│  │  Circular    │          │
+│  │  Mesh        │  │  Enclave     │  │  Router      │          │
+│  └──────────────┘  └──────────────┘  └──────────────┘          │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      Data Layer                                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │  PostgreSQL  │  │  TimescaleDB │  │  Hyperledger │          │
+│  │  (Metadata)  │  │  (Telemetry) │  │  Besu        │          │
+│  └──────────────┘  └──────────────┘  └──────────────┘          │
+│                                                                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │  MinIO       │  │  Redis       │  │  Qdrant      │          │
+│  │  (Objects)   │  │  (Cache)     │  │  (Vectors)   │          │
+│  └──────────────┘  └──────────────┘  └──────────────┘          │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   Infrastructure Layer                           │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │  Kubernetes  │  │  Ghost-Mesh  │  │  Prometheus  │          │
+│  │  (Orchestr.) │  │  (P2P Net)   │  │  (Metrics)   │          │
+│  └──────────────┘  └──────────────┘  └──────────────┘          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Core services
+
+#### API Gateway (Kong)
+Central entry point for all API traffic:
+- **Rate limiting**: Protect services from overload
+- **Authentication**: JWT validation and API key management
+- **Routing**: Intelligent request routing to services
+- **Transformation**: Request/response transformation
+- **Caching**: Response caching for performance
+
+#### Authentication Service (Keycloak)
+Identity and access management:
+- **SSO**: Single sign-on across all services
+- **OAuth2/OIDC**: Standard authentication protocols
+- **RBAC**: Role-based access control
+- **Federation**: Integration with external identity providers
+- **MFA**: Multi-factor authentication support
+
+#### Omni-Law Validator
+Compliance enforcement middleware:
+- **47 frameworks**: GDPR, HIPAA, EU AI Act, etc.
+- **Real-time validation**: Check every operation for compliance
+- **Audit logging**: Immutable compliance audit trail
+- **Policy engine**: Declarative compliance rules
+
+#### Knowledge Mesh
+Distributed educational content delivery:
+- **P2P sync**: Epidemic gossip protocol
+- **Content addressing**: IPFS-style content distribution
+- **Offline-first**: Full functionality without connectivity
+- **Curriculum alignment**: Local educational standards
+
+#### Tele-Justice Enclave
+Confidential legal services:
+- **TEE**: Intel SGX or AMD SEV secure enclaves
+- **Legal-LLM**: Specialized legal AI models
+- **Encrypted processing**: Data encrypted in-use
+- **Remote attestation**: Cryptographic proof of security
+
+#### Circular Router
+Reverse logistics optimization:
+- **cuOpt**: GPU-accelerated routing
+- **Material tracking**: Blockchain-based provenance
+- **Repair network**: Distributed repair-preneur coordination
+- **Urban mining**: E-waste component recovery
+
+### Data architecture
+
+#### PostgreSQL (Metadata)
+Primary relational database:
+- **User accounts**: Authentication and authorization
+- **System configuration**: Service configuration
+- **Audit logs**: Compliance and security logs
+- **Replication**: Multi-master replication for HA
+
+#### TimescaleDB (Time-series)
+Sensor and telemetry data:
+- **IoT sensors**: Agricultural, environmental, health
+- **System metrics**: Performance and health monitoring
+- **Continuous aggregates**: Pre-computed rollups
+- **Retention policies**: Automatic data lifecycle management
+
+#### Hyperledger Besu (Blockchain)
+Distributed ledger for trust:
+- **Bio-credits**: ReFi token for humanitarian actions
+- **Material passports**: Circular economy tracking
+- **Credentials**: Educational and professional credentials
+- **Smart contracts**: Programmable trust logic
+
+#### MinIO (Object Storage)
+S3-compatible object storage:
+- **Medical images**: DICOM files from Holoscan
+- **Educational content**: Videos, documents, simulations
+- **Model artifacts**: Trained ML models
+- **Backups**: System and data backups
+
+#### Redis (Cache)
+In-memory data store:
+- **Session storage**: User session management
+- **API cache**: Response caching
+- **Rate limiting**: Distributed rate limit counters
+- **Pub/sub**: Real-time event distribution
+
+#### Qdrant (Vector Database)
+Semantic search and retrieval:
+- **Legal precedents**: Case law similarity search
+- **Educational content**: Curriculum-aligned content discovery
+- **Component matching**: Compatible parts for repair
+- **Genomic sequences**: Similar sequence search
+
+## Deployment topologies
+
+### Single-site deployment
+Suitable for community centers, schools, clinics:
+
+```
+┌─────────────────────────────────────────┐
+│         Single Kubernetes Cluster        │
+│                                          │
+│  ┌────────────────────────────────────┐ │
+│  │  Control Plane (3 nodes)           │ │
+│  │  - API Server                      │ │
+│  │  - Scheduler                       │ │
+│  │  - Controller Manager              │ │
+│  └────────────────────────────────────┘ │
+│                                          │
+│  ┌────────────────────────────────────┐ │
+│  │  Worker Nodes (5+ nodes)           │ │
+│  │  - Application Pods                │ │
+│  │  - Data Services                   │ │
+│  │  - Edge AI (Jetson)                │ │
+│  └────────────────────────────────────┘ │
+│                                          │
+│  ┌────────────────────────────────────┐ │
+│  │  Storage (Ceph/Longhorn)           │ │
+│  │  - Persistent Volumes              │ │
+│  │  - Replicated Storage              │ │
+│  └────────────────────────────────────┘ │
+└─────────────────────────────────────────┘
+```
+
+**Hardware requirements**:
+- 3x control plane nodes (8 CPU, 16GB RAM)
+- 5x worker nodes (16 CPU, 64GB RAM)
+- 3x Jetson AGX Orin (edge AI)
+- 10TB storage (3x replication)
+
+### Multi-site deployment
+Suitable for regional networks, refugee camps:
+
+```
+┌──────────────┐      ┌──────────────┐      ┌──────────────┐
+│   Site A     │      │   Site B     │      │   Site C     │
+│              │      │              │      │              │
+│  K8s Cluster │◄────►│  K8s Cluster │◄────►│  K8s Cluster │
+│              │      │              │      │              │
+│  Ghost-Mesh  │      │  Ghost-Mesh  │      │  Ghost-Mesh  │
+│  Node        │      │  Node        │      │  Node        │
+└──────────────┘      └──────────────┘      └──────────────┘
+       │                     │                     │
+       └─────────────────────┴─────────────────────┘
+                             │
+                    ┌────────▼────────┐
+                    │  Coordination   │
+                    │  Service        │
+                    │  (Optional)     │
+                    └─────────────────┘
+```
+
+**Characteristics**:
+- **Autonomous operation**: Each site operates independently
+- **Eventual consistency**: Data syncs when connectivity available
+- **Federated learning**: Model training without data centralization
+- **Conflict resolution**: CRDTs for conflict-free replication
+
+### Cloud-hybrid deployment
+Suitable for organizations with existing cloud infrastructure:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Cloud Region                          │
+│                                                          │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │  Managed Kubernetes (EKS/GKE/AKS)                  │ │
+│  │  - Stateless services                              │ │
+│  │  - API Gateway                                     │ │
+│  │  - Authentication                                  │ │
+│  └────────────────────────────────────────────────────┘ │
+│                                                          │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │  Managed Services                                  │ │
+│  │  - RDS (PostgreSQL)                                │ │
+│  │  - ElastiCache (Redis)                             │ │
+│  │  - S3 (Object Storage)                             │ │
+│  └────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+                            │
+                            │ VPN/Direct Connect
+                            ▼
+┌─────────────────────────────────────────────────────────┐
+│                    Edge Sites                            │
+│                                                          │
+│  ┌────────────────┐  ┌────────────────┐                │
+│  │  Jetson Orin   │  │  Jetson Orin   │                │
+│  │  (AI Inference)│  │  (AI Inference)│                │
+│  └────────────────┘  └────────────────┘                │
+│                                                          │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │  Local K3s Cluster                                 │ │
+│  │  - Offline-critical services                       │ │
+│  │  - Local data processing                           │ │
+│  └────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Benefits**:
+- **Scalability**: Leverage cloud elasticity
+- **Cost optimization**: Cloud for stateless, edge for AI
+- **Compliance**: Sensitive data stays on-premises
+- **Resilience**: Edge continues operating if cloud unavailable
+
+## High availability
+
+### Service redundancy
+All critical services run with multiple replicas:
+- **API Gateway**: 3+ replicas with load balancing
+- **Application services**: 2+ replicas per service
+- **Databases**: Multi-master or primary-replica replication
+- **Edge devices**: Failover between Jetson nodes
+
+### Data replication
+Data is replicated for durability:
+- **PostgreSQL**: Streaming replication with automatic failover
+- **TimescaleDB**: Continuous replication to standby
+- **Blockchain**: Distributed consensus (PBFT)
+- **Object storage**: 3x replication across nodes
+
+### Network resilience
+Multiple network paths for connectivity:
+- **Primary**: 5G/6G via Aerial SDK
+- **Secondary**: LoRa mesh for long-range
+- **Tertiary**: Wi-Fi Direct for local P2P
+- **Fallback**: Satellite (Starlink) for remote areas
+
+### Disaster recovery
+Automated backup and recovery:
+- **Continuous backup**: Incremental backups every hour
+- **Point-in-time recovery**: Restore to any point in last 30 days
+- **Cross-site replication**: Backups replicated to remote sites
+- **Recovery time objective (RTO)**: < 1 hour
+- **Recovery point objective (RPO)**: < 15 minutes
+
+## Security architecture
+
+### Defense in depth
+Multiple layers of security:
+1. **Network security**: Firewall, VPN, network segmentation
+2. **Application security**: Input validation, OWASP Top 10 mitigation
+3. **Data security**: Encryption at-rest and in-transit
+4. **Identity security**: MFA, RBAC, least privilege
+5. **Infrastructure security**: Hardened OS, security patches
+
+### Encryption
+Data encrypted at all stages:
+- **In-transit**: TLS 1.3 for all network communication
+- **At-rest**: AES-256 encryption for all storage
+- **In-use**: Confidential computing (SGX/SEV) for sensitive workloads
+- **Key management**: Hardware security modules (HSM)
+
+### Zero-trust architecture
+Never trust, always verify:
+- **Mutual TLS**: Service-to-service authentication
+- **Service mesh**: Istio for encrypted service communication
+- **Network policies**: Kubernetes NetworkPolicies for segmentation
+- **Workload identity**: SPIFFE/SPIRE for service identity
+
+### Compliance automation
+Continuous compliance monitoring:
+- **Policy as code**: Open Policy Agent (OPA) for policy enforcement
+- **Compliance scanning**: Automated vulnerability scanning
+- **Audit logging**: Immutable audit trail on blockchain
+- **Compliance reporting**: Automated compliance reports
+
+## Performance optimization
+
+### Caching strategy
+Multi-level caching for performance:
+- **CDN**: CloudFlare for static assets (if cloud-connected)
+- **API Gateway**: Response caching at gateway
+- **Application**: Redis for session and data caching
+- **Database**: Query result caching
+
+### Database optimization
+Optimized for read-heavy workloads:
+- **Read replicas**: Separate replicas for read traffic
+- **Connection pooling**: PgBouncer for connection management
+- **Indexing**: Optimized indexes for common queries
+- **Partitioning**: Table partitioning for large datasets
+
+### Edge computing
+Minimize latency with edge processing:
+- **Local inference**: AI models run on Jetson at edge
+- **Data aggregation**: Aggregate before sending to cloud
+- **Caching**: Cache frequently accessed data at edge
+- **Prefetching**: Predictive prefetching of content
+
+### Resource management
+Efficient resource utilization:
+- **Horizontal Pod Autoscaling**: Scale based on CPU/memory
+- **Vertical Pod Autoscaling**: Right-size pod resources
+- **Cluster Autoscaling**: Add/remove nodes based on demand
+- **Resource quotas**: Prevent resource exhaustion
+
+## Integration patterns
+
+### API-first design
+All services expose REST/gRPC APIs:
+- **OpenAPI**: API documentation with OpenAPI 3.0
+- **Versioning**: Semantic versioning for APIs
+- **Backward compatibility**: Maintain compatibility across versions
+- **Rate limiting**: Protect APIs from abuse
+
+### Event-driven architecture
+Asynchronous communication via events:
+- **Event bus**: NATS or Kafka for event streaming
+- **Event sourcing**: Store events as source of truth
+- **CQRS**: Separate read and write models
+- **Saga pattern**: Distributed transactions via events
+
+### Service mesh
+Istio for service-to-service communication:
+- **Traffic management**: Intelligent routing and load balancing
+- **Security**: Mutual TLS and authorization
+- **Observability**: Distributed tracing and metrics
+- **Resilience**: Circuit breaking and retries
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="JEPA/MPC architecture" icon="brain" href="/enterprise/jepa-mpc">
+    World models replacing RL
+  </Card>
+  <Card title="Deployment strategies" icon="rocket" href="/enterprise/deployment">
+    Docker, Serverless, Kubernetes
+  </Card>
+  <Card title="Observability" icon="chart-line" href="/enterprise/observability">
+    Monitoring and alerting
+  </Card>
+  <Card title="CI/CD pipeline" icon="code-branch" href="/enterprise/cicd">
+    Automated deployment
+  </Card>
+</CardGroup>

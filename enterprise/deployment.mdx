@@ -1,0 +1,790 @@
+---
+title: Deployment strategies
+description: Deploy iLuminara using Docker, Serverless, or Kubernetes for different scales and requirements
+---
+
+iLuminara supports multiple deployment strategies to match your infrastructure, scale, and operational requirements.
+
+## Deployment decision matrix
+
+| Deployment | Best for | Pros | Cons |
+|------------|----------|------|------|
+| **Docker Compose** | Single-site, development | Simple, fast setup | Limited scalability |
+| **Serverless** | Variable workload, cloud | Auto-scaling, pay-per-use | Vendor lock-in, cold starts |
+| **Kubernetes** | Production, multi-site | Scalable, portable | Complex, operational overhead |
+| **Edge (Jetson)** | Offline, low-latency | Autonomous, low-latency | Limited compute |
+
+## Docker Compose deployment
+
+### Quick start
+
+Suitable for development, testing, and single-site deployments.
+
+```yaml docker-compose.yml
+version: '3.8'
+
+services:
+  # API Gateway
+  kong:
+    image: kong:3.4
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: postgres
+      KONG_PG_DATABASE: kong
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: ${KONG_PG_PASSWORD}
+    ports:
+      - "8000:8000"  # HTTP
+      - "8443:8443"  # HTTPS
+      - "8001:8001"  # Admin API
+    depends_on:
+      - postgres
+    networks:
+      - iluminara
+
+  # Authentication
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+    command: start-dev
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    networks:
+      - iluminara
+
+  # Database
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: iluminara
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: iluminara
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - iluminara
+
+  # Time-series database
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    environment:
+      POSTGRES_USER: timescale
+      POSTGRES_PASSWORD: ${TIMESCALE_PASSWORD}
+      POSTGRES_DB: telemetry
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - iluminara
+
+  # Cache
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - iluminara
+
+  # Object storage
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - iluminara
+
+  # Vector database
+  qdrant:
+    image: qdrant/qdrant:latest
+    volumes:
+      - qdrant_data:/qdrant/storage
+    ports:
+      - "6333:6333"
+    networks:
+      - iluminara
+
+  # Blockchain
+  besu:
+    image: hyperledger/besu:latest
+    command:
+      - --network=dev
+      - --miner-enabled
+      - --miner-coinbase=0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+      - --rpc-http-enabled
+      - --rpc-http-api=ETH,NET,WEB3
+      - --host-allowlist=*
+      - --rpc-http-cors-origins=all
+    volumes:
+      - besu_data:/var/lib/besu
+    ports:
+      - "8545:8545"
+      - "8546:8546"
+    networks:
+      - iluminara
+
+  # Application services
+  api-server:
+    build:
+      context: ./services/api-server
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://iluminara:${POSTGRES_PASSWORD}@postgres:5432/iluminara
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      KEYCLOAK_URL: http://keycloak:8080
+    depends_on:
+      - postgres
+      - redis
+      - keycloak
+    ports:
+      - "3000:3000"
+    networks:
+      - iluminara
+
+  knowledge-mesh:
+    build:
+      context: ./services/knowledge-mesh
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://iluminara:${POSTGRES_PASSWORD}@postgres:5432/iluminara
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+    depends_on:
+      - postgres
+      - minio
+    ports:
+      - "3001:3001"
+    networks:
+      - iluminara
+
+  circular-router:
+    build:
+      context: ./services/circular-router
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://iluminara:${POSTGRES_PASSWORD}@postgres:5432/iluminara
+      BESU_RPC_URL: http://besu:8545
+    depends_on:
+      - postgres
+      - besu
+    ports:
+      - "3002:3002"
+    networks:
+      - iluminara
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  postgres_data:
+  timescale_data:
+  redis_data:
+  minio_data:
+  qdrant_data:
+  besu_data:
+
+networks:
+  iluminara:
+    driver: bridge
+```
+
+### Environment configuration
+
+```bash .env
+# Database
+POSTGRES_PASSWORD=changeme_secure_password
+TIMESCALE_PASSWORD=changeme_secure_password
+
+# Authentication
+KEYCLOAK_DB_PASSWORD=changeme_secure_password
+KEYCLOAK_ADMIN_PASSWORD=changeme_secure_password
+
+# API Gateway
+KONG_PG_PASSWORD=changeme_secure_password
+
+# Cache
+REDIS_PASSWORD=changeme_secure_password
+
+# Object Storage
+MINIO_ROOT_USER=admin
+MINIO_ROOT_PASSWORD=changeme_secure_password
+```
+
+### Deployment commands
+
+```bash
+# Start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Scale a service
+docker-compose up -d --scale api-server=3
+
+# Stop all services
+docker-compose down
+
+# Stop and remove volumes (data loss!)
+docker-compose down -v
+```
+
+## Kubernetes deployment
+
+### Architecture
+
+Production-grade deployment with high availability and auto-scaling.
+
+```yaml k8s/namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: iluminara
+  labels:
+    name: iluminara
+```
+
+### PostgreSQL StatefulSet
+
+```yaml k8s/postgres-statefulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: iluminara
+spec:
+  serviceName: postgres
+  replicas: 3
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:16
+        ports:
+        - containerPort: 5432
+          name: postgres
+        env:
+        - name: POSTGRES_USER
+          value: iluminara
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: password
+        - name: POSTGRES_DB
+          value: iluminara
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-storage
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: fast-ssd
+      resources:
+        requests:
+          storage: 100Gi
+```
+
+### API Server Deployment
+
+```yaml k8s/api-server-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-server
+  namespace: iluminara
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: api-server
+  template:
+    metadata:
+      labels:
+        app: api-server
+        version: v1
+    spec:
+      containers:
+      - name: api-server
+        image: iluminara/api-server:latest
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-secret
+              key: url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: url
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-server
+  namespace: iluminara
+spec:
+  selector:
+    app: api-server
+  ports:
+  - port: 80
+    targetPort: 3000
+    name: http
+  type: ClusterIP
+```
+
+### Horizontal Pod Autoscaler
+
+```yaml k8s/api-server-hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-server-hpa
+  namespace: iluminara
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-server
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 30
+      - type: Pods
+        value: 2
+        periodSeconds: 30
+      selectPolicy: Max
+```
+
+### Ingress
+
+```yaml k8s/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: iluminara-ingress
+  namespace: iluminara
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - api.iluminara.org
+    secretName: iluminara-tls
+  rules:
+  - host: api.iluminara.org
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: api-server
+            port:
+              number: 80
+```
+
+### Deployment commands
+
+```bash
+# Create namespace
+kubectl apply -f k8s/namespace.yaml
+
+# Create secrets
+kubectl create secret generic postgres-secret \
+  --from-literal=password=changeme \
+  -n iluminara
+
+kubectl create secret generic database-secret \
+  --from-literal=url=postgresql://iluminara:changeme@postgres:5432/iluminara \
+  -n iluminara
+
+# Deploy PostgreSQL
+kubectl apply -f k8s/postgres-statefulset.yaml
+
+# Deploy application
+kubectl apply -f k8s/api-server-deployment.yaml
+kubectl apply -f k8s/api-server-hpa.yaml
+
+# Deploy ingress
+kubectl apply -f k8s/ingress.yaml
+
+# Check status
+kubectl get pods -n iluminara
+kubectl get svc -n iluminara
+kubectl get hpa -n iluminara
+
+# View logs
+kubectl logs -f deployment/api-server -n iluminara
+
+# Scale manually
+kubectl scale deployment api-server --replicas=5 -n iluminara
+```
+
+## Serverless deployment
+
+### AWS Lambda
+
+Suitable for variable workloads and event-driven architectures.
+
+```yaml serverless.yml
+service: iluminara-api
+
+provider:
+  name: aws
+  runtime: python3.11
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  environment:
+    DATABASE_URL: ${ssm:/iluminara/${self:provider.stage}/database-url}
+    REDIS_URL: ${ssm:/iluminara/${self:provider.stage}/redis-url}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+            - s3:PutObject
+          Resource: arn:aws:s3:::iluminara-${self:provider.stage}/*
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+          Resource: arn:aws:dynamodb:${self:provider.region}:*:table/iluminara-*
+
+functions:
+  api:
+    handler: handlers/api.handler
+    events:
+      - httpApi:
+          path: /{proxy+}
+          method: ANY
+    timeout: 30
+    memorySize: 1024
+    reservedConcurrency: 100
+
+  knowledge-mesh-sync:
+    handler: handlers/knowledge_mesh.sync
+    events:
+      - schedule: rate(1 hour)
+    timeout: 300
+    memorySize: 2048
+
+  circular-router:
+    handler: handlers/circular_router.optimize
+    events:
+      - sqs:
+          arn: arn:aws:sqs:${self:provider.region}:*:iluminara-routing-queue
+          batchSize: 10
+    timeout: 60
+    memorySize: 3008  # Max memory for GPU access
+
+plugins:
+  - serverless-python-requirements
+  - serverless-offline
+
+custom:
+  pythonRequirements:
+    dockerizePip: true
+    layer: true
+```
+
+### Lambda handler
+
+```python handlers/api.py
+import json
+from mangum import Mangum
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
+
+@app.get("/api/v1/users")
+def list_users():
+    # Implementation
+    return {"users": []}
+
+# Mangum adapter for AWS Lambda
+handler = Mangum(app, lifespan="off")
+```
+
+### Deployment
+
+```bash
+# Install Serverless Framework
+npm install -g serverless
+
+# Deploy to AWS
+serverless deploy --stage prod
+
+# View logs
+serverless logs -f api --stage prod --tail
+
+# Invoke function
+serverless invoke -f api --stage prod --data '{"path": "/health"}'
+
+# Remove deployment
+serverless remove --stage prod
+```
+
+## Edge deployment (NVIDIA Jetson)
+
+### Jetson setup
+
+For edge AI inference and offline operation.
+
+```bash
+# Flash Jetson with JetPack
+# Download from https://developer.nvidia.com/jetpack
+
+# Install Docker
+sudo apt-get update
+sudo apt-get install -y docker.io
+sudo usermod -aG docker $USER
+
+# Install NVIDIA Container Runtime
+distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
+curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | \
+  sudo tee /etc/apt/sources.list.d/nvidia-docker.list
+
+sudo apt-get update
+sudo apt-get install -y nvidia-container-runtime
+
+# Install K3s (lightweight Kubernetes)
+curl -sfL https://get.k3s.io | sh -
+
+# Verify installation
+sudo k3s kubectl get nodes
+```
+
+### Edge deployment manifest
+
+```yaml edge/jetson-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bionemo-inference
+  namespace: iluminara-edge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bionemo-inference
+  template:
+    metadata:
+      labels:
+        app: bionemo-inference
+    spec:
+      nodeSelector:
+        nvidia.com/gpu: "true"
+      containers:
+      - name: bionemo
+        image: iluminara/bionemo-evo2:jetson
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+            memory: "32Gi"
+        volumeMounts:
+        - name: models
+          mountPath: /models
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: models
+        hostPath:
+          path: /opt/iluminara/models
+      - name: data
+        hostPath:
+          path: /opt/iluminara/data
+```
+
+## Hybrid deployment
+
+### Architecture
+
+Combine cloud and edge for optimal performance and cost.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Cloud (AWS/GCP/Azure)                 │
+│                                                          │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │  Stateless Services (Kubernetes)                   │ │
+│  │  - API Gateway                                     │ │
+│  │  - Authentication                                  │ │
+│  │  - Web UI                                          │ │
+│  └────────────────────────────────────────────────────┘ │
+│                                                          │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │  Managed Services                                  │ │
+│  │  - RDS (PostgreSQL)                                │ │
+│  │  - ElastiCache (Redis)                             │ │
+│  │  - S3 (Object Storage)                             │ │
+│  └────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+                            │
+                            │ VPN / Direct Connect
+                            ▼
+┌─────────────────────────────────────────────────────────┐
+│                    Edge Sites                            │
+│                                                          │
+│  ┌────────────────┐  ┌────────────────┐                │
+│  │  Jetson Orin   │  │  Jetson Orin   │                │
+│  │  (BioNeMo)     │  │  (Holoscan)    │                │
+│  └────────────────┘  └────────────────┘                │
+│                                                          │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │  K3s Cluster                                       │ │
+│  │  - Offline-critical services                       │ │
+│  │  - Local data processing                           │ │
+│  │  - Ghost-Mesh coordination                         │ │
+│  └────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+```
+
+## Deployment checklist
+
+### Pre-deployment
+- [ ] Review hardware requirements
+- [ ] Provision infrastructure (cloud/on-prem)
+- [ ] Configure networking and firewall rules
+- [ ] Set up DNS records
+- [ ] Generate TLS certificates
+- [ ] Create secrets and credentials
+- [ ] Configure backup strategy
+
+### Deployment
+- [ ] Deploy database layer
+- [ ] Deploy cache and message queue
+- [ ] Deploy application services
+- [ ] Deploy API gateway and ingress
+- [ ] Configure monitoring and logging
+- [ ] Run smoke tests
+- [ ] Configure auto-scaling
+- [ ] Set up alerting
+
+### Post-deployment
+- [ ] Verify all services healthy
+- [ ] Test end-to-end workflows
+- [ ] Load test critical paths
+- [ ] Document deployment
+- [ ] Train operations team
+- [ ] Set up on-call rotation
+- [ ] Schedule regular backups
+- [ ] Plan disaster recovery drills
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Observability" icon="chart-line" href="/enterprise/observability">
+    Monitoring and alerting
+  </Card>
+  <Card title="CI/CD pipeline" icon="code-branch" href="/enterprise/cicd">
+    Automated deployment
+  </Card>
+  <Card title="Security hardening" icon="shield" href="/security/hardening">
+    Production security
+  </Card>
+  <Card title="Disaster recovery" icon="life-ring" href="/operations/disaster-recovery">
+    Backup and recovery
+  </Card>
+</CardGroup>

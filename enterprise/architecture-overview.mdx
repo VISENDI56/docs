@@ -1,0 +1,411 @@
+---
+title: Enterprise architecture
+description: Scalable, production-ready architecture for iLuminara deployment at scale
+---
+
+iLuminara's enterprise architecture is designed for resilience, scalability, and sovereignty across distributed edge-cloud hybrid deployments.
+
+## Architecture principles
+
+### Sovereignty-first design
+All critical operations function without external dependencies:
+- Edge-first processing with cloud sync
+- Offline-capable by default
+- Data sovereignty enforced at hardware level
+- No vendor lock-in
+
+### Resilient by design
+System continues operating under adverse conditions:
+- Graceful degradation when services unavailable
+- Automatic failover and recovery
+- Multi-protocol networking (5G/LoRa/Wi-Fi/Satellite)
+- Store-and-forward for intermittent connectivity
+
+### Horizontally scalable
+Linear scaling from single device to continental deployment:
+- Microservices architecture
+- Stateless services with distributed state management
+- Event-driven communication
+- Auto-scaling based on demand
+
+### Security-first
+Zero-trust architecture with defense in depth:
+- Confidential computing for sensitive workloads
+- End-to-end encryption
+- Hardware-backed attestation
+- Immutable audit trails
+
+## System architecture
+
+### Edge tier
+Autonomous operation at the edge:
+
+**Hardware**: Jetson Orin Nano/AGX, IGX Orin  
+**Capabilities**:
+- Local AI inference (quantized models)
+- Sensor data processing
+- Offline-first applications
+- P2P mesh networking
+
+**Key services**:
+- Model inference (NIM)
+- Data collection and preprocessing
+- Local storage and caching
+- Ghost-Mesh coordination
+
+### Regional tier
+Coordination and aggregation:
+
+**Hardware**: On-premise servers or regional cloud  
+**Capabilities**:
+- Model training and fine-tuning
+- Data aggregation and analytics
+- Regional coordination
+- Backup and disaster recovery
+
+**Key services**:
+- Training orchestration
+- Data warehouse
+- Regional API gateway
+- Federated learning coordinator
+
+### Cloud tier
+Global coordination and management:
+
+**Hardware**: Multi-cloud (AWS, Azure, GCP) or sovereign cloud  
+**Capabilities**:
+- Global model distribution
+- Cross-regional analytics
+- Disaster recovery
+- Compliance and governance
+
+**Key services**:
+- Model registry
+- Global API gateway
+- Monitoring and observability
+- Compliance enforcement (Omni-Law)
+
+## Component architecture
+
+### Core services
+
+#### Golden Thread
+Unified data lineage and provenance:
+```
+┌─────────────────────────────────────────┐
+│         Golden Thread Service           │
+├─────────────────────────────────────────┤
+│ • Data provenance tracking              │
+│ • Lineage graph management              │
+│ • Compliance validation                 │
+│ • Audit trail generation                │
+└─────────────────────────────────────────┘
+         │                    │
+         ▼                    ▼
+    ┌─────────┐          ┌─────────┐
+    │ Graph   │          │ Audit   │
+    │ Database│          │ Log     │
+    └─────────┘          └─────────┘
+```
+
+#### Omni-Law Matrix
+Multi-jurisdictional compliance enforcement:
+```
+┌─────────────────────────────────────────┐
+│        Omni-Law Interceptor             │
+├─────────────────────────────────────────┤
+│ • Request validation                    │
+│ • Framework selection (47 frameworks)   │
+│ • Policy enforcement                    │
+│ • Compliance reporting                  │
+└─────────────────────────────────────────┘
+         │
+         ▼
+    ┌─────────────────────────────────┐
+    │  Framework Validators           │
+    ├─────────────────────────────────┤
+    │ • GDPR    • HIPAA   • EU AI Act │
+    │ • PABS    • Nagoya  • CCPA      │
+    │ • ... (41 more)                 │
+    └─────────────────────────────────┘
+```
+
+#### Ghost-Mesh
+Resilient networking layer:
+```
+┌─────────────────────────────────────────┐
+│         Ghost-Mesh Router               │
+├─────────────────────────────────────────┤
+│ • Protocol selection (5G/LoRa/WiFi)     │
+│ • Epidemic routing                      │
+│ • Store-and-forward                     │
+│ • Spectrum analysis                     │
+└─────────────────────────────────────────┘
+         │
+         ▼
+    ┌─────────────────────────────────┐
+    │  Protocol Adapters              │
+    ├─────────────────────────────────┤
+    │ • Aerial SDK (5G/6G)            │
+    │ • LoRa concentrator             │
+    │ • Wi-Fi Direct                  │
+    │ • Satellite (Starlink)          │
+    └─────────────────────────────────┘
+```
+
+### AI/ML services
+
+#### Model serving (NVIDIA NIM)
+Optimized inference at scale:
+```
+┌─────────────────────────────────────────┐
+│         NIM Inference Service           │
+├─────────────────────────────────────────┤
+│ • Model loading and caching             │
+│ • Request batching                      │
+│ • Dynamic quantization                  │
+│ • Multi-GPU scheduling                  │
+└─────────────────────────────────────────┘
+         │
+         ▼
+    ┌─────────────────────────────────┐
+    │  Model Repository               │
+    ├─────────────────────────────────┤
+    │ • Llama-3 8B (Education)        │
+    │ • BioNeMo Evo 2 (Genomics)      │
+    │ • Legal-LLM (Tele-Justice)      │
+    │ • Custom fine-tuned models      │
+    └─────────────────────────────────┘
+```
+
+#### Training orchestration
+Distributed training and federated learning:
+```
+┌─────────────────────────────────────────┐
+│      Training Orchestrator              │
+├─────────────────────────────────────────┤
+│ • Job scheduling                        │
+│ • Resource allocation                   │
+│ • Federated aggregation                 │
+│ • Model versioning                      │
+└─────────────────────────────────────────┘
+         │
+         ▼
+    ┌─────────────────────────────────┐
+    │  Training Workers               │
+    ├─────────────────────────────────┤
+    │ • Edge: Jetson Orin             │
+    │ • Regional: A100 clusters       │
+    │ • Cloud: Multi-GPU instances    │
+    └─────────────────────────────────┘
+```
+
+### Data services
+
+#### Time-series database
+Sensor and telemetry data:
+```
+┌─────────────────────────────────────────┐
+│         TimescaleDB / InfluxDB          │
+├─────────────────────────────────────────┤
+│ • High-frequency sensor data            │
+│ • Downsampling and aggregation          │
+│ • Retention policies                    │
+│ • Real-time queries                     │
+└─────────────────────────────────────────┘
+```
+
+#### Graph database
+Relationships and provenance:
+```
+┌─────────────────────────────────────────┐
+│              Neo4j                      │
+├─────────────────────────────────────────┤
+│ • Data lineage graphs                   │
+│ • Knowledge graphs                      │
+│ • Relationship queries                  │
+│ • Graph algorithms                      │
+└─────────────────────────────────────────┘
+```
+
+#### Blockchain
+Immutable audit and transactions:
+```
+┌─────────────────────────────────────────┐
+│         Hyperledger Besu                │
+├─────────────────────────────────────────┤
+│ • Bio-credit transactions               │
+│ • Material passports                    │
+│ • Audit trails                          │
+│ • Smart contracts                       │
+└─────────────────────────────────────────┘
+```
+
+## Communication patterns
+
+### Synchronous (REST/gRPC)
+Real-time request-response:
+- User-facing APIs
+- Service-to-service calls (low latency)
+- Health checks and status queries
+
+### Asynchronous (Message Queue)
+Decoupled event processing:
+- Kafka/RabbitMQ for event streaming
+- Job queues for background processing
+- Pub/sub for notifications
+
+### Epidemic (Ghost-Mesh)
+Delay-tolerant networking:
+- Store-and-forward messaging
+- Gossip protocols for state sync
+- Opportunistic data transfer
+
+## Deployment patterns
+
+### Edge deployment
+Single-device autonomous operation:
+```yaml
+Edge Node:
+  Hardware: Jetson Orin Nano
+  Services:
+    - NIM inference (quantized models)
+    - Local data collection
+    - Ghost-Mesh client
+    - Offline storage
+  Connectivity: Intermittent
+  Power: Solar + battery
+```
+
+### Regional deployment
+Coordinated edge cluster:
+```yaml
+Regional Hub:
+  Hardware: On-premise server cluster
+  Services:
+    - Training orchestration
+    - Regional API gateway
+    - Data aggregation
+    - Model distribution
+  Edge Nodes: 10-100 devices
+  Connectivity: Reliable regional network
+```
+
+### Global deployment
+Multi-region coordination:
+```yaml
+Global Infrastructure:
+  Cloud: Multi-cloud (AWS + Azure + GCP)
+  Services:
+    - Global API gateway
+    - Model registry
+    - Cross-region analytics
+    - Disaster recovery
+  Regions: 5-10 regional hubs
+  Edge Nodes: 1000+ devices
+```
+
+## High availability
+
+### Redundancy
+Multiple layers of redundancy:
+- **Edge**: Peer-to-peer failover via Ghost-Mesh
+- **Regional**: Active-active cluster with load balancing
+- **Cloud**: Multi-region with automatic failover
+
+### Backup and recovery
+Comprehensive backup strategy:
+- **Edge**: Local backup to SD card, sync to regional hub
+- **Regional**: Daily backups to cloud, 30-day retention
+- **Cloud**: Cross-region replication, point-in-time recovery
+
+### Disaster recovery
+Recovery time objectives (RTO) and recovery point objectives (RPO):
+- **Critical services**: RTO < 1 hour, RPO < 15 minutes
+- **Standard services**: RTO < 4 hours, RPO < 1 hour
+- **Archival data**: RTO < 24 hours, RPO < 24 hours
+
+## Security architecture
+
+### Zero-trust model
+Never trust, always verify:
+- Mutual TLS for all service communication
+- JWT tokens with short expiration
+- Service mesh with policy enforcement
+- Network segmentation
+
+### Confidential computing
+Hardware-enforced security:
+- Intel SGX / AMD SEV for sensitive workloads
+- Encrypted memory and storage
+- Remote attestation
+- Sealed storage
+
+### Encryption
+End-to-end encryption:
+- **At rest**: AES-256 for all stored data
+- **In transit**: TLS 1.3 for all network communication
+- **In use**: Confidential computing for sensitive processing
+
+## Scalability
+
+### Horizontal scaling
+Add capacity by adding nodes:
+- Stateless services scale linearly
+- Load balancing across instances
+- Auto-scaling based on metrics
+- No single point of failure
+
+### Vertical scaling
+Increase capacity per node:
+- GPU scaling for AI workloads
+- Memory scaling for data processing
+- Storage scaling for data retention
+
+### Performance targets
+Expected performance at scale:
+
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| API latency (p95) | < 200ms | Regional gateway |
+| Inference latency | < 100ms | Edge NIM |
+| Message throughput | > 10k/sec | Kafka cluster |
+| Concurrent users | > 100k | Global deployment |
+| Data ingestion | > 1M events/sec | Time-series DB |
+
+## Cost optimization
+
+### Edge-first processing
+Minimize cloud costs:
+- Process data at edge when possible
+- Only sync aggregated data to cloud
+- Cache frequently accessed data locally
+
+### Spot instances
+Use spot/preemptible instances for non-critical workloads:
+- Training jobs
+- Batch processing
+- Development environments
+
+### Resource right-sizing
+Match resources to workload:
+- Auto-scaling to match demand
+- Scheduled scaling for predictable patterns
+- Resource quotas to prevent waste
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="JEPA/MPC architecture" icon="brain" href="/enterprise/jepa-mpc-architecture">
+    World models replacing RL
+  </Card>
+  <Card title="Deployment strategies" icon="rocket" href="/enterprise/deployment-strategies">
+    Docker, Kubernetes, Serverless
+  </Card>
+  <Card title="Observability" icon="chart-line" href="/enterprise/observability">
+    Monitoring and alerting
+  </Card>
+  <Card title="CI/CD pipeline" icon="code-branch" href="/enterprise/cicd-pipeline">
+    Automated testing and deployment
+  </Card>
+</CardGroup>
