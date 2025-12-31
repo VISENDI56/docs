@@ -1,0 +1,749 @@
+---
+title: Kubernetes deployment
+description: Deploy and scale iLuminara on Kubernetes for production workloads
+---
+
+Kubernetes provides orchestration for iLuminara at scale, with automated deployment, scaling, and management of containerized services.
+
+## Prerequisites
+
+- Kubernetes cluster 1.28+
+- kubectl configured
+- Helm 3.12+
+- NVIDIA GPU Operator (for GPU workloads)
+- 100GB+ storage per node
+- Load balancer (MetalLB, cloud provider, etc.)
+
+## Quick start
+
+```bash
+# Add iLuminara Helm repository
+helm repo add iluminara https://charts.iluminara.org
+helm repo update
+
+# Install with default values
+helm install iluminara iluminara/iluminara \
+  --namespace iluminara \
+  --create-namespace
+
+# Check deployment status
+kubectl get pods -n iluminara
+
+# Access services
+kubectl port-forward -n iluminara svc/api-gateway 8080:8080
+```
+
+## Helm chart structure
+
+```yaml charts/iluminara/values.yaml
+# Global configuration
+global:
+  imageRegistry: ghcr.io/iluminara
+  imagePullPolicy: IfNotPresent
+  storageClass: standard
+
+# API Gateway
+apiGateway:
+  enabled: true
+  replicaCount: 3
+  image:
+    repository: api-gateway
+    tag: "1.0.0"
+  service:
+    type: LoadBalancer
+    port: 8080
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+
+# JEPA World Model Service
+jepaService:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: jepa-service
+    tag: "1.0.0"
+  resources:
+    requests:
+      cpu: 4000m
+      memory: 16Gi
+      nvidia.com/gpu: 1
+    limits:
+      cpu: 8000m
+      memory: 32Gi
+      nvidia.com/gpu: 1
+  nodeSelector:
+    nvidia.com/gpu.product: NVIDIA-A100-SXM4-40GB
+
+# MPC Controller Service
+mpcService:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: mpc-service
+    tag: "1.0.0"
+  resources:
+    requests:
+      cpu: 2000m
+      memory: 4Gi
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+
+# PostgreSQL
+postgresql:
+  enabled: true
+  auth:
+    username: iluminara
+    password: ""  # Set via secret
+    database: iluminara
+  primary:
+    persistence:
+      enabled: true
+      size: 100Gi
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+
+# Redis
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: true
+    password: ""  # Set via secret
+  master:
+    persistence:
+      enabled: true
+      size: 10Gi
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+
+# Monitoring
+monitoring:
+  prometheus:
+    enabled: true
+  grafana:
+    enabled: true
+    adminPassword: ""  # Set via secret
+```
+
+## Kubernetes manifests
+
+### Namespace
+
+```yaml k8s/namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: iluminara
+  labels:
+    name: iluminara
+    environment: production
+```
+
+### API Gateway Deployment
+
+```yaml k8s/api-gateway-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: iluminara
+  labels:
+    app: api-gateway
+    version: v1
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+        version: v1
+    spec:
+      containers:
+      - name: api-gateway
+        image: ghcr.io/iluminara/api-gateway:1.0.0
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: DB_HOST
+          value: "postgresql"
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: iluminara-secrets
+              key: db-password
+        - name: REDIS_HOST
+          value: "redis-master"
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: iluminara-secrets
+              key: redis-password
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - api-gateway
+              topologyKey: kubernetes.io/hostname
+```
+
+### JEPA Service with GPU
+
+```yaml k8s/jepa-service-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jepa-service
+  namespace: iluminara
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: jepa-service
+  template:
+    metadata:
+      labels:
+        app: jepa-service
+    spec:
+      nodeSelector:
+        nvidia.com/gpu.product: NVIDIA-A100-SXM4-40GB
+      containers:
+      - name: jepa-service
+        image: ghcr.io/iluminara/jepa-service:1.0.0
+        ports:
+        - containerPort: 8081
+        env:
+        - name: CUDA_VISIBLE_DEVICES
+          value: "0"
+        - name: MODEL_PATH
+          value: "/models/jepa_world_model.pth"
+        resources:
+          requests:
+            cpu: 4000m
+            memory: 16Gi
+            nvidia.com/gpu: 1
+          limits:
+            cpu: 8000m
+            memory: 32Gi
+            nvidia.com/gpu: 1
+        volumeMounts:
+        - name: models
+          mountPath: /models
+          readOnly: true
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: models
+        persistentVolumeClaim:
+          claimName: jepa-models-pvc
+      - name: data
+        persistentVolumeClaim:
+          claimName: jepa-data-pvc
+```
+
+### Services
+
+```yaml k8s/services.yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: iluminara
+spec:
+  type: LoadBalancer
+  selector:
+    app: api-gateway
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jepa-service
+  namespace: iluminara
+spec:
+  type: ClusterIP
+  selector:
+    app: jepa-service
+  ports:
+  - port: 8081
+    targetPort: 8081
+    name: http
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mpc-service
+  namespace: iluminara
+spec:
+  type: ClusterIP
+  selector:
+    app: mpc-service
+  ports:
+  - port: 8082
+    targetPort: 8082
+    name: http
+```
+
+### Ingress
+
+```yaml k8s/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: iluminara-ingress
+  namespace: iluminara
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - api.iluminara.org
+    secretName: iluminara-tls
+  rules:
+  - host: api.iluminara.org
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: api-gateway
+            port:
+              number: 8080
+```
+
+## Persistent storage
+
+### PersistentVolumeClaims
+
+```yaml k8s/storage.yaml
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jepa-models-pvc
+  namespace: iluminara
+spec:
+  accessModes:
+  - ReadOnlyMany
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: fast-ssd
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jepa-data-pvc
+  namespace: iluminara
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: standard
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgresql-data-pvc
+  namespace: iluminara
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: standard
+```
+
+## Secrets management
+
+### Using Sealed Secrets
+
+```bash
+# Install Sealed Secrets controller
+kubectl apply -f https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.24.0/controller.yaml
+
+# Create secret
+kubectl create secret generic iluminara-secrets \
+  --from-literal=db-password=your_password \
+  --from-literal=redis-password=your_password \
+  --from-literal=api-keys=your_keys \
+  --dry-run=client -o yaml | \
+  kubeseal -o yaml > sealed-secret.yaml
+
+# Apply sealed secret
+kubectl apply -f sealed-secret.yaml -n iluminara
+```
+
+### Using External Secrets Operator
+
+```yaml k8s/external-secret.yaml
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: iluminara-secrets
+  namespace: iluminara
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: aws-secrets-manager
+    kind: SecretStore
+  target:
+    name: iluminara-secrets
+    creationPolicy: Owner
+  data:
+  - secretKey: db-password
+    remoteRef:
+      key: iluminara/production/db-password
+  - secretKey: redis-password
+    remoteRef:
+      key: iluminara/production/redis-password
+  - secretKey: api-keys
+    remoteRef:
+      key: iluminara/production/api-keys
+```
+
+## Autoscaling
+
+### Horizontal Pod Autoscaler
+
+```yaml k8s/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-gateway-hpa
+  namespace: iluminara
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-gateway
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 30
+      - type: Pods
+        value: 2
+        periodSeconds: 30
+      selectPolicy: Max
+```
+
+### Vertical Pod Autoscaler
+
+```yaml k8s/vpa.yaml
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: jepa-service-vpa
+  namespace: iluminara
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: jepa-service
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: jepa-service
+      minAllowed:
+        cpu: 2000m
+        memory: 8Gi
+      maxAllowed:
+        cpu: 16000m
+        memory: 64Gi
+```
+
+## GPU scheduling
+
+### NVIDIA GPU Operator
+
+```bash
+# Install GPU Operator
+helm repo add nvidia https://helm.ngc.nvidia.com/nvidia
+helm repo update
+
+helm install gpu-operator nvidia/gpu-operator \
+  --namespace gpu-operator \
+  --create-namespace \
+  --set driver.enabled=true
+```
+
+### Time-slicing GPUs
+
+```yaml k8s/gpu-time-slicing.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: time-slicing-config
+  namespace: gpu-operator
+data:
+  any: |-
+    version: v1
+    sharing:
+      timeSlicing:
+        replicas: 4  # Share GPU among 4 pods
+```
+
+## Monitoring and observability
+
+### Prometheus ServiceMonitor
+
+```yaml k8s/servicemonitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: iluminara-metrics
+  namespace: iluminara
+spec:
+  selector:
+    matchLabels:
+      app: api-gateway
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+```
+
+### Grafana dashboards
+
+```yaml k8s/grafana-dashboard.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: iluminara-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  iluminara-overview.json: |
+    {
+      "dashboard": {
+        "title": "iLuminara Overview",
+        "panels": [
+          {
+            "title": "Request Rate",
+            "targets": [
+              {
+                "expr": "rate(http_requests_total{namespace=\"iluminara\"}[5m])"
+              }
+            ]
+          }
+        ]
+      }
+    }
+```
+
+## Backup and disaster recovery
+
+### Velero backup
+
+```bash
+# Install Velero
+velero install \
+  --provider aws \
+  --plugins velero/velero-plugin-for-aws:v1.8.0 \
+  --bucket iluminara-backups \
+  --backup-location-config region=us-east-1 \
+  --snapshot-location-config region=us-east-1
+
+# Create backup schedule
+velero schedule create iluminara-daily \
+  --schedule="0 2 * * *" \
+  --include-namespaces iluminara \
+  --ttl 720h
+
+# Manual backup
+velero backup create iluminara-manual \
+  --include-namespaces iluminara
+
+# Restore from backup
+velero restore create --from-backup iluminara-manual
+```
+
+## Multi-cluster deployment
+
+### Cluster Federation
+
+```yaml k8s/federated-deployment.yaml
+apiVersion: types.kubefed.io/v1beta1
+kind: FederatedDeployment
+metadata:
+  name: api-gateway
+  namespace: iluminara
+spec:
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      replicas: 3
+      selector:
+        matchLabels:
+          app: api-gateway
+      template:
+        metadata:
+          labels:
+            app: api-gateway
+        spec:
+          containers:
+          - name: api-gateway
+            image: ghcr.io/iluminara/api-gateway:1.0.0
+  placement:
+    clusters:
+    - name: us-east-1
+    - name: eu-west-1
+    - name: ap-south-1
+  overrides:
+  - clusterName: us-east-1
+    clusterOverrides:
+    - path: "/spec/replicas"
+      value: 5
+  - clusterName: eu-west-1
+    clusterOverrides:
+    - path: "/spec/replicas"
+      value: 3
+```
+
+## Troubleshooting
+
+### Debug pod issues
+
+```bash
+# Check pod status
+kubectl get pods -n iluminara
+
+# Describe pod
+kubectl describe pod <pod-name> -n iluminara
+
+# View logs
+kubectl logs <pod-name> -n iluminara
+
+# Execute commands in pod
+kubectl exec -it <pod-name> -n iluminara -- /bin/bash
+
+# Check events
+kubectl get events -n iluminara --sort-by='.lastTimestamp'
+```
+
+### GPU troubleshooting
+
+```bash
+# Check GPU nodes
+kubectl get nodes -l nvidia.com/gpu.present=true
+
+# Verify GPU allocation
+kubectl describe node <node-name> | grep -A 10 "Allocated resources"
+
+# Test GPU in pod
+kubectl run gpu-test --rm -it --restart=Never \
+  --image=nvidia/cuda:12.1.0-base-ubuntu22.04 \
+  --limits=nvidia.com/gpu=1 \
+  -- nvidia-smi
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Serverless deployment" icon="bolt" href="/deployment/serverless">
+    Deploy serverless functions
+  </Card>
+  <Card title="Monitoring setup" icon="chart-line" href="/deployment/monitoring">
+    Configure observability
+  </Card>
+  <Card title="CI/CD pipeline" icon="code-branch" href="/deployment/cicd">
+    Automate deployments
+  </Card>
+  <Card title="Security hardening" icon="shield" href="/deployment/security">
+    Secure your cluster
+  </Card>
+</CardGroup>
