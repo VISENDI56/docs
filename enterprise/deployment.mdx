@@ -1,0 +1,647 @@
+---
+title: Deployment strategies
+description: Production deployment patterns for Docker, Serverless, and Kubernetes
+---
+
+iLuminara supports three deployment models to match different scales and operational requirements: Docker Compose for single-node deployments, Serverless for event-driven functions, and Kubernetes for auto-scaling production clusters.
+
+## Deployment decision matrix
+
+| Factor | Docker Compose | Serverless | Kubernetes |
+|--------|----------------|------------|------------|
+| **Scale** | 1-10 users | 10-1000 requests/min | 1000+ concurrent users |
+| **Complexity** | Low | Medium | High |
+| **Cost** | Fixed (hardware) | Pay-per-use | Fixed + scaling |
+| **GPU support** | ✅ Full | ⚠️ Limited | ✅ Full |
+| **Offline capability** | ✅ Yes | ❌ No | ✅ Yes |
+| **Setup time** | 30 minutes | 1 hour | 4 hours |
+
+## Docker Compose deployment
+
+### Single-node production
+
+Ideal for edge deployments, pilot programs, and resource-constrained environments.
+
+**Hardware requirements**:
+- 1x NVIDIA GPU (Jetson AGX Orin or A100)
+- 32GB RAM minimum
+- 500GB SSD storage
+- Ubuntu 22.04 LTS
+
+### Configuration
+
+```yaml
+# deployment/docker/docker-compose.prod.yml
+version: '3.8'
+
+services:
+  iluminara-core:
+    image: iluminara/core:v2.0
+    container_name: iluminara-core
+    restart: always
+    
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - WORLD_MODEL_PATH=/models/jepa_world_model.pth
+      - OMNI_LAW_FRAMEWORKS=GDPR,HIPAA,EU_AI_ACT
+      - GHOST_MESH_MODE=OFFLINE_FIRST
+      - LOG_LEVEL=INFO
+    
+    volumes:
+      - ./data:/data
+      - ./models:/models
+      - ./logs:/logs
+    
+    ports:
+      - "8000:8000"  # API
+      - "8001:8001"  # Metrics
+      - "8501:8501"  # Dashboard
+    
+    networks:
+      - iluminara-net
+  
+  iluminara-db:
+    image: postgres:15
+    container_name: iluminara-db
+    restart: always
+    
+    environment:
+      - POSTGRES_DB=iluminara
+      - POSTGRES_USER=iluminara
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    
+    networks:
+      - iluminara-net
+  
+  iluminara-redis:
+    image: redis:7-alpine
+    container_name: iluminara-redis
+    restart: always
+    
+    command: redis-server --appendonly yes
+    
+    volumes:
+      - redis-data:/data
+    
+    networks:
+      - iluminara-net
+  
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: always
+    
+    volumes:
+      - ./infrastructure/observability/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    
+    ports:
+      - "9090:9090"
+    
+    networks:
+      - iluminara-net
+  
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: always
+    
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+    
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./infrastructure/observability/grafana/dashboards:/etc/grafana/provisioning/dashboards
+    
+    ports:
+      - "3000:3000"
+    
+    networks:
+      - iluminara-net
+
+volumes:
+  postgres-data:
+  redis-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  iluminara-net:
+    driver: bridge
+```
+
+### Deployment steps
+
+```bash
+# 1. Configure NVIDIA Container Toolkit
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+
+# 2. Verify GPU access
+docker run --rm --gpus all nvidia/cuda:12.0-base nvidia-smi
+
+# 3. Set environment variables
+export DB_PASSWORD=$(openssl rand -base64 32)
+export GRAFANA_PASSWORD=$(openssl rand -base64 32)
+
+# Save to .env file
+cat > .env << EOF
+DB_PASSWORD=${DB_PASSWORD}
+GRAFANA_PASSWORD=${GRAFANA_PASSWORD}
+EOF
+
+# 4. Download models
+mkdir -p models
+# Download JEPA world model, ESRI models, etc.
+
+# 5. Start services
+docker-compose -f deployment/docker/docker-compose.prod.yml up -d
+
+# 6. Verify deployment
+curl http://localhost:8000/health
+```
+
+### Health checks
+
+```bash
+# Check all services
+docker-compose ps
+
+# View logs
+docker-compose logs -f iluminara-core
+
+# Check GPU utilization
+docker exec iluminara-core nvidia-smi
+
+# Test API
+curl -X POST http://localhost:8000/api/v1/plan \
+  -H "Content-Type: application/json" \
+  -d '{"state": [0.1, 0.2, 0.3], "horizon": 10}'
+```
+
+## Serverless deployment
+
+### Event-driven functions
+
+Ideal for specific tasks that don't require persistent state or GPU acceleration.
+
+**Use cases**:
+- Omni-Law compliance validation API
+- Lightweight planning tasks
+- Data preprocessing
+- Notification services
+
+### AWS Lambda configuration
+
+```yaml
+# deployment/serverless/serverless.yaml
+service: iluminara-edge-functions
+
+provider:
+  name: aws
+  runtime: python3.9
+  region: us-east-1
+  memorySize: 3008  # Maximum for Lambda
+  timeout: 900  # 15 minutes
+  
+  environment:
+    FRAMEWORKS_ENABLED: ${env:FRAMEWORKS_ENABLED}
+    WORLD_MODEL_S3: ${env:WORLD_MODEL_S3}
+  
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+          Resource: "arn:aws:s3:::iluminara-models/*"
+
+functions:
+  omniLawValidator:
+    handler: governance_kernel.omni_law_interceptor.handler
+    events:
+      - http:
+          path: /validate
+          method: POST
+          cors: true
+    environment:
+      FRAMEWORKS_ENABLED: "GDPR,HIPAA,EU_AI_ACT"
+  
+  jepaPlanner:
+    handler: core.jepa_architecture.mpc_planner.handler
+    events:
+      - sqs:
+          arn: arn:aws:sqs:${aws:region}:${aws:accountId}:planning-queue
+          batchSize: 10
+    environment:
+      WORLD_MODEL_S3: s3://iluminara-models/jepa_world_model.pth
+  
+  dataFlywheel:
+    handler: core.data_flywheel.feedback_loop.handler
+    events:
+      - schedule:
+          rate: rate(1 hour)
+          enabled: true
+
+plugins:
+  - serverless-python-requirements
+
+custom:
+  pythonRequirements:
+    dockerizePip: true
+    layer: true
+```
+
+### Handler implementation
+
+```python
+# governance_kernel/omni_law_interceptor.py
+import json
+from governance_kernel.omni_law_interceptor import OmniLawMatrix
+
+law_matrix = OmniLawMatrix()
+
+def handler(event, context):
+    """
+    AWS Lambda handler for Omni-Law validation.
+    """
+    try:
+        # Parse request
+        body = json.loads(event['body'])
+        function_name = body['function_name']
+        payload = body['payload']
+        
+        # Validate compliance
+        result = law_matrix.intercept_call(function_name, payload)
+        
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            'body': json.dumps({
+                'compliance': result,
+                'frameworks_checked': law_matrix.get_checked_frameworks()
+            })
+        }
+    
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'body': json.dumps({'error': str(e)})
+        }
+```
+
+### Deployment
+
+```bash
+# 1. Install Serverless Framework
+npm install -g serverless
+
+# 2. Configure AWS credentials
+aws configure
+
+# 3. Set environment variables
+export FRAMEWORKS_ENABLED="GDPR,HIPAA,EU_AI_ACT"
+export WORLD_MODEL_S3="s3://iluminara-models/jepa_world_model.pth"
+
+# 4. Deploy
+cd deployment/serverless
+serverless deploy --stage prod
+
+# 5. Test function
+serverless invoke -f omniLawValidator --data '{"function_name": "dispatch_drone", "payload": {}}'
+
+# 6. View logs
+serverless logs -f omniLawValidator --tail
+```
+
+### Google Cloud Run alternative
+
+```yaml
+# deployment/serverless/cloudrun.yaml
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: iluminara-omni-law
+spec:
+  template:
+    spec:
+      containers:
+        - image: gcr.io/PROJECT_ID/iluminara-omni-law:latest
+          resources:
+            limits:
+              memory: 4Gi
+              cpu: 2
+          env:
+            - name: FRAMEWORKS_ENABLED
+              value: "GDPR,HIPAA,EU_AI_ACT"
+```
+
+## Kubernetes deployment
+
+### Production cluster
+
+Ideal for high-availability, auto-scaling production deployments.
+
+**Cluster requirements**:
+- 3+ nodes with NVIDIA GPUs
+- Kubernetes 1.25+
+- NVIDIA GPU Operator installed
+- Persistent storage (NFS, Ceph, or cloud provider)
+
+### Helm chart
+
+```yaml
+# deployment/kubernetes/values.yaml
+replicaCount: 3
+
+image:
+  repository: iluminara/core
+  tag: v2.0
+  pullPolicy: IfNotPresent
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 50
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+resources:
+  requests:
+    memory: "16Gi"
+    cpu: "4"
+    nvidia.com/gpu: 1
+  limits:
+    memory: "32Gi"
+    cpu: "8"
+    nvidia.com/gpu: 1
+
+persistence:
+  enabled: true
+  storageClass: "fast-ssd"
+  size: 500Gi
+  accessMode: ReadWriteMany
+
+service:
+  type: LoadBalancer
+  port: 8000
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: api.iluminara.org
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: iluminara-tls
+      hosts:
+        - api.iluminara.org
+
+monitoring:
+  prometheus:
+    enabled: true
+    scrapeInterval: 15s
+  grafana:
+    enabled: true
+    adminPassword: ${GRAFANA_PASSWORD}
+    dashboards:
+      - jepa-planning-metrics
+      - omni-law-compliance
+      - ghost-mesh-connectivity
+
+postgresql:
+  enabled: true
+  auth:
+    username: iluminara
+    password: ${DB_PASSWORD}
+    database: iluminara
+  primary:
+    persistence:
+      size: 100Gi
+
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: ${REDIS_PASSWORD}
+  master:
+    persistence:
+      size: 10Gi
+```
+
+### Deployment manifest
+
+```yaml
+# deployment/kubernetes/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iluminara-core
+  labels:
+    app: iluminara
+    component: core
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: iluminara
+      component: core
+  template:
+    metadata:
+      labels:
+        app: iluminara
+        component: core
+    spec:
+      containers:
+      - name: iluminara-core
+        image: iluminara/core:v2.0
+        ports:
+        - containerPort: 8000
+          name: api
+        - containerPort: 8001
+          name: metrics
+        
+        env:
+        - name: CUDA_VISIBLE_DEVICES
+          value: "0"
+        - name: WORLD_MODEL_PATH
+          value: "/models/jepa_world_model.pth"
+        - name: OMNI_LAW_FRAMEWORKS
+          value: "GDPR,HIPAA,EU_AI_ACT"
+        - name: DB_HOST
+          value: "postgresql"
+        - name: REDIS_HOST
+          value: "redis-master"
+        
+        resources:
+          requests:
+            memory: "16Gi"
+            cpu: "4"
+            nvidia.com/gpu: 1
+          limits:
+            memory: "32Gi"
+            cpu: "8"
+            nvidia.com/gpu: 1
+        
+        volumeMounts:
+        - name: models
+          mountPath: /models
+        - name: data
+          mountPath: /data
+        
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      
+      volumes:
+      - name: models
+        persistentVolumeClaim:
+          claimName: iluminara-models
+      - name: data
+        persistentVolumeClaim:
+          claimName: iluminara-data
+      
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+```
+
+### Deployment steps
+
+```bash
+# 1. Install NVIDIA GPU Operator
+kubectl apply -f https://raw.githubusercontent.com/NVIDIA/gpu-operator/master/deployments/gpu-operator.yaml
+
+# 2. Verify GPU nodes
+kubectl get nodes -l nvidia.com/gpu.present=true
+
+# 3. Create namespace
+kubectl create namespace iluminara
+
+# 4. Create secrets
+kubectl create secret generic iluminara-secrets \
+  --from-literal=db-password=$(openssl rand -base64 32) \
+  --from-literal=redis-password=$(openssl rand -base64 32) \
+  --from-literal=grafana-password=$(openssl rand -base64 32) \
+  -n iluminara
+
+# 5. Install Helm chart
+helm install iluminara ./deployment/kubernetes \
+  --namespace iluminara \
+  --values deployment/kubernetes/values.yaml
+
+# 6. Verify deployment
+kubectl get pods -n iluminara
+kubectl get svc -n iluminara
+
+# 7. Check GPU allocation
+kubectl describe pod -n iluminara -l app=iluminara
+
+# 8. Test API
+EXTERNAL_IP=$(kubectl get svc iluminara-core -n iluminara -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+curl http://${EXTERNAL_IP}:8000/health
+```
+
+### Scaling
+
+```bash
+# Manual scaling
+kubectl scale deployment iluminara-core --replicas=10 -n iluminara
+
+# Check HPA status
+kubectl get hpa -n iluminara
+
+# View autoscaling events
+kubectl describe hpa iluminara-core -n iluminara
+```
+
+## Hybrid deployment
+
+### Edge + Cloud architecture
+
+Combine edge and cloud for optimal performance:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Cloud (Kubernetes)                    │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐        │
+│  │  Training  │  │  Analytics │  │   Backup   │        │
+│  └────────────┘  └────────────┘  └────────────┘        │
+└─────────────────────────┬───────────────────────────────┘
+                          │ Sync (when connected)
+                          │
+┌─────────────────────────┴───────────────────────────────┐
+│                 Edge (Docker Compose)                    │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐        │
+│  │    JEPA    │  │  Omni-Law  │  │ Ghost-Mesh │        │
+│  │  Planning  │  │ Validation │  │  Routing   │        │
+│  └────────────┘  └────────────┘  └────────────┘        │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Edge responsibilities**:
+- Real-time planning and control
+- Offline-first operation
+- Local data storage
+- Compliance validation
+
+**Cloud responsibilities**:
+- Model training and updates
+- Long-term analytics
+- Backup and disaster recovery
+- Cross-site coordination
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Observability" icon="chart-line" href="/enterprise/observability">
+    Monitoring and alerting
+  </Card>
+  <Card title="Security" icon="shield-halved" href="/enterprise/security">
+    CI/CD and compliance
+  </Card>
+  <Card title="JEPA architecture" icon="brain" href="/enterprise/jepa-architecture">
+    Energy-based planning
+  </Card>
+  <Card title="Enterprise overview" icon="building" href="/enterprise/overview">
+    Return to overview
+  </Card>
+</CardGroup>
