@@ -1,141 +1,77 @@
 ---
-title: Observability and monitoring
-description: Comprehensive monitoring, logging, and tracing for production iLuminara deployments
+title: Observability & monitoring
+description: Comprehensive monitoring, logging, and alerting for production iLuminara deployments
 ---
 
-iLuminara implements full-stack observability using the three pillars: metrics, logs, and traces. This enables rapid debugging, performance optimization, and proactive incident response.
+iLuminara's observability stack provides complete visibility into system health, performance, and security across distributed edge-cloud deployments.
 
-## Observability stack
+## Observability pillars
 
-### Architecture overview
+### Metrics
+Quantitative measurements of system behavior:
+- **Infrastructure**: CPU, memory, disk, network
+- **Application**: Request rate, latency, error rate
+- **Business**: User engagement, model accuracy, bio-credits minted
+
+### Logs
+Structured event records:
+- **Application logs**: Service events and errors
+- **Audit logs**: Compliance and security events
+- **Access logs**: API and data access
+
+### Traces
+Distributed request tracking:
+- **End-to-end latency**: Request flow across services
+- **Bottleneck identification**: Slow components
+- **Dependency mapping**: Service relationships
+
+## Monitoring stack
+
+### Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                   Application Layer                      │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐              │
-│  │ API      │  │ Worker   │  │ ML Model │              │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘              │
-│       │             │              │                     │
-│       │ metrics     │ logs         │ traces             │
-│       ▼             ▼              ▼                     │
-├───────┴─────────────┴──────────────┴─────────────────────┤
-│                  Collection Layer                        │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐              │
-│  │Prometheus│  │  Loki    │  │  Jaeger  │              │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘              │
-│       │             │              │                     │
-│       └─────────────┴──────────────┘                     │
-│                     │                                    │
-│                     ▼                                    │
-│  ┌──────────────────────────────────────┐               │
-│  │           Grafana                     │               │
-│  │  (Unified Visualization)              │               │
-│  └──────────────────────────────────────┘               │
+│              Observability Architecture                 │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  ┌─────────────────────────────────────────────────┐  │
+│  │              Grafana Dashboards                  │  │
+│  │  (Visualization + Alerting)                     │  │
+│  └─────────────────────────────────────────────────┘  │
+│                        │                                │
+│         ┌──────────────┼──────────────┐                │
+│         ▼              ▼              ▼                │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
+│  │Prometheus│  │  Loki    │  │  Tempo   │            │
+│  │(Metrics) │  │  (Logs)  │  │ (Traces) │            │
+│  └──────────┘  └──────────┘  └──────────┘            │
+│         ▲              ▲              ▲                │
+│         │              │              │                │
+│  ┌──────────────────────────────────────────────┐    │
+│  │         Instrumented Services                 │    │
+│  ├──────────────────────────────────────────────┤    │
+│  │ • NIM Inference (OpenTelemetry)              │    │
+│  │ • API Gateway (Prometheus exporter)          │    │
+│  │ • Ghost-Mesh (Custom metrics)                │    │
+│  │ • Omni-Law (Audit logs)                      │    │
+│  └──────────────────────────────────────────────┘    │
+│                                                         │
 └─────────────────────────────────────────────────────────┘
 ```
 
-## Metrics (Prometheus)
+### Prometheus (Metrics)
 
-### Application metrics
+#### Configuration
 
-Instrument code with Prometheus client:
-
-```python
-from prometheus_client import Counter, Histogram, Gauge, generate_latest
-from fastapi import FastAPI, Response
-import time
-
-app = FastAPI()
-
-# Define metrics
-http_requests_total = Counter(
-    'http_requests_total',
-    'Total HTTP requests',
-    ['method', 'endpoint', 'status']
-)
-
-http_request_duration_seconds = Histogram(
-    'http_request_duration_seconds',
-    'HTTP request duration',
-    ['method', 'endpoint']
-)
-
-active_connections = Gauge(
-    'active_connections',
-    'Number of active connections'
-)
-
-model_inference_duration = Histogram(
-    'model_inference_duration_seconds',
-    'Model inference duration',
-    ['model_name', 'model_version']
-)
-
-database_query_duration = Histogram(
-    'database_query_duration_seconds',
-    'Database query duration',
-    ['query_type']
-)
-
-# Middleware for automatic instrumentation
-@app.middleware("http")
-async def metrics_middleware(request, call_next):
-    active_connections.inc()
-    
-    start_time = time.time()
-    response = await call_next(request)
-    duration = time.time() - start_time
-    
-    # Record metrics
-    http_requests_total.labels(
-        method=request.method,
-        endpoint=request.url.path,
-        status=response.status_code
-    ).inc()
-    
-    http_request_duration_seconds.labels(
-        method=request.method,
-        endpoint=request.url.path
-    ).observe(duration)
-    
-    active_connections.dec()
-    
-    return response
-
-# Metrics endpoint
-@app.get("/metrics")
-def metrics():
-    return Response(generate_latest(), media_type="text/plain")
-
-# Example instrumented function
-@database_query_duration.labels(query_type='SELECT').time()
-def get_patient(patient_id: str):
-    # Database query
-    return {"patient_id": patient_id}
-
-# Model inference instrumentation
-def run_inference(model_name: str, input_data):
-    with model_inference_duration.labels(
-        model_name=model_name,
-        model_version="v1.0"
-    ).time():
-        # Run model inference
-        result = model.predict(input_data)
-        return result
-```
-
-### Prometheus configuration
-
-```yaml
-# prometheus.yml
+```yaml prometheus.yml
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
   external_labels:
     cluster: 'iluminara-prod'
-    region: 'kenya-nairobi'
+    region: 'us-east-1'
 
-# Alerting configuration
+# Alertmanager configuration
 alerting:
   alertmanagers:
     - static_configs:
@@ -148,175 +84,174 @@ rule_files:
 
 # Scrape configurations
 scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
   # Kubernetes service discovery
   - job_name: 'kubernetes-pods'
     kubernetes_sd_configs:
       - role: pod
     relabel_configs:
-      # Only scrape pods with prometheus.io/scrape annotation
       - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
         action: keep
         regex: true
-      
-      # Use custom port if specified
-      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
         action: replace
-        target_label: __address__
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
         regex: ([^:]+)(?::\d+)?;(\d+)
         replacement: $1:$2
-      
-      # Add pod metadata as labels
-      - source_labels: [__meta_kubernetes_namespace]
-        target_label: kubernetes_namespace
-      - source_labels: [__meta_kubernetes_pod_name]
-        target_label: kubernetes_pod_name
-  
-  # Node exporter for system metrics
+        target_label: __address__
+
+  # NIM inference service
+  - job_name: 'nim-inference'
+    static_configs:
+      - targets: ['nim-inference:8000']
+    metrics_path: '/metrics'
+
+  # Node exporter (system metrics)
   - job_name: 'node-exporter'
-    static_configs:
-      - targets:
-          - 'node-exporter:9100'
-  
-  # PostgreSQL exporter
-  - job_name: 'postgresql'
-    static_configs:
-      - targets:
-          - 'postgres-exporter:9187'
-  
-  # Redis exporter
-  - job_name: 'redis'
-    static_configs:
-      - targets:
-          - 'redis-exporter:9121'
-  
-  # NVIDIA GPU metrics
-  - job_name: 'nvidia-dcgm'
-    static_configs:
-      - targets:
-          - 'dcgm-exporter:9400'
+    kubernetes_sd_configs:
+      - role: node
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: '(.*):10250'
+        replacement: '${1}:9100'
+        target_label: __address__
+
+  # GPU metrics (DCGM exporter)
+  - job_name: 'dcgm-exporter'
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        action: keep
+        regex: dcgm-exporter
 ```
 
-### Alert rules
-
-```yaml
-# alerts/application.yml
-groups:
-  - name: application
-    interval: 30s
-    rules:
-      # High error rate
-      - alert: HighErrorRate
-        expr: |
-          sum(rate(http_requests_total{status=~"5.."}[5m])) by (endpoint)
-          /
-          sum(rate(http_requests_total[5m])) by (endpoint)
-          > 0.05
-        for: 5m
-        labels:
-          severity: critical
-        annotations:
-          summary: "High error rate on {{ $labels.endpoint }}"
-          description: "Error rate is {{ $value | humanizePercentage }} on {{ $labels.endpoint }}"
-      
-      # High latency
-      - alert: HighLatency
-        expr: |
-          histogram_quantile(0.95,
-            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, endpoint)
-          ) > 1.0
-        for: 10m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High latency on {{ $labels.endpoint }}"
-          description: "P95 latency is {{ $value }}s on {{ $labels.endpoint }}"
-      
-      # Database connection pool exhaustion
-      - alert: DatabasePoolExhausted
-        expr: |
-          pg_stat_database_numbackends / pg_settings_max_connections > 0.8
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Database connection pool nearly exhausted"
-          description: "{{ $value | humanizePercentage }} of connections in use"
-      
-      # GPU utilization
-      - alert: LowGPUUtilization
-        expr: |
-          avg(DCGM_FI_DEV_GPU_UTIL) < 20
-        for: 1h
-        labels:
-          severity: info
-        annotations:
-          summary: "Low GPU utilization"
-          description: "GPU utilization is {{ $value }}% - consider scaling down"
-      
-      # Model inference latency
-      - alert: SlowModelInference
-        expr: |
-          histogram_quantile(0.95,
-            sum(rate(model_inference_duration_seconds_bucket[5m])) by (le, model_name)
-          ) > 5.0
-        for: 10m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Slow model inference for {{ $labels.model_name }}"
-          description: "P95 inference time is {{ $value }}s"
-```
-
-## Logging (Loki)
-
-### Structured logging
+#### Custom metrics instrumentation
 
 ```python
-import logging
-import json
-from pythonjsonlogger import jsonlogger
+from prometheus_client import Counter, Histogram, Gauge, start_http_server
+import time
 
-# Configure structured logging
-logger = logging.getLogger()
-logHandler = logging.StreamHandler()
-
-formatter = jsonlogger.JsonFormatter(
-    '%(timestamp)s %(level)s %(name)s %(message)s %(trace_id)s %(span_id)s'
-)
-logHandler.setFormatter(formatter)
-logger.addHandler(logHandler)
-logger.setLevel(logging.INFO)
-
-# Usage
-logger.info(
-    "Patient record created",
-    extra={
-        "patient_id": "patient-123",
-        "tenant_id": "tenant-001",
-        "user_id": "user-456",
-        "trace_id": "abc123",
-        "span_id": "def456"
-    }
+# Define metrics
+inference_requests = Counter(
+    'nim_inference_requests_total',
+    'Total number of inference requests',
+    ['model', 'status']
 )
 
-# Output:
-# {
-#   "timestamp": "2025-12-31T10:00:00Z",
-#   "level": "INFO",
-#   "name": "api.patients",
-#   "message": "Patient record created",
-#   "patient_id": "patient-123",
-#   "tenant_id": "tenant-001",
-#   "user_id": "user-456",
-#   "trace_id": "abc123",
-#   "span_id": "def456"
-# }
+inference_latency = Histogram(
+    'nim_inference_latency_seconds',
+    'Inference latency in seconds',
+    ['model'],
+    buckets=[0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0]
+)
+
+active_requests = Gauge(
+    'nim_active_requests',
+    'Number of active inference requests',
+    ['model']
+)
+
+model_accuracy = Gauge(
+    'nim_model_accuracy',
+    'Model accuracy score',
+    ['model', 'dataset']
+)
+
+# Instrument code
+def process_inference(model_name, input_data):
+    """Process inference request with metrics."""
+    active_requests.labels(model=model_name).inc()
+    
+    start_time = time.time()
+    try:
+        result = run_inference(model_name, input_data)
+        
+        # Record success
+        inference_requests.labels(model=model_name, status='success').inc()
+        
+        return result
+    except Exception as e:
+        # Record failure
+        inference_requests.labels(model=model_name, status='error').inc()
+        raise
+    finally:
+        # Record latency
+        latency = time.time() - start_time
+        inference_latency.labels(model=model_name).observe(latency)
+        
+        active_requests.labels(model=model_name).dec()
+
+# Start metrics server
+start_http_server(8000)
 ```
 
-### Loki configuration
+### Grafana (Visualization)
 
-```yaml
-# loki-config.yaml
+#### Dashboard configuration
+
+```json grafana-dashboard.json
+{
+  "dashboard": {
+    "title": "iLuminara - System Overview",
+    "panels": [
+      {
+        "title": "Request Rate",
+        "targets": [
+          {
+            "expr": "rate(nim_inference_requests_total[5m])",
+            "legendFormat": "{{model}} - {{status}}"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "P95 Latency",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(nim_inference_latency_seconds_bucket[5m]))",
+            "legendFormat": "{{model}}"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "GPU Utilization",
+        "targets": [
+          {
+            "expr": "DCGM_FI_DEV_GPU_UTIL",
+            "legendFormat": "GPU {{gpu}}"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "Error Rate",
+        "targets": [
+          {
+            "expr": "rate(nim_inference_requests_total{status=\"error\"}[5m]) / rate(nim_inference_requests_total[5m])",
+            "legendFormat": "{{model}}"
+          }
+        ],
+        "type": "graph"
+      }
+    ]
+  }
+}
+```
+
+### Loki (Logs)
+
+#### Configuration
+
+```yaml loki-config.yaml
 auth_enabled: false
 
 server:
@@ -346,7 +281,6 @@ storage_config:
     active_index_directory: /loki/index
     cache_location: /loki/cache
     shared_store: s3
-  
   aws:
     s3: s3://us-east-1/iluminara-logs
     s3forcepathstyle: true
@@ -354,485 +288,169 @@ storage_config:
 limits_config:
   enforce_metric_name: false
   reject_old_samples: true
-  reject_old_samples_max_age: 168h  # 1 week
-  ingestion_rate_mb: 10
-  ingestion_burst_size_mb: 20
+  reject_old_samples_max_age: 168h
 
 chunk_store_config:
-  max_look_back_period: 720h  # 30 days
+  max_look_back_period: 0s
 
 table_manager:
   retention_deletes_enabled: true
   retention_period: 720h  # 30 days
 ```
 
-### Promtail for log shipping
+#### Log aggregation
 
-```yaml
-# promtail-config.yaml
-server:
-  http_listen_port: 9080
-  grpc_listen_port: 0
+```python
+import logging
+import json
+from pythonjsonlogger import jsonlogger
 
-positions:
-  filename: /tmp/positions.yaml
+# Configure structured logging
+logger = logging.getLogger()
+logHandler = logging.StreamHandler()
 
-clients:
-  - url: http://loki:3100/loki/api/v1/push
-
-scrape_configs:
-  # Kubernetes pod logs
-  - job_name: kubernetes-pods
-    kubernetes_sd_configs:
-      - role: pod
-    
-    relabel_configs:
-      # Add namespace label
-      - source_labels: [__meta_kubernetes_namespace]
-        target_label: namespace
-      
-      # Add pod name label
-      - source_labels: [__meta_kubernetes_pod_name]
-        target_label: pod
-      
-      # Add container name label
-      - source_labels: [__meta_kubernetes_pod_container_name]
-        target_label: container
-      
-      # Add app label
-      - source_labels: [__meta_kubernetes_pod_label_app]
-        target_label: app
-    
-    pipeline_stages:
-      # Parse JSON logs
-      - json:
-          expressions:
-            level: level
-            timestamp: timestamp
-            message: message
-            trace_id: trace_id
-      
-      # Extract labels
-      - labels:
-          level:
-          trace_id:
-      
-      # Parse timestamp
-      - timestamp:
-          source: timestamp
-          format: RFC3339
-```
-
-### LogQL queries
-
-```promql
-# Find errors in last hour
-{namespace="iluminara-prod", level="ERROR"} |= "error" | json
-
-# Count errors by endpoint
-sum by (endpoint) (
-  count_over_time({namespace="iluminara-prod", level="ERROR"}[1h])
+formatter = jsonlogger.JsonFormatter(
+    '%(timestamp)s %(level)s %(name)s %(message)s',
+    rename_fields={
+        'levelname': 'level',
+        'name': 'logger',
+        'asctime': 'timestamp'
+    }
 )
 
-# Find slow database queries
-{namespace="iluminara-prod", app="api-gateway"} 
-  |= "database_query_duration" 
-  | json 
-  | duration > 1s
+logHandler.setFormatter(formatter)
+logger.addHandler(logHandler)
+logger.setLevel(logging.INFO)
 
-# Trace-based log correlation
-{namespace="iluminara-prod"} 
-  | json 
-  | trace_id="abc123"
+# Log with structured data
+logger.info(
+    "Inference completed",
+    extra={
+        'model': 'llama-3-8b',
+        'latency_ms': 150,
+        'tokens_generated': 100,
+        'user_id': 'user_12345',
+        'request_id': 'req_67890'
+    }
+)
 ```
 
-## Distributed tracing (Jaeger)
+### Tempo (Traces)
 
-### OpenTelemetry instrumentation
+#### OpenTelemetry instrumentation
 
 ```python
 from opentelemetry import trace
-from opentelemetry.exporter.jaeger.thrift import JaegerExporter
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
-from opentelemetry.instrumentation.redis import RedisInstrumentor
+from opentelemetry.instrumentation.requests import RequestsInstrumentor
 
 # Initialize tracer
 trace.set_tracer_provider(TracerProvider())
 tracer = trace.get_tracer(__name__)
 
-# Configure Jaeger exporter
-jaeger_exporter = JaegerExporter(
-    agent_host_name="jaeger-agent",
-    agent_port=6831,
+# Configure exporter
+otlp_exporter = OTLPSpanExporter(
+    endpoint="tempo:4317",
+    insecure=True
 )
 
-trace.get_tracer_provider().add_span_processor(
-    BatchSpanProcessor(jaeger_exporter)
-)
+# Add span processor
+span_processor = BatchSpanProcessor(otlp_exporter)
+trace.get_tracer_provider().add_span_processor(span_processor)
 
-# Auto-instrument FastAPI
-FastAPIInstrumentor.instrument_app(app)
-
-# Auto-instrument SQLAlchemy
-SQLAlchemyInstrumentor().instrument(engine=db_engine)
-
-# Auto-instrument Redis
-RedisInstrumentor().instrument()
+# Auto-instrument HTTP requests
+RequestsInstrumentor().instrument()
 
 # Manual instrumentation
-@app.post("/api/patients")
-async def create_patient(patient_data: dict):
-    with tracer.start_as_current_span("create_patient") as span:
-        # Add attributes
-        span.set_attribute("patient.age", patient_data.get("age"))
-        span.set_attribute("patient.gender", patient_data.get("gender"))
-        
-        # Validate data
-        with tracer.start_as_current_span("validate_patient_data"):
-            validate(patient_data)
-        
-        # Save to database
-        with tracer.start_as_current_span("database.insert") as db_span:
-            db_span.set_attribute("db.operation", "INSERT")
-            db_span.set_attribute("db.table", "patients")
-            
-            patient_id = db.insert_patient(patient_data)
-        
-        # Send notification
-        with tracer.start_as_current_span("send_notification"):
-            send_email(patient_id)
-        
-        span.set_attribute("patient.id", patient_id)
-        
-        return {"patient_id": patient_id}
-```
-
-### Trace context propagation
-
-```python
-from opentelemetry.propagate import inject, extract
-import httpx
-
-# Inject trace context into outgoing requests
-async def call_external_service(url: str, data: dict):
-    headers = {}
-    inject(headers)  # Inject trace context
+@tracer.start_as_current_span("process_inference")
+def process_inference(model_name, input_data):
+    """Process inference with distributed tracing."""
+    span = trace.get_current_span()
     
-    async with httpx.AsyncClient() as client:
-        response = await client.post(url, json=data, headers=headers)
-        return response.json()
-
-# Extract trace context from incoming requests
-@app.middleware("http")
-async def trace_context_middleware(request, call_next):
-    # Extract trace context from headers
-    context = extract(request.headers)
+    # Add span attributes
+    span.set_attribute("model.name", model_name)
+    span.set_attribute("input.length", len(input_data))
     
-    # Attach to current span
-    token = context.attach()
+    # Call downstream services (automatically traced)
+    with tracer.start_as_current_span("load_model"):
+        model = load_model(model_name)
     
-    try:
-        response = await call_next(request)
-        return response
-    finally:
-        context.detach(token)
-```
-
-## Dashboards (Grafana)
-
-### System overview dashboard
-
-```json
-{
-  "dashboard": {
-    "title": "iLuminara System Overview",
-    "panels": [
-      {
-        "title": "Request Rate",
-        "targets": [
-          {
-            "expr": "sum(rate(http_requests_total[5m])) by (endpoint)",
-            "legendFormat": "{{endpoint}}"
-          }
-        ],
-        "type": "graph"
-      },
-      {
-        "title": "Error Rate",
-        "targets": [
-          {
-            "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m]))",
-            "legendFormat": "Error Rate"
-          }
-        ],
-        "type": "graph",
-        "alert": {
-          "conditions": [
-            {
-              "evaluator": {
-                "params": [0.01],
-                "type": "gt"
-              },
-              "operator": {
-                "type": "and"
-              },
-              "query": {
-                "params": ["A", "5m", "now"]
-              },
-              "reducer": {
-                "type": "avg"
-              },
-              "type": "query"
-            }
-          ],
-          "name": "High Error Rate Alert"
-        }
-      },
-      {
-        "title": "P95 Latency",
-        "targets": [
-          {
-            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, endpoint))",
-            "legendFormat": "{{endpoint}}"
-          }
-        ],
-        "type": "graph"
-      },
-      {
-        "title": "Active Connections",
-        "targets": [
-          {
-            "expr": "active_connections",
-            "legendFormat": "Connections"
-          }
-        ],
-        "type": "graph"
-      }
-    ]
-  }
-}
-```
-
-### ML model performance dashboard
-
-```json
-{
-  "dashboard": {
-    "title": "ML Model Performance",
-    "panels": [
-      {
-        "title": "Inference Latency by Model",
-        "targets": [
-          {
-            "expr": "histogram_quantile(0.95, sum(rate(model_inference_duration_seconds_bucket[5m])) by (le, model_name))",
-            "legendFormat": "{{model_name}}"
-          }
-        ]
-      },
-      {
-        "title": "GPU Utilization",
-        "targets": [
-          {
-            "expr": "DCGM_FI_DEV_GPU_UTIL",
-            "legendFormat": "GPU {{gpu}}"
-          }
-        ]
-      },
-      {
-        "title": "GPU Memory Usage",
-        "targets": [
-          {
-            "expr": "DCGM_FI_DEV_FB_USED / DCGM_FI_DEV_FB_FREE * 100",
-            "legendFormat": "GPU {{gpu}}"
-          }
-        ]
-      },
-      {
-        "title": "Model Accuracy (Online)",
-        "targets": [
-          {
-            "expr": "model_prediction_accuracy",
-            "legendFormat": "{{model_name}}"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-## Custom metrics for iLuminara
-
-### Health system metrics
-
-```python
-from prometheus_client import Counter, Histogram, Gauge
-
-# Patient metrics
-patients_registered_total = Counter(
-    'patients_registered_total',
-    'Total patients registered',
-    ['tenant_id', 'registration_type']
-)
-
-consultations_total = Counter(
-    'consultations_total',
-    'Total consultations',
-    ['tenant_id', 'consultation_type']
-)
-
-# Diagnostic metrics
-diagnostic_accuracy = Gauge(
-    'diagnostic_accuracy',
-    'Diagnostic model accuracy',
-    ['model_name', 'disease_type']
-)
-
-# Supply chain metrics
-vaccine_cold_chain_temperature = Gauge(
-    'vaccine_cold_chain_temperature_celsius',
-    'Vaccine storage temperature',
-    ['location_id', 'refrigerator_id']
-)
-
-vaccine_doses_administered = Counter(
-    'vaccine_doses_administered_total',
-    'Total vaccine doses administered',
-    ['vaccine_type', 'location_id']
-)
-
-# Genomic surveillance metrics
-pathogen_sequences_analyzed = Counter(
-    'pathogen_sequences_analyzed_total',
-    'Total pathogen sequences analyzed',
-    ['pathogen_type', 'location']
-)
-
-variant_detection_latency = Histogram(
-    'variant_detection_latency_seconds',
-    'Time to detect new variant',
-    ['pathogen_type']
-)
-```
-
-### Agricultural metrics
-
-```python
-# Crop monitoring
-crop_health_index = Gauge(
-    'crop_health_index',
-    'Crop health index (0-1)',
-    ['field_id', 'crop_type']
-)
-
-soil_moisture = Gauge(
-    'soil_moisture_percent',
-    'Soil moisture percentage',
-    ['field_id', 'sensor_id']
-)
-
-irrigation_water_used = Counter(
-    'irrigation_water_used_liters',
-    'Total irrigation water used',
-    ['field_id']
-)
-
-# Agro-voltaic metrics
-solar_panel_tilt_angle = Gauge(
-    'solar_panel_tilt_angle_degrees',
-    'Current solar panel tilt angle',
-    ['installation_id']
-)
-
-energy_generated = Counter(
-    'energy_generated_kwh',
-    'Total energy generated',
-    ['installation_id']
-)
-
-microclimate_temperature = Gauge(
-    'microclimate_temperature_celsius',
-    'Micro-climate temperature under panels',
-    ['installation_id']
-)
-```
-
-## Log aggregation patterns
-
-### Correlation IDs
-
-```python
-import uuid
-from contextvars import ContextVar
-
-# Context variable for correlation ID
-correlation_id_var: ContextVar[str] = ContextVar('correlation_id', default=None)
-
-@app.middleware("http")
-async def correlation_id_middleware(request, call_next):
-    # Get or generate correlation ID
-    correlation_id = request.headers.get('X-Correlation-ID', str(uuid.uuid4()))
-    correlation_id_var.set(correlation_id)
+    with tracer.start_as_current_span("run_inference"):
+        result = model.predict(input_data)
     
-    # Add to response headers
-    response = await call_next(request)
-    response.headers['X-Correlation-ID'] = correlation_id
+    # Add result attributes
+    span.set_attribute("output.length", len(result))
     
-    return response
-
-# Use in logging
-def log_with_correlation(message: str, **kwargs):
-    logger.info(
-        message,
-        extra={
-            "correlation_id": correlation_id_var.get(),
-            **kwargs
-        }
-    )
+    return result
 ```
 
-### Multi-line log parsing
+## Alerting
 
-```yaml
-# promtail pipeline for Python tracebacks
-pipeline_stages:
-  # Detect start of multi-line log (timestamp pattern)
-  - multiline:
-      firstline: '^\d{4}-\d{2}-\d{2}'
-      max_wait_time: 3s
-  
-  # Parse JSON
-  - json:
-      expressions:
-        level: level
-        timestamp: timestamp
-        message: message
-        trace_id: trace_id
-        exception: exception
-  
-  # Extract exception details
-  - regex:
-      expression: '(?P<exception_type>\w+Error): (?P<exception_message>.*)'
-      source: exception
-  
-  # Add labels
-  - labels:
-      level:
-      exception_type:
+### Alert rules
+
+```yaml alerts/inference.yml
+groups:
+  - name: inference_alerts
+    interval: 30s
+    rules:
+      # High error rate
+      - alert: HighInferenceErrorRate
+        expr: |
+          rate(nim_inference_requests_total{status="error"}[5m])
+          / rate(nim_inference_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: nim-inference
+        annotations:
+          summary: "High inference error rate ({{ $value | humanizePercentage }})"
+          description: "Model {{ $labels.model }} has error rate above 5% for 5 minutes"
+
+      # High latency
+      - alert: HighInferenceLatency
+        expr: |
+          histogram_quantile(0.95,
+            rate(nim_inference_latency_seconds_bucket[5m])
+          ) > 2.0
+        for: 10m
+        labels:
+          severity: warning
+          component: nim-inference
+        annotations:
+          summary: "High inference latency ({{ $value }}s)"
+          description: "Model {{ $labels.model }} P95 latency above 2s for 10 minutes"
+
+      # GPU utilization
+      - alert: LowGPUUtilization
+        expr: DCGM_FI_DEV_GPU_UTIL < 20
+        for: 30m
+        labels:
+          severity: info
+          component: gpu
+        annotations:
+          summary: "Low GPU utilization ({{ $value }}%)"
+          description: "GPU {{ $labels.gpu }} utilization below 20% for 30 minutes"
+
+      # Service down
+      - alert: ServiceDown
+        expr: up{job="nim-inference"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: nim-inference
+        annotations:
+          summary: "Service is down"
+          description: "NIM inference service has been down for 2 minutes"
 ```
 
-## Alerting and incident response
+### Alertmanager configuration
 
-### AlertManager configuration
-
-```yaml
-# alertmanager.yml
+```yaml alertmanager.yml
 global:
   resolve_timeout: 5m
-  slack_api_url: 'https://hooks.slack.com/services/XXX/YYY/ZZZ'
+  slack_api_url: 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL'
 
 route:
   group_by: ['alertname', 'cluster', 'service']
@@ -840,7 +458,6 @@ route:
   group_interval: 10s
   repeat_interval: 12h
   receiver: 'default'
-  
   routes:
     # Critical alerts to PagerDuty
     - match:
@@ -848,274 +465,206 @@ route:
       receiver: 'pagerduty'
       continue: true
     
-    # Warning alerts to Slack
-    - match:
-        severity: warning
+    # All alerts to Slack
+    - match_re:
+        severity: critical|warning
       receiver: 'slack'
-    
-    # Info alerts to email
-    - match:
-        severity: info
-      receiver: 'email'
 
 receivers:
   - name: 'default'
+    webhook_configs:
+      - url: 'http://webhook-receiver:8080/alerts'
+
+  - name: 'slack'
     slack_configs:
       - channel: '#iluminara-alerts'
         title: '{{ .GroupLabels.alertname }}'
         text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
-  
+        send_resolved: true
+
   - name: 'pagerduty'
     pagerduty_configs:
-      - service_key: '<pagerduty-key>'
+      - service_key: 'YOUR_PAGERDUTY_KEY'
         description: '{{ .GroupLabels.alertname }}'
-  
-  - name: 'slack'
-    slack_configs:
-      - channel: '#iluminara-warnings'
-        title: '{{ .GroupLabels.alertname }}'
-        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
-  
-  - name: 'email'
-    email_configs:
-      - to: 'ops@iluminara.org'
-        from: 'alerts@iluminara.org'
-        smarthost: 'smtp.gmail.com:587'
-        auth_username: 'alerts@iluminara.org'
-        auth_password: '<password>'
-
-inhibit_rules:
-  # Inhibit warning if critical is firing
-  - source_match:
-      severity: 'critical'
-    target_match:
-      severity: 'warning'
-    equal: ['alertname', 'cluster', 'service']
 ```
 
-## Performance monitoring
+## Edge monitoring
 
-### Application Performance Monitoring (APM)
-
-```python
-from opentelemetry.instrumentation.auto_instrumentation import sitecustomize
-
-# Automatic instrumentation for common libraries
-# - requests
-# - httpx
-# - psycopg2
-# - redis
-# - celery
-
-# Custom spans for business logic
-@tracer.start_as_current_span("process_medical_image")
-def process_medical_image(image_data: bytes):
-    span = trace.get_current_span()
-    
-    # Add custom attributes
-    span.set_attribute("image.size_bytes", len(image_data))
-    span.set_attribute("image.format", "DICOM")
-    
-    # Preprocessing
-    with tracer.start_as_current_span("preprocess_image"):
-        preprocessed = preprocess(image_data)
-    
-    # Model inference
-    with tracer.start_as_current_span("model_inference") as inference_span:
-        inference_span.set_attribute("model.name", "ultrasound_segmentation")
-        inference_span.set_attribute("model.version", "v1.2")
-        
-        result = model.predict(preprocessed)
-        
-        inference_span.set_attribute("prediction.confidence", result.confidence)
-    
-    # Postprocessing
-    with tracer.start_as_current_span("postprocess_result"):
-        final_result = postprocess(result)
-    
-    return final_result
-```
-
-### Database query monitoring
+### Lightweight monitoring for edge devices
 
 ```python
-from sqlalchemy import event
-from sqlalchemy.engine import Engine
+import psutil
+import GPUtil
+import requests
 import time
 
-@event.listens_for(Engine, "before_cursor_execute")
-def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
-    conn.info.setdefault('query_start_time', []).append(time.time())
-
-@event.listens_for(Engine, "after_cursor_execute")
-def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
-    total_time = time.time() - conn.info['query_start_time'].pop()
+class EdgeMonitor:
+    """
+    Lightweight monitoring for edge devices.
+    Sends metrics to regional hub when connectivity available.
+    """
+    def __init__(self, hub_url, device_id):
+        self.hub_url = hub_url
+        self.device_id = device_id
+        self.metrics_buffer = []
     
-    # Record metric
-    database_query_duration.labels(
-        query_type=statement.split()[0]  # SELECT, INSERT, UPDATE, DELETE
-    ).observe(total_time)
+    def collect_metrics(self):
+        """Collect system metrics."""
+        metrics = {
+            'timestamp': time.time(),
+            'device_id': self.device_id,
+            'cpu_percent': psutil.cpu_percent(interval=1),
+            'memory_percent': psutil.virtual_memory().percent,
+            'disk_percent': psutil.disk_usage('/').percent,
+            'temperature': self._get_temperature(),
+            'battery_percent': self._get_battery_percent(),
+            'network_bytes_sent': psutil.net_io_counters().bytes_sent,
+            'network_bytes_recv': psutil.net_io_counters().bytes_recv
+        }
+        
+        # Add GPU metrics if available
+        try:
+            gpus = GPUtil.getGPUs()
+            if gpus:
+                gpu = gpus[0]
+                metrics['gpu_utilization'] = gpu.load * 100
+                metrics['gpu_memory_used'] = gpu.memoryUsed
+                metrics['gpu_temperature'] = gpu.temperature
+        except:
+            pass
+        
+        return metrics
     
-    # Log slow queries
-    if total_time > 1.0:
-        logger.warning(
-            "Slow query detected",
-            extra={
-                "duration": total_time,
-                "statement": statement[:200],  # Truncate long queries
-                "parameters": str(parameters)[:100]
-            }
-        )
+    def send_metrics(self, metrics):
+        """Send metrics to regional hub."""
+        try:
+            response = requests.post(
+                f"{self.hub_url}/api/v1/metrics",
+                json=metrics,
+                timeout=5
+            )
+            return response.status_code == 200
+        except:
+            # Buffer metrics if hub unreachable
+            self.metrics_buffer.append(metrics)
+            return False
+    
+    def flush_buffer(self):
+        """Flush buffered metrics when connectivity restored."""
+        if not self.metrics_buffer:
+            return
+        
+        try:
+            response = requests.post(
+                f"{self.hub_url}/api/v1/metrics/batch",
+                json=self.metrics_buffer,
+                timeout=10
+            )
+            if response.status_code == 200:
+                self.metrics_buffer = []
+        except:
+            pass
+    
+    def run(self, interval=60):
+        """Run monitoring loop."""
+        while True:
+            metrics = self.collect_metrics()
+            
+            if not self.send_metrics(metrics):
+                # Try to flush buffer
+                self.flush_buffer()
+            
+            time.sleep(interval)
 ```
 
-## SLI/SLO monitoring
+## Compliance monitoring
 
-### Service Level Indicators
+### Omni-Law audit logging
 
-```yaml
-# SLI definitions
-slis:
-  - name: api_availability
-    description: "Percentage of successful API requests"
-    query: |
-      sum(rate(http_requests_total{status!~"5.."}[5m]))
-      /
-      sum(rate(http_requests_total[5m]))
-  
-  - name: api_latency
-    description: "95th percentile API latency"
-    query: |
-      histogram_quantile(0.95,
-        sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
-      )
-  
-  - name: model_accuracy
-    description: "Model prediction accuracy"
-    query: |
-      avg(model_prediction_accuracy) by (model_name)
+```python
+import hashlib
+import json
+from datetime import datetime
+
+class ComplianceMonitor:
+    """
+    Monitor compliance with Omni-Law framework.
+    Generate audit logs for all data operations.
+    """
+    def __init__(self, blockchain_client):
+        self.blockchain = blockchain_client
+    
+    def log_data_access(self, user_id, data_type, operation, justification):
+        """
+        Log data access for compliance audit.
+        
+        Args:
+            user_id: User accessing data
+            data_type: Type of data (PHI, PII, genomic, etc.)
+            operation: Operation (read, write, delete)
+            justification: Legal basis for access
+        """
+        audit_entry = {
+            'timestamp': datetime.utcnow().isoformat(),
+            'user_id': user_id,
+            'data_type': data_type,
+            'operation': operation,
+            'justification': justification,
+            'frameworks_checked': self._get_applicable_frameworks(data_type)
+        }
+        
+        # Hash for integrity
+        audit_hash = hashlib.sha256(
+            json.dumps(audit_entry, sort_keys=True).encode()
+        ).hexdigest()
+        
+        audit_entry['hash'] = audit_hash
+        
+        # Store on blockchain for immutability
+        self.blockchain.store_audit_log(audit_entry)
+        
+        # Also send to monitoring system
+        self._send_to_monitoring(audit_entry)
+    
+    def _get_applicable_frameworks(self, data_type):
+        """Determine which compliance frameworks apply."""
+        frameworks = []
+        
+        if data_type in ['PHI', 'medical_record']:
+            frameworks.extend(['HIPAA', 'GDPR'])
+        
+        if data_type == 'genomic':
+            frameworks.extend(['PABS', 'Nagoya_Protocol'])
+        
+        if data_type == 'PII':
+            frameworks.append('GDPR')
+        
+        return frameworks
 ```
 
-### Service Level Objectives
+## Performance benchmarks
 
-```yaml
-# SLO definitions
-slos:
-  - name: api_availability_slo
-    description: "API should be available 99.9% of the time"
-    sli: api_availability
-    target: 0.999
-    window: 30d
-  
-  - name: api_latency_slo
-    description: "95% of requests should complete within 500ms"
-    sli: api_latency
-    target: 0.5  # 500ms
-    window: 30d
-  
-  - name: model_accuracy_slo
-    description: "Model accuracy should be above 90%"
-    sli: model_accuracy
-    target: 0.90
-    window: 7d
-```
-
-### Error budget alerts
-
-```yaml
-# Error budget alert
-- alert: ErrorBudgetExhausted
-  expr: |
-    (
-      1 - (
-        sum(rate(http_requests_total{status!~"5.."}[30d]))
-        /
-        sum(rate(http_requests_total[30d]))
-      )
-    ) > 0.001  # 0.1% error budget
-  labels:
-    severity: critical
-  annotations:
-    summary: "Error budget exhausted for 30-day window"
-    description: "Current error rate: {{ $value | humanizePercentage }}"
-```
-
-## Observability best practices
-
-### Golden signals
-
-Monitor the four golden signals:
-
-1. **Latency**: Time to serve requests
-2. **Traffic**: Demand on the system
-3. **Errors**: Rate of failed requests
-4. **Saturation**: Resource utilization
-
-```promql
-# Latency (P95)
-histogram_quantile(0.95,
-  sum(rate(http_request_duration_seconds_bucket[5m])) by (le, endpoint)
-)
-
-# Traffic (requests per second)
-sum(rate(http_requests_total[5m])) by (endpoint)
-
-# Errors (error rate)
-sum(rate(http_requests_total{status=~"5.."}[5m])) by (endpoint)
-/
-sum(rate(http_requests_total[5m])) by (endpoint)
-
-# Saturation (CPU utilization)
-avg(rate(container_cpu_usage_seconds_total[5m])) by (pod)
-```
-
-### RED method for services
-
-**Rate, Errors, Duration**:
-
-```promql
-# Rate
-sum(rate(http_requests_total[5m])) by (service)
-
-# Errors
-sum(rate(http_requests_total{status=~"5.."}[5m])) by (service)
-
-# Duration
-histogram_quantile(0.95,
-  sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service)
-)
-```
-
-### USE method for resources
-
-**Utilization, Saturation, Errors**:
-
-```promql
-# CPU Utilization
-avg(rate(node_cpu_seconds_total{mode!="idle"}[5m])) by (instance)
-
-# CPU Saturation (load average)
-node_load1 / count(node_cpu_seconds_total{mode="idle"}) by (instance)
-
-# Memory Utilization
-1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)
-
-# Disk I/O Saturation
-rate(node_disk_io_time_seconds_total[5m])
-```
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| Metrics collection overhead | < 1% CPU | Prometheus scrape |
+| Log ingestion rate | > 100k events/sec | Loki |
+| Trace sampling rate | 1-10% | Tempo |
+| Dashboard load time | < 2 sec | Grafana |
+| Alert latency | < 30 sec | Alertmanager |
 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="CI/CD and security" icon="shield-halved" href="/enterprise/cicd-security">
-    Automated pipelines and security
+  <Card title="CI/CD pipeline" icon="code-branch" href="/enterprise/cicd-pipeline">
+    Automated testing and deployment
   </Card>
-  <Card title="Alert runbooks" icon="book-open" href="/operations/alert-runbooks">
-    Incident response procedures
+  <Card title="Security" icon="shield" href="/enterprise/security">
+    Security best practices
   </Card>
-  <Card title="Performance tuning" icon="gauge-high" href="/operations/performance-tuning">
-    Optimization techniques
+  <Card title="Incident response" icon="siren" href="/enterprise/incident-response">
+    Handling production incidents
   </Card>
-  <Card title="Capacity planning" icon="chart-line" href="/operations/capacity-planning">
-    Resource forecasting
+  <Card title="Cost optimization" icon="dollar-sign" href="/enterprise/cost-optimization">
+    Reduce monitoring costs
   </Card>
 </CardGroup>
