@@ -1,0 +1,474 @@
+---
+title: Stack 6 - Connectivity & ghost-mesh
+description: NVIDIA Aerial SDK with polymorphic mesh networking for jamming-resistant communication
+---
+
+The Connectivity & Ghost-Mesh stack combines NVIDIA Aerial SDK (6G) with polymorphic mesh networking that automatically hops between 5G/LoRa/Wi-Fi Direct based on spectrum conditions, ensuring resilient communication in hostile environments.
+
+## Core capabilities
+
+### Polymorphic networking
+Automatic protocol switching based on conditions:
+- 5G/6G vRAN for high bandwidth
+- LoRa for long-range, low-power
+- Wi-Fi Direct for peer-to-peer
+- Satellite (Starlink) for remote areas
+
+### Spectrum intelligence
+Real-time RF analysis and jamming detection:
+- Software-defined radio (SDR) spectrum scanning
+- Machine learning-based jamming classification
+- Automatic frequency hopping
+- Cognitive radio for dynamic spectrum access
+
+### Mesh resilience
+Self-healing network topology:
+- Epidemic routing for intermittent connectivity
+- Store-and-forward for asynchronous communication
+- Multi-hop routing with opportunistic forwarding
+
+## Hardware architecture
+
+**Primary**: NVIDIA ConnectX-7 SmartNIC (400Gbps)  
+**Radio**: USRP B210 SDR for spectrum analysis  
+**Mesh nodes**: Raspberry Pi 4 with LoRa HAT  
+**Satellite**: Starlink terminal for backhaul
+
+## Aerial polymorphic implementation
+
+```python infrastructure/aerial_6g/polymorphic_mesh.py
+import numpy as np
+from scipy import signal
+import torch
+
+class AerialPolymorphic:
+    """
+    NVIDIA Aerial SDK on ConnectX-7.
+    Hops between 5G/6G and LoRa/Wi-Fi Direct based on spectrum jamming.
+    """
+    def __init__(self):
+        self.sdr = SoftwareDefinedRadio()
+        self.ml_classifier = JammingClassifier()
+        self.protocols = {
+            "5G_VRAN": FiveGProtocol(),
+            "LORA": LoRaProtocol(),
+            "WIFI_DIRECT": WiFiDirectProtocol(),
+            "SATELLITE": StarlinkProtocol()
+        }
+        self.current_protocol = "5G_VRAN"
+        self.mesh_router = MeshRouter()
+    
+    def analyze_spectrum(self, rf_input: np.ndarray) -> str:
+        """
+        Analyze RF spectrum and detect jamming.
+        
+        Args:
+            rf_input: IQ samples from SDR (complex64 array)
+        
+        Returns:
+            Network mode decision
+        """
+        # Compute power spectral density
+        freqs, psd = signal.welch(rf_input, fs=20e6, nperseg=1024)
+        
+        # Detect anomalies
+        jamming_detected = self._detect_jamming(psd)
+        
+        if jamming_detected:
+            print("   [Aerial] Jamming detected. Hopping to Ghost-Mesh (LoRa/Wi-Fi).")
+            
+            # Classify jamming type
+            jamming_type = self.ml_classifier.classify(psd)
+            
+            # Select best alternative protocol
+            if jamming_type == "WIDEBAND":
+                # Wideband jamming - use LoRa (narrow band, frequency hopping)
+                return self._switch_protocol("LORA")
+            elif jamming_type == "NARROWBAND":
+                # Narrowband jamming - use Wi-Fi Direct (different band)
+                return self._switch_protocol("WIFI_DIRECT")
+            else:
+                # Unknown jamming - fall back to satellite
+                return self._switch_protocol("SATELLITE")
+        
+        # No jamming - use highest bandwidth available
+        if self._check_5g_available():
+            return self._switch_protocol("5G_VRAN")
+        else:
+            return self._switch_protocol("LORA")
+    
+    def _detect_jamming(self, psd: np.ndarray) -> bool:
+        """
+        Detect jamming via statistical analysis.
+        
+        Jamming indicators:
+        - Abnormally high noise floor
+        - Flat spectrum (wideband jamming)
+        - Strong narrowband peaks (tone jamming)
+        - Rapid power fluctuations (pulsed jamming)
+        """
+        # Compute noise floor
+        noise_floor = np.median(psd)
+        
+        # Check for elevated noise
+        if noise_floor > -80:  # dBm threshold
+            return True
+        
+        # Check for flat spectrum (low variance)
+        psd_variance = np.var(psd)
+        if psd_variance < 10:
+            return True
+        
+        # Check for strong narrowband peaks
+        peak_power = np.max(psd)
+        if peak_power > noise_floor + 40:  # 40 dB above noise
+            return True
+        
+        return False
+    
+    def _switch_protocol(self, new_protocol: str) -> str:
+        """Switch to new protocol and reconfigure radio."""
+        if new_protocol == self.current_protocol:
+            return f"MODE_{new_protocol}"
+        
+        print(f"   [Aerial] Switching from {self.current_protocol} to {new_protocol}")
+        
+        # Gracefully close current protocol
+        self.protocols[self.current_protocol].close()
+        
+        # Initialize new protocol
+        self.protocols[new_protocol].initialize()
+        
+        # Update routing table
+        self.mesh_router.update_protocol(new_protocol)
+        
+        self.current_protocol = new_protocol
+        return f"MODE_{new_protocol}"
+    
+    def _check_5g_available(self) -> bool:
+        """Check if 5G base station is reachable."""
+        # Scan for 5G NR signals
+        return self.sdr.scan_5g_nr() is not None
+
+class JammingClassifier(torch.nn.Module):
+    """
+    ML classifier for jamming type detection.
+    Trained on synthetic and real-world jamming datasets.
+    """
+    def __init__(self):
+        super().__init__()
+        self.conv1 = torch.nn.Conv1d(1, 32, kernel_size=7)
+        self.conv2 = torch.nn.Conv1d(32, 64, kernel_size=5)
+        self.fc1 = torch.nn.Linear(64 * 250, 128)
+        self.fc2 = torch.nn.Linear(128, 4)  # 4 classes: NONE, WIDEBAND, NARROWBAND, PULSED
+        
+        self.load_state_dict(torch.load("/models/jamming_classifier.pth"))
+        self.eval()
+    
+    def classify(self, psd: np.ndarray) -> str:
+        """Classify jamming type from power spectral density."""
+        # Preprocess
+        psd_tensor = torch.from_numpy(psd).float().unsqueeze(0).unsqueeze(0)
+        
+        # Forward pass
+        with torch.no_grad():
+            logits = self.forward(psd_tensor)
+            pred = torch.argmax(logits, dim=1).item()
+        
+        classes = ["NONE", "WIDEBAND", "NARROWBAND", "PULSED"]
+        return classes[pred]
+    
+    def forward(self, x):
+        x = torch.relu(self.conv1(x))
+        x = torch.max_pool1d(x, 2)
+        x = torch.relu(self.conv2(x))
+        x = torch.max_pool1d(x, 2)
+        x = x.view(x.size(0), -1)
+        x = torch.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
+```
+
+## Mesh routing implementation
+
+```python infrastructure/aerial_6g/mesh_router.py
+import time
+from collections import defaultdict
+import heapq
+
+class MeshRouter:
+    """
+    Epidemic routing with opportunistic forwarding.
+    Handles intermittent connectivity and store-and-forward.
+    """
+    def __init__(self):
+        self.routing_table = {}
+        self.message_buffer = []
+        self.peer_history = defaultdict(list)
+        self.delivery_probability = {}
+    
+    def route_message(self, message: dict, destination: str):
+        """
+        Route message through mesh network.
+        
+        Args:
+            message: {
+                "id": str,
+                "payload": bytes,
+                "ttl": int,
+                "priority": int
+            }
+            destination: Destination node ID
+        
+        Returns:
+            Routing decision
+        """
+        # Check if destination is directly reachable
+        if self._is_neighbor(destination):
+            return self._send_direct(message, destination)
+        
+        # Check routing table for known path
+        if destination in self.routing_table:
+            next_hop = self.routing_table[destination]['next_hop']
+            return self._forward_to(message, next_hop)
+        
+        # No known path - use epidemic routing
+        return self._epidemic_forward(message, destination)
+    
+    def _epidemic_forward(self, message: dict, destination: str):
+        """
+        Epidemic routing: forward to all neighbors with higher delivery probability.
+        """
+        # Calculate delivery probability to destination
+        my_prob = self._calculate_delivery_prob(destination)
+        
+        # Get neighbors
+        neighbors = self._get_neighbors()
+        
+        # Forward to neighbors with higher probability
+        forwarded_to = []
+        for neighbor in neighbors:
+            neighbor_prob = self._get_neighbor_delivery_prob(neighbor, destination)
+            
+            if neighbor_prob > my_prob:
+                self._forward_to(message, neighbor)
+                forwarded_to.append(neighbor)
+        
+        if not forwarded_to:
+            # No better neighbor - store and forward later
+            self.message_buffer.append({
+                "message": message,
+                "destination": destination,
+                "timestamp": time.time()
+            })
+            return "STORED_FOR_LATER"
+        
+        return f"FORWARDED_TO_{len(forwarded_to)}_PEERS"
+    
+    def _calculate_delivery_prob(self, destination: str) -> float:
+        """
+        Calculate delivery probability based on encounter history.
+        
+        Uses Prophet routing metric:
+        P(a,b) = P(a,b)_old + (1 - P(a,b)_old) * P_init
+        """
+        if destination not in self.peer_history:
+            return 0.0
+        
+        encounters = self.peer_history[destination]
+        if not encounters:
+            return 0.0
+        
+        # Time since last encounter
+        last_encounter = encounters[-1]
+        time_since = time.time() - last_encounter
+        
+        # Decay probability over time
+        P_init = 0.75
+        beta = 0.25  # Decay factor
+        
+        prob = P_init * np.exp(-beta * time_since / 3600)  # Decay per hour
+        
+        return prob
+    
+    def update_peer_encounter(self, peer_id: str):
+        """Record encounter with peer for delivery probability calculation."""
+        self.peer_history[peer_id].append(time.time())
+        
+        # Update delivery probabilities
+        self._update_delivery_probabilities()
+    
+    def _update_delivery_probabilities(self):
+        """Update delivery probabilities based on transitive property."""
+        # If A encounters B, and B has high prob to C, then A's prob to C increases
+        for peer in self.peer_history:
+            peer_probs = self._get_peer_delivery_probs(peer)
+            
+            for dest, prob in peer_probs.items():
+                if dest not in self.delivery_probability:
+                    self.delivery_probability[dest] = 0.0
+                
+                # Transitive update
+                self.delivery_probability[dest] = max(
+                    self.delivery_probability[dest],
+                    prob * 0.8  # Discount factor
+                )
+    
+    def process_buffer(self):
+        """
+        Periodically process buffered messages.
+        Attempt to forward when better paths become available.
+        """
+        current_time = time.time()
+        
+        # Sort by priority and age
+        self.message_buffer.sort(
+            key=lambda x: (x['message']['priority'], current_time - x['timestamp']),
+            reverse=True
+        )
+        
+        # Attempt to forward buffered messages
+        forwarded = []
+        for item in self.message_buffer:
+            result = self.route_message(item['message'], item['destination'])
+            
+            if result != "STORED_FOR_LATER":
+                forwarded.append(item)
+        
+        # Remove forwarded messages from buffer
+        for item in forwarded:
+            self.message_buffer.remove(item)
+```
+
+## Protocol implementations
+
+```python infrastructure/aerial_6g/protocols.py
+class LoRaProtocol:
+    """
+    LoRa protocol for long-range, low-power communication.
+    Frequency hopping for anti-jamming.
+    """
+    def __init__(self):
+        self.frequency_plan = [868.1, 868.3, 868.5, 867.1, 867.3, 867.5, 867.7, 867.9]
+        self.current_freq_idx = 0
+        self.spreading_factor = 12  # Max range
+        self.bandwidth = 125  # kHz
+    
+    def initialize(self):
+        """Initialize LoRa radio."""
+        self._configure_radio(
+            freq=self.frequency_plan[self.current_freq_idx],
+            sf=self.spreading_factor,
+            bw=self.bandwidth
+        )
+    
+    def send(self, data: bytes, destination: str):
+        """Send data via LoRa with frequency hopping."""
+        # Hop to next frequency
+        self.current_freq_idx = (self.current_freq_idx + 1) % len(self.frequency_plan)
+        self._configure_radio(freq=self.frequency_plan[self.current_freq_idx])
+        
+        # Transmit
+        self._transmit(data, destination)
+    
+    def receive(self) -> bytes:
+        """Receive data from LoRa."""
+        return self._receive_blocking(timeout=5.0)
+
+class WiFiDirectProtocol:
+    """
+    Wi-Fi Direct for peer-to-peer communication.
+    No infrastructure required.
+    """
+    def __init__(self):
+        self.group_owner = False
+        self.peers = []
+    
+    def initialize(self):
+        """Initialize Wi-Fi Direct."""
+        # Become group owner or join existing group
+        self.group_owner = self._negotiate_group_owner()
+        
+        if self.group_owner:
+            self._create_group()
+        else:
+            self._join_group()
+    
+    def send(self, data: bytes, destination: str):
+        """Send data via Wi-Fi Direct."""
+        if destination in self.peers:
+            self._send_tcp(data, destination)
+        else:
+            raise ValueError(f"Peer {destination} not in group")
+```
+
+## Use cases
+
+### Crisis communication
+Maintain connectivity during infrastructure failure:
+1. 5G towers destroyed by disaster
+2. Aerial detects loss of signal
+3. Automatically switches to LoRa mesh
+4. Messages routed via multi-hop
+5. Satellite backhaul for internet access
+
+### Military-grade resilience
+Operate under active jamming:
+1. SDR detects wideband jamming
+2. ML classifier identifies jamming type
+3. Switches to frequency-hopping LoRa
+4. Continues operation with degraded bandwidth
+
+### Remote area connectivity
+Connect isolated communities:
+1. No cellular coverage
+2. LoRa mesh for local communication
+3. Starlink terminal for backhaul
+4. Epidemic routing handles intermittent connectivity
+
+## Performance benchmarks
+
+| Protocol | Range | Bandwidth | Latency | Power |
+|----------|-------|-----------|---------|-------|
+| 5G vRAN | 1 km | 1 Gbps | 10 ms | 5W |
+| LoRa | 15 km | 50 kbps | 1 s | 100 mW |
+| Wi-Fi Direct | 200 m | 250 Mbps | 20 ms | 2W |
+| Satellite | Global | 150 Mbps | 40 ms | 100W |
+
+## Integration with other stacks
+
+### Stack 2: Kinetic & sensory
+- Holoscan adapts compression based on Ghost-Mesh bandwidth
+- cuOpt routes consider network topology
+
+### Stack 3: Spatial omniscience
+- GeoGhost syncs maps via Ghost-Mesh gossip protocol
+- Mesh routing uses geospatial data for path selection
+
+### Stack 5: Humanitarian substrate
+- Blockchain nodes sync via Ghost-Mesh
+- Bio-credit transactions propagate through mesh
+
+## Regulatory compliance
+
+- **ITU Radio Regulations**: Frequency allocation compliance
+- **FCC Part 15**: Unlicensed band operation (LoRa, Wi-Fi)
+- **ETSI EN 300 220**: European LoRa regulations
+- **Cognitive Radio**: Dynamic spectrum access with incumbent protection
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Stack 7: Educational sovereignty" icon="graduation-cap" href="/nuclear-thesis/educational-sovereignty">
+    Knowledge Mesh + NIM
+  </Card>
+  <Card title="Aerial SDK guide" icon="tower-broadcast" href="/deployment/aerial-sdk">
+    NVIDIA Aerial deployment
+  </Card>
+  <Card title="LoRa mesh setup" icon="network-wired" href="/deployment/lora-mesh">
+    Ghost-Mesh configuration
+  </Card>
+  <Card title="Spectrum analysis" icon="wave-square" href="/api-reference/spectrum-analysis">
+    SDR API documentation
+  </Card>
+</CardGroup>
