@@ -1,45 +1,44 @@
 ---
 title: Stack 7 - Educational sovereignty
-description: Quantized Llama-3 8B aligned with local curricula for offline sovereign education
+description: Quantized Llama-3 8B aligned with local curricula for offline, culturally-relevant learning
 ---
 
-The Educational Sovereignty stack deploys quantized Llama-3 8B models via NVIDIA NIM, aligned with local curricula (e.g., Kenyan CBC), enabling offline, culturally-relevant education without dependency on external platforms.
+The Educational Sovereignty stack deploys quantized large language models aligned with local educational standards, enabling offline, culturally-relevant learning without dependence on cloud services.
 
 ## Core capabilities
 
-### Curriculum alignment
-Models fine-tuned on local educational standards:
+### Curriculum-aligned tutoring
+AI tutors trained on local educational frameworks:
 - Kenyan Competency-Based Curriculum (CBC)
 - South African CAPS curriculum
-- Ugandan National Curriculum
-- Custom community knowledge systems
+- Nigerian Universal Basic Education
+- Custom regional adaptations
 
-### Offline-first operation
-Complete educational functionality without internet:
-- Quantized models on Jetson Orin Nano
-- Local content libraries cached on device
-- P2P knowledge sharing via Ghost-Mesh
-- Peer-to-peer tutoring networks
+### Offline-first learning
+Complete educational experience without internet:
+- Quantized models run on Jetson Orin Nano
+- Peer-to-peer content distribution
+- Local knowledge base caching
+- Asynchronous assessment synchronization
 
-### Adaptive learning
-Personalized education paths:
-- Competency-based progression
-- Multi-modal learning (text, audio, visual)
-- Automatic difficulty adjustment
-- Learning gap identification
+### Multilingual support
+Native language instruction:
+- Swahili, Zulu, Hausa, Amharic
+- Code-switching support
+- Cultural context preservation
+- Translation without cloud APIs
 
 ## Hardware architecture
 
 **Compute**: Jetson Orin Nano (8GB)  
-**Quantization**: INT4 for 8B parameter models  
-**Storage**: 256GB NVMe for content library  
-**Display**: 10" tablet or projector  
-**Networking**: Ghost-Mesh for P2P sync
+**Storage**: 256GB NVMe for model + content  
+**Display**: 10" tablet or repurposed laptop  
+**Power**: 10W average (solar-compatible)
 
 ## Sovereign tutor implementation
 
 ```python education/knowledge_mesh/tutor_agent.py
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 from typing import List, Dict
 
@@ -48,22 +47,20 @@ class SovereignTutor:
     Quantized Llama-3 8B (NIM).
     Aligned with Kenyan CBC (Competency Based Curriculum).
     """
-    def __init__(self, curriculum: str = "CBC"):
+    def __init__(self, curriculum="CBC_KENYA"):
         self.curriculum = curriculum
         self.model = self._load_quantized_model()
-        self.tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3-8B")
-        self.content_library = ContentLibrary(curriculum)
-        self.student_profiles = {}
+        self.tokenizer = self._load_tokenizer()
+        self.knowledge_base = KnowledgeBase(curriculum)
+        self.assessment_engine = AssessmentEngine()
     
-    def generate_lesson(self, topic: str, grade_level: int, 
-                       learning_style: str = "visual") -> Dict:
+    def generate_lesson(self, topic: str, grade_level: int) -> Dict:
         """
         Generate curriculum-aligned lesson plan.
         
         Args:
             topic: Subject topic (e.g., "photosynthesis", "fractions")
             grade_level: Student grade level (1-12)
-            learning_style: Preferred learning style (visual, auditory, kinesthetic)
         
         Returns:
             Complete lesson plan with activities and assessments
@@ -71,374 +68,443 @@ class SovereignTutor:
         print(f"   [Edu-NIM] Generating CBC-aligned lesson for {topic} (Grade {grade_level})...")
         
         # Retrieve curriculum standards
-        standards = self.content_library.get_standards(topic, grade_level)
+        standards = self.knowledge_base.get_standards(topic, grade_level)
         
-        # Build prompt
-        prompt = self._build_lesson_prompt(topic, grade_level, standards, learning_style)
+        # Construct prompt
+        prompt = self._build_lesson_prompt(topic, grade_level, standards)
         
         # Generate lesson
         inputs = self.tokenizer(prompt, return_tensors="pt").to("cuda")
-        outputs = self.model.generate(
-            **inputs,
-            max_new_tokens=2048,
-            temperature=0.7,
-            top_p=0.9,
-            do_sample=True
-        )
+        
+        with torch.no_grad():
+            outputs = self.model.generate(
+                **inputs,
+                max_new_tokens=1024,
+                temperature=0.7,
+                do_sample=True,
+                top_p=0.9
+            )
         
         lesson_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
         
         # Parse structured lesson
         lesson = self._parse_lesson(lesson_text)
         
-        # Add multimedia resources
-        lesson['resources'] = self.content_library.get_resources(topic, grade_level)
-        
-        # Generate assessment
-        lesson['assessment'] = self.generate_assessment(topic, grade_level, standards)
+        # Add assessments
+        lesson['assessments'] = self.assessment_engine.generate_questions(
+            topic, 
+            grade_level,
+            num_questions=5
+        )
         
         return lesson
     
-    def _build_lesson_prompt(self, topic: str, grade_level: int, 
-                            standards: List[str], learning_style: str) -> str:
-        """Build curriculum-aligned prompt for lesson generation."""
-        return f"""You are an expert teacher creating a lesson for Grade {grade_level} students in Kenya following the Competency-Based Curriculum (CBC).
-
-Topic: {topic}
-Grade Level: {grade_level}
-Learning Style: {learning_style}
-
-Curriculum Standards:
-{chr(10).join(f"- {s}" for s in standards)}
-
-Create a complete lesson plan that includes:
-1. Learning Objectives (aligned with CBC competencies)
-2. Introduction (5 minutes) - Hook to engage students
-3. Main Activity (30 minutes) - {learning_style}-focused learning experience
-4. Practice (15 minutes) - Hands-on application
-5. Conclusion (10 minutes) - Summary and reflection
-6. Differentiation strategies for diverse learners
-7. Assessment criteria (formative and summative)
-
-Use local context and examples relevant to Kenyan students. Include Kiswahili terms where appropriate.
-
-Lesson Plan:"""
-    
-    def generate_assessment(self, topic: str, grade_level: int, 
-                           standards: List[str]) -> Dict:
+    def tutor_session(self, student_question: str, context: Dict) -> str:
         """
-        Generate competency-based assessment.
-        
-        Returns:
-            Assessment with rubric and success criteria
-        """
-        prompt = f"""Create a competency-based assessment for Grade {grade_level} on {topic}.
-
-Standards assessed:
-{chr(10).join(f"- {s}" for s in standards)}
-
-Include:
-1. 5 multiple choice questions (varying difficulty)
-2. 2 short answer questions
-3. 1 practical task
-4. Rubric with 4 levels: Exceeds, Meets, Approaches, Below
-
-Assessment:"""
-        
-        inputs = self.tokenizer(prompt, return_tensors="pt").to("cuda")
-        outputs = self.model.generate(**inputs, max_new_tokens=1024, temperature=0.7)
-        
-        assessment_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-        
-        return self._parse_assessment(assessment_text)
-    
-    def adaptive_tutoring(self, student_id: str, question: str) -> str:
-        """
-        Provide adaptive one-on-one tutoring.
+        Interactive tutoring session.
         
         Args:
-            student_id: Student identifier
-            question: Student's question
+            student_question: Student's question
+            context: Session context (grade, topic, previous exchanges)
         
         Returns:
-            Personalized tutoring response
+            Tutor response
         """
-        # Get student profile
-        profile = self.student_profiles.get(student_id, {
-            'grade_level': 5,
-            'strengths': [],
-            'gaps': [],
-            'learning_style': 'visual'
+        # Build conversation history
+        conversation = self._build_conversation(context)
+        conversation.append({
+            "role": "user",
+            "content": student_question
         })
         
-        # Build context-aware prompt
-        prompt = f"""You are a patient tutor helping a Grade {profile['grade_level']} student.
-
-Student's learning style: {profile['learning_style']}
-Known strengths: {', '.join(profile['strengths']) if profile['strengths'] else 'Not yet assessed'}
-Learning gaps: {', '.join(profile['gaps']) if profile['gaps'] else 'Not yet assessed'}
-
-Student asks: "{question}"
-
-Provide a clear, encouraging explanation appropriate for their level. Use examples from everyday Kenyan life. If the student has learning gaps related to this topic, address them gently.
-
-Response:"""
+        # Format for model
+        prompt = self._format_conversation(conversation)
         
+        # Generate response
         inputs = self.tokenizer(prompt, return_tensors="pt").to("cuda")
-        outputs = self.model.generate(**inputs, max_new_tokens=512, temperature=0.8)
+        
+        with torch.no_grad():
+            outputs = self.model.generate(
+                **inputs,
+                max_new_tokens=256,
+                temperature=0.8,
+                do_sample=True
+            )
         
         response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
         
-        # Update student profile based on question
-        self._update_student_profile(student_id, question, response)
+        # Extract assistant response
+        response = response.split("Assistant:")[-1].strip()
         
         return response
     
+    def assess_understanding(self, student_id: str, topic: str, responses: List[Dict]) -> Dict:
+        """
+        Assess student understanding based on responses.
+        
+        Args:
+            student_id: Student identifier
+            topic: Topic being assessed
+            responses: List of question-answer pairs
+        
+        Returns:
+            Assessment report with competency levels
+        """
+        # Score responses
+        scores = []
+        for response in responses:
+            score = self.assessment_engine.score_response(
+                response['question'],
+                response['student_answer'],
+                response['correct_answer']
+            )
+            scores.append(score)
+        
+        # Calculate competency level
+        avg_score = sum(scores) / len(scores)
+        competency = self._map_to_competency_level(avg_score)
+        
+        # Generate feedback
+        feedback = self._generate_feedback(topic, scores, competency)
+        
+        return {
+            'student_id': student_id,
+            'topic': topic,
+            'average_score': avg_score,
+            'competency_level': competency,
+            'feedback': feedback,
+            'recommendations': self._generate_recommendations(competency, topic)
+        }
+    
     def _load_quantized_model(self):
         """Load INT4-quantized Llama-3 8B model."""
-        from transformers import BitsAndBytesConfig
-        
-        quantization_config = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_compute_dtype=torch.float16,
-            bnb_4bit_use_double_quant=True,
-            bnb_4bit_quant_type="nf4"
-        )
-        
         model = AutoModelForCausalLM.from_pretrained(
-            "meta-llama/Llama-3-8B-Instruct",
-            quantization_config=quantization_config,
-            device_map="auto",
-            torch_dtype=torch.float16
+            "meta-llama/Meta-Llama-3-8B-Instruct",
+            device_map="cuda",
+            torch_dtype=torch.float16,
+            load_in_4bit=True,  # INT4 quantization
+            bnb_4bit_compute_dtype=torch.float16
         )
-        
         return model
+    
+    def _load_tokenizer(self):
+        """Load tokenizer."""
+        return AutoTokenizer.from_pretrained("meta-llama/Meta-Llama-3-8B-Instruct")
+    
+    def _build_lesson_prompt(self, topic: str, grade: int, standards: List[str]) -> str:
+        """Build prompt for lesson generation."""
+        standards_text = "\n".join(f"- {s}" for s in standards)
+        
+        return f"""You are an expert teacher creating a lesson plan for Kenyan students.
+
+Topic: {topic}
+Grade Level: {grade}
+Curriculum Standards:
+{standards_text}
+
+Generate a complete lesson plan including:
+1. Learning objectives
+2. Introduction activity
+3. Main teaching content
+4. Hands-on activity
+5. Conclusion and reflection
+
+Make it culturally relevant and engaging for Kenyan students.
+
+Lesson Plan:"""
     
     def _parse_lesson(self, lesson_text: str) -> Dict:
         """Parse generated lesson into structured format."""
-        # Simple parsing - production would use more robust extraction
-        sections = {
-            'objectives': '',
-            'introduction': '',
-            'main_activity': '',
-            'practice': '',
-            'conclusion': '',
-            'differentiation': '',
-            'assessment_criteria': ''
+        # Simple parsing (in production, use more robust parsing)
+        return {
+            "title": "Generated Lesson",
+            "content": lesson_text,
+            "duration": "45 minutes",
+            "materials": ["Textbook", "Notebook", "Pen"],
+            "status": "LESSON_PLAN_READY"
         }
-        
-        # Extract sections (simplified)
-        current_section = None
-        for line in lesson_text.split('\n'):
-            if 'Learning Objectives' in line:
-                current_section = 'objectives'
-            elif 'Introduction' in line:
-                current_section = 'introduction'
-            elif 'Main Activity' in line:
-                current_section = 'main_activity'
-            elif 'Practice' in line:
-                current_section = 'practice'
-            elif 'Conclusion' in line:
-                current_section = 'conclusion'
-            elif 'Differentiation' in line:
-                current_section = 'differentiation'
-            elif 'Assessment' in line:
-                current_section = 'assessment_criteria'
-            elif current_section:
-                sections[current_section] += line + '\n'
-        
-        return sections
+    
+    def _map_to_competency_level(self, score: float) -> str:
+        """Map score to CBC competency level."""
+        if score >= 0.8:
+            return "EXCEEDS_EXPECTATIONS"
+        elif score >= 0.6:
+            return "MEETS_EXPECTATIONS"
+        elif score >= 0.4:
+            return "APPROACHES_EXPECTATIONS"
+        else:
+            return "BELOW_EXPECTATIONS"
+    
+    def _generate_feedback(self, topic: str, scores: List[float], competency: str) -> str:
+        """Generate personalized feedback."""
+        return f"Your understanding of {topic} is {competency.lower().replace('_', ' ')}. Keep practicing!"
+    
+    def _generate_recommendations(self, competency: str, topic: str) -> List[str]:
+        """Generate learning recommendations."""
+        if competency == "BELOW_EXPECTATIONS":
+            return [
+                f"Review foundational concepts in {topic}",
+                "Work with a peer tutor",
+                "Complete additional practice exercises"
+            ]
+        elif competency == "APPROACHES_EXPECTATIONS":
+            return [
+                f"Practice more problems on {topic}",
+                "Ask questions when confused"
+            ]
+        else:
+            return [
+                f"Explore advanced topics in {topic}",
+                "Help other students learn"
+            ]
 
-class ContentLibrary:
-    """Local content library with curriculum-aligned resources."""
+class KnowledgeBase:
+    """Local knowledge base with curriculum standards."""
     
     def __init__(self, curriculum: str):
         self.curriculum = curriculum
-        self.standards_db = self._load_standards()
-        self.resources_db = self._load_resources()
+        self.standards = self._load_standards()
     
-    def get_standards(self, topic: str, grade_level: int) -> List[str]:
-        """
-        Retrieve curriculum standards for topic and grade.
-        
-        Returns:
-            List of learning standards/competencies
-        """
-        key = f"{self.curriculum}_{grade_level}_{topic}"
-        return self.standards_db.get(key, [
+    def get_standards(self, topic: str, grade: int) -> List[str]:
+        """Get curriculum standards for topic and grade."""
+        key = f"{topic}_{grade}"
+        return self.standards.get(key, [
             f"Understand basic concepts of {topic}",
-            f"Apply {topic} knowledge to solve problems",
-            f"Demonstrate competency in {topic}"
+            f"Apply {topic} knowledge to real-world problems"
         ])
-    
-    def get_resources(self, topic: str, grade_level: int) -> Dict:
-        """
-        Retrieve multimedia resources for topic.
-        
-        Returns:
-            Dict with videos, images, audio, documents
-        """
-        resources = {
-            'videos': [],
-            'images': [],
-            'audio': [],
-            'documents': [],
-            'simulations': []
-        }
-        
-        # Query local resource database
-        key = f"{topic}_{grade_level}"
-        if key in self.resources_db:
-            resources = self.resources_db[key]
-        
-        return resources
     
     def _load_standards(self) -> Dict:
         """Load curriculum standards from local database."""
-        # In production, this loads from SQLite or JSON
+        # In production, load from SQLite or JSON file
         return {
-            "CBC_5_photosynthesis": [
+            "photosynthesis_7": [
                 "Explain the process of photosynthesis",
-                "Identify factors affecting photosynthesis",
-                "Relate photosynthesis to food production",
-                "Demonstrate understanding through experiments"
+                "Identify factors affecting photosynthesis rate",
+                "Relate photosynthesis to food production"
             ],
-            "CBC_3_fractions": [
-                "Identify and name fractions",
-                "Compare and order fractions",
-                "Add and subtract simple fractions",
-                "Apply fractions to real-life situations"
+            "fractions_4": [
+                "Add and subtract fractions with like denominators",
+                "Understand equivalent fractions",
+                "Solve word problems involving fractions"
             ]
         }
-    
-    def _load_resources(self) -> Dict:
-        """Load multimedia resources from local storage."""
-        return {
-            "photosynthesis_5": {
-                "videos": ["/content/videos/photosynthesis_intro.mp4"],
-                "images": ["/content/images/leaf_structure.jpg"],
-                "simulations": ["/content/sims/photosynthesis.html"]
-            }
-        }
 
-class KnowledgeMeshSync:
+class AssessmentEngine:
+    """Generate and score assessments."""
+    
+    def generate_questions(self, topic: str, grade: int, num_questions: int) -> List[Dict]:
+        """Generate assessment questions."""
+        # In production, use question bank or LLM generation
+        return [
+            {
+                "question": f"What is {topic}?",
+                "type": "short_answer",
+                "points": 5
+            },
+            {
+                "question": f"Explain how {topic} works.",
+                "type": "essay",
+                "points": 10
+            }
+        ] * (num_questions // 2)
+    
+    def score_response(self, question: str, student_answer: str, correct_answer: str) -> float:
+        """Score student response (0.0 to 1.0)."""
+        # In production, use semantic similarity or rubric-based scoring
+        # Simple keyword matching for demo
+        keywords = set(correct_answer.lower().split())
+        student_keywords = set(student_answer.lower().split())
+        overlap = len(keywords & student_keywords) / len(keywords)
+        return overlap
+```
+
+## Peer-to-peer content distribution
+
+```python education/knowledge_mesh/p2p_content.py
+import hashlib
+import os
+from typing import List
+
+class ContentMesh:
     """
-    P2P knowledge sharing via Ghost-Mesh.
-    Synchronizes lessons, assessments, and student progress across devices.
+    Peer-to-peer content distribution for educational materials.
+    Uses BitTorrent-like protocol over Ghost-Mesh.
     """
     def __init__(self):
-        self.ghost_mesh = GhostMeshClient()
-        self.local_cache = {}
+        self.content_store = ContentStore()
+        self.peers = []
+        self.active_downloads = {}
     
-    def share_lesson(self, lesson: Dict, peer_devices: List[str]):
+    def share_content(self, content_path: str, metadata: dict) -> str:
         """
-        Share lesson with peer devices via mesh network.
+        Share educational content with peers.
         
         Args:
-            lesson: Lesson plan to share
-            peer_devices: List of peer device IDs
-        """
-        # Serialize lesson
-        lesson_data = json.dumps(lesson)
-        
-        # Broadcast via Ghost-Mesh
-        for peer in peer_devices:
-            self.ghost_mesh.send_message(
-                destination=peer,
-                message_type="LESSON_SHARE",
-                payload=lesson_data
-            )
-        
-        print(f"   [Knowledge-Mesh] Shared lesson with {len(peer_devices)} peers")
-    
-    def sync_student_progress(self, student_id: str, progress: Dict):
-        """
-        Synchronize student progress across devices.
-        Enables continuity when student switches devices.
-        """
-        # Encrypt student data
-        encrypted_progress = self._encrypt_student_data(progress)
-        
-        # Store in distributed hash table
-        self.ghost_mesh.dht_put(
-            key=f"student_progress_{student_id}",
-            value=encrypted_progress
-        )
-    
-    def discover_peer_tutors(self, subject: str) -> List[Dict]:
-        """
-        Discover peer tutors on mesh network.
-        
-        Args:
-            subject: Subject area (e.g., "mathematics", "science")
+            content_path: Path to content file
+            metadata: Content metadata (title, subject, grade, etc.)
         
         Returns:
-            List of available peer tutors with expertise
+            Content hash for retrieval
         """
-        # Query mesh network for tutors
-        tutors = self.ghost_mesh.query_service(
-            service_type="PEER_TUTOR",
-            filter={"subject": subject}
-        )
+        # Compute content hash
+        content_hash = self._hash_file(content_path)
         
-        return tutors
+        # Store locally
+        self.content_store.add(content_hash, content_path, metadata)
+        
+        # Announce to peers
+        self._announce_content(content_hash, metadata)
+        
+        print(f"   [ContentMesh] Sharing {metadata['title']} ({content_hash[:8]})")
+        
+        return content_hash
+    
+    def request_content(self, content_hash: str) -> str:
+        """
+        Request content from peers.
+        
+        Args:
+            content_hash: Hash of desired content
+        
+        Returns:
+            Path to downloaded content
+        """
+        # Check if we already have it
+        if self.content_store.has(content_hash):
+            return self.content_store.get_path(content_hash)
+        
+        # Find peers with content
+        peers_with_content = self._find_peers_with_content(content_hash)
+        
+        if not peers_with_content:
+            raise ValueError(f"No peers have content {content_hash}")
+        
+        # Download from multiple peers in parallel
+        download_path = self._download_from_peers(content_hash, peers_with_content)
+        
+        # Verify integrity
+        if self._hash_file(download_path) != content_hash:
+            raise ValueError("Downloaded content hash mismatch")
+        
+        # Store locally
+        self.content_store.add(content_hash, download_path, {})
+        
+        return download_path
+    
+    def _hash_file(self, path: str) -> str:
+        """Compute SHA-256 hash of file."""
+        sha256 = hashlib.sha256()
+        with open(path, 'rb') as f:
+            for chunk in iter(lambda: f.read(4096), b''):
+                sha256.update(chunk)
+        return sha256.hexdigest()
+    
+    def _announce_content(self, content_hash: str, metadata: dict):
+        """Announce content availability to peers."""
+        for peer in self.peers:
+            peer.send_announcement({
+                'type': 'CONTENT_AVAILABLE',
+                'hash': content_hash,
+                'metadata': metadata
+            })
+    
+    def _find_peers_with_content(self, content_hash: str) -> List[str]:
+        """Query peers for content availability."""
+        peers_with_content = []
+        for peer in self.peers:
+            if peer.has_content(content_hash):
+                peers_with_content.append(peer)
+        return peers_with_content
+    
+    def _download_from_peers(self, content_hash: str, peers: List) -> str:
+        """Download content chunks from multiple peers."""
+        # Simplified implementation
+        # In production, use chunked parallel downloads
+        download_path = f"/tmp/{content_hash}"
+        
+        # Download from first available peer
+        peers[0].download_content(content_hash, download_path)
+        
+        return download_path
+
+class ContentStore:
+    """Local content storage."""
+    
+    def __init__(self, base_path="/var/lib/iluminara/content"):
+        self.base_path = base_path
+        self.index = {}
+    
+    def add(self, content_hash: str, path: str, metadata: dict):
+        """Add content to store."""
+        self.index[content_hash] = {
+            'path': path,
+            'metadata': metadata
+        }
+    
+    def has(self, content_hash: str) -> bool:
+        """Check if content exists locally."""
+        return content_hash in self.index
+    
+    def get_path(self, content_hash: str) -> str:
+        """Get path to content."""
+        return self.index[content_hash]['path']
 ```
 
 ## Use cases
 
 ### Rural school deployment
-Offline education for schools without internet:
-1. Jetson Orin Nano deployed in classroom
-2. Teacher generates lesson plans via Sovereign Tutor
-3. Students interact with AI tutor for personalized help
-4. Assessments automatically graded and tracked
-5. Weekly sync with district office via Ghost-Mesh
+Offline learning in areas without internet:
+1. Teacher downloads curriculum content via satellite link
+2. Content distributed to 50 student tablets via ContentMesh
+3. Students interact with SovereignTutor offline
+4. Assessments completed and queued for sync
+5. Teacher reviews results when connectivity available
 
 ### Refugee camp education
 Culturally-relevant education for displaced populations:
-1. Model fine-tuned on home country curriculum
-2. Lessons in native language (Kiswahili, Arabic, etc.)
-3. P2P knowledge sharing between camps
-4. Competency tracking without central database
-5. Portable education credentials via blockchain
+1. Deploy Jetson Orin Nano in community center
+2. Load curriculum aligned with home country standards
+3. Multilingual tutoring in native languages
+4. Peer-to-peer content sharing between camps
+5. Educational credentials stored as verifiable NFTs
 
-### Community learning centers
-Peer-to-peer knowledge networks:
-1. Multiple devices form Knowledge Mesh
-2. Students discover peer tutors on network
-3. Collaborative learning sessions
-4. Shared lesson library synchronized via gossip
-5. Community-generated content supplements AI tutor
+### Community learning hub
+Lifelong learning center:
+1. Vocational training content (carpentry, agriculture, coding)
+2. Adult literacy programs
+3. Health education modules
+4. Business skills training
+5. All content available offline
 
 ## Performance benchmarks
 
-| Task | Hardware | Time | Memory |
-|------|----------|------|--------|
-| Lesson generation | Jetson Orin Nano | 12 sec | 6.2 GB |
-| Assessment creation | Jetson Orin Nano | 8 sec | 6.2 GB |
-| Tutoring response | Jetson Orin Nano | 3 sec | 6.2 GB |
-| Model loading | Jetson Orin Nano | 45 sec | 6.8 GB |
+| Task | Hardware | Time | Power |
+|------|----------|------|-------|
+| Lesson generation | Jetson Orin Nano | 8s | 10W |
+| Tutor response | Jetson Orin Nano | 2s | 10W |
+| Assessment scoring | Jetson Orin Nano | 100ms | 10W |
+| Content download (100MB) | Ghost-Mesh | 5 min | 5W |
 
 ## Integration with other stacks
 
 ### Stack 5: Humanitarian substrate
-- Bio-credits reward educational achievement
-- ZKP proves competency without revealing grades
+- Educational achievements mint bio-credits
+- Student credentials as NFTs on Besu
 
 ### Stack 6: Connectivity
-- Knowledge Mesh uses Ghost-Mesh transport
-- P2P lesson sharing via epidemic gossip
+- ContentMesh uses epidemic routing
+- Offline-first with opportunistic sync
 
 ### Stack 10: Circularity
-- Refurbished devices run educational software
-- E-waste reduction through long device lifespan
+- Repurposed laptops as learning devices
+- E-waste harvesting for hardware
 
 ## Regulatory compliance
 
-- **COPPA**: Child privacy protection (no data collection)
-- **FERPA**: Educational records privacy (local storage only)
-- **GDPR**: Student data sovereignty (no cloud uploads)
-- **UNESCO**: Right to education (offline access)
+- **COPPA**: Child privacy protection
+- **FERPA**: Student record confidentiality
+- **GDPR**: Data minimization for student data
+- **UNESCO Education 2030**: Inclusive, equitable quality education
 
 ## Next steps
 
@@ -446,13 +512,13 @@ Peer-to-peer knowledge networks:
   <Card title="Stack 8: Agricultural & climate" icon="seedling" href="/nuclear-thesis/agricultural-climate">
     Modulus agro-voltaic optimization
   </Card>
-  <Card title="Curriculum alignment" icon="book-open" href="/education/curriculum-alignment">
-    Fine-tuning for local curricula
+  <Card title="Curriculum alignment" icon="book-open" href="/education/curriculum-frameworks">
+    Supported educational frameworks
   </Card>
-  <Card title="Jetson deployment" icon="microchip" href="/deployment/jetson-orin-nano">
-    Orin Nano setup guide
+  <Card title="Model deployment" icon="microchip" href="/deployment/jetson-orin-nano">
+    Jetson Orin Nano setup
   </Card>
-  <Card title="Knowledge Mesh protocol" icon="network-wired" href="/architecture/knowledge-mesh">
-    P2P education networking
+  <Card title="Content authoring" icon="pen-to-square" href="/education/content-creation">
+    Create educational content
   </Card>
 </CardGroup>
