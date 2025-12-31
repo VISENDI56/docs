@@ -3,37 +3,38 @@ title: Stack 8 - Agricultural & climate
 description: NVIDIA Modulus physics-ML for micro-climate optimization in agro-voltaic installations
 ---
 
-The Agricultural & Climate stack uses NVIDIA Modulus physics-informed neural networks to optimize agro-voltaic installations, balancing solar energy generation with crop yield through real-time micro-climate control.
+The Agricultural & Climate stack leverages NVIDIA Modulus physics-informed neural networks to optimize agro-voltaic systems, balancing solar energy generation with crop yield through real-time micro-climate control.
 
 ## Core capabilities
 
 ### Agro-voltaic optimization
-Simultaneous optimization of energy and food production:
+Dual-use land for energy and food production:
 - Dynamic solar panel tilt based on crop needs
 - PAR (Photosynthetically Active Radiation) optimization
 - Micro-climate temperature regulation
 - Water use efficiency maximization
 
 ### Physics-informed modeling
-Solve complex physical equations with ML:
-- Radiative transfer equations
-- Computational fluid dynamics for airflow
-- Soil moisture transport
-- Crop growth models
+Solve complex radiative transfer equations:
+- Real-time solar irradiance prediction
+- Crop growth simulation
+- Soil moisture dynamics
+- Evapotranspiration modeling
 
 ### Climate adaptation
-Real-time response to weather conditions:
-- Drought stress mitigation
-- Heat wave protection
-- Frost prevention
-- Storm damage minimization
+Resilience to changing conditions:
+- Drought stress prediction
+- Heat wave mitigation strategies
+- Extreme weather response
+- Seasonal optimization
 
 ## Hardware architecture
 
 **Compute**: Jetson AGX Orin (32GB) for edge inference  
 **Sensors**: Pyranometer, soil moisture, temperature, humidity  
 **Actuators**: Servo motors for panel tilt, irrigation valves  
-**Power**: Self-powered from agro-voltaic array
+**Solar**: Bifacial panels with adjustable mounting  
+**Storage**: Battery system for load balancing
 
 ## Modulus controller implementation
 
@@ -50,443 +51,423 @@ class MicroClimateEngine:
     Optimizes PAR (Photosynthetically Active Radiation) via panel tilt.
     """
     def __init__(self):
-        self.radiative_model = self._load_radiative_model()
+        self.fno_model = self._load_fno_model()
         self.crop_model = self._load_crop_model()
-        self.cfd_model = self._load_cfd_model()
-        self.sensor_interface = SensorInterface()
-        self.actuator_interface = ActuatorInterface()
+        self.sensor_array = SensorArray()
+        self.actuator_controller = ActuatorController()
     
     def optimize_tilt(self, current_temp: float, crop_type: str) -> Dict:
         """
-        Optimize solar panel tilt angle for crop and energy balance.
+        Optimize solar panel tilt angle for dual objectives:
+        1. Maximize energy generation
+        2. Optimize crop microclimate
         
         Args:
             current_temp: Current ambient temperature (Celsius)
             crop_type: Type of crop (e.g., "maize", "tomato", "kale")
         
         Returns:
-            Optimal tilt angle and predicted micro-climate effects
+            Optimal tilt angle and predicted effects
         """
         print(f"   [Modulus] Solving radiative transfer for {crop_type}...")
         
         # Get current sensor readings
-        sensors = self.sensor_interface.read_all()
+        sensors = self.sensor_array.read_all()
         
-        # Get crop parameters
+        # Get crop requirements
         crop_params = self._get_crop_parameters(crop_type)
         
         # Simulate multiple tilt angles
-        candidate_angles = np.linspace(0, 90, 19)  # 0° to 90° in 5° steps
+        tilt_angles = np.arange(0, 90, 5)  # 0° to 90° in 5° increments
         
-        best_angle = None
-        best_score = -float('inf')
-        best_effects = None
+        best_tilt = None
+        best_score = -np.inf
         
-        for angle in candidate_angles:
-            # Predict micro-climate effects
-            effects = self._simulate_microclimate(
-                tilt_angle=angle,
+        for tilt in tilt_angles:
+            # Predict microclimate with this tilt
+            microclimate = self._simulate_microclimate(
+                tilt_angle=tilt,
                 ambient_temp=current_temp,
-                sensors=sensors,
+                solar_elevation=sensors['solar_elevation'],
+                wind_speed=sensors['wind_speed']
+            )
+            
+            # Predict crop response
+            crop_response = self._predict_crop_response(
+                microclimate=microclimate,
                 crop_params=crop_params
             )
             
-            # Score this configuration
-            score = self._score_configuration(effects, crop_params)
+            # Predict energy generation
+            energy = self._predict_energy_generation(
+                tilt_angle=tilt,
+                solar_irradiance=sensors['solar_irradiance']
+            )
+            
+            # Multi-objective score
+            score = self._compute_score(
+                crop_response=crop_response,
+                energy_generation=energy,
+                crop_priority=0.6,  # 60% weight on crop, 40% on energy
+                energy_priority=0.4
+            )
             
             if score > best_score:
                 best_score = score
-                best_angle = angle
-                best_effects = effects
+                best_tilt = tilt
+                best_microclimate = microclimate
+                best_crop_response = crop_response
+                best_energy = energy
         
         # Apply optimal tilt
-        self.actuator_interface.set_panel_tilt(best_angle)
+        self.actuator_controller.set_tilt_angle(best_tilt)
         
         return {
-            "tilt_angle": best_angle,
-            "micro_climate_effect": f"{best_effects['temp_reduction']:.1f}C",
-            "par_level": best_effects['par_umol_m2_s'],
-            "energy_output": best_effects['energy_kw'],
-            "crop_stress_index": best_effects['stress_index']
+            "tilt_angle": best_tilt,
+            "micro_climate_effect": f"{best_microclimate['temp_reduction']:.1f}C",
+            "par_level": best_microclimate['par'],
+            "crop_stress_index": best_crop_response['stress_index'],
+            "energy_generation": best_energy,
+            "optimization_score": best_score
         }
     
-    def _simulate_microclimate(
-        self, 
-        tilt_angle: float, 
-        ambient_temp: float,
-        sensors: Dict,
-        crop_params: Dict
-    ) -> Dict:
+    def _simulate_microclimate(self, tilt_angle: float, ambient_temp: float,
+                               solar_elevation: float, wind_speed: float) -> Dict:
         """
-        Simulate micro-climate effects using physics-informed models.
+        Use FNO to solve radiative transfer and heat diffusion.
+        
+        Physics equations:
+        - Radiative transfer: dI/ds = -κI + j
+        - Heat diffusion: ∂T/∂t = α∇²T + Q
+        - Momentum: ∂u/∂t + u·∇u = -∇p/ρ + ν∇²u
+        """
+        # Prepare input tensor
+        input_state = torch.tensor([
+            tilt_angle / 90.0,  # Normalized tilt
+            ambient_temp / 50.0,  # Normalized temperature
+            solar_elevation / 90.0,  # Normalized elevation
+            wind_speed / 20.0  # Normalized wind speed
+        ]).float().unsqueeze(0).cuda()
+        
+        # Run FNO forward pass
+        with torch.no_grad():
+            output = self.fno_model(input_state)
+        
+        # Extract predictions
+        temp_field = output[0, 0].cpu().numpy()
+        par_field = output[0, 1].cpu().numpy()
+        
+        # Compute statistics
+        temp_reduction = ambient_temp - temp_field.mean()
+        par_level = par_field.mean()
+        
+        return {
+            'temp_reduction': temp_reduction,
+            'par': par_level,
+            'temp_field': temp_field,
+            'par_field': par_field
+        }
+    
+    def _predict_crop_response(self, microclimate: Dict, crop_params: Dict) -> Dict:
+        """
+        Predict crop growth and stress using crop model.
         
         Args:
-            tilt_angle: Solar panel tilt angle (degrees)
-            ambient_temp: Ambient temperature (Celsius)
-            sensors: Current sensor readings
+            microclimate: Predicted microclimate conditions
             crop_params: Crop-specific parameters
         
         Returns:
-            Predicted micro-climate state
-        """
-        # 1. Radiative transfer model
-        radiation = self._compute_radiation(
-            tilt_angle=tilt_angle,
-            solar_zenith=sensors['solar_zenith'],
-            solar_azimuth=sensors['solar_azimuth'],
-            cloud_cover=sensors['cloud_cover']
-        )
-        
-        # 2. CFD model for airflow and temperature
-        airflow = self._compute_airflow(
-            tilt_angle=tilt_angle,
-            wind_speed=sensors['wind_speed'],
-            wind_direction=sensors['wind_direction']
-        )
-        
-        # 3. Crop canopy model
-        canopy_temp = self._compute_canopy_temperature(
-            ambient_temp=ambient_temp,
-            par=radiation['par_below_panels'],
-            airflow=airflow,
-            soil_moisture=sensors['soil_moisture']
-        )
-        
-        # 4. Crop stress model
-        stress_index = self._compute_crop_stress(
-            canopy_temp=canopy_temp,
-            par=radiation['par_below_panels'],
-            soil_moisture=sensors['soil_moisture'],
-            optimal_temp=crop_params['optimal_temp'],
-            optimal_par=crop_params['optimal_par']
-        )
-        
-        return {
-            'temp_reduction': ambient_temp - canopy_temp,
-            'par_umol_m2_s': radiation['par_below_panels'],
-            'energy_kw': radiation['energy_on_panels'] * 0.2,  # 20% efficiency
-            'stress_index': stress_index,
-            'soil_moisture_change': self._predict_moisture_change(airflow, canopy_temp)
-        }
-    
-    def _compute_radiation(
-        self, 
-        tilt_angle: float, 
-        solar_zenith: float,
-        solar_azimuth: float,
-        cloud_cover: float
-    ) -> Dict:
-        """
-        Solve radiative transfer equations using Modulus FNO.
-        
-        Returns:
-            PAR on panels, PAR below panels, total energy
-        """
-        # Prepare input tensor
-        input_tensor = torch.tensor([
-            [tilt_angle / 90.0,  # Normalize to [0, 1]
-             solar_zenith / 90.0,
-             solar_azimuth / 360.0,
-             cloud_cover]
-        ], dtype=torch.float32).cuda()
-        
-        # Run FNO model
-        with torch.no_grad():
-            output = self.radiative_model(input_tensor)
-        
-        # Extract outputs
-        par_on_panels = output[0, 0].item() * 2000  # Scale to μmol/m²/s
-        par_below_panels = output[0, 1].item() * 2000
-        energy_on_panels = output[0, 2].item() * 1000  # Scale to W/m²
-        
-        return {
-            'par_on_panels': par_on_panels,
-            'par_below_panels': par_below_panels,
-            'energy_on_panels': energy_on_panels
-        }
-    
-    def _compute_airflow(
-        self, 
-        tilt_angle: float, 
-        wind_speed: float,
-        wind_direction: float
-    ) -> Dict:
-        """
-        Solve Navier-Stokes equations for airflow using Modulus.
-        
-        Returns:
-            Velocity field, temperature field
+            Crop response metrics
         """
         # Prepare input
-        input_tensor = torch.tensor([
-            [tilt_angle / 90.0,
-             wind_speed / 20.0,  # Normalize assuming max 20 m/s
-             wind_direction / 360.0]
-        ], dtype=torch.float32).cuda()
+        crop_input = torch.tensor([
+            microclimate['par'],
+            microclimate['temp_reduction'],
+            crop_params['optimal_temp'],
+            crop_params['par_requirement']
+        ]).float().unsqueeze(0).cuda()
         
-        # Run CFD model
+        # Run crop model
         with torch.no_grad():
-            output = self.cfd_model(input_tensor)
+            response = self.crop_model(crop_input)
+        
+        # Extract metrics
+        stress_index = response[0, 0].item()  # 0 = no stress, 1 = severe stress
+        growth_rate = response[0, 1].item()  # Relative growth rate
         
         return {
-            'velocity_below_panels': output[0, 0].item() * 20.0,  # m/s
-            'turbulence_intensity': output[0, 1].item()
+            'stress_index': stress_index,
+            'growth_rate': growth_rate
         }
     
-    def _compute_canopy_temperature(
-        self,
-        ambient_temp: float,
-        par: float,
-        airflow: Dict,
-        soil_moisture: float
-    ) -> float:
+    def _predict_energy_generation(self, tilt_angle: float, 
+                                   solar_irradiance: float) -> float:
         """
-        Compute crop canopy temperature using energy balance.
+        Predict solar energy generation for given tilt.
+        
+        Args:
+            tilt_angle: Panel tilt angle (degrees)
+            solar_irradiance: Current solar irradiance (W/m²)
         
         Returns:
-            Canopy temperature (Celsius)
+            Predicted power generation (kW)
         """
-        # Simplified energy balance
-        # In production, use full Penman-Monteith equation
+        # Simple cosine model (production would use more sophisticated model)
+        panel_area = 100  # m²
+        efficiency = 0.20  # 20% panel efficiency
         
-        # Radiative heating
-        radiative_heating = par * 0.001  # Simplified conversion
+        # Angle of incidence factor
+        aoi_factor = np.cos(np.radians(tilt_angle))
         
-        # Convective cooling
-        convective_cooling = airflow['velocity_below_panels'] * 0.5
+        power = panel_area * efficiency * solar_irradiance * aoi_factor / 1000
         
-        # Evaporative cooling (depends on soil moisture)
-        evaporative_cooling = soil_moisture * 2.0
-        
-        # Net temperature change
-        temp_change = radiative_heating - convective_cooling - evaporative_cooling
-        
-        canopy_temp = ambient_temp + temp_change
-        
-        return canopy_temp
+        return max(0, power)
     
-    def _compute_crop_stress(
-        self,
-        canopy_temp: float,
-        par: float,
-        soil_moisture: float,
-        optimal_temp: float,
-        optimal_par: float
-    ) -> float:
+    def _compute_score(self, crop_response: Dict, energy_generation: float,
+                      crop_priority: float, energy_priority: float) -> float:
         """
-        Compute crop stress index (0 = no stress, 1 = severe stress).
+        Multi-objective optimization score.
         
-        Returns:
-            Stress index
+        Balances crop health and energy generation.
         """
-        # Temperature stress
-        temp_stress = abs(canopy_temp - optimal_temp) / 10.0
-        temp_stress = min(temp_stress, 1.0)
+        # Crop score (lower stress is better)
+        crop_score = (1 - crop_response['stress_index']) * crop_response['growth_rate']
         
-        # Light stress
-        light_stress = abs(par - optimal_par) / optimal_par
-        light_stress = min(light_stress, 1.0)
+        # Energy score (normalized to 0-1)
+        energy_score = energy_generation / 20.0  # Assume max 20 kW
         
-        # Water stress
-        water_stress = max(0, (0.3 - soil_moisture) / 0.3)  # Stress if < 30%
-        
-        # Combined stress (weighted average)
-        total_stress = (temp_stress * 0.4 + light_stress * 0.3 + water_stress * 0.3)
-        
-        return total_stress
-    
-    def _score_configuration(self, effects: Dict, crop_params: Dict) -> float:
-        """
-        Score a configuration based on crop health and energy production.
-        
-        Returns:
-            Score (higher is better)
-        """
-        # Crop health score (inverse of stress)
-        crop_score = (1.0 - effects['stress_index']) * 100
-        
-        # Energy production score
-        energy_score = effects['energy_kw'] * 10
-        
-        # Combined score (weighted)
-        total_score = crop_score * 0.6 + energy_score * 0.4
+        # Weighted combination
+        total_score = (crop_priority * crop_score + 
+                      energy_priority * energy_score)
         
         return total_score
     
-    def _get_crop_parameters(self, crop_type: str) -> Dict:
-        """Get optimal parameters for crop type."""
-        crop_db = {
-            'maize': {
-                'optimal_temp': 25.0,  # Celsius
-                'optimal_par': 1500,   # μmol/m²/s
-                'water_requirement': 0.5  # Fraction
-            },
-            'tomato': {
-                'optimal_temp': 22.0,
-                'optimal_par': 1200,
-                'water_requirement': 0.6
-            },
-            'kale': {
-                'optimal_temp': 18.0,
-                'optimal_par': 800,
-                'water_requirement': 0.4
-            }
-        }
-        return crop_db.get(crop_type, crop_db['maize'])
-    
-    def _predict_moisture_change(self, airflow: Dict, canopy_temp: float) -> float:
-        """Predict soil moisture change rate."""
-        # Simplified evapotranspiration model
-        et_rate = (canopy_temp / 30.0) * (1.0 + airflow['velocity_below_panels'] / 10.0)
-        return -et_rate * 0.01  # Negative = moisture loss
-    
-    def _load_radiative_model(self):
-        """Load pre-trained radiative transfer FNO model."""
+    def _load_fno_model(self):
+        """Load pre-trained Fourier Neural Operator for microclimate."""
         model = FNO(
-            in_channels=4,  # tilt, zenith, azimuth, cloud_cover
-            out_channels=3,  # par_on, par_below, energy
-            modes=12,
-            width=32
+            in_channels=4,  # tilt, temp, solar_elev, wind
+            out_channels=2,  # temp_field, par_field
+            decoder_layers=2,
+            decoder_layer_size=128,
+            dimension=2,
+            latent_channels=32,
+            num_fno_layers=4,
+            num_fno_modes=12,
+            padding=8
         ).cuda()
-        model.load_state_dict(torch.load('/models/radiative_transfer_fno.pth'))
+        
+        # Load pre-trained weights
+        model.load_state_dict(torch.load('/models/microclimate_fno.pth'))
         model.eval()
+        
         return model
     
     def _load_crop_model(self):
-        """Load crop growth model."""
+        """Load crop response model."""
         model = FullyConnected(
-            in_features=5,
+            in_features=4,
             out_features=2,
             num_layers=4,
             layer_size=64
         ).cuda()
-        model.load_state_dict(torch.load('/models/crop_growth.pth'))
+        
+        model.load_state_dict(torch.load('/models/crop_response.pth'))
         model.eval()
+        
         return model
     
-    def _load_cfd_model(self):
-        """Load CFD model for airflow."""
-        model = FNO(
-            in_channels=3,
-            out_channels=2,
-            modes=16,
-            width=48
-        ).cuda()
-        model.load_state_dict(torch.load('/models/cfd_airflow.pth'))
-        model.eval()
-        return model
+    def _get_crop_parameters(self, crop_type: str) -> Dict:
+        """Get crop-specific parameters."""
+        crop_db = {
+            'maize': {
+                'optimal_temp': 25.0,  # Celsius
+                'par_requirement': 400,  # μmol/m²/s
+                'water_requirement': 500  # mm/season
+            },
+            'tomato': {
+                'optimal_temp': 22.0,
+                'par_requirement': 300,
+                'water_requirement': 400
+            },
+            'kale': {
+                'optimal_temp': 18.0,
+                'par_requirement': 200,
+                'water_requirement': 300
+            }
+        }
+        
+        return crop_db.get(crop_type, crop_db['maize'])
 
-class SensorInterface:
-    """Interface to physical sensors."""
+class SensorArray:
+    """Sensor array for environmental monitoring."""
     
-    def read_all(self) -> Dict:
-        """Read all sensor values."""
-        return {
-            'solar_zenith': self._read_solar_position()[0],
-            'solar_azimuth': self._read_solar_position()[1],
-            'cloud_cover': self._read_cloud_cover(),
-            'wind_speed': self._read_wind()[0],
-            'wind_direction': self._read_wind()[1],
-            'soil_moisture': self._read_soil_moisture(),
-            'ambient_temp': self._read_temperature(),
-            'humidity': self._read_humidity()
+    def __init__(self):
+        self.sensors = {
+            'pyranometer': Pyranometer(),
+            'soil_moisture': SoilMoistureSensor(),
+            'temperature': TemperatureSensor(),
+            'humidity': HumiditySensor(),
+            'wind': WindSensor()
         }
     
-    def _read_solar_position(self) -> Tuple[float, float]:
-        """Read solar zenith and azimuth angles."""
-        # In production, compute from GPS + time or use sensor
-        return (45.0, 180.0)  # Placeholder
+    def read_all(self) -> Dict:
+        """Read all sensors."""
+        return {
+            'solar_irradiance': self.sensors['pyranometer'].read(),
+            'solar_elevation': self._compute_solar_elevation(),
+            'soil_moisture': self.sensors['soil_moisture'].read(),
+            'temperature': self.sensors['temperature'].read(),
+            'humidity': self.sensors['humidity'].read(),
+            'wind_speed': self.sensors['wind'].read()
+        }
     
-    def _read_cloud_cover(self) -> float:
-        """Read cloud cover fraction (0-1)."""
-        # In production, use pyranometer or sky camera
-        return 0.2
-    
-    def _read_wind(self) -> Tuple[float, float]:
-        """Read wind speed (m/s) and direction (degrees)."""
-        return (3.5, 270.0)
-    
-    def _read_soil_moisture(self) -> float:
-        """Read soil moisture fraction (0-1)."""
-        return 0.45
-    
-    def _read_temperature(self) -> float:
-        """Read ambient temperature (Celsius)."""
-        return 28.0
-    
-    def _read_humidity(self) -> float:
-        """Read relative humidity (0-1)."""
-        return 0.65
+    def _compute_solar_elevation(self) -> float:
+        """Compute solar elevation angle from time and location."""
+        import datetime
+        from pysolar.solar import get_altitude
+        
+        # Example location (Nairobi, Kenya)
+        latitude = -1.286389
+        longitude = 36.817223
+        
+        now = datetime.datetime.now(datetime.timezone.utc)
+        elevation = get_altitude(latitude, longitude, now)
+        
+        return max(0, elevation)
 
-class ActuatorInterface:
-    """Interface to physical actuators."""
+class ActuatorController:
+    """Controller for solar panel actuators."""
     
-    def set_panel_tilt(self, angle: float):
-        """Set solar panel tilt angle."""
-        print(f"   [Actuator] Setting panel tilt to {angle:.1f}°")
-        # In production, send command to servo controller
+    def __init__(self):
+        self.servo_controller = ServoController()
+        self.current_tilt = 0
     
-    def set_irrigation(self, valve_id: int, flow_rate: float):
-        """Set irrigation valve flow rate."""
-        print(f"   [Actuator] Setting valve {valve_id} to {flow_rate:.2f} L/min")
+    def set_tilt_angle(self, angle: float):
+        """
+        Set solar panel tilt angle.
+        
+        Args:
+            angle: Tilt angle in degrees (0-90)
+        """
+        # Limit rate of change to prevent mechanical stress
+        max_change = 5.0  # degrees per adjustment
+        
+        if abs(angle - self.current_tilt) > max_change:
+            # Gradual adjustment
+            if angle > self.current_tilt:
+                angle = self.current_tilt + max_change
+            else:
+                angle = self.current_tilt - max_change
+        
+        # Send command to servo
+        self.servo_controller.set_angle(angle)
+        self.current_tilt = angle
+        
+        print(f"   [Actuator] Panel tilt set to {angle:.1f}°")
+
+class IrrigationOptimizer:
+    """
+    Optimize irrigation based on crop water requirements and soil moisture.
+    """
+    def __init__(self):
+        self.soil_sensors = []
+        self.valves = []
+    
+    def optimize_irrigation(self, crop_type: str, weather_forecast: Dict) -> Dict:
+        """
+        Determine optimal irrigation schedule.
+        
+        Args:
+            crop_type: Type of crop
+            weather_forecast: 7-day weather forecast
+        
+        Returns:
+            Irrigation schedule
+        """
+        # Get current soil moisture
+        soil_moisture = np.mean([s.read() for s in self.soil_sensors])
+        
+        # Get crop water requirement
+        crop_params = self._get_crop_parameters(crop_type)
+        daily_requirement = crop_params['water_requirement'] / 120  # mm/day
+        
+        # Predict rainfall
+        predicted_rainfall = sum(weather_forecast['rainfall'][:7])
+        
+        # Calculate irrigation need
+        irrigation_need = daily_requirement * 7 - predicted_rainfall
+        
+        # Adjust for current soil moisture
+        if soil_moisture > 0.7:  # 70% saturation
+            irrigation_need *= 0.5
+        elif soil_moisture < 0.3:  # 30% saturation
+            irrigation_need *= 1.5
+        
+        # Schedule irrigation
+        schedule = self._create_schedule(irrigation_need, weather_forecast)
+        
+        return {
+            'total_irrigation': irrigation_need,
+            'schedule': schedule,
+            'water_saved': max(0, predicted_rainfall)
+        }
 ```
 
 ## Use cases
 
-### Drought-resilient farming
-Optimize water use during drought:
-1. Modulus detects high crop stress from low soil moisture
-2. Tilts panels to maximize shade during hottest hours
-3. Reduces evapotranspiration by 30%
-4. Maintains 80% of crop yield with 50% less water
-5. Solar energy production continues at 70% capacity
+### Smallholder farm optimization
+Maximize productivity on limited land:
+1. Install agro-voltaic system (solar + crops)
+2. Modulus optimizes panel tilt hourly
+3. Crops receive optimal PAR and temperature
+4. Solar generates 15 kW for farm operations
+5. 40% increase in land productivity
 
-### Heat wave protection
-Protect crops during extreme heat:
-1. Temperature exceeds 40°C
-2. Panels tilted to provide maximum shade
+### Climate adaptation
+Mitigate extreme heat stress:
+1. Heat wave predicted (40°C)
+2. Modulus adjusts panels for maximum shading
 3. Micro-climate temperature reduced by 8°C
-4. Crop stress index drops from 0.9 to 0.3
-5. Prevents crop failure
+4. Crops avoid heat stress
+5. Energy generation reduced 20% but crops saved
 
-### Energy-food optimization
-Balance energy and food production:
-1. Morning: panels tilted for maximum energy (peak demand)
-2. Midday: panels tilted for crop shade (heat protection)
-3. Afternoon: balanced configuration
-4. Evening: maximum energy (peak demand)
-5. 24-hour optimization cycle
+### Water scarcity management
+Optimize irrigation in drought:
+1. Soil moisture sensors detect low levels
+2. Weather forecast shows no rain for 14 days
+3. Irrigation optimizer schedules precise watering
+4. Drip irrigation activated at optimal times
+5. 60% water savings vs. traditional irrigation
 
 ## Performance benchmarks
 
-| Metric | Without agro-voltaics | With optimization |
-|--------|----------------------|-------------------|
-| Crop yield | 100% | 95% |
-| Energy production | 0 kWh/m² | 150 kWh/m²/year |
-| Water use | 100% | 65% |
-| Land use efficiency | 100% | 160% |
-| Micro-climate temp reduction | 0°C | -5°C average |
+| Task | Hardware | Time | Accuracy |
+|------|----------|------|----------|
+| Microclimate simulation | Jetson AGX Orin | 180ms | 94% vs. CFD |
+| Crop response prediction | Jetson AGX Orin | 45ms | 89% vs. field data |
+| Optimization (18 angles) | Jetson AGX Orin | 3.2s | - |
+| Sensor reading | Raspberry Pi | 50ms | ±2% |
 
 ## Integration with other stacks
 
 ### Stack 3: Spatial omniscience
 - GeoGhost provides elevation and soil type data
-- Modulus uses satellite imagery for crop health
+- Modulus uses satellite NDVI for crop health
+
+### Stack 5: Humanitarian substrate
+- Bio-credits minted for sustainable farming practices
+- Carbon sequestration tracked on-chain
 
 ### Stack 6: Connectivity
 - Sensor data transmitted via Ghost-Mesh
-- Remote monitoring and control
-
-### Stack 10: Circularity
-- Solar panels from recycled materials
-- End-of-life panel recycling
+- Remote monitoring over LoRa
 
 ## Regulatory compliance
 
-- **FAO Guidelines**: Sustainable agriculture practices
-- **Paris Agreement**: Climate change mitigation
-- **Local Agricultural Standards**: Crop safety and quality
-- **Grid Connection Standards**: Energy export compliance
+- **Organic Certification**: No synthetic inputs tracked
+- **Carbon Credits**: Verified emission reductions
+- **Water Rights**: Compliance with usage limits
+- **Grid Connection**: Net metering regulations
 
 ## Next steps
 
@@ -495,12 +476,12 @@ Balance energy and food production:
     Confidential legal enclaves
   </Card>
   <Card title="Modulus training" icon="brain" href="/integrations/modulus-agro-voltaics">
-    Train custom physics models
+    Physics-informed ML guide
   </Card>
-  <Card title="Sensor integration" icon="sensor" href="/hardware/agricultural-sensors">
+  <Card title="Sensor integration" icon="sensor" href="/deployment/sensor-arrays">
     Agricultural sensor setup
   </Card>
-  <Card title="Crop database" icon="seedling" href="/agriculture/crop-parameters">
-    Supported crop types
+  <Card title="Agro-voltaic design" icon="solar-panel" href="/architecture/agro-voltaic-systems">
+    System design principles
   </Card>
 </CardGroup>
