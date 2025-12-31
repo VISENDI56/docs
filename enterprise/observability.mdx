@@ -1,0 +1,660 @@
+---
+title: Observability
+description: Monitoring, metrics, and alerting for production iLuminara deployments
+---
+
+Comprehensive observability enables proactive monitoring, rapid troubleshooting, and continuous optimization of iLuminara deployments through metrics collection, visualization, and intelligent alerting.
+
+## Observability stack
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                   iLuminara Services                     │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐        │
+│  │    JEPA    │  │  Omni-Law  │  │ Ghost-Mesh │        │
+│  │  Planning  │  │ Validation │  │  Routing   │        │
+│  └──────┬─────┘  └──────┬─────┘  └──────┬─────┘        │
+│         │ metrics        │ metrics        │ metrics      │
+└─────────┼────────────────┼────────────────┼──────────────┘
+          │                │                │
+          ▼                ▼                ▼
+┌─────────────────────────────────────────────────────────┐
+│                      Prometheus                          │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │  Time-series database (15s scrape interval)        │ │
+│  └────────────────────────────────────────────────────┘ │
+└─────────────────────────┬───────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────┐
+│                       Grafana                            │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐        │
+│  │  Planning  │  │ Compliance │  │ Networking │        │
+│  │ Dashboard  │  │ Dashboard  │  │ Dashboard  │        │
+│  └────────────┘  └────────────┘  └────────────┘        │
+└─────────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────┐
+│                    Alertmanager                          │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │  Slack, Email, PagerDuty, SMS                      │ │
+│  └────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+```
+
+## Prometheus configuration
+
+### Scrape configuration
+
+```yaml
+# infrastructure/observability/prometheus.yml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'iluminara-prod'
+    environment: 'production'
+
+scrape_configs:
+  # iLuminara Core API
+  - job_name: 'iluminara_core'
+    static_configs:
+      - targets: ['localhost:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+  
+  # JEPA Planning Engine
+  - job_name: 'jepa_planner'
+    static_configs:
+      - targets: ['localhost:8001']
+    metrics_path: '/metrics'
+  
+  # Omni-Law Governance
+  - job_name: 'omni_law'
+    static_configs:
+      - targets: ['localhost:8002']
+    metrics_path: '/metrics'
+  
+  # Ghost-Mesh Networking
+  - job_name: 'ghost_mesh'
+    static_configs:
+      - targets: ['localhost:8003']
+    metrics_path: '/metrics'
+  
+  # Node Exporter (system metrics)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['localhost:9100']
+  
+  # NVIDIA GPU metrics
+  - job_name: 'nvidia_gpu'
+    static_configs:
+      - targets: ['localhost:9445']
+
+# Alerting rules
+rule_files:
+  - 'alerts/*.yml'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['localhost:9093']
+```
+
+### Metrics instrumentation
+
+```python
+# core/observability/metrics.py
+from prometheus_client import Counter, Histogram, Gauge, Summary
+import time
+
+# JEPA Planning metrics
+jepa_planning_latency = Histogram(
+    'jepa_planning_latency_seconds',
+    'Time spent planning action',
+    buckets=[0.01, 0.05, 0.1, 0.5, 1.0, 5.0]
+)
+
+jepa_world_model_uncertainty = Gauge(
+    'jepa_world_model_uncertainty',
+    'World model prediction uncertainty',
+    ['state_type']
+)
+
+jepa_energy_minimized = Histogram(
+    'jepa_energy_minimized',
+    'Energy value of selected trajectory',
+    buckets=[0, 10, 50, 100, 500, 1000]
+)
+
+jepa_rl_fallback_total = Counter(
+    'jepa_rl_fallback_total',
+    'Number of times RL fallback was triggered'
+)
+
+# Omni-Law metrics
+omni_law_validation_latency = Histogram(
+    'omni_law_validation_latency_seconds',
+    'Time spent validating compliance',
+    ['framework'],
+    buckets=[0.001, 0.005, 0.01, 0.05, 0.1]
+)
+
+omni_law_violations_total = Counter(
+    'omni_law_violations_total',
+    'Total compliance violations detected',
+    ['framework', 'severity']
+)
+
+omni_law_frameworks_checked = Gauge(
+    'omni_law_frameworks_checked',
+    'Number of frameworks checked per validation'
+)
+
+# Ghost-Mesh metrics
+ghost_mesh_connectivity_ratio = Gauge(
+    'ghost_mesh_connectivity_ratio',
+    'Ratio of reachable peers',
+    ['protocol']
+)
+
+ghost_mesh_message_latency = Histogram(
+    'ghost_mesh_message_latency_seconds',
+    'Message delivery latency',
+    ['protocol'],
+    buckets=[0.1, 0.5, 1.0, 5.0, 10.0, 30.0]
+)
+
+ghost_mesh_bandwidth_mbps = Gauge(
+    'ghost_mesh_bandwidth_mbps',
+    'Available bandwidth',
+    ['protocol']
+)
+
+# System metrics
+gpu_utilization_percent = Gauge(
+    'gpu_utilization_percent',
+    'GPU utilization percentage',
+    ['gpu_id']
+)
+
+gpu_memory_used_bytes = Gauge(
+    'gpu_memory_used_bytes',
+    'GPU memory used in bytes',
+    ['gpu_id']
+)
+
+# Example instrumentation
+class InstrumentedJEPAPlanner:
+    def __init__(self, planner):
+        self.planner = planner
+    
+    @jepa_planning_latency.time()
+    def plan_action(self, state, horizon=10):
+        # Record uncertainty
+        uncertainty = self.planner.world_model.uncertainty(state)
+        jepa_world_model_uncertainty.labels(state_type='drone').set(uncertainty)
+        
+        # Plan action
+        action = self.planner.plan_action(state, horizon)
+        
+        # Record if RL fallback was triggered
+        if action == "TRIGGER_RL_ADAPTATION":
+            jepa_rl_fallback_total.inc()
+        
+        return action
+```
+
+## Grafana dashboards
+
+### JEPA planning dashboard
+
+```json
+{
+  "dashboard": {
+    "title": "JEPA Planning Metrics",
+    "panels": [
+      {
+        "title": "Planning Latency",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(jepa_planning_latency_seconds_bucket[5m]))",
+            "legendFormat": "p95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(jepa_planning_latency_seconds_bucket[5m]))",
+            "legendFormat": "p99"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "World Model Uncertainty",
+        "targets": [
+          {
+            "expr": "jepa_world_model_uncertainty",
+            "legendFormat": "{{state_type}}"
+          }
+        ],
+        "type": "graph",
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [0.8],
+                "type": "gt"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              }
+            }
+          ],
+          "message": "High world model uncertainty detected"
+        }
+      },
+      {
+        "title": "RL Fallback Rate",
+        "targets": [
+          {
+            "expr": "rate(jepa_rl_fallback_total[5m])",
+            "legendFormat": "fallbacks/sec"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "Energy Minimized Distribution",
+        "targets": [
+          {
+            "expr": "rate(jepa_energy_minimized_bucket[5m])",
+            "legendFormat": "{{le}}"
+          }
+        ],
+        "type": "heatmap"
+      }
+    ]
+  }
+}
+```
+
+### Omni-Law compliance dashboard
+
+```json
+{
+  "dashboard": {
+    "title": "Omni-Law Compliance",
+    "panels": [
+      {
+        "title": "Validation Latency by Framework",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(omni_law_validation_latency_seconds_bucket[5m]))",
+            "legendFormat": "{{framework}}"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "Violations by Framework",
+        "targets": [
+          {
+            "expr": "sum(rate(omni_law_violations_total[1h])) by (framework)",
+            "legendFormat": "{{framework}}"
+          }
+        ],
+        "type": "bar"
+      },
+      {
+        "title": "Critical Violations",
+        "targets": [
+          {
+            "expr": "sum(rate(omni_law_violations_total{severity=\"CRITICAL\"}[5m]))",
+            "legendFormat": "critical/min"
+          }
+        ],
+        "type": "stat",
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [0],
+                "type": "gt"
+              }
+            }
+          ],
+          "message": "Critical compliance violation detected"
+        }
+      }
+    ]
+  }
+}
+```
+
+### Ghost-Mesh connectivity dashboard
+
+```json
+{
+  "dashboard": {
+    "title": "Ghost-Mesh Connectivity",
+    "panels": [
+      {
+        "title": "Connectivity Ratio by Protocol",
+        "targets": [
+          {
+            "expr": "ghost_mesh_connectivity_ratio",
+            "legendFormat": "{{protocol}}"
+          }
+        ],
+        "type": "graph",
+        "yaxis": {
+          "min": 0,
+          "max": 1
+        }
+      },
+      {
+        "title": "Message Latency",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(ghost_mesh_message_latency_seconds_bucket[5m]))",
+            "legendFormat": "{{protocol}} p95"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "Bandwidth by Protocol",
+        "targets": [
+          {
+            "expr": "ghost_mesh_bandwidth_mbps",
+            "legendFormat": "{{protocol}}"
+          }
+        ],
+        "type": "graph"
+      }
+    ]
+  }
+}
+```
+
+## Alerting rules
+
+### Critical alerts
+
+```yaml
+# infrastructure/observability/alerts/critical.yml
+groups:
+  - name: critical
+    interval: 30s
+    rules:
+      # High world model uncertainty
+      - alert: HighWorldModelUncertainty
+        expr: jepa_world_model_uncertainty > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High world model uncertainty detected"
+          description: "World model uncertainty is {{ $value }}, triggering RL fallback"
+      
+      # Compliance violations
+      - alert: CriticalComplianceViolation
+        expr: rate(omni_law_violations_total{severity="CRITICAL"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical compliance violation"
+          description: "Framework {{ $labels.framework }} detected critical violation"
+      
+      # Ghost-Mesh connectivity loss
+      - alert: GhostMeshConnectivityLoss
+        expr: ghost_mesh_connectivity_ratio < 0.3
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Ghost-Mesh connectivity degraded"
+          description: "Connectivity ratio is {{ $value }} for {{ $labels.protocol }}"
+      
+      # GPU out of memory
+      - alert: GPUOutOfMemory
+        expr: gpu_memory_used_bytes / gpu_memory_total_bytes > 0.95
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "GPU {{ $labels.gpu_id }} out of memory"
+          description: "GPU memory usage is {{ $value | humanizePercentage }}"
+      
+      # Planning latency spike
+      - alert: PlanningLatencySpike
+        expr: histogram_quantile(0.95, rate(jepa_planning_latency_seconds_bucket[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Planning latency spike"
+          description: "p95 planning latency is {{ $value }}s"
+```
+
+### Alertmanager configuration
+
+```yaml
+# infrastructure/observability/alertmanager.yml
+global:
+  resolve_timeout: 5m
+  slack_api_url: ${SLACK_WEBHOOK_URL}
+
+route:
+  group_by: ['alertname', 'cluster']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  receiver: 'default'
+  
+  routes:
+    # Critical alerts go to PagerDuty
+    - match:
+        severity: critical
+      receiver: 'pagerduty'
+      continue: true
+    
+    # All alerts go to Slack
+    - match_re:
+        severity: ^(warning|critical)$
+      receiver: 'slack'
+
+receivers:
+  - name: 'default'
+    email_configs:
+      - to: 'ops@iluminara.org'
+        from: 'alertmanager@iluminara.org'
+        smarthost: 'smtp.gmail.com:587'
+  
+  - name: 'slack'
+    slack_configs:
+      - channel: '#iluminara-alerts'
+        title: '{{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+  
+  - name: 'pagerduty'
+    pagerduty_configs:
+      - service_key: ${PAGERDUTY_SERVICE_KEY}
+        description: '{{ .GroupLabels.alertname }}'
+```
+
+## Real-time dashboard
+
+### Streamlit enterprise console
+
+```python
+# dashboard_pro.py
+import streamlit as st
+import time
+import requests
+from datetime import datetime
+
+st.set_page_config(
+    layout="wide",
+    page_title="iLuminara Enterprise Console",
+    page_icon="🌍"
+)
+
+# Initialize components
+PROMETHEUS_URL = "http://localhost:9090"
+
+st.title("🌍 iLuminara Enterprise Monitor")
+
+# Metrics containers
+metrics_row1 = st.columns(4)
+metrics_row2 = st.columns(4)
+logs_container = st.empty()
+charts_container = st.empty()
+
+def query_prometheus(query):
+    """Query Prometheus API."""
+    response = requests.get(
+        f"{PROMETHEUS_URL}/api/v1/query",
+        params={'query': query}
+    )
+    return response.json()['data']['result']
+
+# Main loop
+while True:
+    # Query metrics
+    planning_latency = query_prometheus(
+        'histogram_quantile(0.95, rate(jepa_planning_latency_seconds_bucket[5m]))'
+    )
+    
+    world_model_uncertainty = query_prometheus(
+        'jepa_world_model_uncertainty'
+    )
+    
+    compliance_status = query_prometheus(
+        'rate(omni_law_violations_total[5m])'
+    )
+    
+    connectivity_ratio = query_prometheus(
+        'ghost_mesh_connectivity_ratio'
+    )
+    
+    # Display metrics
+    with metrics_row1[0]:
+        st.metric(
+            "Planning Latency (p95)",
+            f"{float(planning_latency[0]['value'][1]):.0f}ms",
+            delta="-5ms"
+        )
+    
+    with metrics_row1[1]:
+        uncertainty = float(world_model_uncertainty[0]['value'][1])
+        st.metric(
+            "World Model Uncertainty",
+            f"{uncertainty:.2f}",
+            delta="0.05" if uncertainty > 0.8 else None,
+            delta_color="inverse"
+        )
+    
+    with metrics_row1[2]:
+        violations = sum(float(r['value'][1]) for r in compliance_status)
+        st.metric(
+            "Compliance Violations",
+            f"{violations:.1f}/min",
+            delta=None if violations == 0 else f"+{violations:.1f}"
+        )
+    
+    with metrics_row1[3]:
+        connectivity = float(connectivity_ratio[0]['value'][1])
+        st.metric(
+            "Ghost-Mesh Connectivity",
+            f"{connectivity:.0%}",
+            delta="-10%" if connectivity < 0.5 else None
+        )
+    
+    # Logs
+    with logs_container.container():
+        st.subheader("Recent Events")
+        st.write(f"[{datetime.now().strftime('%X')}] JEPA planning completed in 42ms")
+        st.write(f"[{datetime.now().strftime('%X')}] Omni-Law validated GDPR compliance")
+        st.write(f"[{datetime.now().strftime('%X')}] Ghost-Mesh switched to LoRa mode")
+    
+    time.sleep(2)  # 2-second refresh
+```
+
+## Log aggregation
+
+### Structured logging
+
+```python
+# core/observability/logging.py
+import logging
+import json
+from datetime import datetime
+
+class StructuredLogger:
+    """Structured JSON logging for centralized aggregation."""
+    
+    def __init__(self, name):
+        self.logger = logging.getLogger(name)
+        self.logger.setLevel(logging.INFO)
+        
+        handler = logging.StreamHandler()
+        handler.setFormatter(JSONFormatter())
+        self.logger.addHandler(handler)
+    
+    def info(self, message, **kwargs):
+        self.logger.info(message, extra=kwargs)
+    
+    def error(self, message, **kwargs):
+        self.logger.error(message, extra=kwargs)
+
+class JSONFormatter(logging.Formatter):
+    """Format logs as JSON."""
+    
+    def format(self, record):
+        log_data = {
+            'timestamp': datetime.utcnow().isoformat(),
+            'level': record.levelname,
+            'logger': record.name,
+            'message': record.getMessage(),
+            'module': record.module,
+            'function': record.funcName,
+            'line': record.lineno
+        }
+        
+        # Add extra fields
+        if hasattr(record, 'extra'):
+            log_data.update(record.extra)
+        
+        return json.dumps(log_data)
+
+# Usage
+logger = StructuredLogger('jepa_planner')
+logger.info(
+    "Planning completed",
+    latency_ms=42,
+    uncertainty=0.15,
+    energy=125.3
+)
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Security" icon="shield-halved" href="/enterprise/security">
+    CI/CD and compliance
+  </Card>
+  <Card title="Deployment" icon="rocket" href="/enterprise/deployment">
+    Production deployment
+  </Card>
+  <Card title="JEPA architecture" icon="brain" href="/enterprise/jepa-architecture">
+    Energy-based planning
+  </Card>
+  <Card title="Enterprise overview" icon="building" href="/enterprise/overview">
+    Return to overview
+  </Card>
+</CardGroup>
