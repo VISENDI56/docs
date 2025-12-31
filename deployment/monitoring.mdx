@@ -1,0 +1,714 @@
+---
+title: Observability and monitoring
+description: Comprehensive monitoring, logging, and tracing for iLuminara production deployments
+---
+
+iLuminara uses a complete observability stack with Prometheus, Grafana, Loki, and Tempo for metrics, logs, and traces.
+
+## Observability stack
+
+### Architecture
+
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│   Services  │────▶│  Prometheus  │────▶│   Grafana   │
+│             │     │   (Metrics)  │     │ (Dashboards)│
+└─────────────┘     └──────────────┘     └─────────────┘
+       │                                         ▲
+       │            ┌──────────────┐             │
+       └───────────▶│     Loki     │─────────────┘
+       │            │    (Logs)    │
+       │            └──────────────┘
+       │
+       │            ┌──────────────┐
+       └───────────▶│    Tempo     │
+                    │   (Traces)   │
+                    └──────────────┘
+```
+
+### Components
+
+**Prometheus**: Time-series metrics collection and alerting  
+**Grafana**: Visualization and dashboards  
+**Loki**: Log aggregation and querying  
+**Tempo**: Distributed tracing  
+**Alertmanager**: Alert routing and notification
+
+## Prometheus setup
+
+### Configuration
+
+```yaml monitoring/prometheus.yml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'iluminara-prod'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Load rules
+rule_files:
+  - '/etc/prometheus/rules/*.yml'
+
+# Scrape configurations
+scrape_configs:
+  # API Gateway
+  - job_name: 'api-gateway'
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - iluminara
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        action: keep
+        regex: api-gateway
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+
+  # JEPA Service
+  - job_name: 'jepa-service'
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - iluminara
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        action: keep
+        regex: jepa-service
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+
+  # Node Exporter
+  - job_name: 'node-exporter'
+    kubernetes_sd_configs:
+      - role: node
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: '(.*):10250'
+        replacement: '${1}:9100'
+        target_label: __address__
+
+  # NVIDIA DCGM Exporter (GPU metrics)
+  - job_name: 'dcgm-exporter'
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - gpu-operator
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        action: keep
+        regex: nvidia-dcgm-exporter
+```
+
+### Alert rules
+
+```yaml monitoring/rules/alerts.yml
+groups:
+  - name: iluminara_alerts
+    interval: 30s
+    rules:
+      # High error rate
+      - alert: HighErrorRate
+        expr: |
+          rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate detected"
+          description: "{{ $labels.service }} has error rate of {{ $value | humanizePercentage }}"
+
+      # High latency
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95, 
+            rate(http_request_duration_seconds_bucket[5m])
+          ) > 1.0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency detected"
+          description: "{{ $labels.service }} p95 latency is {{ $value }}s"
+
+      # GPU utilization
+      - alert: LowGPUUtilization
+        expr: |
+          avg(DCGM_FI_DEV_GPU_UTIL) < 20
+        for: 30m
+        labels:
+          severity: info
+        annotations:
+          summary: "Low GPU utilization"
+          description: "GPU utilization is {{ $value }}%"
+
+      # Memory pressure
+      - alert: HighMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "Node {{ $labels.node }} memory usage is {{ $value | humanizePercentage }}"
+
+      # Pod restarts
+      - alert: FrequentPodRestarts
+        expr: |
+          rate(kube_pod_container_status_restarts_total[15m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Frequent pod restarts"
+          description: "Pod {{ $labels.pod }} is restarting frequently"
+
+      # Certificate expiry
+      - alert: CertificateExpiringSoon
+        expr: |
+          (x509_cert_not_after - time()) / 86400 < 30
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Certificate expiring soon"
+          description: "Certificate {{ $labels.subject }} expires in {{ $value }} days"
+```
+
+## Grafana dashboards
+
+### iLuminara overview dashboard
+
+```json monitoring/grafana/dashboards/iluminara-overview.json
+{
+  "dashboard": {
+    "title": "iLuminara Overview",
+    "tags": ["iluminara", "overview"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Request Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{namespace=\"iluminara\"}[5m])) by (service)",
+            "legendFormat": "{{ service }}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Error Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{namespace=\"iluminara\",status=~\"5..\"}[5m])) by (service)",
+            "legendFormat": "{{ service }}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Latency (p95)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace=\"iluminara\"}[5m])) by (service, le))",
+            "legendFormat": "{{ service }}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "Active Pods",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "count(kube_pod_status_phase{namespace=\"iluminara\",phase=\"Running\"})"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 8}
+      }
+    ]
+  }
+}
+```
+
+### GPU monitoring dashboard
+
+```json monitoring/grafana/dashboards/gpu-monitoring.json
+{
+  "dashboard": {
+    "title": "GPU Monitoring",
+    "tags": ["gpu", "nvidia"],
+    "panels": [
+      {
+        "id": 1,
+        "title": "GPU Utilization",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "DCGM_FI_DEV_GPU_UTIL",
+            "legendFormat": "GPU {{ gpu }}"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "GPU Memory Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "DCGM_FI_DEV_FB_USED / DCGM_FI_DEV_FB_FREE * 100",
+            "legendFormat": "GPU {{ gpu }}"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "GPU Temperature",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "DCGM_FI_DEV_GPU_TEMP",
+            "legendFormat": "GPU {{ gpu }}"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "GPU Power Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "DCGM_FI_DEV_POWER_USAGE",
+            "legendFormat": "GPU {{ gpu }}"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+## Logging with Loki
+
+### Loki configuration
+
+```yaml monitoring/loki-config.yml
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+
+ingester:
+  lifecycler:
+    address: 127.0.0.1
+    ring:
+      kvstore:
+        store: inmemory
+      replication_factor: 1
+  chunk_idle_period: 5m
+  chunk_retain_period: 30s
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: boltdb-shipper
+      object_store: s3
+      schema: v11
+      index:
+        prefix: loki_index_
+        period: 24h
+
+storage_config:
+  boltdb_shipper:
+    active_index_directory: /loki/index
+    cache_location: /loki/cache
+    shared_store: s3
+  aws:
+    s3: s3://us-east-1/iluminara-logs
+    s3forcepathstyle: true
+
+limits_config:
+  enforce_metric_name: false
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h
+  ingestion_rate_mb: 10
+  ingestion_burst_size_mb: 20
+
+chunk_store_config:
+  max_look_back_period: 720h
+
+table_manager:
+  retention_deletes_enabled: true
+  retention_period: 720h
+```
+
+### Promtail configuration
+
+```yaml monitoring/promtail-config.yml
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Kubernetes pod logs
+  - job_name: kubernetes-pods
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        target_label: app
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+      - source_labels: [__meta_kubernetes_pod_container_name]
+        target_label: container
+    pipeline_stages:
+      # Parse JSON logs
+      - json:
+          expressions:
+            level: level
+            message: message
+            timestamp: timestamp
+      # Extract log level
+      - labels:
+          level:
+      # Add timestamp
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+```
+
+### Log queries
+
+```promql
+# Error logs in last hour
+{namespace="iluminara"} |= "error" | json | level="error"
+
+# Slow requests
+{app="api-gateway"} | json | duration > 1s
+
+# GPU out of memory errors
+{app="jepa-service"} |= "CUDA out of memory"
+
+# Failed authentication attempts
+{app="api-gateway"} | json | status="401"
+
+# Top error messages
+topk(10, 
+  sum by (message) (
+    count_over_time({namespace="iluminara"} | json | level="error" [1h])
+  )
+)
+```
+
+## Distributed tracing with Tempo
+
+### Tempo configuration
+
+```yaml monitoring/tempo-config.yml
+server:
+  http_listen_port: 3200
+
+distributor:
+  receivers:
+    jaeger:
+      protocols:
+        thrift_http:
+        grpc:
+    otlp:
+      protocols:
+        http:
+        grpc:
+
+ingester:
+  trace_idle_period: 10s
+  max_block_bytes: 1_000_000
+  max_block_duration: 5m
+
+compactor:
+  compaction:
+    block_retention: 720h
+
+storage:
+  trace:
+    backend: s3
+    s3:
+      bucket: iluminara-traces
+      endpoint: s3.us-east-1.amazonaws.com
+    pool:
+      max_workers: 100
+      queue_depth: 10000
+```
+
+### Instrumentation
+
+```python services/tracing.py
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.requests import RequestsInstrumentor
+
+def setup_tracing(service_name: str):
+    """
+    Setup OpenTelemetry tracing for service.
+    
+    Args:
+        service_name: Name of the service
+    """
+    # Create tracer provider
+    provider = TracerProvider(
+        resource=Resource.create({
+            "service.name": service_name,
+            "service.namespace": "iluminara",
+            "deployment.environment": "production"
+        })
+    )
+    
+    # Configure OTLP exporter
+    otlp_exporter = OTLPSpanExporter(
+        endpoint="tempo:4317",
+        insecure=True
+    )
+    
+    # Add span processor
+    provider.add_span_processor(
+        BatchSpanProcessor(otlp_exporter)
+    )
+    
+    # Set global tracer provider
+    trace.set_tracer_provider(provider)
+    
+    # Auto-instrument frameworks
+    FastAPIInstrumentor.instrument()
+    RequestsInstrumentor.instrument()
+
+# Usage in service
+from fastapi import FastAPI
+
+app = FastAPI()
+setup_tracing("api-gateway")
+
+@app.get("/predict")
+async def predict(request: PredictionRequest):
+    tracer = trace.get_tracer(__name__)
+    
+    with tracer.start_as_current_span("predict") as span:
+        span.set_attribute("model", "jepa")
+        span.set_attribute("horizon", request.horizon)
+        
+        # Call JEPA service
+        with tracer.start_as_current_span("jepa_rollout"):
+            result = await jepa_client.rollout(request)
+        
+        # Call MPC service
+        with tracer.start_as_current_span("mpc_plan"):
+            action = await mpc_client.plan(result)
+        
+        return action
+```
+
+## Alerting
+
+### Alertmanager configuration
+
+```yaml monitoring/alertmanager.yml
+global:
+  resolve_timeout: 5m
+  slack_api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  receiver: 'default'
+  routes:
+    # Critical alerts to PagerDuty
+    - match:
+        severity: critical
+      receiver: 'pagerduty'
+      continue: true
+    
+    # Warning alerts to Slack
+    - match:
+        severity: warning
+      receiver: 'slack'
+    
+    # Info alerts to email
+    - match:
+        severity: info
+      receiver: 'email'
+
+receivers:
+  - name: 'default'
+    slack_configs:
+      - channel: '#iluminara-alerts'
+        title: '{{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+
+  - name: 'pagerduty'
+    pagerduty_configs:
+      - service_key: 'YOUR_PAGERDUTY_KEY'
+        description: '{{ .GroupLabels.alertname }}'
+
+  - name: 'slack'
+    slack_configs:
+      - channel: '#iluminara-warnings'
+        title: '{{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+
+  - name: 'email'
+    email_configs:
+      - to: 'ops@iluminara.org'
+        from: 'alerts@iluminara.org'
+        smarthost: 'smtp.gmail.com:587'
+        auth_username: 'alerts@iluminara.org'
+        auth_password: 'YOUR_PASSWORD'
+```
+
+## Custom metrics
+
+### Application metrics
+
+```python services/metrics.py
+from prometheus_client import Counter, Histogram, Gauge, generate_latest
+from fastapi import FastAPI, Response
+
+app = FastAPI()
+
+# Define metrics
+request_count = Counter(
+    'http_requests_total',
+    'Total HTTP requests',
+    ['method', 'endpoint', 'status']
+)
+
+request_duration = Histogram(
+    'http_request_duration_seconds',
+    'HTTP request duration',
+    ['method', 'endpoint']
+)
+
+active_predictions = Gauge(
+    'active_predictions',
+    'Number of active predictions'
+)
+
+jepa_rollout_duration = Histogram(
+    'jepa_rollout_duration_seconds',
+    'JEPA rollout duration',
+    buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
+)
+
+mpc_iterations = Histogram(
+    'mpc_iterations',
+    'MPC optimization iterations',
+    buckets=[5, 10, 20, 50, 100]
+)
+
+# Middleware to track metrics
+@app.middleware("http")
+async def track_metrics(request, call_next):
+    with request_duration.labels(
+        method=request.method,
+        endpoint=request.url.path
+    ).time():
+        response = await call_next(request)
+    
+    request_count.labels(
+        method=request.method,
+        endpoint=request.url.path,
+        status=response.status_code
+    ).inc()
+    
+    return response
+
+# Metrics endpoint
+@app.get("/metrics")
+async def metrics():
+    return Response(
+        content=generate_latest(),
+        media_type="text/plain"
+    )
+```
+
+## SLO monitoring
+
+### Service Level Objectives
+
+```yaml monitoring/slos.yml
+# API Gateway SLOs
+- name: api_gateway_availability
+  objective: 99.9
+  description: "API Gateway should be available 99.9% of the time"
+  sli:
+    expr: |
+      sum(rate(http_requests_total{service="api-gateway",status!~"5.."}[5m]))
+      /
+      sum(rate(http_requests_total{service="api-gateway"}[5m]))
+
+- name: api_gateway_latency
+  objective: 95
+  description: "95% of requests should complete within 500ms"
+  sli:
+    expr: |
+      histogram_quantile(0.95,
+        sum(rate(http_request_duration_seconds_bucket{service="api-gateway"}[5m])) by (le)
+      ) < 0.5
+
+# JEPA Service SLOs
+- name: jepa_prediction_accuracy
+  objective: 90
+  description: "JEPA predictions should be 90% accurate"
+  sli:
+    expr: |
+      sum(rate(jepa_prediction_accuracy_total[5m]))
+      /
+      sum(rate(jepa_predictions_total[5m]))
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="CI/CD pipeline" icon="code-branch" href="/deployment/cicd">
+    Automate deployments
+  </Card>
+  <Card title="Security hardening" icon="shield" href="/deployment/security">
+    Secure your deployment
+  </Card>
+  <Card title="Performance tuning" icon="gauge-high" href="/deployment/performance">
+    Optimize performance
+  </Card>
+  <Card title="Incident response" icon="siren" href="/deployment/incident-response">
+    Handle incidents
+  </Card>
+</CardGroup>

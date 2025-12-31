@@ -1,0 +1,753 @@
+---
+title: CI/CD pipeline
+description: Automated testing, building, and deployment for iLuminara services
+---
+
+iLuminara's CI/CD pipeline automates testing, security scanning, and deployment across edge, regional, and cloud tiers with comprehensive quality gates.
+
+## Pipeline architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                  CI/CD Pipeline                         │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  Code Push (GitHub)                                     │
+│       │                                                  │
+│       ▼                                                  │
+│  ┌─────────────────────────────────────┐               │
+│  │  1. Build & Test (GitHub Actions)   │               │
+│  ├─────────────────────────────────────┤               │
+│  │  • Lint code                        │               │
+│  │  • Run unit tests                   │               │
+│  │  • Build Docker images              │               │
+│  │  • Security scan (Trivy)            │               │
+│  └─────────────────────────────────────┘               │
+│       │                                                  │
+│       ▼                                                  │
+│  ┌─────────────────────────────────────┐               │
+│  │  2. Integration Tests               │               │
+│  ├─────────────────────────────────────┤               │
+│  │  • Deploy to staging                │               │
+│  │  • Run integration tests            │               │
+│  │  • Performance benchmarks           │               │
+│  │  • Compliance validation            │               │
+│  └─────────────────────────────────────┘               │
+│       │                                                  │
+│       ▼                                                  │
+│  ┌─────────────────────────────────────┐               │
+│  │  3. Security & Compliance           │               │
+│  ├─────────────────────────────────────┤               │
+│  │  • SAST (Semgrep)                   │               │
+│  │  • DAST (OWASP ZAP)                 │               │
+│  │  • Dependency scan (Snyk)           │               │
+│  │  • Omni-Law validation              │               │
+│  └─────────────────────────────────────┘               │
+│       │                                                  │
+│       ▼                                                  │
+│  ┌─────────────────────────────────────┐               │
+│  │  4. Deploy to Production            │               │
+│  ├─────────────────────────────────────┤               │
+│  │  • Blue-green deployment            │               │
+│  │  • Canary rollout                   │               │
+│  │  • Smoke tests                      │               │
+│  │  • Rollback on failure              │               │
+│  └─────────────────────────────────────┘               │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+## GitHub Actions workflow
+
+### Main CI/CD workflow
+
+```yaml .github/workflows/ci-cd.yml
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Job 1: Lint and test
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov ruff mypy
+      
+      - name: Lint with ruff
+        run: ruff check .
+      
+      - name: Type check with mypy
+        run: mypy --strict src/
+      
+      - name: Run unit tests
+        run: |
+          pytest tests/unit \
+            --cov=src \
+            --cov-report=xml \
+            --cov-report=term
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+
+  # Job 2: Security scanning
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Semgrep (SAST)
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/owasp-top-ten
+      
+      - name: Run Snyk (dependency scan)
+        uses: snyk/actions/python@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+      
+      - name: Run Trivy (container scan)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Job 3: Build Docker images
+  build:
+    runs-on: ubuntu-latest
+    needs: [test, security]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+      
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+  # Job 4: Integration tests
+  integration-test:
+    runs-on: ubuntu-latest
+    needs: build
+    services:
+      postgres:
+        image: timescale/timescaledb:latest-pg15
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: iluminara_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      
+      - name: Run integration tests
+        env:
+          DATABASE_URL: postgresql://postgres:test@localhost:5432/iluminara_test
+        run: pytest tests/integration -v
+
+  # Job 5: Deploy to staging
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: integration-test
+    if: github.ref == 'refs/heads/develop'
+    environment:
+      name: staging
+      url: https://staging.iluminara.org
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG_STAGING }}
+      
+      - name: Deploy to staging
+        run: |
+          kubectl set image deployment/nim-inference \
+            nim=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            -n iluminara-staging
+          
+          kubectl rollout status deployment/nim-inference \
+            -n iluminara-staging \
+            --timeout=5m
+      
+      - name: Run smoke tests
+        run: |
+          python tests/smoke/test_staging.py
+
+  # Job 6: Deploy to production
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://api.iluminara.org
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG_PROD }}
+      
+      - name: Canary deployment (10%)
+        run: |
+          # Deploy canary with 10% traffic
+          kubectl apply -f k8s/canary-deployment.yaml
+          
+          # Wait for canary to be ready
+          kubectl rollout status deployment/nim-inference-canary \
+            -n iluminara \
+            --timeout=5m
+      
+      - name: Monitor canary metrics
+        run: |
+          python scripts/monitor_canary.py \
+            --duration=300 \
+            --error-threshold=0.01
+      
+      - name: Promote canary to production
+        run: |
+          # Update main deployment
+          kubectl set image deployment/nim-inference \
+            nim=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            -n iluminara
+          
+          # Wait for rollout
+          kubectl rollout status deployment/nim-inference \
+            -n iluminara \
+            --timeout=10m
+          
+          # Delete canary
+          kubectl delete deployment nim-inference-canary -n iluminara
+      
+      - name: Run production smoke tests
+        run: python tests/smoke/test_production.py
+      
+      - name: Notify deployment
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: 'Deployment to production completed'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+```
+
+## Security scanning
+
+### Container image scanning
+
+```yaml .github/workflows/security-scan.yml
+name: Security Scan
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Daily at midnight
+  workflow_dispatch:
+
+jobs:
+  scan-images:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'ghcr.io/iluminara/nim-inference:latest'
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+      
+      - name: Scan with Grype
+        uses: anchore/scan-action@v3
+        with:
+          image: 'ghcr.io/iluminara/nim-inference:latest'
+          fail-build: true
+          severity-cutoff: high
+```
+
+### Dependency scanning
+
+```yaml .github/workflows/dependency-scan.yml
+name: Dependency Scan
+
+on:
+  push:
+    paths:
+      - 'requirements.txt'
+      - 'package.json'
+  schedule:
+    - cron: '0 0 * * 1'  # Weekly on Monday
+
+jobs:
+  scan-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Safety (Python)
+        run: |
+          pip install safety
+          safety check --json
+      
+      - name: Run npm audit (Node.js)
+        run: |
+          npm audit --audit-level=high
+      
+      - name: Run Snyk
+        uses: snyk/actions/python@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+```
+
+## Testing strategy
+
+### Test pyramid
+
+```
+         ┌─────────────┐
+         │   E2E Tests │  (10%)
+         │   (Slow)    │
+         └─────────────┘
+              │
+       ┌──────────────────┐
+       │ Integration Tests│  (20%)
+       │    (Medium)      │
+       └──────────────────┘
+              │
+    ┌─────────────────────────┐
+    │     Unit Tests          │  (70%)
+    │      (Fast)             │
+    └─────────────────────────┘
+```
+
+### Unit tests
+
+```python tests/unit/test_jepa_predictor.py
+import pytest
+import torch
+from src.jepa.predictor import JEPAPredictor
+
+class TestJEPAPredictor:
+    """Unit tests for JEPA predictor."""
+    
+    @pytest.fixture
+    def predictor(self):
+        return JEPAPredictor(repr_dim=256, num_layers=6)
+    
+    def test_forward_pass(self, predictor):
+        """Test forward pass produces correct output shape."""
+        batch_size = 4
+        repr_dim = 256
+        horizon = 10
+        
+        z_current = torch.randn(batch_size, repr_dim)
+        predictions = predictor(z_current, horizon=horizon)
+        
+        assert predictions.shape == (batch_size, horizon, repr_dim)
+    
+    def test_prediction_consistency(self, predictor):
+        """Test predictions are consistent for same input."""
+        z = torch.randn(1, 256)
+        
+        pred1 = predictor(z, horizon=5)
+        pred2 = predictor(z, horizon=5)
+        
+        assert torch.allclose(pred1, pred2, atol=1e-6)
+    
+    def test_gradient_flow(self, predictor):
+        """Test gradients flow through predictor."""
+        z = torch.randn(1, 256, requires_grad=True)
+        predictions = predictor(z, horizon=5)
+        
+        loss = predictions.sum()
+        loss.backward()
+        
+        assert z.grad is not None
+        assert not torch.isnan(z.grad).any()
+```
+
+### Integration tests
+
+```python tests/integration/test_inference_pipeline.py
+import pytest
+import requests
+import time
+
+class TestInferencePipeline:
+    """Integration tests for inference pipeline."""
+    
+    @pytest.fixture
+    def api_url(self):
+        return "http://localhost:8000"
+    
+    def test_end_to_end_inference(self, api_url):
+        """Test complete inference pipeline."""
+        # Submit inference request
+        response = requests.post(
+            f"{api_url}/v1/inference",
+            json={
+                "model": "llama-3-8b",
+                "prompt": "Explain photosynthesis to a 5th grader",
+                "max_tokens": 100
+            }
+        )
+        
+        assert response.status_code == 200
+        result = response.json()
+        
+        assert 'text' in result
+        assert len(result['text']) > 0
+        assert result['model'] == 'llama-3-8b'
+    
+    def test_compliance_validation(self, api_url):
+        """Test Omni-Law compliance validation."""
+        # Request with PHI should be validated
+        response = requests.post(
+            f"{api_url}/v1/data/patient",
+            json={
+                "patient_id": "12345",
+                "data_type": "medical_record",
+                "operation": "read"
+            },
+            headers={
+                "Authorization": "Bearer test-token"
+            }
+        )
+        
+        # Should pass through Omni-Law validator
+        assert response.status_code in [200, 403]  # Either allowed or blocked
+        
+        if response.status_code == 200:
+            # Check compliance headers
+            assert 'X-Compliance-Frameworks' in response.headers
+            assert 'HIPAA' in response.headers['X-Compliance-Frameworks']
+    
+    def test_ghost_mesh_failover(self, api_url):
+        """Test Ghost-Mesh protocol failover."""
+        # Simulate 5G failure
+        requests.post(f"{api_url}/test/simulate-5g-failure")
+        
+        # Wait for failover
+        time.sleep(2)
+        
+        # Check protocol switched to LoRa
+        status = requests.get(f"{api_url}/v1/network/status").json()
+        assert status['current_protocol'] in ['LORA', 'WIFI_DIRECT']
+```
+
+### Performance tests
+
+```python tests/performance/test_inference_latency.py
+import pytest
+import requests
+import statistics
+import time
+
+class TestPerformance:
+    """Performance benchmarks."""
+    
+    def test_inference_latency_p95(self, api_url):
+        """Test P95 inference latency is under 200ms."""
+        latencies = []
+        
+        for _ in range(100):
+            start = time.time()
+            
+            response = requests.post(
+                f"{api_url}/v1/inference",
+                json={
+                    "model": "llama-3-8b",
+                    "prompt": "Hello world",
+                    "max_tokens": 10
+                }
+            )
+            
+            latency = time.time() - start
+            latencies.append(latency)
+            
+            assert response.status_code == 200
+        
+        # Calculate P95
+        p95 = statistics.quantiles(latencies, n=20)[18]  # 95th percentile
+        
+        assert p95 < 0.2, f"P95 latency {p95:.3f}s exceeds 200ms threshold"
+    
+    def test_throughput(self, api_url):
+        """Test system can handle 100 requests/second."""
+        import concurrent.futures
+        
+        def make_request():
+            return requests.post(
+                f"{api_url}/v1/inference",
+                json={"model": "llama-3-8b", "prompt": "Test", "max_tokens": 10}
+            )
+        
+        # Send 100 concurrent requests
+        start = time.time()
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=100) as executor:
+            futures = [executor.submit(make_request) for _ in range(100)]
+            results = [f.result() for f in futures]
+        
+        duration = time.time() - start
+        
+        # Check all succeeded
+        assert all(r.status_code == 200 for r in results)
+        
+        # Check throughput
+        throughput = 100 / duration
+        assert throughput >= 100, f"Throughput {throughput:.1f} req/s below 100 req/s target"
+```
+
+## Deployment strategies
+
+### Blue-green deployment
+
+```bash
+# Deploy green environment
+kubectl apply -f k8s/green-deployment.yaml
+
+# Wait for green to be ready
+kubectl rollout status deployment/nim-inference-green -n iluminara
+
+# Run smoke tests on green
+python tests/smoke/test_green.py
+
+# Switch traffic to green
+kubectl patch service nim-inference -n iluminara \
+  -p '{"spec":{"selector":{"version":"green"}}}'
+
+# Monitor for 10 minutes
+sleep 600
+
+# If successful, delete blue
+kubectl delete deployment nim-inference-blue -n iluminara
+
+# If failed, rollback to blue
+kubectl patch service nim-inference -n iluminara \
+  -p '{"spec":{"selector":{"version":"blue"}}}'
+```
+
+### Canary deployment
+
+```yaml k8s/canary-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nim-inference-canary
+  namespace: iluminara
+spec:
+  replicas: 1  # 10% of production (10 replicas)
+  selector:
+    matchLabels:
+      app: nim-inference
+      version: canary
+  template:
+    metadata:
+      labels:
+        app: nim-inference
+        version: canary
+    spec:
+      containers:
+      - name: nim
+        image: ghcr.io/iluminara/nim-inference:$NEW_VERSION
+        # ... rest of container spec
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nim-inference
+  namespace: iluminara
+spec:
+  selector:
+    app: nim-inference
+    # No version selector - routes to both stable and canary
+  ports:
+  - port: 8000
+```
+
+### Rollback procedure
+
+```bash
+# Automatic rollback on failure
+kubectl rollout undo deployment/nim-inference -n iluminara
+
+# Rollback to specific revision
+kubectl rollout history deployment/nim-inference -n iluminara
+kubectl rollout undo deployment/nim-inference --to-revision=3 -n iluminara
+
+# Verify rollback
+kubectl rollout status deployment/nim-inference -n iluminara
+```
+
+## Continuous deployment to edge
+
+### Edge device update strategy
+
+```python
+class EdgeUpdater:
+    """
+    Over-the-air updates for edge devices.
+    Uses Ghost-Mesh for distribution.
+    """
+    def __init__(self):
+        self.ghost_mesh = GhostMeshClient()
+        self.current_version = self._get_current_version()
+    
+    def check_for_updates(self, update_server_url):
+        """Check for available updates."""
+        try:
+            response = requests.get(
+                f"{update_server_url}/api/v1/updates/check",
+                params={'current_version': self.current_version},
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                update_info = response.json()
+                
+                if update_info['update_available']:
+                    return update_info
+        except:
+            # No connectivity - check peers via Ghost-Mesh
+            return self._check_peer_updates()
+        
+        return None
+    
+    def download_update(self, update_info):
+        """Download update package."""
+        # Try direct download
+        try:
+            response = requests.get(
+                update_info['download_url'],
+                stream=True,
+                timeout=300
+            )
+            
+            if response.status_code == 200:
+                return self._save_update(response.content)
+        except:
+            pass
+        
+        # Fall back to P2P download via Ghost-Mesh
+        return self._download_from_peers(update_info['version'])
+    
+    def apply_update(self, update_path):
+        """Apply update with rollback capability."""
+        # Create backup
+        backup_path = self._create_backup()
+        
+        try:
+            # Verify update signature
+            if not self._verify_signature(update_path):
+                raise SecurityError("Invalid update signature")
+            
+            # Apply update
+            self._extract_update(update_path)
+            
+            # Restart services
+            self._restart_services()
+            
+            # Verify health
+            if not self._health_check():
+                raise UpdateError("Health check failed")
+            
+            # Success - delete backup
+            os.remove(backup_path)
+            
+        except Exception as e:
+            # Rollback
+            self._restore_backup(backup_path)
+            raise
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Security best practices" icon="shield" href="/enterprise/security">
+    Secure your deployment
+  </Card>
+  <Card title="Incident response" icon="siren" href="/enterprise/incident-response">
+    Handle production incidents
+  </Card>
+  <Card title="Performance tuning" icon="gauge-high" href="/enterprise/performance-tuning">
+    Optimize system performance
+  </Card>
+  <Card title="Disaster recovery" icon="life-ring" href="/enterprise/disaster-recovery">
+    Backup and recovery procedures
+  </Card>
+</CardGroup>

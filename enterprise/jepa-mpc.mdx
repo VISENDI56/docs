@@ -1,0 +1,615 @@
+---
+title: JEPA/MPC architecture
+description: Joint-Embedding Predictive Architecture and Model Predictive Control replacing reinforcement learning
+---
+
+iLuminara uses Joint-Embedding Predictive Architecture (JEPA) combined with Model Predictive Control (MPC) instead of traditional reinforcement learning, providing more sample-efficient, interpretable, and robust decision-making.
+
+## Why JEPA/MPC over RL?
+
+### Problems with reinforcement learning
+
+Traditional RL approaches have fundamental limitations:
+
+**Sample inefficiency**: Requires millions of interactions to learn simple tasks
+- AlphaGo: 30 million self-play games
+- Dota 2 bot: 10,000 years of gameplay
+- Impractical for real-world humanitarian applications
+
+**Reward hacking**: Agents exploit reward functions in unintended ways
+- Boat racing game: Agent spins in circles to collect rewards
+- Grasping task: Robot learns to position camera to fake success
+- Dangerous in safety-critical applications
+
+**Lack of interpretability**: Black-box policies difficult to audit
+- Cannot explain why agent made decision
+- Fails Omni-Law compliance requirements
+- Unacceptable for medical, legal, financial applications
+
+**Poor generalization**: Overfits to training environment
+- Fails when environment changes slightly
+- Cannot transfer knowledge to new tasks
+- Requires retraining from scratch
+
+### JEPA/MPC advantages
+
+**Sample efficiency**: Learn world models from observation
+- No need for millions of trial-and-error interactions
+- Can learn from demonstrations and passive observation
+- Practical for real-world deployment
+
+**Interpretability**: Explicit world model can be inspected
+- Understand agent's beliefs about world
+- Audit predictions and decisions
+- Meets regulatory compliance requirements
+
+**Robustness**: Model-based planning adapts to changes
+- Replan when environment changes
+- Graceful degradation when model uncertain
+- Safe exploration with uncertainty quantification
+
+**Generalization**: World models transfer across tasks
+- Learn physics once, apply to many tasks
+- Few-shot adaptation to new scenarios
+- Compositional reasoning about novel situations
+
+## JEPA architecture
+
+### Core concept
+
+JEPA learns representations by predicting in latent space rather than pixel space:
+
+```
+Observation (x_t) ──► Encoder ──► Latent (z_t)
+                                       │
+                                       ▼
+                                   Predictor
+                                       │
+                                       ▼
+Observation (x_t+1) ──► Encoder ──► Latent (z_t+1)
+                                       │
+                                       ▼
+                                   Compare
+                                   (Loss)
+```
+
+**Key insight**: Predict abstract representations, not raw pixels. This avoids modeling irrelevant details (e.g., background motion, lighting changes).
+
+### Implementation
+
+```python ml_core/jepa/world_model.py
+import torch
+import torch.nn as nn
+from typing import Dict, Tuple
+
+class JEPAWorldModel(nn.Module):
+    """
+    Joint-Embedding Predictive Architecture for world modeling.
+    
+    Learns to predict future latent states without reconstructing pixels.
+    """
+    def __init__(
+        self,
+        observation_dim: int,
+        latent_dim: int = 256,
+        action_dim: int = 10,
+        hidden_dim: int = 512
+    ):
+        super().__init__()
+        
+        # Encoder: observation -> latent
+        self.encoder = nn.Sequential(
+            nn.Linear(observation_dim, hidden_dim),
+            nn.LayerNorm(hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.LayerNorm(hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, latent_dim)
+        )
+        
+        # Predictor: (latent, action) -> next latent
+        self.predictor = nn.Sequential(
+            nn.Linear(latent_dim + action_dim, hidden_dim),
+            nn.LayerNorm(hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.LayerNorm(hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, latent_dim)
+        )
+        
+        # Uncertainty estimator
+        self.uncertainty = nn.Sequential(
+            nn.Linear(latent_dim, hidden_dim // 2),
+            nn.ReLU(),
+            nn.Linear(hidden_dim // 2, latent_dim)
+        )
+    
+    def encode(self, observation: torch.Tensor) -> torch.Tensor:
+        """Encode observation to latent representation."""
+        return self.encoder(observation)
+    
+    def predict(
+        self, 
+        latent: torch.Tensor, 
+        action: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Predict next latent state given current latent and action.
+        
+        Returns:
+            next_latent: Predicted next latent state
+            uncertainty: Epistemic uncertainty of prediction
+        """
+        # Concatenate latent and action
+        input_tensor = torch.cat([latent, action], dim=-1)
+        
+        # Predict next latent
+        next_latent = self.predictor(input_tensor)
+        
+        # Estimate uncertainty
+        uncertainty = torch.exp(self.uncertainty(latent))
+        
+        return next_latent, uncertainty
+    
+    def forward(
+        self,
+        observation: torch.Tensor,
+        action: torch.Tensor,
+        next_observation: torch.Tensor
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Training forward pass.
+        
+        Args:
+            observation: Current observation
+            action: Action taken
+            next_observation: Observed next observation
+        
+        Returns:
+            Dictionary with predictions and losses
+        """
+        # Encode observations
+        latent = self.encode(observation)
+        next_latent_target = self.encode(next_observation)
+        
+        # Predict next latent
+        next_latent_pred, uncertainty = self.predict(latent, action)
+        
+        # Compute prediction loss (in latent space)
+        prediction_loss = nn.functional.mse_loss(
+            next_latent_pred,
+            next_latent_target.detach()  # Stop gradient through target
+        )
+        
+        # Compute uncertainty loss (negative log-likelihood)
+        uncertainty_loss = (
+            0.5 * torch.log(uncertainty) +
+            0.5 * (next_latent_pred - next_latent_target.detach())**2 / uncertainty
+        ).mean()
+        
+        # Total loss
+        total_loss = prediction_loss + 0.1 * uncertainty_loss
+        
+        return {
+            'loss': total_loss,
+            'prediction_loss': prediction_loss,
+            'uncertainty_loss': uncertainty_loss,
+            'latent': latent,
+            'next_latent_pred': next_latent_pred,
+            'next_latent_target': next_latent_target,
+            'uncertainty': uncertainty
+        }
+    
+    def rollout(
+        self,
+        initial_observation: torch.Tensor,
+        actions: torch.Tensor,
+        horizon: int
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Rollout world model for planning.
+        
+        Args:
+            initial_observation: Starting observation
+            actions: Sequence of actions [horizon, action_dim]
+            horizon: Planning horizon
+        
+        Returns:
+            latents: Predicted latent trajectory [horizon+1, latent_dim]
+            uncertainties: Uncertainty at each step [horizon, latent_dim]
+        """
+        latents = []
+        uncertainties = []
+        
+        # Encode initial observation
+        latent = self.encode(initial_observation)
+        latents.append(latent)
+        
+        # Rollout
+        for t in range(horizon):
+            action = actions[t]
+            latent, uncertainty = self.predict(latent, action)
+            latents.append(latent)
+            uncertainties.append(uncertainty)
+        
+        return torch.stack(latents), torch.stack(uncertainties)
+```
+
+### Training procedure
+
+```python ml_core/jepa/training.py
+class JEPATrainer:
+    """Trainer for JEPA world model."""
+    
+    def __init__(
+        self,
+        model: JEPAWorldModel,
+        learning_rate: float = 1e-4,
+        device: str = 'cuda'
+    ):
+        self.model = model.to(device)
+        self.optimizer = torch.optim.AdamW(
+            model.parameters(),
+            lr=learning_rate,
+            weight_decay=1e-5
+        )
+        self.device = device
+    
+    def train_step(self, batch: Dict[str, torch.Tensor]) -> Dict[str, float]:
+        """Single training step."""
+        # Move batch to device
+        observation = batch['observation'].to(self.device)
+        action = batch['action'].to(self.device)
+        next_observation = batch['next_observation'].to(self.device)
+        
+        # Forward pass
+        outputs = self.model(observation, action, next_observation)
+        
+        # Backward pass
+        self.optimizer.zero_grad()
+        outputs['loss'].backward()
+        
+        # Gradient clipping
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+        
+        self.optimizer.step()
+        
+        # Return metrics
+        return {
+            'loss': outputs['loss'].item(),
+            'prediction_loss': outputs['prediction_loss'].item(),
+            'uncertainty_loss': outputs['uncertainty_loss'].item()
+        }
+    
+    def train_from_demonstrations(
+        self,
+        demonstrations: List[Dict],
+        num_epochs: int = 100,
+        batch_size: int = 256
+    ):
+        """
+        Train world model from expert demonstrations.
+        
+        Much more sample-efficient than RL!
+        """
+        dataset = DemonstrationDataset(demonstrations)
+        dataloader = torch.utils.data.DataLoader(
+            dataset,
+            batch_size=batch_size,
+            shuffle=True
+        )
+        
+        for epoch in range(num_epochs):
+            epoch_metrics = []
+            
+            for batch in dataloader:
+                metrics = self.train_step(batch)
+                epoch_metrics.append(metrics)
+            
+            # Log epoch metrics
+            avg_loss = np.mean([m['loss'] for m in epoch_metrics])
+            print(f"Epoch {epoch}: Loss = {avg_loss:.4f}")
+```
+
+## Model Predictive Control (MPC)
+
+### Core concept
+
+MPC uses the learned world model to plan actions:
+
+1. **Predict**: Rollout world model for multiple action sequences
+2. **Evaluate**: Score each trajectory using objective function
+3. **Execute**: Take first action of best trajectory
+4. **Replan**: Repeat at next timestep (receding horizon)
+
+### Implementation
+
+```python ml_core/mpc/planner.py
+import torch
+from typing import Callable, Tuple
+
+class MPCPlanner:
+    """
+    Model Predictive Control planner using JEPA world model.
+    """
+    def __init__(
+        self,
+        world_model: JEPAWorldModel,
+        horizon: int = 10,
+        num_samples: int = 1000,
+        action_dim: int = 10,
+        device: str = 'cuda'
+    ):
+        self.world_model = world_model
+        self.horizon = horizon
+        self.num_samples = num_samples
+        self.action_dim = action_dim
+        self.device = device
+    
+    def plan(
+        self,
+        observation: torch.Tensor,
+        objective: Callable[[torch.Tensor], torch.Tensor],
+        constraints: Callable[[torch.Tensor], torch.Tensor] = None
+    ) -> torch.Tensor:
+        """
+        Plan optimal action using MPC.
+        
+        Args:
+            observation: Current observation
+            objective: Function that scores latent trajectories
+            constraints: Optional constraint function
+        
+        Returns:
+            best_action: Optimal first action
+        """
+        # Sample random action sequences
+        action_sequences = self._sample_action_sequences()
+        
+        # Rollout world model for each sequence
+        latent_trajectories, uncertainties = self._rollout_sequences(
+            observation,
+            action_sequences
+        )
+        
+        # Evaluate each trajectory
+        scores = self._evaluate_trajectories(
+            latent_trajectories,
+            uncertainties,
+            objective,
+            constraints
+        )
+        
+        # Select best action sequence
+        best_idx = torch.argmax(scores)
+        best_action = action_sequences[best_idx, 0]
+        
+        return best_action
+    
+    def _sample_action_sequences(self) -> torch.Tensor:
+        """
+        Sample random action sequences.
+        
+        Uses Cross-Entropy Method (CEM) for better sampling.
+        """
+        # Initialize with random samples
+        action_sequences = torch.randn(
+            self.num_samples,
+            self.horizon,
+            self.action_dim,
+            device=self.device
+        )
+        
+        # Clip to valid action range
+        action_sequences = torch.tanh(action_sequences)
+        
+        return action_sequences
+    
+    def _rollout_sequences(
+        self,
+        observation: torch.Tensor,
+        action_sequences: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Rollout world model for all action sequences."""
+        batch_size = action_sequences.shape[0]
+        
+        # Expand observation for batch
+        observation_batch = observation.unsqueeze(0).expand(batch_size, -1)
+        
+        # Rollout each sequence
+        latent_trajectories = []
+        uncertainties = []
+        
+        for i in range(batch_size):
+            latents, uncert = self.world_model.rollout(
+                observation_batch[i],
+                action_sequences[i],
+                self.horizon
+            )
+            latent_trajectories.append(latents)
+            uncertainties.append(uncert)
+        
+        return (
+            torch.stack(latent_trajectories),
+            torch.stack(uncertainties)
+        )
+    
+    def _evaluate_trajectories(
+        self,
+        latent_trajectories: torch.Tensor,
+        uncertainties: torch.Tensor,
+        objective: Callable,
+        constraints: Callable = None
+    ) -> torch.Tensor:
+        """
+        Evaluate trajectories using objective function.
+        
+        Penalizes high-uncertainty predictions for safety.
+        """
+        # Compute objective scores
+        scores = objective(latent_trajectories)
+        
+        # Penalize uncertainty (risk-averse planning)
+        uncertainty_penalty = uncertainties.mean(dim=(1, 2))
+        scores = scores - 0.1 * uncertainty_penalty
+        
+        # Apply constraints if provided
+        if constraints is not None:
+            constraint_violations = constraints(latent_trajectories)
+            scores = scores - 1000.0 * constraint_violations
+        
+        return scores
+```
+
+### Example: Agro-voltaic optimization
+
+```python examples/agro_voltaic_mpc.py
+class AgroVoltaicMPC:
+    """
+    MPC for agro-voltaic panel tilt optimization.
+    
+    Objective: Maximize crop health + energy generation
+    Constraints: Panel tilt limits, rate limits
+    """
+    def __init__(self, world_model: JEPAWorldModel):
+        self.planner = MPCPlanner(
+            world_model=world_model,
+            horizon=24,  # 24 hours
+            num_samples=500
+        )
+    
+    def optimize_tilt(
+        self,
+        current_state: Dict,
+        weather_forecast: Dict
+    ) -> float:
+        """
+        Optimize panel tilt for next 24 hours.
+        
+        Args:
+            current_state: Current temperature, PAR, soil moisture
+            weather_forecast: Predicted weather
+        
+        Returns:
+            optimal_tilt: Optimal tilt angle (degrees)
+        """
+        # Encode current state
+        observation = self._encode_state(current_state, weather_forecast)
+        
+        # Define objective function
+        def objective(latent_trajectories):
+            # Decode latents to interpretable states
+            states = self._decode_latents(latent_trajectories)
+            
+            # Crop health score
+            crop_score = self._compute_crop_health(states)
+            
+            # Energy generation score
+            energy_score = self._compute_energy_generation(states)
+            
+            # Weighted combination
+            return 0.6 * crop_score + 0.4 * energy_score
+        
+        # Define constraints
+        def constraints(latent_trajectories):
+            states = self._decode_latents(latent_trajectories)
+            
+            # Tilt must be in [0, 90] degrees
+            tilt_violations = (
+                (states['tilt'] < 0) | (states['tilt'] > 90)
+            ).float().sum(dim=1)
+            
+            # Rate limit: max 5 degrees per hour
+            tilt_changes = torch.abs(torch.diff(states['tilt'], dim=1))
+            rate_violations = (tilt_changes > 5).float().sum(dim=1)
+            
+            return tilt_violations + rate_violations
+        
+        # Plan optimal action
+        optimal_action = self.planner.plan(
+            observation,
+            objective,
+            constraints
+        )
+        
+        # Decode action to tilt angle
+        optimal_tilt = self._decode_action(optimal_action)
+        
+        return optimal_tilt
+```
+
+## Advantages in iLuminara context
+
+### Sample efficiency
+Learn from limited data:
+- **Medical imaging**: Learn from 100s of scans, not millions
+- **Agricultural optimization**: Learn from one growing season
+- **Logistics**: Learn from demonstrations, not trial-and-error
+
+### Safety
+Uncertainty-aware planning:
+- **Medical decisions**: Defer to human when uncertain
+- **Autonomous vehicles**: Slow down in uncertain situations
+- **Resource allocation**: Conservative when model uncertain
+
+### Interpretability
+Audit and explain decisions:
+- **Omni-Law compliance**: Inspect world model predictions
+- **Medical AI**: Explain diagnosis reasoning
+- **Legal AI**: Show precedent-based reasoning
+
+### Generalization
+Transfer across domains:
+- **Multi-crop optimization**: Learn physics once, apply to all crops
+- **Multi-disease diagnosis**: Transfer medical knowledge
+- **Multi-region deployment**: Adapt to local conditions
+
+## Training data requirements
+
+### Passive observation
+Learn from watching, not interacting:
+- **Video data**: Learn physics from video
+- **Sensor logs**: Learn from historical sensor data
+- **Demonstrations**: Learn from expert demonstrations
+
+### Active learning
+Strategically collect informative data:
+- **Uncertainty sampling**: Collect data where model uncertain
+- **Diversity sampling**: Ensure coverage of state space
+- **Counterfactual queries**: Ask "what if" questions
+
+### Simulation
+Bootstrap from simulation:
+- **Physics simulators**: Train on synthetic data
+- **Domain randomization**: Ensure robustness
+- **Sim-to-real transfer**: Fine-tune on real data
+
+## Comparison with RL
+
+| Aspect | Reinforcement Learning | JEPA/MPC |
+|--------|----------------------|----------|
+| Sample efficiency | Poor (millions of samples) | Good (hundreds of samples) |
+| Interpretability | Black box | Interpretable world model |
+| Safety | Reward hacking risks | Uncertainty-aware planning |
+| Generalization | Task-specific | Transfers across tasks |
+| Computational cost | High (online learning) | Moderate (offline learning) |
+| Deployment | Requires simulator | Works with real data |
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Deployment strategies" icon="rocket" href="/enterprise/deployment">
+    Docker, Serverless, Kubernetes
+  </Card>
+  <Card title="Training pipelines" icon="diagram-project" href="/ml/training-pipelines">
+    JEPA training workflows
+  </Card>
+  <Card title="Model zoo" icon="box" href="/ml/model-zoo">
+    Pre-trained JEPA models
+  </Card>
+  <Card title="MPC examples" icon="code" href="/examples/mpc">
+    MPC implementation examples
+  </Card>
+</CardGroup>

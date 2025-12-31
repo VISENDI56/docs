@@ -1,0 +1,700 @@
+---
+title: JEPA/MPC architecture
+description: Joint-Embedding Predictive Architecture with Model Predictive Control replacing traditional RL
+---
+
+iLuminara uses Joint-Embedding Predictive Architecture (JEPA) combined with Model Predictive Control (MPC) instead of traditional reinforcement learning, providing more efficient, interpretable, and robust decision-making for humanitarian operations.
+
+## Why JEPA/MPC over RL
+
+### Limitations of traditional RL
+
+**Sample inefficiency**: RL requires millions of interactions to learn policies, impractical for real-world humanitarian scenarios where data is scarce and expensive.
+
+**Reward engineering**: Designing reward functions for complex humanitarian objectives (equity, dignity, cultural sensitivity) is extremely difficult and prone to misalignment.
+
+**Lack of interpretability**: Neural network policies are black boxes, making it impossible to audit decisions or explain actions to stakeholders.
+
+**Poor generalization**: RL policies often fail when deployed in environments that differ from training, common in crisis scenarios.
+
+### Advantages of JEPA/MPC
+
+**World model learning**: JEPA learns predictive models of the environment from observation, requiring far less data than RL.
+
+**Explicit planning**: MPC uses the learned world model to plan actions explicitly, making decisions interpretable and auditable.
+
+**Constraint satisfaction**: MPC naturally handles hard constraints (budget limits, safety requirements, ethical guidelines) that are difficult to encode in RL rewards.
+
+**Uncertainty quantification**: JEPA provides uncertainty estimates for predictions, enabling risk-aware decision-making.
+
+## JEPA architecture
+
+### Joint-embedding space
+
+JEPA learns to embed observations and future predictions into a shared latent space where prediction becomes simple.
+
+```python ml_health/jepa/world_model.py
+import torch
+import torch.nn as nn
+from typing import Tuple, Dict
+
+class JEPAWorldModel(nn.Module):
+    """
+    Joint-Embedding Predictive Architecture for humanitarian operations.
+    
+    Learns to predict future states in latent space rather than pixel space,
+    enabling efficient planning and decision-making.
+    """
+    def __init__(
+        self,
+        observation_dim: int,
+        action_dim: int,
+        latent_dim: int = 256,
+        context_length: int = 10
+    ):
+        super().__init__()
+        
+        self.observation_dim = observation_dim
+        self.action_dim = action_dim
+        self.latent_dim = latent_dim
+        self.context_length = context_length
+        
+        # Observation encoder
+        self.obs_encoder = nn.Sequential(
+            nn.Linear(observation_dim, 512),
+            nn.LayerNorm(512),
+            nn.ReLU(),
+            nn.Linear(512, 512),
+            nn.LayerNorm(512),
+            nn.ReLU(),
+            nn.Linear(512, latent_dim)
+        )
+        
+        # Context encoder (processes history)
+        self.context_encoder = nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(
+                d_model=latent_dim,
+                nhead=8,
+                dim_feedforward=1024,
+                dropout=0.1,
+                batch_first=True
+            ),
+            num_layers=4
+        )
+        
+        # Predictor (predicts future latent states)
+        self.predictor = nn.Sequential(
+            nn.Linear(latent_dim + action_dim, 512),
+            nn.LayerNorm(512),
+            nn.ReLU(),
+            nn.Linear(512, 512),
+            nn.LayerNorm(512),
+            nn.ReLU(),
+            nn.Linear(512, latent_dim)
+        )
+        
+        # Uncertainty estimator
+        self.uncertainty_head = nn.Sequential(
+            nn.Linear(latent_dim, 256),
+            nn.ReLU(),
+            nn.Linear(256, latent_dim),
+            nn.Softplus()  # Ensure positive uncertainty
+        )
+        
+        # Decoder (optional, for visualization)
+        self.decoder = nn.Sequential(
+            nn.Linear(latent_dim, 512),
+            nn.ReLU(),
+            nn.Linear(512, 512),
+            nn.ReLU(),
+            nn.Linear(512, observation_dim)
+        )
+    
+    def encode_observation(self, obs: torch.Tensor) -> torch.Tensor:
+        """
+        Encode observation into latent space.
+        
+        Args:
+            obs: Observation tensor [batch, obs_dim]
+        
+        Returns:
+            Latent representation [batch, latent_dim]
+        """
+        return self.obs_encoder(obs)
+    
+    def encode_context(self, obs_history: torch.Tensor) -> torch.Tensor:
+        """
+        Encode observation history into context representation.
+        
+        Args:
+            obs_history: History of observations [batch, seq_len, obs_dim]
+        
+        Returns:
+            Context representation [batch, latent_dim]
+        """
+        # Encode each observation
+        batch_size, seq_len, _ = obs_history.shape
+        obs_flat = obs_history.reshape(-1, self.observation_dim)
+        latent_flat = self.obs_encoder(obs_flat)
+        latent_seq = latent_flat.reshape(batch_size, seq_len, self.latent_dim)
+        
+        # Process with transformer
+        context = self.context_encoder(latent_seq)
+        
+        # Use last token as context
+        return context[:, -1, :]
+    
+    def predict_next_state(
+        self,
+        current_latent: torch.Tensor,
+        action: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Predict next latent state given current state and action.
+        
+        Args:
+            current_latent: Current latent state [batch, latent_dim]
+            action: Action to take [batch, action_dim]
+        
+        Returns:
+            Tuple of (predicted_latent, uncertainty)
+        """
+        # Concatenate state and action
+        state_action = torch.cat([current_latent, action], dim=-1)
+        
+        # Predict next state
+        next_latent = self.predictor(state_action)
+        
+        # Estimate uncertainty
+        uncertainty = self.uncertainty_head(next_latent)
+        
+        return next_latent, uncertainty
+    
+    def rollout(
+        self,
+        initial_obs: torch.Tensor,
+        actions: torch.Tensor,
+        obs_history: torch.Tensor = None
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Rollout trajectory given initial observation and action sequence.
+        
+        Args:
+            initial_obs: Initial observation [batch, obs_dim]
+            actions: Sequence of actions [batch, horizon, action_dim]
+            obs_history: Optional history for context [batch, seq_len, obs_dim]
+        
+        Returns:
+            Dictionary with predicted latents, uncertainties, and observations
+        """
+        batch_size, horizon, _ = actions.shape
+        
+        # Encode initial state
+        current_latent = self.encode_observation(initial_obs)
+        
+        # Encode context if provided
+        if obs_history is not None:
+            context = self.encode_context(obs_history)
+            current_latent = current_latent + context  # Add context
+        
+        # Rollout
+        predicted_latents = []
+        uncertainties = []
+        
+        for t in range(horizon):
+            # Predict next state
+            next_latent, uncertainty = self.predict_next_state(
+                current_latent,
+                actions[:, t, :]
+            )
+            
+            predicted_latents.append(next_latent)
+            uncertainties.append(uncertainty)
+            
+            current_latent = next_latent
+        
+        # Stack predictions
+        predicted_latents = torch.stack(predicted_latents, dim=1)
+        uncertainties = torch.stack(uncertainties, dim=1)
+        
+        # Decode to observation space (optional)
+        predicted_obs = self.decoder(
+            predicted_latents.reshape(-1, self.latent_dim)
+        ).reshape(batch_size, horizon, self.observation_dim)
+        
+        return {
+            'latents': predicted_latents,
+            'uncertainties': uncertainties,
+            'observations': predicted_obs
+        }
+    
+    def compute_loss(
+        self,
+        obs_sequence: torch.Tensor,
+        action_sequence: torch.Tensor
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Compute JEPA training loss.
+        
+        Args:
+            obs_sequence: Sequence of observations [batch, seq_len, obs_dim]
+            action_sequence: Sequence of actions [batch, seq_len-1, action_dim]
+        
+        Returns:
+            Dictionary of losses
+        """
+        batch_size, seq_len, _ = obs_sequence.shape
+        
+        # Encode all observations
+        obs_flat = obs_sequence.reshape(-1, self.observation_dim)
+        latents_flat = self.obs_encoder(obs_flat)
+        latents = latents_flat.reshape(batch_size, seq_len, self.latent_dim)
+        
+        # Predict each transition
+        prediction_loss = 0
+        uncertainty_loss = 0
+        
+        for t in range(seq_len - 1):
+            # Predict next latent
+            pred_latent, uncertainty = self.predict_next_state(
+                latents[:, t, :],
+                action_sequence[:, t, :]
+            )
+            
+            # Target is actual next latent
+            target_latent = latents[:, t + 1, :]
+            
+            # Prediction loss (MSE in latent space)
+            pred_error = pred_latent - target_latent
+            prediction_loss += (pred_error ** 2).mean()
+            
+            # Uncertainty loss (negative log-likelihood)
+            # Assume Gaussian with predicted uncertainty as variance
+            nll = 0.5 * ((pred_error ** 2) / (uncertainty + 1e-6)).mean()
+            nll += 0.5 * torch.log(uncertainty + 1e-6).mean()
+            uncertainty_loss += nll
+        
+        # Normalize by sequence length
+        prediction_loss /= (seq_len - 1)
+        uncertainty_loss /= (seq_len - 1)
+        
+        # Total loss
+        total_loss = prediction_loss + 0.1 * uncertainty_loss
+        
+        return {
+            'total_loss': total_loss,
+            'prediction_loss': prediction_loss,
+            'uncertainty_loss': uncertainty_loss
+        }
+```
+
+### Training JEPA
+
+JEPA is trained on historical data from humanitarian operations, learning to predict outcomes without requiring reward labels.
+
+```python ml_health/jepa/training.py
+import torch
+from torch.utils.data import DataLoader, Dataset
+from typing import Dict, List
+
+class HumanitarianDataset(Dataset):
+    """
+    Dataset of humanitarian operation trajectories.
+    
+    Each sample is a sequence of:
+    - Observations (resource levels, population needs, weather, etc.)
+    - Actions (resource allocations, logistics decisions, etc.)
+    """
+    def __init__(self, trajectories: List[Dict], seq_length: int = 20):
+        self.trajectories = trajectories
+        self.seq_length = seq_length
+    
+    def __len__(self):
+        return len(self.trajectories)
+    
+    def __getitem__(self, idx):
+        traj = self.trajectories[idx]
+        
+        # Extract sequences
+        obs_seq = torch.tensor(traj['observations'][:self.seq_length], dtype=torch.float32)
+        action_seq = torch.tensor(traj['actions'][:self.seq_length-1], dtype=torch.float32)
+        
+        return obs_seq, action_seq
+
+def train_jepa(
+    model: JEPAWorldModel,
+    train_data: List[Dict],
+    val_data: List[Dict],
+    num_epochs: int = 100,
+    batch_size: int = 32,
+    learning_rate: float = 1e-4
+):
+    """
+    Train JEPA world model on humanitarian operation data.
+    
+    Args:
+        model: JEPA model to train
+        train_data: Training trajectories
+        val_data: Validation trajectories
+        num_epochs: Number of training epochs
+        batch_size: Batch size
+        learning_rate: Learning rate
+    """
+    # Create datasets
+    train_dataset = HumanitarianDataset(train_data)
+    val_dataset = HumanitarianDataset(val_data)
+    
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size)
+    
+    # Optimizer
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-5)
+    
+    # Learning rate scheduler
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer,
+        T_max=num_epochs,
+        eta_min=1e-6
+    )
+    
+    # Training loop
+    for epoch in range(num_epochs):
+        # Training
+        model.train()
+        train_losses = []
+        
+        for obs_seq, action_seq in train_loader:
+            obs_seq = obs_seq.cuda()
+            action_seq = action_seq.cuda()
+            
+            # Forward pass
+            losses = model.compute_loss(obs_seq, action_seq)
+            
+            # Backward pass
+            optimizer.zero_grad()
+            losses['total_loss'].backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            optimizer.step()
+            
+            train_losses.append(losses['total_loss'].item())
+        
+        # Validation
+        model.eval()
+        val_losses = []
+        
+        with torch.no_grad():
+            for obs_seq, action_seq in val_loader:
+                obs_seq = obs_seq.cuda()
+                action_seq = action_seq.cuda()
+                
+                losses = model.compute_loss(obs_seq, action_seq)
+                val_losses.append(losses['total_loss'].item())
+        
+        # Update learning rate
+        scheduler.step()
+        
+        # Log progress
+        print(f"Epoch {epoch+1}/{num_epochs}")
+        print(f"  Train Loss: {sum(train_losses)/len(train_losses):.4f}")
+        print(f"  Val Loss: {sum(val_losses)/len(val_losses):.4f}")
+```
+
+## Model Predictive Control
+
+MPC uses the learned JEPA world model to plan actions by optimizing over future trajectories.
+
+```python ml_health/mpc/controller.py
+import torch
+import torch.optim as optim
+from typing import Dict, Callable, List
+
+class MPCController:
+    """
+    Model Predictive Control using JEPA world model.
+    
+    Plans actions by optimizing predicted trajectories subject to constraints.
+    """
+    def __init__(
+        self,
+        world_model: JEPAWorldModel,
+        horizon: int = 10,
+        num_iterations: int = 10,
+        learning_rate: float = 0.1
+    ):
+        self.world_model = world_model
+        self.horizon = horizon
+        self.num_iterations = num_iterations
+        self.learning_rate = learning_rate
+    
+    def plan(
+        self,
+        current_obs: torch.Tensor,
+        obs_history: torch.Tensor,
+        objective_fn: Callable,
+        constraints: List[Callable] = None
+    ) -> torch.Tensor:
+        """
+        Plan optimal action sequence using MPC.
+        
+        Args:
+            current_obs: Current observation [obs_dim]
+            obs_history: Recent observation history [seq_len, obs_dim]
+            objective_fn: Function to maximize over trajectory
+            constraints: List of constraint functions
+        
+        Returns:
+            Optimal action sequence [horizon, action_dim]
+        """
+        # Initialize action sequence (random or from previous plan)
+        actions = torch.randn(
+            1, self.horizon, self.world_model.action_dim,
+            requires_grad=True,
+            device=current_obs.device
+        )
+        
+        # Optimizer for action sequence
+        optimizer = optim.Adam([actions], lr=self.learning_rate)
+        
+        # Optimization loop
+        for iteration in range(self.num_iterations):
+            optimizer.zero_grad()
+            
+            # Rollout trajectory with current action sequence
+            rollout = self.world_model.rollout(
+                current_obs.unsqueeze(0),
+                actions,
+                obs_history.unsqueeze(0)
+            )
+            
+            # Compute objective (negative for minimization)
+            objective = objective_fn(rollout)
+            loss = -objective
+            
+            # Add constraint penalties
+            if constraints:
+                for constraint_fn in constraints:
+                    violation = constraint_fn(rollout, actions)
+                    loss += 1000.0 * torch.relu(violation)  # Penalty for violations
+            
+            # Backward pass
+            loss.backward()
+            optimizer.step()
+            
+            # Clip actions to valid range
+            with torch.no_grad():
+                actions.clamp_(-1.0, 1.0)
+        
+        # Return first action (MPC receding horizon)
+        return actions[0, 0, :].detach()
+    
+    def plan_with_uncertainty(
+        self,
+        current_obs: torch.Tensor,
+        obs_history: torch.Tensor,
+        objective_fn: Callable,
+        risk_aversion: float = 1.0,
+        constraints: List[Callable] = None
+    ) -> torch.Tensor:
+        """
+        Risk-aware planning that accounts for prediction uncertainty.
+        
+        Args:
+            current_obs: Current observation
+            obs_history: Recent history
+            objective_fn: Objective function
+            risk_aversion: How much to penalize uncertainty (0=risk-neutral, >0=risk-averse)
+            constraints: Constraint functions
+        
+        Returns:
+            Optimal action considering uncertainty
+        """
+        actions = torch.randn(
+            1, self.horizon, self.world_model.action_dim,
+            requires_grad=True,
+            device=current_obs.device
+        )
+        
+        optimizer = optim.Adam([actions], lr=self.learning_rate)
+        
+        for iteration in range(self.num_iterations):
+            optimizer.zero_grad()
+            
+            # Rollout
+            rollout = self.world_model.rollout(
+                current_obs.unsqueeze(0),
+                actions,
+                obs_history.unsqueeze(0)
+            )
+            
+            # Compute expected objective
+            objective = objective_fn(rollout)
+            
+            # Penalize uncertainty (risk-averse planning)
+            uncertainty_penalty = risk_aversion * rollout['uncertainties'].mean()
+            
+            loss = -objective + uncertainty_penalty
+            
+            # Constraints
+            if constraints:
+                for constraint_fn in constraints:
+                    violation = constraint_fn(rollout, actions)
+                    loss += 1000.0 * torch.relu(violation)
+            
+            loss.backward()
+            optimizer.step()
+            
+            with torch.no_grad():
+                actions.clamp_(-1.0, 1.0)
+        
+        return actions[0, 0, :].detach()
+```
+
+## Application: Resource allocation
+
+Example of using JEPA/MPC for humanitarian resource allocation.
+
+```python ml_health/mpc/resource_allocation.py
+import torch
+from typing import Dict
+
+class ResourceAllocationMPC:
+    """
+    MPC for humanitarian resource allocation.
+    
+    Optimizes distribution of limited resources (food, medicine, shelter)
+    across populations in need while respecting constraints.
+    """
+    def __init__(self, world_model: JEPAWorldModel, mpc_controller: MPCController):
+        self.world_model = world_model
+        self.mpc = mpc_controller
+    
+    def allocate_resources(
+        self,
+        current_state: Dict,
+        available_resources: Dict,
+        population_needs: Dict
+    ) -> Dict:
+        """
+        Determine optimal resource allocation.
+        
+        Args:
+            current_state: Current system state (inventory, logistics, etc.)
+            available_resources: Available quantities of each resource
+            population_needs: Needs by population group
+        
+        Returns:
+            Allocation plan
+        """
+        # Convert to observation tensor
+        current_obs = self._state_to_obs(current_state)
+        obs_history = self._get_recent_history()
+        
+        # Define objective: maximize welfare while ensuring equity
+        def objective_fn(rollout):
+            # Extract predicted states
+            pred_obs = rollout['observations']  # [batch, horizon, obs_dim]
+            
+            # Compute welfare (sum of satisfied needs)
+            welfare = self._compute_welfare(pred_obs)
+            
+            # Compute equity (minimize variance in satisfaction)
+            equity_penalty = self._compute_equity_penalty(pred_obs)
+            
+            # Combined objective
+            return welfare - 0.5 * equity_penalty
+        
+        # Define constraints
+        def resource_constraint(rollout, actions):
+            """Ensure we don't exceed available resources."""
+            # Extract resource allocations from actions
+            allocations = self._actions_to_allocations(actions)
+            
+            # Check if total allocation exceeds availability
+            violations = []
+            for resource_type, available in available_resources.items():
+                total_allocated = allocations[resource_type].sum()
+                violation = total_allocated - available
+                violations.append(violation)
+            
+            return torch.stack(violations).max()
+        
+        def minimum_needs_constraint(rollout, actions):
+            """Ensure minimum needs are met for all groups."""
+            pred_obs = rollout['observations']
+            
+            # Extract satisfaction levels
+            satisfaction = self._extract_satisfaction(pred_obs)
+            
+            # Minimum threshold (e.g., 50% of needs)
+            min_threshold = 0.5
+            
+            # Violation if any group below threshold
+            violations = min_threshold - satisfaction
+            return violations.max()
+        
+        # Plan with MPC
+        optimal_action = self.mpc.plan_with_uncertainty(
+            current_obs=current_obs,
+            obs_history=obs_history,
+            objective_fn=objective_fn,
+            risk_aversion=0.5,  # Moderately risk-averse
+            constraints=[resource_constraint, minimum_needs_constraint]
+        )
+        
+        # Convert action to allocation plan
+        allocation_plan = self._action_to_plan(optimal_action)
+        
+        return allocation_plan
+    
+    def _compute_welfare(self, pred_obs: torch.Tensor) -> torch.Tensor:
+        """Compute total welfare from predicted observations."""
+        # Extract need satisfaction from observations
+        # Assuming observations include satisfaction levels for each group
+        satisfaction = pred_obs[:, :, :10]  # First 10 dims are satisfaction
+        return satisfaction.sum()
+    
+    def _compute_equity_penalty(self, pred_obs: torch.Tensor) -> torch.Tensor:
+        """Penalize inequitable distributions."""
+        satisfaction = pred_obs[:, :, :10]
+        # Variance across groups
+        return satisfaction.var(dim=-1).mean()
+```
+
+## Benefits for humanitarian operations
+
+### Interpretability
+
+MPC plans are fully interpretable - you can inspect the predicted trajectory and understand why each action was chosen.
+
+### Constraint satisfaction
+
+Hard constraints (budget limits, minimum service levels, ethical guidelines) are guaranteed to be satisfied, unlike RL which only optimizes soft rewards.
+
+### Sample efficiency
+
+JEPA learns from observational data without requiring reward labels, making it practical for real-world deployment where data is limited.
+
+### Uncertainty awareness
+
+JEPA quantifies prediction uncertainty, enabling risk-aware planning that accounts for unknown factors.
+
+### Rapid adaptation
+
+When conditions change, MPC can immediately replan using the world model without retraining, unlike RL policies that require extensive retraining.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Training JEPA models" icon="brain" href="/ml-health/jepa-training">
+    Train world models on your data
+  </Card>
+  <Card title="MPC configuration" icon="sliders" href="/ml-health/mpc-config">
+    Configure MPC parameters
+  </Card>
+  <Card title="Constraint specification" icon="shield-check" href="/ml-health/constraints">
+    Define operational constraints
+  </Card>
+  <Card title="Deployment guide" icon="rocket" href="/deployment/jepa-mpc">
+    Deploy JEPA/MPC in production
+  </Card>
+</CardGroup>

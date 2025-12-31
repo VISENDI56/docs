@@ -1,0 +1,226 @@
+---
+title: Connectivity & Ghost-Mesh Stack
+description: Uncensorable 6G infrastructure with polymorphic mesh networking
+---
+
+## Overview
+
+The Connectivity & Ghost-Mesh Stack establishes an **Uncensorable 6G Infrastructure** capable of surviving state-level shutdowns and physical infrastructure collapse. This is not merely about providing internet access—it's about guaranteeing connectivity as a fundamental human right through physics and code.
+
+<Card
+  title="Philosophy"
+  icon="tower-broadcast"
+>
+  "The Truth always finds a path. When frequencies are blocked, we hop. When towers fall, we mesh. When networks die, we ferry data through the air itself."
+</Card>
+
+## Core engine
+
+**NVIDIA Aerial (Software-Defined 6G RAN)**
+- Protocol: Polymorphic "Ghost-Mesh" (LoRa / Wi-Fi Direct / 6G)
+- Hardware: IGX Orin ConnectX-7 SmartNIC
+- Capability: Autonomous "Network-in-a-Box" with spectrum hopping
+
+## Architecture
+
+The NVIDIA Aerial SDK virtualizes the entire Radio Access Network (vRAN), allowing a solar-powered clinic node to function as a fully autonomous 5G/6G cell tower. Unlike static legacy towers, this software-defined network is **Polymorphic**—it continuously analyzes the RF spectrum using deep learning to detect jamming or congestion.
+
+### Key capabilities
+
+<CardGroup cols={2}>
+  <Card title="Software-defined RAN" icon="tower-broadcast">
+    Virtualized 5G/6G cell tower on edge
+  </Card>
+  <Card title="Polymorphic mesh" icon="network-wired">
+    Autonomous frequency hopping
+  </Card>
+  <Card title="Data muling" icon="drone">
+    Physical packet transport via drones
+  </Card>
+  <Card title="Ghost-Mode" icon="ghost">
+    LoRa + Wi-Fi Direct fallback
+  </Card>
+</CardGroup>
+
+## Polymorphic protocol
+
+When a frequency is blocked, the stack autonomously "hops" to an alternative band or degrades gracefully into a peer-to-peer "Ghost-Mode" mesh:
+
+- **LoRaWAN** - For telemetry and low-bandwidth critical alerts
+- **Wi-Fi Direct** - For heavy payloads like genomic data
+- **6G NR** - For high-bandwidth medical imaging when available
+
+This ensures that the "Truth"—whether it be epidemiological data indicating a cholera outbreak or evidence of human rights violations—always finds a path to the outside world.
+
+## Data muling protocol
+
+When the air gap cannot be bridged electronically, the system implements **physical data transport**:
+
+1. High-bandwidth packets (e.g., BioNeMo training gradients) are encrypted and sharded
+2. Shards are stored on drone storage modules
+3. Drones physically "ferry" gigabytes of data across the air gap to a backhaul point
+4. Data is reassembled and transmitted to the global network
+
+This redefines connectivity from a service provided by a telco to a fundamental human right guaranteed by physics.
+
+## Implementation
+
+### Requirements
+
+```txt
+nvidia-aerial-sdk>=24.11.0  # Software-Defined 6G RAN
+lora-gateway>=1.2.0         # LoRaWAN mesh fallback
+```
+
+### Aerial vRAN deployment
+
+```python
+from nvidia_aerial import vRAN, SpectrumAnalyzer
+
+# Initialize software-defined cell tower
+vran = vRAN(
+    hardware="igx_orin",
+    bands=["n77", "n78", "n79"],  # 5G NR bands
+    mode="standalone"
+)
+
+# Autonomous spectrum monitoring
+analyzer = SpectrumAnalyzer()
+spectrum = analyzer.scan(frequency_range=(3300, 4200))
+
+# Detect jamming and hop
+if spectrum.detect_jamming():
+    vran.hop_to_band(spectrum.find_clear_band())
+```
+
+### Ghost-Mode mesh fallback
+
+```python
+from ghost_mesh import LoRaMesh, WiFiDirectMesh
+
+# Initialize polymorphic mesh
+lora = LoRaMesh(bandwidth=125, spreading_factor=12)
+wifi = WiFiDirectMesh(channel=6)
+
+# Route data based on payload size
+def route_packet(packet):
+    if packet.size < 256:  # Small telemetry
+        lora.send(packet)
+    else:  # Large genomic data
+        wifi.send(packet)
+```
+
+### Data muling with drones
+
+```python
+from aerial_transport import DroneMule
+
+# Initialize drone storage module
+mule = DroneMule(
+    storage_capacity="256GB",
+    encryption="AES-256-GCM"
+)
+
+# Shard and encrypt data
+genomic_data = load_bionemo_gradients()
+shards = mule.shard(genomic_data, redundancy=3)
+
+# Physical transport across air gap
+mule.ferry(
+    shards=shards,
+    source="kalobeyei_clinic",
+    destination="nairobi_backhaul",
+    route="avoid_conflict_zones"
+)
+```
+
+## Real-world deployment
+
+### Kalobeyei refugee settlement
+
+In the Kalobeyei refugee settlement, the Ghost-Mesh Stack operates as follows:
+
+1. **Primary mode**: NVIDIA Aerial provides 6G connectivity to 50,000 residents
+2. **Degraded mode**: When internet backhaul fails, the system switches to Wi-Fi Direct mesh
+3. **Crisis mode**: During government shutdowns, LoRa mesh maintains critical telemetry
+4. **Air gap mode**: Drones ferry encrypted data to Nairobi every 48 hours
+
+This ensures that health surveillance data continues to flow regardless of political or infrastructure conditions.
+
+## Network resilience
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    CONNECTIVITY HIERARCHY                     │
+└──────────────────────────────────────────────────────────────┘
+                            │
+        ┌───────────────────┼───────────────────┐
+        │                   │                   │
+   ┌────▼────┐      ┌──────▼──────┐    ┌──────▼──────┐
+   │  6G NR  │      │  Wi-Fi      │    │   LoRa      │
+   │ (Aerial)│      │  Direct     │    │   Mesh      │
+   │ 1 Gbps  │      │  100 Mbps   │    │  50 kbps    │
+   └────┬────┘      └──────┬──────┘    └──────┬──────┘
+        │                  │                  │
+        └──────────────────┼──────────────────┘
+                    ▼
+         ┌────────────────────────┐
+         │   DATA MULING          │
+         │  (Physical Transport)  │
+         │   256 GB / 48 hours    │
+         └────────────────────────┘
+```
+
+## Spectrum management
+
+The system continuously monitors the RF spectrum and adapts:
+
+| Condition | Action | Bandwidth |
+|-----------|--------|-----------|
+| Clear spectrum | 6G NR on n77 (3.7 GHz) | 1 Gbps |
+| Congestion detected | Hop to n78 (3.8 GHz) | 800 Mbps |
+| Jamming detected | Switch to Wi-Fi Direct | 100 Mbps |
+| Total RF denial | LoRa mesh only | 50 kbps |
+| Air gap | Drone muling | 256 GB / 48h |
+
+## Security
+
+All data transmitted through the Ghost-Mesh is:
+
+- **Encrypted**: AES-256-GCM for data at rest and in transit
+- **Authenticated**: Cryptographic signatures prevent spoofing
+- **Sharded**: No single node contains complete data
+- **Ephemeral**: Mesh nodes do not store data permanently
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Nuclear Stack overview"
+    icon="atom"
+    href="/architecture/nuclear-stack"
+  >
+    Explore all 10 architectural singularities
+  </Card>
+  <Card
+    title="Educational Sovereignty"
+    icon="graduation-cap"
+    href="/architecture/educational-sovereignty"
+  >
+    Local-first AI tutor with offline operation
+  </Card>
+  <Card
+    title="Deployment guide"
+    icon="rocket"
+    href="/deployment/overview"
+  >
+    Deploy Aerial vRAN to production
+  </Card>
+  <Card
+    title="NVIDIA Aerial integration"
+    icon="tower-broadcast"
+    href="/integrations/nvidia-kinetic-sensory"
+  >
+    Technical integration details
+  </Card>
+</CardGroup>

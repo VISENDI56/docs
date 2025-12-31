@@ -1,0 +1,787 @@
+---
+title: Deployment strategies
+description: Production deployment patterns for Docker, Kubernetes, and serverless architectures
+---
+
+iLuminara supports multiple deployment strategies to match different operational requirements, from single-device edge deployments to global cloud-native architectures.
+
+## Deployment overview
+
+### Edge deployment
+Autonomous operation on resource-constrained devices:
+- **Target**: Jetson Orin Nano/AGX, IGX Orin
+- **Pattern**: Docker Compose or systemd services
+- **Connectivity**: Intermittent, offline-first
+- **Scale**: 1-10 devices per location
+
+### Regional deployment
+Coordinated clusters for regional operations:
+- **Target**: On-premise servers or regional cloud
+- **Pattern**: Kubernetes with local storage
+- **Connectivity**: Reliable regional network
+- **Scale**: 10-1000 devices
+
+### Cloud deployment
+Global coordination and management:
+- **Target**: AWS, Azure, GCP, or sovereign cloud
+- **Pattern**: Kubernetes + serverless functions
+- **Connectivity**: High-bandwidth internet
+- **Scale**: 1000+ devices, multi-region
+
+## Docker deployment
+
+### Edge device (Docker Compose)
+
+Single-device deployment with all services:
+
+```yaml docker-compose.yml
+version: '3.8'
+
+services:
+  # NVIDIA NIM inference service
+  nim-inference:
+    image: nvcr.io/nvidia/nim:llama-3-8b-instruct
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NIM_MODEL_PATH=/models/llama-3-8b-quantized
+    volumes:
+      - ./models:/models
+      - ./cache:/cache
+    ports:
+      - "8000:8000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+  
+  # Ghost-Mesh networking
+  ghost-mesh:
+    image: iluminara/ghost-mesh:latest
+    network_mode: host
+    privileged: true
+    volumes:
+      - /var/run/dbus:/var/run/dbus
+      - ./ghost-mesh-config:/config
+    environment:
+      - MESH_MODE=edge
+      - LORA_ENABLED=true
+      - WIFI_DIRECT_ENABLED=true
+    restart: unless-stopped
+  
+  # Local data collection
+  data-collector:
+    image: iluminara/data-collector:latest
+    volumes:
+      - ./data:/data
+      - /dev:/dev
+    privileged: true
+    environment:
+      - SENSOR_CONFIG=/config/sensors.yaml
+      - STORAGE_PATH=/data
+    depends_on:
+      - timescaledb
+    restart: unless-stopped
+  
+  # Time-series database
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    volumes:
+      - timescale-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=iluminara
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+  
+  # Local API gateway
+  api-gateway:
+    image: iluminara/api-gateway:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./certs:/certs
+    environment:
+      - NIM_ENDPOINT=http://nim-inference:8000
+      - DB_HOST=timescaledb
+      - DB_PASSWORD=${DB_PASSWORD}
+    depends_on:
+      - nim-inference
+      - timescaledb
+    restart: unless-stopped
+  
+  # Omni-Law compliance validator
+  omni-law:
+    image: iluminara/omni-law:latest
+    volumes:
+      - ./policies:/policies
+    environment:
+      - FRAMEWORKS=GDPR,HIPAA,PABS,EU_AI_ACT
+      - JURISDICTION=KE
+    restart: unless-stopped
+
+volumes:
+  timescale-data:
+  models:
+  cache:
+```
+
+### Deployment commands
+
+```bash
+# Pull images
+docker-compose pull
+
+# Start services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Scale specific service
+docker-compose up -d --scale data-collector=3
+
+# Update services
+docker-compose pull
+docker-compose up -d
+
+# Backup data
+docker-compose exec timescaledb pg_dump -U postgres iluminara > backup.sql
+
+# Stop services
+docker-compose down
+```
+
+### Resource limits
+
+```yaml docker-compose.override.yml
+version: '3.8'
+
+services:
+  nim-inference:
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
+  
+  data-collector:
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+  
+  timescaledb:
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+```
+
+## Kubernetes deployment
+
+### Regional cluster architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│              Kubernetes Cluster (Regional)              │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  ┌─────────────────────────────────────────────────┐  │
+│  │              Ingress Controller                  │  │
+│  │  (NGINX + cert-manager for TLS)                 │  │
+│  └─────────────────────────────────────────────────┘  │
+│                        │                                │
+│                        ▼                                │
+│  ┌─────────────────────────────────────────────────┐  │
+│  │              API Gateway                         │  │
+│  │  (Kong or Traefik)                              │  │
+│  └─────────────────────────────────────────────────┘  │
+│                        │                                │
+│         ┌──────────────┼──────────────┐                │
+│         ▼              ▼              ▼                │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
+│  │   NIM    │  │  Ghost   │  │  Omni    │            │
+│  │ Inference│  │  Mesh    │  │  Law     │            │
+│  │ (GPU)    │  │  Router  │  │ Validator│            │
+│  └──────────┘  └──────────┘  └──────────┘            │
+│                                                         │
+│  ┌─────────────────────────────────────────────────┐  │
+│  │              Data Layer                          │  │
+│  ├─────────────────────────────────────────────────┤  │
+│  │ • TimescaleDB (StatefulSet)                     │  │
+│  │ • Neo4j (StatefulSet)                           │  │
+│  │ • Redis (StatefulSet)                           │  │
+│  │ • Kafka (StatefulSet)                           │  │
+│  └─────────────────────────────────────────────────┘  │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Kubernetes manifests
+
+#### Namespace
+
+```yaml namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: iluminara
+  labels:
+    name: iluminara
+    environment: production
+```
+
+#### NIM Inference Deployment
+
+```yaml nim-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nim-inference
+  namespace: iluminara
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nim-inference
+  template:
+    metadata:
+      labels:
+        app: nim-inference
+    spec:
+      nodeSelector:
+        nvidia.com/gpu: "true"
+      containers:
+      - name: nim
+        image: nvcr.io/nvidia/nim:llama-3-8b-instruct
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+            memory: 16Gi
+            cpu: 4
+          requests:
+            nvidia.com/gpu: 1
+            memory: 8Gi
+            cpu: 2
+        env:
+        - name: NIM_MODEL_PATH
+          value: /models/llama-3-8b-quantized
+        - name: NIM_CACHE_PATH
+          value: /cache
+        volumeMounts:
+        - name: models
+          mountPath: /models
+          readOnly: true
+        - name: cache
+          mountPath: /cache
+        ports:
+        - containerPort: 8000
+          name: http
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 5
+      volumes:
+      - name: models
+        persistentVolumeClaim:
+          claimName: nim-models-pvc
+      - name: cache
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nim-inference
+  namespace: iluminara
+spec:
+  selector:
+    app: nim-inference
+  ports:
+  - port: 8000
+    targetPort: 8000
+    name: http
+  type: ClusterIP
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: nim-inference-hpa
+  namespace: iluminara
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nim-inference
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+```
+
+#### TimescaleDB StatefulSet
+
+```yaml timescaledb-statefulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: timescaledb
+  namespace: iluminara
+spec:
+  serviceName: timescaledb
+  replicas: 3
+  selector:
+    matchLabels:
+      app: timescaledb
+  template:
+    metadata:
+      labels:
+        app: timescaledb
+    spec:
+      containers:
+      - name: timescaledb
+        image: timescale/timescaledb:latest-pg15
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: password
+        - name: POSTGRES_DB
+          value: iluminara
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        ports:
+        - containerPort: 5432
+          name: postgres
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: 2Gi
+            cpu: 1
+          limits:
+            memory: 4Gi
+            cpu: 2
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - postgres
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - postgres
+          initialDelaySeconds: 5
+          periodSeconds: 5
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: fast-ssd
+      resources:
+        requests:
+          storage: 100Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: timescaledb
+  namespace: iluminara
+spec:
+  selector:
+    app: timescaledb
+  ports:
+  - port: 5432
+    targetPort: 5432
+  clusterIP: None  # Headless service for StatefulSet
+```
+
+#### Ingress
+
+```yaml ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: iluminara-ingress
+  namespace: iluminara
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - api.iluminara.org
+    secretName: iluminara-tls
+  rules:
+  - host: api.iluminara.org
+    http:
+      paths:
+      - path: /v1/inference
+        pathType: Prefix
+        backend:
+          service:
+            name: nim-inference
+            port:
+              number: 8000
+      - path: /v1/data
+        pathType: Prefix
+        backend:
+          service:
+            name: api-gateway
+            port:
+              number: 8080
+```
+
+### Deployment commands
+
+```bash
+# Create namespace
+kubectl apply -f namespace.yaml
+
+# Create secrets
+kubectl create secret generic db-credentials \
+  --from-literal=password=<strong-password> \
+  -n iluminara
+
+# Deploy services
+kubectl apply -f timescaledb-statefulset.yaml
+kubectl apply -f nim-deployment.yaml
+kubectl apply -f ingress.yaml
+
+# Check status
+kubectl get pods -n iluminara
+kubectl get svc -n iluminara
+
+# View logs
+kubectl logs -f deployment/nim-inference -n iluminara
+
+# Scale deployment
+kubectl scale deployment nim-inference --replicas=5 -n iluminara
+
+# Rolling update
+kubectl set image deployment/nim-inference \
+  nim=nvcr.io/nvidia/nim:llama-3-8b-instruct-v2 \
+  -n iluminara
+
+# Rollback
+kubectl rollout undo deployment/nim-inference -n iluminara
+```
+
+## Serverless deployment
+
+### AWS Lambda + ECS Fargate
+
+Hybrid serverless architecture:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│              Serverless Architecture (AWS)              │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  ┌─────────────────────────────────────────────────┐  │
+│  │         API Gateway (REST/WebSocket)             │  │
+│  └─────────────────────────────────────────────────┘  │
+│                        │                                │
+│         ┌──────────────┼──────────────┐                │
+│         ▼              ▼              ▼                │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
+│  │ Lambda   │  │ Lambda   │  │  ECS     │            │
+│  │ (API)    │  │ (Data)   │  │ Fargate  │            │
+│  │          │  │          │  │ (NIM)    │            │
+│  └──────────┘  └──────────┘  └──────────┘            │
+│                                                         │
+│  ┌─────────────────────────────────────────────────┐  │
+│  │              Data Layer                          │  │
+│  ├─────────────────────────────────────────────────┤  │
+│  │ • RDS (PostgreSQL + TimescaleDB)                │  │
+│  │ • DynamoDB (NoSQL)                              │  │
+│  │ • S3 (Object storage)                           │  │
+│  │ • ElastiCache (Redis)                           │  │
+│  └─────────────────────────────────────────────────┘  │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Lambda function (API handler)
+
+```python lambda/api_handler.py
+import json
+import boto3
+import os
+
+# Initialize clients
+ecs_client = boto3.client('ecs')
+dynamodb = boto3.resource('dynamodb')
+
+def lambda_handler(event, context):
+    """
+    API Gateway Lambda handler.
+    Routes requests to appropriate services.
+    """
+    # Parse request
+    path = event['path']
+    method = event['httpMethod']
+    body = json.loads(event.get('body', '{}'))
+    
+    # Route to appropriate handler
+    if path.startswith('/v1/inference'):
+        return handle_inference(body)
+    elif path.startswith('/v1/data'):
+        return handle_data(body)
+    else:
+        return {
+            'statusCode': 404,
+            'body': json.dumps({'error': 'Not found'})
+        }
+
+def handle_inference(body):
+    """
+    Handle inference request by invoking ECS Fargate task.
+    """
+    # Start ECS task for inference
+    response = ecs_client.run_task(
+        cluster=os.environ['ECS_CLUSTER'],
+        taskDefinition=os.environ['NIM_TASK_DEFINITION'],
+        launchType='FARGATE',
+        networkConfiguration={
+            'awsvpcConfiguration': {
+                'subnets': os.environ['SUBNETS'].split(','),
+                'securityGroups': [os.environ['SECURITY_GROUP']],
+                'assignPublicIp': 'ENABLED'
+            }
+        },
+        overrides={
+            'containerOverrides': [{
+                'name': 'nim-inference',
+                'environment': [
+                    {'name': 'INPUT_TEXT', 'value': body['text']},
+                    {'name': 'MAX_TOKENS', 'value': str(body.get('max_tokens', 100))}
+                ]
+            }]
+        }
+    )
+    
+    task_arn = response['tasks'][0]['taskArn']
+    
+    return {
+        'statusCode': 202,
+        'body': json.dumps({
+            'task_id': task_arn,
+            'status': 'processing'
+        })
+    }
+
+def handle_data(body):
+    """
+    Handle data query from DynamoDB.
+    """
+    table = dynamodb.Table(os.environ['DYNAMODB_TABLE'])
+    
+    response = table.get_item(
+        Key={'id': body['id']}
+    )
+    
+    if 'Item' in response:
+        return {
+            'statusCode': 200,
+            'body': json.dumps(response['Item'])
+        }
+    else:
+        return {
+            'statusCode': 404,
+            'body': json.dumps({'error': 'Item not found'})
+        }
+```
+
+### ECS Fargate task definition
+
+```json ecs-task-definition.json
+{
+  "family": "nim-inference",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "4096",
+  "memory": "16384",
+  "containerDefinitions": [
+    {
+      "name": "nim-inference",
+      "image": "nvcr.io/nvidia/nim:llama-3-8b-instruct",
+      "essential": true,
+      "environment": [
+        {
+          "name": "NIM_MODEL_PATH",
+          "value": "/models/llama-3-8b-quantized"
+        }
+      ],
+      "mountPoints": [
+        {
+          "sourceVolume": "models",
+          "containerPath": "/models",
+          "readOnly": true
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/nim-inference",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "resourceRequirements": [
+        {
+          "type": "GPU",
+          "value": "1"
+        }
+      ]
+    }
+  ],
+  "volumes": [
+    {
+      "name": "models",
+      "efsVolumeConfiguration": {
+        "fileSystemId": "fs-12345678",
+        "rootDirectory": "/models"
+      }
+    }
+  ]
+}
+```
+
+### Terraform deployment
+
+```hcl main.tf
+# Lambda function
+resource "aws_lambda_function" "api_handler" {
+  filename      = "lambda.zip"
+  function_name = "iluminara-api-handler"
+  role          = aws_iam_role.lambda_role.arn
+  handler       = "api_handler.lambda_handler"
+  runtime       = "python3.11"
+  timeout       = 30
+  memory_size   = 512
+
+  environment {
+    variables = {
+      ECS_CLUSTER          = aws_ecs_cluster.main.name
+      NIM_TASK_DEFINITION  = aws_ecs_task_definition.nim.family
+      DYNAMODB_TABLE       = aws_dynamodb_table.data.name
+      SUBNETS              = join(",", aws_subnet.private[*].id)
+      SECURITY_GROUP       = aws_security_group.ecs.id
+    }
+  }
+}
+
+# ECS cluster
+resource "aws_ecs_cluster" "main" {
+  name = "iluminara-cluster"
+
+  setting {
+    name  = "containerInsights"
+    value = "enabled"
+  }
+}
+
+# ECS task definition
+resource "aws_ecs_task_definition" "nim" {
+  family                   = "nim-inference"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "4096"
+  memory                   = "16384"
+
+  container_definitions = file("ecs-task-definition.json")
+}
+
+# API Gateway
+resource "aws_apigatewayv2_api" "main" {
+  name          = "iluminara-api"
+  protocol_type = "HTTP"
+}
+
+resource "aws_apigatewayv2_integration" "lambda" {
+  api_id           = aws_apigatewayv2_api.main.id
+  integration_type = "AWS_PROXY"
+  integration_uri  = aws_lambda_function.api_handler.invoke_arn
+}
+
+# DynamoDB table
+resource "aws_dynamodb_table" "data" {
+  name           = "iluminara-data"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "id"
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
+}
+```
+
+## Deployment comparison
+
+| Feature | Docker Compose | Kubernetes | Serverless |
+|---------|----------------|------------|------------|
+| **Complexity** | Low | High | Medium |
+| **Scalability** | Limited (1-10 nodes) | High (1000+ nodes) | Very high (auto-scale) |
+| **Cost** | Low (fixed) | Medium (fixed + variable) | Variable (pay-per-use) |
+| **Latency** | Low | Low | Medium (cold start) |
+| **Maintenance** | Manual | Automated | Fully managed |
+| **Best for** | Edge devices | Regional clusters | Global, variable load |
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Observability" icon="chart-line" href="/enterprise/observability">
+    Monitoring and alerting
+  </Card>
+  <Card title="CI/CD pipeline" icon="code-branch" href="/enterprise/cicd-pipeline">
+    Automated deployment
+  </Card>
+  <Card title="Security" icon="shield" href="/enterprise/security">
+    Security best practices
+  </Card>
+  <Card title="Cost optimization" icon="dollar-sign" href="/enterprise/cost-optimization">
+    Reduce infrastructure costs
+  </Card>
+</CardGroup>
