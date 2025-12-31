@@ -1,0 +1,1214 @@
+---
+title: CI/CD and security
+description: Automated pipelines, security scanning, and deployment automation for iLuminara
+---
+
+iLuminara implements comprehensive CI/CD pipelines with integrated security scanning, automated testing, and GitOps-based deployments to ensure rapid, secure releases.
+
+## CI/CD pipeline architecture
+
+### Pipeline stages
+
+```
+┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
+│  Commit  │───▶│  Build   │───▶│   Test   │───▶│  Deploy  │
+└──────────┘    └──────────┘    └──────────┘    └──────────┘
+                      │               │               │
+                      ▼               ▼               ▼
+                ┌──────────┐    ┌──────────┐    ┌──────────┐
+                │ Security │    │   QA     │    │ Rollback │
+                │  Scan    │    │ Approval │    │ Strategy │
+                └──────────┘    └──────────┘    └──────────┘
+```
+
+## GitHub Actions workflows
+
+### Main CI/CD pipeline
+
+```yaml
+# .github/workflows/ci-cd.yml
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Code quality checks
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install ruff black mypy
+      
+      - name: Run ruff
+        run: ruff check .
+      
+      - name: Run black
+        run: black --check .
+      
+      - name: Run mypy
+        run: mypy --strict src/
+
+  # Security scanning
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+      
+      - name: Run Bandit security linter
+        run: |
+          pip install bandit
+          bandit -r src/ -f json -o bandit-report.json
+      
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/owasp-top-ten
+
+  # Unit tests
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:15-3.3
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-asyncio
+      
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379
+        run: |
+          pytest tests/ \
+            --cov=src \
+            --cov-report=xml \
+            --cov-report=html \
+            --junitxml=junit.xml
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+
+  # Build and push Docker image
+  build:
+    needs: [lint, security, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+      
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+      
+      - name: Sign image with Cosign
+        run: |
+          cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+
+  # Deploy to staging
+  deploy-staging:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    environment:
+      name: staging
+      url: https://staging.iluminara.org
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+      
+      - name: Configure kubectl
+        run: |
+          echo "${{ secrets.KUBECONFIG_STAGING }}" > kubeconfig
+          export KUBECONFIG=kubeconfig
+      
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install iluminara ./helm/iluminara \
+            --namespace iluminara-staging \
+            --create-namespace \
+            --set image.tag=${{ github.sha }} \
+            --values helm/values.staging.yaml \
+            --wait \
+            --timeout 10m
+      
+      - name: Run smoke tests
+        run: |
+          kubectl run smoke-test \
+            --image=curlimages/curl \
+            --rm -i --restart=Never \
+            -- curl -f https://staging.iluminara.org/health
+
+  # Deploy to production
+  deploy-production:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://api.iluminara.org
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Deploy via ArgoCD
+        run: |
+          argocd app sync iluminara-prod \
+            --revision ${{ github.sha }} \
+            --prune
+      
+      - name: Wait for rollout
+        run: |
+          argocd app wait iluminara-prod \
+            --health \
+            --timeout 600
+      
+      - name: Run integration tests
+        run: |
+          kubectl run integration-test \
+            --image=iluminara/integration-tests:latest \
+            --rm -i --restart=Never \
+            --env="API_URL=https://api.iluminara.org"
+```
+
+### Automated rollback
+
+```yaml
+# .github/workflows/rollback.yml
+name: Automated Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to rollback'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      revision:
+        description: 'Git revision to rollback to'
+        required: true
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.revision }}
+      
+      - name: Rollback with Helm
+        run: |
+          helm rollback iluminara \
+            --namespace iluminara-${{ inputs.environment }} \
+            --wait \
+            --timeout 10m
+      
+      - name: Verify rollback
+        run: |
+          kubectl rollout status deployment/api-gateway \
+            --namespace iluminara-${{ inputs.environment }}
+      
+      - name: Notify team
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "Rollback completed for ${{ inputs.environment }} to revision ${{ inputs.revision }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+```
+
+## Security scanning
+
+### Container image scanning
+
+```yaml
+# .github/workflows/container-scan.yml
+name: Container Security Scan
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 0 * * *'  # Daily scan
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Trivy scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'ghcr.io/iluminara/api-gateway:latest'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+      
+      - name: Run Grype scanner
+        uses: anchore/scan-action@v3
+        with:
+          image: 'ghcr.io/iluminara/api-gateway:latest'
+          fail-build: true
+          severity-cutoff: high
+```
+
+### Dependency scanning
+
+```yaml
+# .github/workflows/dependency-scan.yml
+name: Dependency Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '0 0 * * 1'  # Weekly
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Snyk
+        uses: snyk/actions/python@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+      
+      - name: Run Safety
+        run: |
+          pip install safety
+          safety check --json
+      
+      - name: Run pip-audit
+        run: |
+          pip install pip-audit
+          pip-audit
+```
+
+### SAST (Static Application Security Testing)
+
+```yaml
+# .github/workflows/sast.yml
+name: SAST
+
+on: [push, pull_request]
+
+jobs:
+  codeql:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: python
+      
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+  
+  semgrep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/owasp-top-ten
+            p/python
+```
+
+## Secret management
+
+### GitHub Secrets
+
+```bash
+# Add secrets via GitHub CLI
+gh secret set DATABASE_URL --body "postgresql://..."
+gh secret set JWT_SECRET --body "$(openssl rand -hex 32)"
+gh secret set KUBECONFIG_PROD --body "$(cat ~/.kube/config)"
+
+# Environment-specific secrets
+gh secret set API_KEY --env production --body "prod-key-123"
+gh secret set API_KEY --env staging --body "staging-key-456"
+```
+
+### HashiCorp Vault integration
+
+```yaml
+# .github/workflows/vault-secrets.yml
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Import Secrets from Vault
+        uses: hashicorp/vault-action@v2
+        with:
+          url: https://vault.iluminara.org
+          token: ${{ secrets.VAULT_TOKEN }}
+          secrets: |
+            secret/data/production/database username | DATABASE_USER ;
+            secret/data/production/database password | DATABASE_PASSWORD ;
+            secret/data/production/jwt secret | JWT_SECRET
+      
+      - name: Deploy with secrets
+        run: |
+          helm upgrade iluminara ./helm/iluminara \
+            --set database.username=$DATABASE_USER \
+            --set database.password=$DATABASE_PASSWORD \
+            --set jwt.secret=$JWT_SECRET
+```
+
+## Testing strategies
+
+### Unit tests
+
+```python
+# tests/test_patient_service.py
+import pytest
+from unittest.mock import Mock, patch
+from src.services.patient_service import PatientService
+
+@pytest.fixture
+def patient_service():
+    return PatientService(db=Mock())
+
+def test_create_patient(patient_service):
+    """Test patient creation."""
+    patient_data = {
+        "name": "John Doe",
+        "age": 35,
+        "gender": "M"
+    }
+    
+    result = patient_service.create_patient(patient_data)
+    
+    assert result["patient_id"] is not None
+    assert result["name"] == "John Doe"
+
+@pytest.mark.asyncio
+async def test_create_patient_async(patient_service):
+    """Test async patient creation."""
+    patient_data = {"name": "Jane Doe"}
+    
+    result = await patient_service.create_patient_async(patient_data)
+    
+    assert result["patient_id"] is not None
+```
+
+### Integration tests
+
+```python
+# tests/integration/test_api.py
+import pytest
+from httpx import AsyncClient
+from src.main import app
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_patient_workflow():
+    """Test complete patient workflow."""
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        # Create patient
+        response = await client.post("/api/patients", json={
+            "name": "Test Patient",
+            "age": 30
+        })
+        assert response.status_code == 201
+        patient_id = response.json()["patient_id"]
+        
+        # Get patient
+        response = await client.get(f"/api/patients/{patient_id}")
+        assert response.status_code == 200
+        assert response.json()["name"] == "Test Patient"
+        
+        # Update patient
+        response = await client.patch(f"/api/patients/{patient_id}", json={
+            "age": 31
+        })
+        assert response.status_code == 200
+        
+        # Delete patient
+        response = await client.delete(f"/api/patients/{patient_id}")
+        assert response.status_code == 204
+```
+
+### End-to-end tests
+
+```python
+# tests/e2e/test_medical_workflow.py
+import pytest
+from playwright.async_api import async_playwright
+
+@pytest.mark.e2e
+@pytest.mark.asyncio
+async def test_medical_consultation_flow():
+    """Test complete medical consultation flow."""
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        page = await browser.new_page()
+        
+        # Login
+        await page.goto("https://staging.iluminara.org/login")
+        await page.fill("#username", "doctor@test.com")
+        await page.fill("#password", "test123")
+        await page.click("#login-button")
+        
+        # Wait for dashboard
+        await page.wait_for_selector("#dashboard")
+        
+        # Create new consultation
+        await page.click("#new-consultation")
+        await page.fill("#patient-search", "John Doe")
+        await page.click("#patient-result-1")
+        
+        # Enter vitals
+        await page.fill("#temperature", "37.5")
+        await page.fill("#blood-pressure", "120/80")
+        
+        # AI diagnosis
+        await page.click("#run-diagnosis")
+        await page.wait_for_selector("#diagnosis-result")
+        
+        # Verify diagnosis displayed
+        diagnosis = await page.text_content("#diagnosis-result")
+        assert len(diagnosis) > 0
+        
+        # Save consultation
+        await page.click("#save-consultation")
+        await page.wait_for_selector("#success-message")
+        
+        await browser.close()
+```
+
+### Load testing
+
+```python
+# tests/load/locustfile.py
+from locust import HttpUser, task, between
+
+class iLuminaraUser(HttpUser):
+    wait_time = between(1, 3)
+    
+    def on_start(self):
+        """Login before starting tasks."""
+        response = self.client.post("/api/auth/login", json={
+            "username": "test@example.com",
+            "password": "test123"
+        })
+        self.token = response.json()["access_token"]
+        self.client.headers.update({"Authorization": f"Bearer {self.token}"})
+    
+    @task(3)
+    def list_patients(self):
+        """List patients (most common operation)."""
+        self.client.get("/api/patients")
+    
+    @task(2)
+    def get_patient(self):
+        """Get specific patient."""
+        self.client.get("/api/patients/patient-123")
+    
+    @task(1)
+    def create_patient(self):
+        """Create new patient."""
+        self.client.post("/api/patients", json={
+            "name": "Load Test Patient",
+            "age": 30,
+            "gender": "M"
+        })
+    
+    @task(1)
+    def run_diagnosis(self):
+        """Run AI diagnosis."""
+        self.client.post("/api/diagnosis", json={
+            "patient_id": "patient-123",
+            "symptoms": ["fever", "cough"],
+            "vitals": {"temperature": 38.5}
+        })
+```
+
+**Run load test**:
+
+```bash
+# Local load test
+locust -f tests/load/locustfile.py --host=http://localhost:8080
+
+# Distributed load test
+locust -f tests/load/locustfile.py \
+  --master \
+  --expect-workers=10 \
+  --host=https://staging.iluminara.org
+
+# Headless mode for CI
+locust -f tests/load/locustfile.py \
+  --headless \
+  --users 1000 \
+  --spawn-rate 10 \
+  --run-time 10m \
+  --host=https://staging.iluminara.org
+```
+
+## Security hardening
+
+### Container security
+
+```dockerfile
+# Secure Dockerfile
+FROM python:3.11-slim as builder
+
+# Install dependencies as root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --user --no-cache-dir -r requirements.txt
+
+# Runtime stage
+FROM python:3.11-slim
+
+# Create non-root user
+RUN groupadd -r iluminara && useradd -r -g iluminara iluminara
+
+# Copy dependencies
+COPY --from=builder /root/.local /home/iluminara/.local
+
+# Set working directory
+WORKDIR /app
+
+# Copy application
+COPY --chown=iluminara:iluminara . .
+
+# Switch to non-root user
+USER iluminara
+
+# Set PATH
+ENV PATH=/home/iluminara/.local/bin:$PATH
+
+# Security: read-only root filesystem
+# Security: drop all capabilities
+# Security: no new privileges
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+```
+
+### Kubernetes security policies
+
+```yaml
+# pod-security-policy.yaml
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: restricted
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+  readOnlyRootFilesystem: true
+```
+
+### Network policies
+
+```yaml
+# network-policy.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-gateway-netpol
+  namespace: iluminara-prod
+spec:
+  podSelector:
+    matchLabels:
+      app: api-gateway
+  policyTypes:
+    - Ingress
+    - Egress
+  
+  ingress:
+    # Allow from ingress controller
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: ingress-nginx
+      ports:
+      - protocol: TCP
+        port: 8080
+  
+  egress:
+    # Allow to database
+    - to:
+      - podSelector:
+          matchLabels:
+            app: postgresql
+      ports:
+      - protocol: TCP
+        port: 5432
+    
+    # Allow to Redis
+    - to:
+      - podSelector:
+          matchLabels:
+            app: redis
+      ports:
+      - protocol: TCP
+        port: 6379
+    
+    # Allow DNS
+    - to:
+      - namespaceSelector:
+          matchLabels:
+            name: kube-system
+      ports:
+      - protocol: UDP
+        port: 53
+```
+
+## Compliance automation
+
+### GDPR compliance checks
+
+```python
+# compliance/gdpr_validator.py
+from typing import Dict, List
+
+class GDPRValidator:
+    """Automated GDPR compliance validation."""
+    
+    def validate_data_processing(self, operation: Dict) -> Dict:
+        """
+        Validate data processing operation against GDPR.
+        
+        Checks:
+        - Lawful basis (Art. 6)
+        - Data minimization (Art. 5)
+        - Purpose limitation (Art. 5)
+        - Storage limitation (Art. 5)
+        - Consent (if applicable, Art. 7)
+        
+        Returns:
+            Validation result with violations
+        """
+        violations = []
+        
+        # Check lawful basis
+        if 'lawful_basis' not in operation:
+            violations.append({
+                'article': 'Art. 6',
+                'violation': 'Missing lawful basis for processing',
+                'severity': 'CRITICAL'
+            })
+        
+        # Check data minimization
+        if len(operation.get('fields', [])) > 20:
+            violations.append({
+                'article': 'Art. 5(1)(c)',
+                'violation': 'Excessive data collection (data minimization)',
+                'severity': 'HIGH'
+            })
+        
+        # Check purpose limitation
+        if 'purpose' not in operation:
+            violations.append({
+                'article': 'Art. 5(1)(b)',
+                'violation': 'Processing purpose not specified',
+                'severity': 'HIGH'
+            })
+        
+        # Check retention period
+        if 'retention_period' not in operation:
+            violations.append({
+                'article': 'Art. 5(1)(e)',
+                'violation': 'Retention period not specified',
+                'severity': 'MEDIUM'
+            })
+        
+        # Check consent (if lawful basis is consent)
+        if operation.get('lawful_basis') == 'CONSENT':
+            if not operation.get('consent_timestamp'):
+                violations.append({
+                    'article': 'Art. 7',
+                    'violation': 'Consent not documented',
+                    'severity': 'CRITICAL'
+                })
+        
+        return {
+            'compliant': len(violations) == 0,
+            'violations': violations,
+            'recommendations': self._generate_recommendations(violations)
+        }
+    
+    def check_data_subject_rights(self, tenant_id: str) -> Dict:
+        """
+        Check implementation of data subject rights.
+        
+        Rights:
+        - Right to access (Art. 15)
+        - Right to rectification (Art. 16)
+        - Right to erasure (Art. 17)
+        - Right to data portability (Art. 20)
+        
+        Returns:
+            Implementation status for each right
+        """
+        return {
+            'right_to_access': self._check_access_implementation(tenant_id),
+            'right_to_rectification': self._check_rectification_implementation(tenant_id),
+            'right_to_erasure': self._check_erasure_implementation(tenant_id),
+            'right_to_portability': self._check_portability_implementation(tenant_id)
+        }
+```
+
+### Automated compliance reporting
+
+```python
+# compliance/reporter.py
+from datetime import datetime, timedelta
+
+class ComplianceReporter:
+    """Generate automated compliance reports."""
+    
+    def generate_monthly_report(self, tenant_id: str, month: str) -> Dict:
+        """
+        Generate monthly GDPR compliance report.
+        
+        Includes:
+        - Data processing activities
+        - Data subject requests handled
+        - Security incidents
+        - Third-party data transfers
+        - Consent statistics
+        
+        Returns:
+            Compliance report
+        """
+        start_date = datetime.fromisoformat(f"{month}-01")
+        end_date = start_date + timedelta(days=32)
+        end_date = end_date.replace(day=1) - timedelta(days=1)
+        
+        report = {
+            'tenant_id': tenant_id,
+            'period': f"{start_date.date()} to {end_date.date()}",
+            'processing_activities': self._get_processing_activities(
+                tenant_id, start_date, end_date
+            ),
+            'data_subject_requests': self._get_dsr_stats(
+                tenant_id, start_date, end_date
+            ),
+            'security_incidents': self._get_security_incidents(
+                tenant_id, start_date, end_date
+            ),
+            'third_party_transfers': self._get_data_transfers(
+                tenant_id, start_date, end_date
+            ),
+            'consent_stats': self._get_consent_stats(
+                tenant_id, start_date, end_date
+            ),
+            'violations': self._get_violations(
+                tenant_id, start_date, end_date
+            )
+        }
+        
+        return report
+```
+
+## Deployment strategies
+
+### Blue-green deployment
+
+```yaml
+# blue-green-deployment.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+spec:
+  selector:
+    app: api-gateway
+    version: blue  # Switch to 'green' for cutover
+  ports:
+  - port: 80
+    targetPort: 8080
+
+---
+# Blue deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway-blue
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: api-gateway
+      version: blue
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+        version: blue
+    spec:
+      containers:
+      - name: api-gateway
+        image: iluminara/api-gateway:v1.2.3
+
+---
+# Green deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway-green
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: api-gateway
+      version: green
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+        version: green
+    spec:
+      containers:
+      - name: api-gateway
+        image: iluminara/api-gateway:v1.3.0
+```
+
+**Cutover script**:
+
+```bash
+#!/bin/bash
+# blue-green-cutover.sh
+
+# Deploy green
+kubectl apply -f api-gateway-green.yaml
+
+# Wait for green to be ready
+kubectl rollout status deployment/api-gateway-green
+
+# Run smoke tests against green
+kubectl run smoke-test --rm -i --restart=Never \
+  --image=curlimages/curl \
+  -- curl -f http://api-gateway-green/health
+
+# Switch traffic to green
+kubectl patch service api-gateway -p '{"spec":{"selector":{"version":"green"}}}'
+
+# Monitor for 10 minutes
+sleep 600
+
+# Check error rate
+ERROR_RATE=$(curl -s 'http://prometheus:9090/api/v1/query?query=sum(rate(http_requests_total{status=~"5..",version="green"}[5m]))/sum(rate(http_requests_total{version="green"}[5m]))' | jq -r '.data.result[0].value[1]')
+
+if (( $(echo "$ERROR_RATE > 0.01" | bc -l) )); then
+  echo "High error rate detected, rolling back..."
+  kubectl patch service api-gateway -p '{"spec":{"selector":{"version":"blue"}}}'
+  exit 1
+fi
+
+echo "Deployment successful, deleting blue"
+kubectl delete deployment api-gateway-blue
+```
+
+### Canary deployment
+
+```yaml
+# canary-deployment.yaml
+apiVersion: flagger.app/v1beta1
+kind: Canary
+metadata:
+  name: api-gateway
+  namespace: iluminara-prod
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-gateway
+  
+  service:
+    port: 80
+    targetPort: 8080
+  
+  analysis:
+    interval: 1m
+    threshold: 5
+    maxWeight: 50
+    stepWeight: 10
+    
+    metrics:
+      # Success rate
+      - name: request-success-rate
+        thresholdRange:
+          min: 99
+        interval: 1m
+      
+      # Latency
+      - name: request-duration
+        thresholdRange:
+          max: 500
+        interval: 1m
+    
+    webhooks:
+      # Load test during canary
+      - name: load-test
+        url: http://flagger-loadtester/
+        timeout: 5s
+        metadata:
+          cmd: "hey -z 1m -q 10 -c 2 http://api-gateway-canary/health"
+```
+
+## Continuous deployment
+
+### GitOps with ArgoCD
+
+```yaml
+# argocd-app.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: iluminara-prod
+  namespace: argocd
+spec:
+  project: default
+  
+  source:
+    repoURL: https://github.com/iluminara/k8s-manifests
+    targetRevision: HEAD
+    path: overlays/production
+    
+    # Helm values
+    helm:
+      values: |
+        replicaCount: 10
+        image:
+          tag: v1.2.3
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: iluminara-prod
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    
+    syncOptions:
+      - CreateNamespace=true
+    
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  
+  # Health assessment
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas  # Ignore HPA-managed replicas
+```
+
+### Progressive delivery
+
+```yaml
+# progressive-delivery.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: api-gateway
+spec:
+  replicas: 10
+  
+  strategy:
+    canary:
+      steps:
+        - setWeight: 10
+        - pause: {duration: 5m}
+        - setWeight: 20
+        - pause: {duration: 5m}
+        - setWeight: 40
+        - pause: {duration: 10m}
+        - setWeight: 60
+        - pause: {duration: 10m}
+        - setWeight: 80
+        - pause: {duration: 10m}
+      
+      analysis:
+        templates:
+          - templateName: success-rate
+          - templateName: latency
+        
+        startingStep: 2
+        
+        args:
+          - name: service-name
+            value: api-gateway
+  
+  selector:
+    matchLabels:
+      app: api-gateway
+  
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+      - name: api-gateway
+        image: iluminara/api-gateway:v1.3.0
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Enterprise architecture" icon="building" href="/enterprise/architecture-overview">
+    System architecture overview
+  </Card>
+  <Card title="Disaster recovery" icon="life-ring" href="/operations/disaster-recovery">
+    Backup and restore procedures
+  </Card>
+  <Card title="Incident response" icon="siren" href="/operations/incident-response">
+    On-call playbooks
+  </Card>
+  <Card title="Performance tuning" icon="gauge-high" href="/operations/performance-tuning">
+    Optimization guide
+  </Card>
+</CardGroup>
