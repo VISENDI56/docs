@@ -1,79 +1,55 @@
 ---
 title: Deployment strategies
-description: Docker, Serverless, and Kubernetes deployment options for iLuminara
+description: Production deployment patterns for Docker, Kubernetes, and serverless architectures
 ---
 
-iLuminara supports multiple deployment strategies to match different operational requirements, from single-container development to multi-region Kubernetes clusters.
+iLuminara supports multiple deployment strategies to match different operational requirements, from single-device edge deployments to global cloud-native architectures.
 
-## Deployment options overview
+## Deployment overview
 
-| Strategy | Use case | Complexity | Scalability | Cost |
-|----------|----------|------------|-------------|------|
-| Docker Compose | Development, small deployments | Low | Limited | Low |
-| Serverless | Event-driven workloads | Medium | Auto | Pay-per-use |
-| Kubernetes | Production, multi-tenant | High | Unlimited | Medium-High |
-| Edge (K3s) | Remote, offline-first | Medium | Limited | Low |
+### Edge deployment
+Autonomous operation on resource-constrained devices:
+- **Target**: Jetson Orin Nano/AGX, IGX Orin
+- **Pattern**: Docker Compose or systemd services
+- **Connectivity**: Intermittent, offline-first
+- **Scale**: 1-10 devices per location
+
+### Regional deployment
+Coordinated clusters for regional operations:
+- **Target**: On-premise servers or regional cloud
+- **Pattern**: Kubernetes with local storage
+- **Connectivity**: Reliable regional network
+- **Scale**: 10-1000 devices
+
+### Cloud deployment
+Global coordination and management:
+- **Target**: AWS, Azure, GCP, or sovereign cloud
+- **Pattern**: Kubernetes + serverless functions
+- **Connectivity**: High-bandwidth internet
+- **Scale**: 1000+ devices, multi-region
 
 ## Docker deployment
 
-### Docker Compose for development
+### Edge device (Docker Compose)
 
-Complete stack in a single `docker-compose.yml`:
+Single-device deployment with all services:
 
-```yaml
+```yaml docker-compose.yml
 version: '3.8'
 
 services:
-  # API Gateway
-  api-gateway:
-    image: iluminara/api-gateway:latest
-    ports:
-      - "8080:8080"
+  # NVIDIA NIM inference service
+  nim-inference:
+    image: nvcr.io/nvidia/nim:llama-3-8b-instruct
+    runtime: nvidia
     environment:
-      - DATABASE_URL=postgresql://postgres:password@postgres:5432/iluminara
-      - REDIS_URL=redis://redis:6379
-      - JWT_SECRET=${JWT_SECRET}
-    depends_on:
-      - postgres
-      - redis
-    networks:
-      - iluminara-network
-
-  # PostgreSQL Database
-  postgres:
-    image: postgis/postgis:15-3.3
-    environment:
-      - POSTGRES_DB=iluminara
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-      - ./init-scripts:/docker-entrypoint-initdb.d
-    ports:
-      - "5432:5432"
-    networks:
-      - iluminara-network
-
-  # Redis Cache
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis-data:/data
-    networks:
-      - iluminara-network
-
-  # NVIDIA Triton Inference Server
-  triton:
-    image: nvcr.io/nvidia/tritonserver:23.10-py3
-    command: tritonserver --model-repository=/models
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NIM_MODEL_PATH=/models/llama-3-8b-quantized
     volumes:
       - ./models:/models
+      - ./cache:/cache
     ports:
-      - "8000:8000"  # HTTP
-      - "8001:8001"  # gRPC
-      - "8002:8002"  # Metrics
+      - "8000:8000"
     deploy:
       resources:
         reservations:
@@ -81,459 +57,283 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
-    networks:
-      - iluminara-network
-
-  # Worker for async tasks
-  worker:
-    image: iluminara/worker:latest
+    restart: unless-stopped
+  
+  # Ghost-Mesh networking
+  ghost-mesh:
+    image: iluminara/ghost-mesh:latest
+    network_mode: host
+    privileged: true
+    volumes:
+      - /var/run/dbus:/var/run/dbus
+      - ./ghost-mesh-config:/config
     environment:
-      - DATABASE_URL=postgresql://postgres:password@postgres:5432/iluminara
-      - REDIS_URL=redis://redis:6379
-      - CELERY_BROKER_URL=redis://redis:6379/0
+      - MESH_MODE=edge
+      - LORA_ENABLED=true
+      - WIFI_DIRECT_ENABLED=true
+    restart: unless-stopped
+  
+  # Local data collection
+  data-collector:
+    image: iluminara/data-collector:latest
+    volumes:
+      - ./data:/data
+      - /dev:/dev
+    privileged: true
+    environment:
+      - SENSOR_CONFIG=/config/sensors.yaml
+      - STORAGE_PATH=/data
     depends_on:
-      - postgres
-      - redis
-    networks:
-      - iluminara-network
-
-  # Prometheus for metrics
-  prometheus:
-    image: prom/prometheus:latest
+      - timescaledb
+    restart: unless-stopped
+  
+  # Time-series database
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus-data:/prometheus
-    ports:
-      - "9090:9090"
-    networks:
-      - iluminara-network
-
-  # Grafana for visualization
-  grafana:
-    image: grafana/grafana:latest
+      - timescale-data:/var/lib/postgresql/data
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-    volumes:
-      - grafana-data:/var/lib/grafana
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=iluminara
     ports:
-      - "3000:3000"
-    networks:
-      - iluminara-network
+      - "5432:5432"
+    restart: unless-stopped
+  
+  # Local API gateway
+  api-gateway:
+    image: iluminara/api-gateway:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./certs:/certs
+    environment:
+      - NIM_ENDPOINT=http://nim-inference:8000
+      - DB_HOST=timescaledb
+      - DB_PASSWORD=${DB_PASSWORD}
+    depends_on:
+      - nim-inference
+      - timescaledb
+    restart: unless-stopped
+  
+  # Omni-Law compliance validator
+  omni-law:
+    image: iluminara/omni-law:latest
+    volumes:
+      - ./policies:/policies
+    environment:
+      - FRAMEWORKS=GDPR,HIPAA,PABS,EU_AI_ACT
+      - JURISDICTION=KE
+    restart: unless-stopped
 
 volumes:
-  postgres-data:
-  redis-data:
-  prometheus-data:
-  grafana-data:
-
-networks:
-  iluminara-network:
-    driver: bridge
+  timescale-data:
+  models:
+  cache:
 ```
 
-### Multi-stage Docker builds
+### Deployment commands
 
-Optimized Dockerfile for production:
+```bash
+# Pull images
+docker-compose pull
 
-```dockerfile
-# Build stage
-FROM python:3.11-slim as builder
+# Start services
+docker-compose up -d
 
-WORKDIR /app
+# View logs
+docker-compose logs -f
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Scale specific service
+docker-compose up -d --scale data-collector=3
 
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --user --no-cache-dir -r requirements.txt
+# Update services
+docker-compose pull
+docker-compose up -d
 
-# Runtime stage
-FROM python:3.11-slim
+# Backup data
+docker-compose exec timescaledb pg_dump -U postgres iluminara > backup.sql
 
-WORKDIR /app
-
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-    libpq5 \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy Python packages from builder
-COPY --from=builder /root/.local /root/.local
-
-# Copy application code
-COPY . .
-
-# Create non-root user
-RUN useradd -m -u 1000 iluminara && \
-    chown -R iluminara:iluminara /app
-
-USER iluminara
-
-# Set PATH
-ENV PATH=/root/.local/bin:$PATH
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD python -c "import requests; requests.get('http://localhost:8080/health')"
-
-# Run application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Stop services
+docker-compose down
 ```
 
-### Docker secrets management
+### Resource limits
 
-```yaml
-# docker-compose.prod.yml
+```yaml docker-compose.override.yml
 version: '3.8'
 
 services:
-  api-gateway:
-    image: iluminara/api-gateway:latest
-    secrets:
-      - db_password
-      - jwt_secret
-    environment:
-      - DATABASE_URL=postgresql://postgres:$(cat /run/secrets/db_password)@postgres:5432/iluminara
-      - JWT_SECRET_FILE=/run/secrets/jwt_secret
-
-secrets:
-  db_password:
-    external: true
-  jwt_secret:
-    external: true
-```
-
-## Serverless deployment
-
-### AWS Lambda functions
-
-Deploy individual services as Lambda functions:
-
-```python
-# lambda_handler.py
-import json
-import boto3
-from mangum import Mangum
-from fastapi import FastAPI
-
-app = FastAPI()
-
-@app.get("/health")
-def health_check():
-    return {"status": "healthy"}
-
-@app.post("/api/patients")
-def create_patient(patient_data: dict):
-    # Process patient data
-    return {"patient_id": "generated-id"}
-
-# Lambda handler
-handler = Mangum(app)
-```
-
-**Serverless Framework configuration**:
-
-```yaml
-# serverless.yml
-service: iluminara-api
-
-provider:
-  name: aws
-  runtime: python3.11
-  region: us-east-1
-  stage: ${opt:stage, 'dev'}
+  nim-inference:
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
   
-  environment:
-    DATABASE_URL: ${ssm:/iluminara/${self:provider.stage}/database-url}
-    JWT_SECRET: ${ssm:/iluminara/${self:provider.stage}/jwt-secret~true}
+  data-collector:
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
   
-  iam:
-    role:
-      statements:
-        - Effect: Allow
-          Action:
-            - dynamodb:Query
-            - dynamodb:Scan
-            - dynamodb:GetItem
-            - dynamodb:PutItem
-          Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/iluminara-*"
-
-functions:
-  api:
-    handler: lambda_handler.handler
-    events:
-      - http:
-          path: /{proxy+}
-          method: ANY
-          cors: true
-    timeout: 30
-    memorySize: 1024
-    
-  worker:
-    handler: worker.handler
-    events:
-      - sqs:
-          arn: !GetAtt TaskQueue.Arn
-          batchSize: 10
-    timeout: 300
-    memorySize: 2048
-
-resources:
-  Resources:
-    TaskQueue:
-      Type: AWS::SQS::Queue
-      Properties:
-        QueueName: iluminara-tasks-${self:provider.stage}
-        VisibilityTimeout: 300
-
-plugins:
-  - serverless-python-requirements
-  - serverless-offline
-
-custom:
-  pythonRequirements:
-    dockerizePip: true
-    layer: true
-```
-
-### Google Cloud Functions
-
-```python
-# main.py
-import functions_framework
-from flask import Request
-
-@functions_framework.http
-def process_sensor_data(request: Request):
-    """
-    HTTP Cloud Function for processing sensor data.
-    """
-    request_json = request.get_json(silent=True)
-    
-    if not request_json or 'sensor_id' not in request_json:
-        return {'error': 'Invalid request'}, 400
-    
-    # Process sensor data
-    result = process_data(request_json)
-    
-    return {'status': 'success', 'result': result}, 200
-
-def process_data(data):
-    # Processing logic
-    return {"processed": True}
-```
-
-**Deployment**:
-
-```bash
-gcloud functions deploy process-sensor-data \
-  --runtime python311 \
-  --trigger-http \
-  --allow-unauthenticated \
-  --region us-central1 \
-  --memory 512MB \
-  --timeout 60s \
-  --set-env-vars DATABASE_URL=$DATABASE_URL
-```
-
-### Azure Functions
-
-```python
-# function_app.py
-import azure.functions as func
-import logging
-
-app = func.FunctionApp()
-
-@app.route(route="patients", methods=["POST"])
-def create_patient(req: func.HttpRequest) -> func.HttpResponse:
-    logging.info('Creating patient record')
-    
-    try:
-        req_body = req.get_json()
-        patient_id = save_patient(req_body)
-        
-        return func.HttpResponse(
-            json.dumps({"patient_id": patient_id}),
-            mimetype="application/json",
-            status_code=201
-        )
-    except ValueError:
-        return func.HttpResponse(
-            "Invalid request body",
-            status_code=400
-        )
-
-@app.queue_trigger(arg_name="msg", queue_name="tasks",
-                   connection="AzureWebJobsStorage")
-def process_task(msg: func.QueueMessage):
-    logging.info('Processing task: %s', msg.get_body().decode('utf-8'))
-    # Task processing logic
+  timescaledb:
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
 ```
 
 ## Kubernetes deployment
 
-### Production-grade Kubernetes manifests
+### Regional cluster architecture
 
-#### Namespace and resource quotas
+```
+┌─────────────────────────────────────────────────────────┐
+│              Kubernetes Cluster (Regional)              │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  ┌─────────────────────────────────────────────────┐  │
+│  │              Ingress Controller                  │  │
+│  │  (NGINX + cert-manager for TLS)                 │  │
+│  └─────────────────────────────────────────────────┘  │
+│                        │                                │
+│                        ▼                                │
+│  ┌─────────────────────────────────────────────────┐  │
+│  │              API Gateway                         │  │
+│  │  (Kong or Traefik)                              │  │
+│  └─────────────────────────────────────────────────┘  │
+│                        │                                │
+│         ┌──────────────┼──────────────┐                │
+│         ▼              ▼              ▼                │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
+│  │   NIM    │  │  Ghost   │  │  Omni    │            │
+│  │ Inference│  │  Mesh    │  │  Law     │            │
+│  │ (GPU)    │  │  Router  │  │ Validator│            │
+│  └──────────┘  └──────────┘  └──────────┘            │
+│                                                         │
+│  ┌─────────────────────────────────────────────────┐  │
+│  │              Data Layer                          │  │
+│  ├─────────────────────────────────────────────────┤  │
+│  │ • TimescaleDB (StatefulSet)                     │  │
+│  │ • Neo4j (StatefulSet)                           │  │
+│  │ • Redis (StatefulSet)                           │  │
+│  │ • Kafka (StatefulSet)                           │  │
+│  └─────────────────────────────────────────────────┘  │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
 
-```yaml
-# namespace.yaml
+### Kubernetes manifests
+
+#### Namespace
+
+```yaml namespace.yaml
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: iluminara-prod
+  name: iluminara
   labels:
-    name: iluminara-prod
-
----
-apiVersion: v1
-kind: ResourceQuota
-metadata:
-  name: compute-quota
-  namespace: iluminara-prod
-spec:
-  hard:
-    requests.cpu: "100"
-    requests.memory: 200Gi
-    limits.cpu: "200"
-    limits.memory: 400Gi
-    persistentvolumeclaims: "50"
+    name: iluminara
+    environment: production
 ```
 
-#### API deployment with HPA
+#### NIM Inference Deployment
 
-```yaml
-# api-deployment.yaml
+```yaml nim-deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: api-gateway
-  namespace: iluminara-prod
-  labels:
-    app: api-gateway
-    version: v1
+  name: nim-inference
+  namespace: iluminara
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: api-gateway
+      app: nim-inference
   template:
     metadata:
       labels:
-        app: api-gateway
-        version: v1
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "8080"
-        prometheus.io/path: "/metrics"
+        app: nim-inference
     spec:
-      serviceAccountName: api-gateway
-      
-      # Pod anti-affinity for HA
-      affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            podAffinityTerm:
-              labelSelector:
-                matchExpressions:
-                - key: app
-                  operator: In
-                  values:
-                  - api-gateway
-              topologyKey: kubernetes.io/hostname
-      
+      nodeSelector:
+        nvidia.com/gpu: "true"
       containers:
-      - name: api-gateway
-        image: iluminara/api-gateway:v1.2.3
-        imagePullPolicy: IfNotPresent
-        
-        ports:
-        - name: http
-          containerPort: 8080
-          protocol: TCP
-        
-        env:
-        - name: DATABASE_URL
-          valueFrom:
-            secretKeyRef:
-              name: database-credentials
-              key: url
-        - name: REDIS_URL
-          value: "redis://redis-service:6379"
-        - name: LOG_LEVEL
-          value: "info"
-        
+      - name: nim
+        image: nvcr.io/nvidia/nim:llama-3-8b-instruct
         resources:
-          requests:
-            cpu: 500m
-            memory: 512Mi
           limits:
-            cpu: 2000m
-            memory: 2Gi
-        
+            nvidia.com/gpu: 1
+            memory: 16Gi
+            cpu: 4
+          requests:
+            nvidia.com/gpu: 1
+            memory: 8Gi
+            cpu: 2
+        env:
+        - name: NIM_MODEL_PATH
+          value: /models/llama-3-8b-quantized
+        - name: NIM_CACHE_PATH
+          value: /cache
+        volumeMounts:
+        - name: models
+          mountPath: /models
+          readOnly: true
+        - name: cache
+          mountPath: /cache
+        ports:
+        - containerPort: 8000
+          name: http
         livenessProbe:
           httpGet:
             path: /health
-            port: 8080
-          initialDelaySeconds: 30
+            port: 8000
+          initialDelaySeconds: 60
           periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
-        
         readinessProbe:
           httpGet:
             path: /ready
-            port: 8080
-          initialDelaySeconds: 10
+            port: 8000
+          initialDelaySeconds: 30
           periodSeconds: 5
-          timeoutSeconds: 3
-          failureThreshold: 3
-        
-        securityContext:
-          runAsNonRoot: true
-          runAsUser: 1000
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
-          capabilities:
-            drop:
-            - ALL
-
+      volumes:
+      - name: models
+        persistentVolumeClaim:
+          claimName: nim-models-pvc
+      - name: cache
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: api-gateway
-  namespace: iluminara-prod
+  name: nim-inference
+  namespace: iluminara
 spec:
-  type: ClusterIP
   selector:
-    app: api-gateway
+    app: nim-inference
   ports:
-  - name: http
-    port: 80
-    targetPort: 8080
-    protocol: TCP
-
+  - port: 8000
+    targetPort: 8000
+    name: http
+  type: ClusterIP
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: api-gateway-hpa
-  namespace: iluminara-prod
+  name: nim-inference-hpa
+  namespace: iluminara
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: api-gateway
-  minReplicas: 3
-  maxReplicas: 50
+    name: nim-inference
+  minReplicas: 2
+  maxReplicas: 10
   metrics:
   - type: Resource
     resource:
@@ -547,97 +347,67 @@ spec:
       target:
         type: Utilization
         averageUtilization: 80
-  - type: Pods
-    pods:
-      metric:
-        name: http_requests_per_second
-      target:
-        type: AverageValue
-        averageValue: "1000"
-  behavior:
-    scaleDown:
-      stabilizationWindowSeconds: 300
-      policies:
-      - type: Percent
-        value: 50
-        periodSeconds: 60
-    scaleUp:
-      stabilizationWindowSeconds: 0
-      policies:
-      - type: Percent
-        value: 100
-        periodSeconds: 30
-      - type: Pods
-        value: 4
-        periodSeconds: 30
-      selectPolicy: Max
 ```
 
-#### StatefulSet for databases
+#### TimescaleDB StatefulSet
 
-```yaml
-# postgres-statefulset.yaml
+```yaml timescaledb-statefulset.yaml
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: postgresql
-  namespace: iluminara-prod
+  name: timescaledb
+  namespace: iluminara
 spec:
-  serviceName: postgresql
+  serviceName: timescaledb
   replicas: 3
   selector:
     matchLabels:
-      app: postgresql
+      app: timescaledb
   template:
     metadata:
       labels:
-        app: postgresql
+        app: timescaledb
     spec:
       containers:
-      - name: postgresql
-        image: postgis/postgis:15-3.3
-        ports:
-        - containerPort: 5432
-          name: postgresql
+      - name: timescaledb
+        image: timescale/timescaledb:latest-pg15
         env:
-        - name: POSTGRES_DB
-          value: iluminara
-        - name: POSTGRES_USER
-          valueFrom:
-            secretKeyRef:
-              name: postgresql-credentials
-              key: username
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: postgresql-credentials
+              name: db-credentials
               key: password
+        - name: POSTGRES_DB
+          value: iluminara
         - name: PGDATA
           value: /var/lib/postgresql/data/pgdata
+        ports:
+        - containerPort: 5432
+          name: postgres
         volumeMounts:
         - name: data
           mountPath: /var/lib/postgresql/data
         resources:
           requests:
-            cpu: 2000m
-            memory: 4Gi
+            memory: 2Gi
+            cpu: 1
           limits:
-            cpu: 4000m
-            memory: 8Gi
+            memory: 4Gi
+            cpu: 2
         livenessProbe:
           exec:
             command:
-            - /bin/sh
-            - -c
-            - pg_isready -U $POSTGRES_USER
+            - pg_isready
+            - -U
+            - postgres
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
           exec:
             command:
-            - /bin/sh
-            - -c
-            - pg_isready -U $POSTGRES_USER
+            - pg_isready
+            - -U
+            - postgres
           initialDelaySeconds: 5
           periodSeconds: 5
   volumeClaimTemplates:
@@ -649,22 +419,33 @@ spec:
       resources:
         requests:
           storage: 100Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: timescaledb
+  namespace: iluminara
+spec:
+  selector:
+    app: timescaledb
+  ports:
+  - port: 5432
+    targetPort: 5432
+  clusterIP: None  # Headless service for StatefulSet
 ```
 
-#### Ingress with TLS
+#### Ingress
 
-```yaml
-# ingress.yaml
+```yaml ingress.yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: iluminara-ingress
-  namespace: iluminara-prod
+  namespace: iluminara
   annotations:
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
-    nginx.ingress.kubernetes.io/rate-limit: "100"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
 spec:
   ingressClassName: nginx
   tls:
@@ -675,287 +456,332 @@ spec:
   - host: api.iluminara.org
     http:
       paths:
-      - path: /
+      - path: /v1/inference
+        pathType: Prefix
+        backend:
+          service:
+            name: nim-inference
+            port:
+              number: 8000
+      - path: /v1/data
         pathType: Prefix
         backend:
           service:
             name: api-gateway
             port:
-              number: 80
+              number: 8080
 ```
 
-### Helm charts
-
-Package Kubernetes manifests as Helm charts:
-
-```yaml
-# Chart.yaml
-apiVersion: v2
-name: iluminara
-description: iLuminara platform Helm chart
-type: application
-version: 1.0.0
-appVersion: "1.2.3"
-
-dependencies:
-  - name: postgresql
-    version: 12.x.x
-    repository: https://charts.bitnami.com/bitnami
-  - name: redis
-    version: 17.x.x
-    repository: https://charts.bitnami.com/bitnami
-```
-
-```yaml
-# values.yaml
-replicaCount: 3
-
-image:
-  repository: iluminara/api-gateway
-  pullPolicy: IfNotPresent
-  tag: "v1.2.3"
-
-service:
-  type: ClusterIP
-  port: 80
-
-ingress:
-  enabled: true
-  className: "nginx"
-  annotations:
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
-  hosts:
-    - host: api.iluminara.org
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - secretName: iluminara-tls
-      hosts:
-        - api.iluminara.org
-
-resources:
-  limits:
-    cpu: 2000m
-    memory: 2Gi
-  requests:
-    cpu: 500m
-    memory: 512Mi
-
-autoscaling:
-  enabled: true
-  minReplicas: 3
-  maxReplicas: 50
-  targetCPUUtilizationPercentage: 70
-  targetMemoryUtilizationPercentage: 80
-
-postgresql:
-  enabled: true
-  auth:
-    username: iluminara
-    password: ""  # Set via --set
-    database: iluminara
-  primary:
-    persistence:
-      size: 100Gi
-
-redis:
-  enabled: true
-  architecture: standalone
-  auth:
-    enabled: true
-    password: ""  # Set via --set
-```
-
-**Deploy with Helm**:
+### Deployment commands
 
 ```bash
-# Add Helm repo
-helm repo add bitnami https://charts.bitnami.com/bitnami
-helm repo update
+# Create namespace
+kubectl apply -f namespace.yaml
 
-# Install chart
-helm install iluminara ./iluminara-chart \
-  --namespace iluminara-prod \
-  --create-namespace \
-  --set postgresql.auth.password=$DB_PASSWORD \
-  --set redis.auth.password=$REDIS_PASSWORD \
-  --values values.prod.yaml
+# Create secrets
+kubectl create secret generic db-credentials \
+  --from-literal=password=<strong-password> \
+  -n iluminara
 
-# Upgrade
-helm upgrade iluminara ./iluminara-chart \
-  --namespace iluminara-prod \
-  --values values.prod.yaml
+# Deploy services
+kubectl apply -f timescaledb-statefulset.yaml
+kubectl apply -f nim-deployment.yaml
+kubectl apply -f ingress.yaml
+
+# Check status
+kubectl get pods -n iluminara
+kubectl get svc -n iluminara
+
+# View logs
+kubectl logs -f deployment/nim-inference -n iluminara
+
+# Scale deployment
+kubectl scale deployment nim-inference --replicas=5 -n iluminara
+
+# Rolling update
+kubectl set image deployment/nim-inference \
+  nim=nvcr.io/nvidia/nim:llama-3-8b-instruct-v2 \
+  -n iluminara
 
 # Rollback
-helm rollback iluminara 1 --namespace iluminara-prod
+kubectl rollout undo deployment/nim-inference -n iluminara
 ```
 
-## Edge deployment (K3s)
+## Serverless deployment
 
-### Lightweight Kubernetes for edge
+### AWS Lambda + ECS Fargate
 
-Install K3s on Jetson devices:
+Hybrid serverless architecture:
 
-```bash
-# Install K3s on master node
-curl -sfL https://get.k3s.io | sh -s - \
-  --write-kubeconfig-mode 644 \
-  --disable traefik \
-  --disable servicelb
-
-# Get node token
-sudo cat /var/lib/rancher/k3s/server/node-token
-
-# Join worker nodes
-curl -sfL https://get.k3s.io | K3S_URL=https://master-ip:6443 \
-  K3S_TOKEN=<node-token> sh -
+```
+┌─────────────────────────────────────────────────────────┐
+│              Serverless Architecture (AWS)              │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  ┌─────────────────────────────────────────────────┐  │
+│  │         API Gateway (REST/WebSocket)             │  │
+│  └─────────────────────────────────────────────────┘  │
+│                        │                                │
+│         ┌──────────────┼──────────────┐                │
+│         ▼              ▼              ▼                │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
+│  │ Lambda   │  │ Lambda   │  │  ECS     │            │
+│  │ (API)    │  │ (Data)   │  │ Fargate  │            │
+│  │          │  │          │  │ (NIM)    │            │
+│  └──────────┘  └──────────┘  └──────────┘            │
+│                                                         │
+│  ┌─────────────────────────────────────────────────┐  │
+│  │              Data Layer                          │  │
+│  ├─────────────────────────────────────────────────┤  │
+│  │ • RDS (PostgreSQL + TimescaleDB)                │  │
+│  │ • DynamoDB (NoSQL)                              │  │
+│  │ • S3 (Object storage)                           │  │
+│  │ • ElastiCache (Redis)                           │  │
+│  └─────────────────────────────────────────────────┘  │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
 ```
 
-### Edge-optimized deployment
+### Lambda function (API handler)
 
-```yaml
-# edge-deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: edge-inference
-  namespace: iluminara-edge
-spec:
-  replicas: 1  # Single replica for edge
-  selector:
-    matchLabels:
-      app: edge-inference
-  template:
-    metadata:
-      labels:
-        app: edge-inference
-    spec:
-      nodeSelector:
-        nvidia.com/gpu: "true"  # Schedule on GPU nodes
-      
-      containers:
-      - name: triton
-        image: nvcr.io/nvidia/tritonserver:23.10-py3
-        command: ["tritonserver"]
-        args:
-          - "--model-repository=/models"
-          - "--strict-model-config=false"
-        
-        volumeMounts:
-        - name: models
-          mountPath: /models
-          readOnly: true
-        
-        resources:
-          limits:
-            nvidia.com/gpu: 1
-        
-        ports:
-        - containerPort: 8000
-          name: http
-        - containerPort: 8001
-          name: grpc
-      
-      volumes:
-      - name: models
-        hostPath:
-          path: /data/models
-          type: Directory
+```python lambda/api_handler.py
+import json
+import boto3
+import os
+
+# Initialize clients
+ecs_client = boto3.client('ecs')
+dynamodb = boto3.resource('dynamodb')
+
+def lambda_handler(event, context):
+    """
+    API Gateway Lambda handler.
+    Routes requests to appropriate services.
+    """
+    # Parse request
+    path = event['path']
+    method = event['httpMethod']
+    body = json.loads(event.get('body', '{}'))
+    
+    # Route to appropriate handler
+    if path.startswith('/v1/inference'):
+        return handle_inference(body)
+    elif path.startswith('/v1/data'):
+        return handle_data(body)
+    else:
+        return {
+            'statusCode': 404,
+            'body': json.dumps({'error': 'Not found'})
+        }
+
+def handle_inference(body):
+    """
+    Handle inference request by invoking ECS Fargate task.
+    """
+    # Start ECS task for inference
+    response = ecs_client.run_task(
+        cluster=os.environ['ECS_CLUSTER'],
+        taskDefinition=os.environ['NIM_TASK_DEFINITION'],
+        launchType='FARGATE',
+        networkConfiguration={
+            'awsvpcConfiguration': {
+                'subnets': os.environ['SUBNETS'].split(','),
+                'securityGroups': [os.environ['SECURITY_GROUP']],
+                'assignPublicIp': 'ENABLED'
+            }
+        },
+        overrides={
+            'containerOverrides': [{
+                'name': 'nim-inference',
+                'environment': [
+                    {'name': 'INPUT_TEXT', 'value': body['text']},
+                    {'name': 'MAX_TOKENS', 'value': str(body.get('max_tokens', 100))}
+                ]
+            }]
+        }
+    )
+    
+    task_arn = response['tasks'][0]['taskArn']
+    
+    return {
+        'statusCode': 202,
+        'body': json.dumps({
+            'task_id': task_arn,
+            'status': 'processing'
+        })
+    }
+
+def handle_data(body):
+    """
+    Handle data query from DynamoDB.
+    """
+    table = dynamodb.Table(os.environ['DYNAMODB_TABLE'])
+    
+    response = table.get_item(
+        Key={'id': body['id']}
+    )
+    
+    if 'Item' in response:
+        return {
+            'statusCode': 200,
+            'body': json.dumps(response['Item'])
+        }
+    else:
+        return {
+            'statusCode': 404,
+            'body': json.dumps({'error': 'Item not found'})
+        }
 ```
 
-## Deployment automation
+### ECS Fargate task definition
 
-### GitOps with ArgoCD
-
-```yaml
-# argocd-application.yaml
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: iluminara-prod
-  namespace: argocd
-spec:
-  project: default
-  
-  source:
-    repoURL: https://github.com/iluminara/k8s-manifests
-    targetRevision: main
-    path: overlays/production
-  
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: iluminara-prod
-  
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-      allowEmpty: false
-    syncOptions:
-    - CreateNamespace=true
-    retry:
-      limit: 5
-      backoff:
-        duration: 5s
-        factor: 2
-        maxDuration: 3m
+```json ecs-task-definition.json
+{
+  "family": "nim-inference",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "4096",
+  "memory": "16384",
+  "containerDefinitions": [
+    {
+      "name": "nim-inference",
+      "image": "nvcr.io/nvidia/nim:llama-3-8b-instruct",
+      "essential": true,
+      "environment": [
+        {
+          "name": "NIM_MODEL_PATH",
+          "value": "/models/llama-3-8b-quantized"
+        }
+      ],
+      "mountPoints": [
+        {
+          "sourceVolume": "models",
+          "containerPath": "/models",
+          "readOnly": true
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/nim-inference",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "resourceRequirements": [
+        {
+          "type": "GPU",
+          "value": "1"
+        }
+      ]
+    }
+  ],
+  "volumes": [
+    {
+      "name": "models",
+      "efsVolumeConfiguration": {
+        "fileSystemId": "fs-12345678",
+        "rootDirectory": "/models"
+      }
+    }
+  ]
+}
 ```
 
-### Kustomize overlays
+### Terraform deployment
 
-```yaml
-# base/kustomization.yaml
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
+```hcl main.tf
+# Lambda function
+resource "aws_lambda_function" "api_handler" {
+  filename      = "lambda.zip"
+  function_name = "iluminara-api-handler"
+  role          = aws_iam_role.lambda_role.arn
+  handler       = "api_handler.lambda_handler"
+  runtime       = "python3.11"
+  timeout       = 30
+  memory_size   = 512
 
-resources:
-  - deployment.yaml
-  - service.yaml
-  - ingress.yaml
+  environment {
+    variables = {
+      ECS_CLUSTER          = aws_ecs_cluster.main.name
+      NIM_TASK_DEFINITION  = aws_ecs_task_definition.nim.family
+      DYNAMODB_TABLE       = aws_dynamodb_table.data.name
+      SUBNETS              = join(",", aws_subnet.private[*].id)
+      SECURITY_GROUP       = aws_security_group.ecs.id
+    }
+  }
+}
 
-configMapGenerator:
-  - name: app-config
-    literals:
-      - LOG_LEVEL=info
+# ECS cluster
+resource "aws_ecs_cluster" "main" {
+  name = "iluminara-cluster"
 
----
-# overlays/production/kustomization.yaml
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
+  setting {
+    name  = "containerInsights"
+    value = "enabled"
+  }
+}
 
-bases:
-  - ../../base
+# ECS task definition
+resource "aws_ecs_task_definition" "nim" {
+  family                   = "nim-inference"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "4096"
+  memory                   = "16384"
 
-replicas:
-  - name: api-gateway
-    count: 10
+  container_definitions = file("ecs-task-definition.json")
+}
 
-images:
-  - name: iluminara/api-gateway
-    newTag: v1.2.3
+# API Gateway
+resource "aws_apigatewayv2_api" "main" {
+  name          = "iluminara-api"
+  protocol_type = "HTTP"
+}
 
-configMapGenerator:
-  - name: app-config
-    behavior: merge
-    literals:
-      - LOG_LEVEL=warn
-      - ENVIRONMENT=production
+resource "aws_apigatewayv2_integration" "lambda" {
+  api_id           = aws_apigatewayv2_api.main.id
+  integration_type = "AWS_PROXY"
+  integration_uri  = aws_lambda_function.api_handler.invoke_arn
+}
+
+# DynamoDB table
+resource "aws_dynamodb_table" "data" {
+  name           = "iluminara-data"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "id"
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
+}
 ```
+
+## Deployment comparison
+
+| Feature | Docker Compose | Kubernetes | Serverless |
+|---------|----------------|------------|------------|
+| **Complexity** | Low | High | Medium |
+| **Scalability** | Limited (1-10 nodes) | High (1000+ nodes) | Very high (auto-scale) |
+| **Cost** | Low (fixed) | Medium (fixed + variable) | Variable (pay-per-use) |
+| **Latency** | Low | Low | Medium (cold start) |
+| **Maintenance** | Manual | Automated | Fully managed |
+| **Best for** | Edge devices | Regional clusters | Global, variable load |
 
 ## Next steps
 
 <CardGroup cols={2}>
   <Card title="Observability" icon="chart-line" href="/enterprise/observability">
-    Monitoring and logging
+    Monitoring and alerting
   </Card>
-  <Card title="CI/CD pipelines" icon="code-branch" href="/enterprise/cicd-security">
-    Automated deployments
+  <Card title="CI/CD pipeline" icon="code-branch" href="/enterprise/cicd-pipeline">
+    Automated deployment
   </Card>
-  <Card title="Disaster recovery" icon="life-ring" href="/enterprise/disaster-recovery">
-    Backup and restore
+  <Card title="Security" icon="shield" href="/enterprise/security">
+    Security best practices
   </Card>
   <Card title="Cost optimization" icon="dollar-sign" href="/enterprise/cost-optimization">
-    Resource efficiency
+    Reduce infrastructure costs
   </Card>
 </CardGroup>

@@ -1,421 +1,584 @@
 ---
 title: Docker deployment
-description: Containerized deployment with NIST-compliant infrastructure
+description: Deploy iLuminara components using Docker containers for development and production
 ---
 
-## Overview
+Docker provides containerized deployment for iLuminara, ensuring consistent environments across development, testing, and production.
 
-iLuminara-Core uses a unified Docker infrastructure with multi-stage builds, security hardening, and compliance-first design. All images are pinned to specific SHA hashes to meet NIST RMF supply chain requirements.
+## Quick start
 
-<Card
-  title=\"Philosophy\"
-  icon=\"docker\"
->
-  \"The Fortress is containerized. Every layer is attested.\"
-</Card>
+### Prerequisites
 
-## Docker images
+- Docker Engine 24.0+
+- Docker Compose 2.20+
+- NVIDIA Container Toolkit (for GPU support)
+- 16GB RAM minimum, 32GB recommended
+- 100GB disk space
 
-<CardGroup cols={2}>
-  <Card title=\"Frontend\" icon=\"browser\">
-    Compassionate CHW Interface with Nginx
-  </Card>
-  <Card title=\"Backend\" icon=\"server\">
-    Governance Kernel + API Service + Dashboard
-  </Card>
-  <Card title=\"FRENASA Engine\" icon=\"microphone\">
-    Voice-to-JSON with offline SQLite buffer
-  </Card>
-  <Card title=\"Marketplace\" icon=\"store\">
-    Sovereign Compliance Marketplace
-  </Card>
-</CardGroup>
+### Basic deployment
 
-## Frontend Dockerfile
+```bash
+# Clone repository
+git clone https://github.com/your-org/iluminara.git
+cd iluminara
 
-Multi-stage build for optimized Compassionate CHW Interface.
+# Build images
+docker-compose build
 
-```dockerfile
-# Stage 1: Build
-FROM node:20.11.0-alpine@sha256:bf77dc26e48ea95fca9d1aceb5acfa69d2e546b765ec2abfb502975f1a2d4def AS builder
+# Start services
+docker-compose up -d
 
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production && npm audit fix
-COPY . .
-RUN npm run build
+# Check status
+docker-compose ps
 
-# Stage 2: Production
-FROM nginx:1.25.3-alpine@sha256:6a2f8b28e45c4adea04ec207a251fd4a2df03ddc930f782af51e315ebc76e9a9
-
-# Security updates
-RUN apk update && apk upgrade && apk add --no-cache ca-certificates
-
-# Copy built assets
-COPY --from=builder /app/build /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/nginx.conf
-
-# Create non-root user
-RUN addgroup -g 1001 -S iluminara && \\
-    adduser -S -D -H -u 1001 -h /usr/share/nginx/html -s /sbin/nologin -G iluminara -g iluminara iluminara
-
-USER iluminara
-
-EXPOSE 8080
-CMD [\"nginx\", \"-g\", \"daemon off;\"]
+# View logs
+docker-compose logs -f
 ```
 
-**Features:**
-- Multi-stage build reduces image size by 70%
-- Pinned SHA hashes for supply chain security
-- Non-root user execution
-- Security headers in Nginx config
-- Health check endpoint
+## Docker Compose configuration
 
-## Backend Dockerfile
+### Core services
 
-Governance Kernel + API Service with local package installation.
-
-```dockerfile
-FROM python:3.11.7-slim AS base
-
-ENV PYTHONUNBUFFERED=1 \\
-    PYTHONDONTWRITEBYTECODE=1 \\
-    PIP_NO_CACHE_DIR=1
-
-WORKDIR /app
-
-# Install system dependencies
-RUN apt-get update && \\
-    apt-get install -y --no-install-recommends gcc g++ libpq-dev curl && \\
-    apt-get clean
-
-# Install Python dependencies
-COPY requirements.txt requirements-backend.txt ./
-RUN pip install --no-cache-dir -r requirements.txt && \\
-    pip install --no-cache-dir -r requirements-backend.txt
-
-# Install governance kernel as local package
-COPY governance_kernel/ ./governance_kernel/
-COPY setup.py ./
-RUN pip install --no-cache-dir -e .
-
-# Copy application code
-COPY api_service.py dashboard.py ./
-COPY edge_node/ ./edge_node/
-COPY config/ ./config/
-
-# Create non-root user
-RUN useradd -m -u 1001 -s /bin/bash iluminara && \\
-    chown -R iluminara:iluminara /app
-
-USER iluminara
-
-EXPOSE 8501 8080
-
-CMD [\"streamlit\", \"run\", \"dashboard.py\", \"--server.port=8501\", \"--server.address=0.0.0.0\"]
-```
-
-**Features:**
-- Governance kernel installed as local package
-- Dual port exposure (Dashboard: 8501, API: 8080)
-- Non-root user execution
-- Health check integration
-
-## FRENASA Engine Dockerfile
-
-Voice-to-JSON transformation with offline SQLite buffer (IP-05: Golden Thread).
-
-```dockerfile
-FROM python:3.11.7-slim AS base
-
-ENV OFFLINE_MODE=true \\
-    GOLDEN_THREAD_BUFFER=/app/data/golden_thread.db
-
-WORKDIR /app
-
-# Install system dependencies including SQLite
-RUN apt-get update && \\
-    apt-get install -y --no-install-recommends \\
-        gcc g++ libsqlite3-dev sqlite3 libsndfile1 ffmpeg && \\
-    apt-get clean
-
-# Install Python dependencies
-COPY requirements-frenasa.txt ./
-RUN pip install --no-cache-dir -r requirements-frenasa.txt
-
-# Copy FRENASA engine code
-COPY edge_node/frenasa_engine/ ./frenasa_engine/
-COPY edge_node/sync_protocol/ ./sync_protocol/
-COPY governance_kernel/ ./governance_kernel/
-
-# Create offline buffer database
-RUN mkdir -p /app/data && \\
-    sqlite3 /app/data/golden_thread.db \"CREATE TABLE IF NOT EXISTS offline_buffer (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, data_type TEXT, payload TEXT, synced INTEGER DEFAULT 0);\"
-
-# Create non-root user
-RUN useradd -m -u 1001 -s /bin/bash iluminara && \\
-    chown -R iluminara:iluminara /app
-
-USER iluminara
-
-EXPOSE 8082
-
-CMD [\"python\", \"-m\", \"frenasa_engine.voice_processor\"]
-```
-
-**Features:**
-- SQLite offline buffer for IP-05: Golden Thread
-- Audio processing libraries (libsndfile, ffmpeg)
-- Offline-first operation
-- Automatic sync when connectivity restored
-
-## Marketplace Dockerfile
-
-Sovereign Compliance Marketplace with ENTRYPOINT validation.
-
-```dockerfile
-FROM python:3.11.7-slim AS base
-
-ENV NODE_ID=MARKETPLACE-01 \\
-    JURISDICTION=GLOBAL_DEFAULT
-
-WORKDIR /app
-
-# Install dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends gcc curl && apt-get clean
-
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy code
-COPY governance_kernel/ ./governance_kernel/
-COPY config/ ./config/
-COPY scripts/ ./scripts/
-COPY marketplace/ ./marketplace/
-
-# Create non-root user
-RUN useradd -m -u 1001 -s /bin/bash iluminara && \\
-    chown -R iluminara:iluminara /app && \\
-    chmod +x scripts/validate_fortress.sh
-
-USER iluminara
-
-EXPOSE 8000
-
-# ENTRYPOINT: SovereignGuardrail validation before startup
-ENTRYPOINT [\"/bin/bash\", \"-c\", \"python -c 'from governance_kernel.vector_ledger import SovereignGuardrail; g = SovereignGuardrail(); print(\\\"🛡️ SovereignGuardrail: OPERATIONAL\\\")' && exec \\\"$@\\\"\", \"--\"]
-
-CMD [\"python\", \"-m\", \"marketplace.app\"]
-```
-
-**Features:**
-- ENTRYPOINT enforces SovereignGuardrail check before startup
-- No container starts without compliance validation
-- Marketplace services for sovereign compliance
-
-## Docker Compose
-
-Orchestrate all services with docker-compose.
-
-```yaml
+```yaml docker-compose.yml
 version: '3.8'
 
 services:
-  frontend:
+  # API Gateway
+  api-gateway:
     build:
-      context: .
-      dockerfile: frontend_web/Dockerfile
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
     ports:
-      - \"8080:8080\"
+      - "8080:8080"
     environment:
       - NODE_ENV=production
-      - API_ENDPOINT=http://backend:8501
+      - LOG_LEVEL=info
+    depends_on:
+      - redis
+      - postgres
     networks:
       - iluminara-network
+    restart: unless-stopped
     healthcheck:
-      test: [\"CMD\", \"wget\", \"--no-verbose\", \"--tries=1\", \"--spider\", \"http://localhost:8080/health\"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
-      timeout: 3s
+      timeout: 10s
       retries: 3
 
-  backend:
+  # JEPA World Model Service
+  jepa-service:
     build:
-      context: .
-      dockerfile: Dockerfile.backend
+      context: ./ml_health/jepa
+      dockerfile: Dockerfile
     ports:
-      - \"8501:8501\"
-      - \"8080:8080\"
+      - "8081:8081"
     environment:
-      - NODE_ID=CLOUD-ORACLE-01
-      - JURISDICTION=KDPA_KE
-      - ENABLE_TAMPER_PROOF_AUDIT=true
+      - CUDA_VISIBLE_DEVICES=0
+      - MODEL_PATH=/models/jepa_world_model.pth
     volumes:
-      - ./data:/app/data
-      - ./keys:/app/keys
+      - ./models:/models:ro
+      - ./data:/data
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     networks:
       - iluminara-network
+    restart: unless-stopped
+
+  # MPC Controller Service
+  mpc-service:
+    build:
+      context: ./ml_health/mpc
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      - JEPA_SERVICE_URL=http://jepa-service:8081
+      - HORIZON=10
+      - NUM_ITERATIONS=10
+    depends_on:
+      - jepa-service
+    networks:
+      - iluminara-network
+    restart: unless-stopped
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=iluminara
+      - POSTGRES_USER=iluminara
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - iluminara-network
+    restart: unless-stopped
     healthcheck:
-      test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8501/_stcore/health\"]
-      interval: 30s
+      test: ["CMD-SHELL", "pg_isready -U iluminara"]
+      interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
 
-  frenasa:
-    build:
-      context: .
-      dockerfile: edge_node/frenasa_engine/Dockerfile
-    ports:
-      - \"8082:8082\"
-    environment:
-      - OFFLINE_MODE=true
-      - GOLDEN_THREAD_BUFFER=/app/data/golden_thread.db
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
     volumes:
-      - ./data:/app/data
+      - redis-data:/data
     networks:
       - iluminara-network
+    restart: unless-stopped
     healthcheck:
-      test: [\"CMD\", \"python\", \"-c\", \"import sqlite3; conn = sqlite3.connect('/app/data/golden_thread.db'); conn.execute('SELECT 1'); conn.close()\"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  marketplace:
-    build:
-      context: .
-      dockerfile: Dockerfile.marketplace
+  # Prometheus Monitoring
+  prometheus:
+    image: prom/prometheus:latest
     ports:
-      - \"8000:8000\"
-    environment:
-      - NODE_ID=MARKETPLACE-01
-      - JURISDICTION=GLOBAL_DEFAULT
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
     networks:
       - iluminara-network
-    healthcheck:
-      test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8000/health\"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
+    restart: unless-stopped
+
+  # Grafana Dashboards
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    networks:
+      - iluminara-network
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
+  prometheus-data:
+  grafana-data:
 
 networks:
   iluminara-network:
     driver: bridge
-
-volumes:
-  data:
-  keys:
 ```
 
-## Build and run
+### Environment variables
 
-### Build all images
+```bash .env
+# Database
+DB_PASSWORD=your_secure_password_here
 
-```bash
-# Build frontend
-docker build -t iluminara-frontend:latest -f frontend_web/Dockerfile .
+# Grafana
+GRAFANA_PASSWORD=your_grafana_password
 
-# Build backend
-docker build -t iluminara-backend:latest -f Dockerfile.backend .
+# API Keys
+OPENAI_API_KEY=your_openai_key
+ANTHROPIC_API_KEY=your_anthropic_key
 
-# Build FRENASA engine
-docker build -t iluminara-frenasa:latest -f edge_node/frenasa_engine/Dockerfile .
+# NVIDIA
+NVIDIA_VISIBLE_DEVICES=all
+NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
-# Build marketplace
-docker build -t iluminara-marketplace:latest -f Dockerfile.marketplace .
+# Logging
+LOG_LEVEL=info
+LOG_FORMAT=json
 ```
 
-### Run with docker-compose
+## Service Dockerfiles
+
+### JEPA Service
+
+```dockerfile ml_health/jepa/Dockerfile
+FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
+
+# Install Python
+RUN apt-get update && apt-get install -y \
+    python3.10 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY . .
+
+# Expose port
+EXPOSE 8081
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD python3 -c "import requests; requests.get('http://localhost:8081/health')"
+
+# Run service
+CMD ["python3", "service.py"]
+```
+
+### API Gateway
+
+```dockerfile services/api-gateway/Dockerfile
+FROM node:20-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy application code
+COPY . .
+
+# Build TypeScript
+RUN npm run build
+
+# Expose port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD node healthcheck.js
+
+# Run service
+CMD ["node", "dist/index.js"]
+```
+
+## GPU support
+
+### NVIDIA Container Toolkit setup
 
 ```bash
-# Start all services
-docker-compose up -d
+# Install NVIDIA Container Toolkit
+distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
+curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | \
+  sudo tee /etc/apt/sources.list.d/nvidia-docker.list
 
-# View logs
-docker-compose logs -f
+sudo apt-get update
+sudo apt-get install -y nvidia-container-toolkit
 
-# Stop all services
+# Restart Docker
+sudo systemctl restart docker
+
+# Test GPU access
+docker run --rm --gpus all nvidia/cuda:12.1.0-base-ubuntu22.04 nvidia-smi
+```
+
+### GPU resource allocation
+
+```yaml docker-compose.gpu.yml
+services:
+  jepa-service:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['0']  # Specific GPU
+              capabilities: [gpu]
+        limits:
+          memory: 16G
+          cpus: '4'
+
+  bionemo-service:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['1']  # Different GPU
+              capabilities: [gpu]
+        limits:
+          memory: 32G
+          cpus: '8'
+```
+
+## Production deployment
+
+### Multi-stage builds
+
+```dockerfile Dockerfile.production
+# Build stage
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# Production stage
+FROM node:20-alpine
+
+# Security: Run as non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+WORKDIR /app
+
+# Copy only production dependencies
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
+COPY --from=builder --chown=nodejs:nodejs /app/package*.json ./
+
+USER nodejs
+
+EXPOSE 8080
+
+CMD ["node", "dist/index.js"]
+```
+
+### Security hardening
+
+```yaml docker-compose.production.yml
+services:
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile.production
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    read_only: true
+    tmpfs:
+      - /tmp
+    environment:
+      - NODE_ENV=production
+    secrets:
+      - db_password
+      - api_keys
+
+secrets:
+  db_password:
+    external: true
+  api_keys:
+    external: true
+```
+
+### Resource limits
+
+```yaml docker-compose.limits.yml
+services:
+  api-gateway:
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+```
+
+## Networking
+
+### Service discovery
+
+```yaml docker-compose.network.yml
+services:
+  api-gateway:
+    networks:
+      - frontend
+      - backend
+
+  jepa-service:
+    networks:
+      - backend
+
+  postgres:
+    networks:
+      - backend
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
+    internal: true  # No external access
+```
+
+### Load balancing
+
+```yaml docker-compose.scale.yml
+services:
+  api-gateway:
+    deploy:
+      replicas: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api-gateway
+```
+
+## Monitoring and logging
+
+### Logging configuration
+
+```yaml docker-compose.logging.yml
+services:
+  api-gateway:
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service,environment"
+        env: "NODE_ENV"
+
+  # Centralized logging with Loki
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./monitoring/loki-config.yml:/etc/loki/local-config.yaml
+      - loki-data:/loki
+
+  promtail:
+    image: grafana/promtail:latest
+    volumes:
+      - /var/log:/var/log
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./monitoring/promtail-config.yml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+```
+
+## Backup and recovery
+
+### Database backups
+
+```bash scripts/backup.sh
+#!/bin/bash
+
+# Backup PostgreSQL
+docker-compose exec -T postgres pg_dump -U iluminara iluminara | \
+  gzip > backups/postgres_$(date +%Y%m%d_%H%M%S).sql.gz
+
+# Backup volumes
+docker run --rm \
+  -v iluminara_postgres-data:/data \
+  -v $(pwd)/backups:/backup \
+  alpine tar czf /backup/postgres-volume_$(date +%Y%m%d_%H%M%S).tar.gz /data
+```
+
+### Restore procedure
+
+```bash scripts/restore.sh
+#!/bin/bash
+
+# Stop services
 docker-compose down
+
+# Restore database
+gunzip < backups/postgres_20250101_120000.sql.gz | \
+  docker-compose exec -T postgres psql -U iluminara iluminara
+
+# Restore volumes
+docker run --rm \
+  -v iluminara_postgres-data:/data \
+  -v $(pwd)/backups:/backup \
+  alpine tar xzf /backup/postgres-volume_20250101_120000.tar.gz -C /
+
+# Start services
+docker-compose up -d
 ```
 
-### Run individual containers
+## Troubleshooting
 
+### Common issues
+
+**Container won't start**
 ```bash
-# Frontend
-docker run -d -p 8080:8080 --name iluminara-frontend iluminara-frontend:latest
+# Check logs
+docker-compose logs service-name
 
-# Backend
-docker run -d -p 8501:8501 -p 8080:8080 --name iluminara-backend iluminara-backend:latest
+# Inspect container
+docker inspect container-id
 
-# FRENASA Engine
-docker run -d -p 8082:8082 --name iluminara-frenasa iluminara-frenasa:latest
-
-# Marketplace
-docker run -d -p 8000:8000 --name iluminara-marketplace iluminara-marketplace:latest
+# Check resource usage
+docker stats
 ```
 
-## Security features
+**GPU not detected**
+```bash
+# Verify NVIDIA runtime
+docker run --rm --gpus all nvidia/cuda:12.1.0-base-ubuntu22.04 nvidia-smi
 
-<AccordionGroup>
-  <Accordion title=\"Pinned SHA hashes\">
-    All base images use specific SHA256 hashes to prevent supply chain attacks (NIST RMF requirement)
-  </Accordion>
-  <Accordion title=\"Non-root execution\">
-    All containers run as non-root user (UID 1001) for security
-  </Accordion>
-  <Accordion title=\"Minimal attack surface\">
-    Alpine Linux and slim Python images reduce attack surface by 80%
-  </Accordion>
-  <Accordion title=\"Security updates\">
-    Automated security updates via Dependabot
-  </Accordion>
-  <Accordion title=\"Health checks\">
-    All containers include health checks for monitoring
-  </Accordion>
-</AccordionGroup>
+# Check Docker daemon config
+cat /etc/docker/daemon.json
+```
 
-## Compliance labels
+**Network connectivity issues**
+```bash
+# Test inter-service communication
+docker-compose exec api-gateway ping jepa-service
 
-All images include compliance labels:
-
-```dockerfile
-LABEL compliance.gdpr=\"true\" \\
-      compliance.hipaa=\"true\" \\
-      compliance.kdpa=\"true\" \\
-      compliance.popia=\"true\" \\
-      nuclear_ip.crypto_shredder=\"active\" \\
-      nuclear_ip.golden_thread=\"active\"
+# Inspect network
+docker network inspect iluminara_iluminara-network
 ```
 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card
-    title=\"Deploy to GCP\"
-    icon=\"google\"
-    href=\"/deployment/gcp\"
-  >
-    Deploy containers to Cloud Run
+  <Card title="Kubernetes deployment" icon="dharmachakra" href="/deployment/kubernetes">
+    Scale with Kubernetes
   </Card>
-  <Card
-    title=\"Security stack\"
-    icon=\"shield-halved\"
-    href=\"/security/overview\"
-  >
-    Understand security architecture
+  <Card title="Serverless deployment" icon="bolt" href="/deployment/serverless">
+    Deploy serverless functions
   </Card>
-  <Card
-    title=\"Monitoring\"
-    icon=\"chart-line\"
-    href=\"/deployment/monitoring\"
-  >
-    Set up Prometheus and Grafana
+  <Card title="Monitoring setup" icon="chart-line" href="/deployment/monitoring">
+    Configure observability
   </Card>
-  <Card
-    title=\"CI/CD\"
-    icon=\"workflow\"
-    href=\"/deployment/cicd\"
-  >
-    Automated deployment pipelines
+  <Card title="CI/CD pipeline" icon="code-branch" href="/deployment/cicd">
+    Automate deployments
   </Card>
 </CardGroup>
-"}
