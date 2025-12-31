@@ -1,0 +1,771 @@
+---
+title: CI/CD pipeline
+description: Automated testing, building, and deployment pipeline for iLuminara
+---
+
+iLuminara uses GitHub Actions for continuous integration and deployment, with automated testing, security scanning, and multi-environment deployments.
+
+## Pipeline overview
+
+```
+┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
+│   Push   │───▶│   Test   │───▶│  Build   │───▶│  Deploy  │
+│  to Git  │    │  & Lint  │    │  Images  │    │  to Env  │
+└──────────┘    └──────────┘    └──────────┘    └──────────┘
+                      │                │              │
+                      ▼                ▼              ▼
+                ┌──────────┐    ┌──────────┐    ┌──────────┐
+                │ Security │    │   Push   │    │  Verify  │
+                │   Scan   │    │ Registry │    │  Health  │
+                └──────────┘    └──────────┘    └──────────┘
+```
+
+## GitHub Actions workflows
+
+### Main CI/CD workflow
+
+```yaml .github/workflows/ci-cd.yml
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Lint and test
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+      
+      - name: Lint with ruff
+        run: ruff check .
+      
+      - name: Type check with mypy
+        run: mypy .
+      
+      - name: Run tests
+        run: pytest tests/ -v --cov=. --cov-report=xml
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+
+  # Security scanning
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+      
+      - name: Run Bandit security linter
+        run: |
+          pip install bandit
+          bandit -r . -f json -o bandit-report.json
+      
+      - name: Check for secrets
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+
+  # Build Docker images
+  build:
+    needs: [test, security]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        service:
+          - api-gateway
+          - jepa-service
+          - mpc-service
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+      
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/${{ matrix.service }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+  # Deploy to staging
+  deploy-staging:
+    needs: build
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://staging.iluminara.org
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG_STAGING }}
+      
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install iluminara ./charts/iluminara \
+            --namespace iluminara \
+            --create-namespace \
+            --set global.imageTag=${{ github.sha }} \
+            --set global.environment=staging \
+            --values ./charts/iluminara/values-staging.yaml \
+            --wait \
+            --timeout 10m
+      
+      - name: Run smoke tests
+        run: |
+          kubectl wait --for=condition=ready pod -l app=api-gateway -n iluminara --timeout=300s
+          ./scripts/smoke-tests.sh https://staging.iluminara.org
+
+  # Deploy to production
+  deploy-production:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://api.iluminara.org
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
+      
+      - name: Deploy with Helm (canary)
+        run: |
+          # Deploy canary (10% traffic)
+          helm upgrade --install iluminara-canary ./charts/iluminara \
+            --namespace iluminara \
+            --set global.imageTag=${{ github.sha }} \
+            --set global.environment=production \
+            --set replicaCount=1 \
+            --set service.weight=10 \
+            --values ./charts/iluminara/values-production.yaml \
+            --wait
+      
+      - name: Monitor canary
+        run: |
+          sleep 300  # Monitor for 5 minutes
+          ./scripts/check-canary-health.sh
+      
+      - name: Promote canary
+        run: |
+          # Deploy to all replicas
+          helm upgrade --install iluminara ./charts/iluminara \
+            --namespace iluminara \
+            --set global.imageTag=${{ github.sha }} \
+            --set global.environment=production \
+            --values ./charts/iluminara/values-production.yaml \
+            --wait \
+            --timeout 15m
+      
+      - name: Run integration tests
+        run: |
+          kubectl wait --for=condition=ready pod -l app=api-gateway -n iluminara --timeout=600s
+          ./scripts/integration-tests.sh https://api.iluminara.org
+      
+      - name: Notify deployment
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: 'Production deployment completed'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+```
+
+### Model training workflow
+
+```yaml .github/workflows/train-models.yml
+name: Train ML Models
+
+on:
+  schedule:
+    - cron: '0 2 * * 0'  # Weekly on Sunday at 2 AM
+  workflow_dispatch:
+    inputs:
+      model_type:
+        description: 'Model to train'
+        required: true
+        type: choice
+        options:
+          - jepa
+          - bionemo
+          - legal-llm
+
+jobs:
+  train:
+    runs-on: [self-hosted, gpu]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r ml_health/requirements.txt
+      
+      - name: Download training data
+        run: |
+          aws s3 sync s3://iluminara-training-data/latest ./data/
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      
+      - name: Train model
+        run: |
+          python ml_health/jepa/train.py \
+            --data-dir ./data \
+            --output-dir ./models \
+            --epochs 100 \
+            --batch-size 32 \
+            --gpus 4
+      
+      - name: Evaluate model
+        run: |
+          python ml_health/jepa/evaluate.py \
+            --model-path ./models/jepa_world_model.pth \
+            --test-data ./data/test
+      
+      - name: Upload model artifacts
+        run: |
+          aws s3 cp ./models/jepa_world_model.pth \
+            s3://iluminara-models/jepa/$(date +%Y%m%d)/
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      
+      - name: Create model registry entry
+        run: |
+          python scripts/register_model.py \
+            --model-path ./models/jepa_world_model.pth \
+            --metrics ./models/metrics.json \
+            --version $(date +%Y%m%d)
+```
+
+## Testing strategies
+
+### Unit tests
+
+```python tests/test_jepa.py
+import pytest
+import torch
+from ml_health.jepa.world_model import JEPAWorldModel
+
+@pytest.fixture
+def world_model():
+    return JEPAWorldModel(
+        observation_dim=100,
+        action_dim=10,
+        latent_dim=256
+    )
+
+def test_encode_observation(world_model):
+    """Test observation encoding."""
+    obs = torch.randn(4, 100)
+    latent = world_model.encode_observation(obs)
+    
+    assert latent.shape == (4, 256)
+    assert not torch.isnan(latent).any()
+
+def test_predict_next_state(world_model):
+    """Test state prediction."""
+    current_latent = torch.randn(4, 256)
+    action = torch.randn(4, 10)
+    
+    next_latent, uncertainty = world_model.predict_next_state(current_latent, action)
+    
+    assert next_latent.shape == (4, 256)
+    assert uncertainty.shape == (4, 256)
+    assert (uncertainty > 0).all()  # Uncertainty must be positive
+
+def test_rollout(world_model):
+    """Test trajectory rollout."""
+    initial_obs = torch.randn(4, 100)
+    actions = torch.randn(4, 10, 10)  # 10-step horizon
+    
+    rollout = world_model.rollout(initial_obs, actions)
+    
+    assert rollout['latents'].shape == (4, 10, 256)
+    assert rollout['uncertainties'].shape == (4, 10, 256)
+    assert rollout['observations'].shape == (4, 10, 100)
+```
+
+### Integration tests
+
+```python tests/integration/test_mpc_pipeline.py
+import pytest
+import requests
+from time import sleep
+
+@pytest.fixture(scope="module")
+def api_url():
+    return "http://localhost:8080"
+
+def test_health_check(api_url):
+    """Test service health endpoints."""
+    response = requests.get(f"{api_url}/health")
+    assert response.status_code == 200
+    assert response.json()['status'] == 'healthy'
+
+def test_prediction_pipeline(api_url):
+    """Test end-to-end prediction pipeline."""
+    # Submit prediction request
+    request_data = {
+        "observation": [0.5] * 100,
+        "horizon": 10,
+        "constraints": {
+            "max_resource_usage": 1000
+        }
+    }
+    
+    response = requests.post(
+        f"{api_url}/api/v1/predict",
+        json=request_data
+    )
+    
+    assert response.status_code == 200
+    result = response.json()
+    
+    assert 'action' in result
+    assert 'predicted_trajectory' in result
+    assert len(result['predicted_trajectory']) == 10
+
+def test_mpc_constraints(api_url):
+    """Test that MPC respects constraints."""
+    request_data = {
+        "observation": [0.5] * 100,
+        "horizon": 10,
+        "constraints": {
+            "max_resource_usage": 100  # Very tight constraint
+        }
+    }
+    
+    response = requests.post(
+        f"{api_url}/api/v1/predict",
+        json=request_data
+    )
+    
+    assert response.status_code == 200
+    result = response.json()
+    
+    # Verify constraint satisfaction
+    total_usage = sum(result['predicted_trajectory'])
+    assert total_usage <= 100
+```
+
+### Load tests
+
+```python tests/load/locustfile.py
+from locust import HttpUser, task, between
+
+class iLuminaraUser(HttpUser):
+    wait_time = between(1, 3)
+    
+    @task(3)
+    def predict(self):
+        """Test prediction endpoint."""
+        self.client.post("/api/v1/predict", json={
+            "observation": [0.5] * 100,
+            "horizon": 10
+        })
+    
+    @task(1)
+    def health_check(self):
+        """Test health endpoint."""
+        self.client.get("/health")
+    
+    def on_start(self):
+        """Login before starting tasks."""
+        response = self.client.post("/auth/login", json={
+            "username": "test_user",
+            "password": "test_password"
+        })
+        self.token = response.json()['token']
+        self.client.headers.update({"Authorization": f"Bearer {self.token}"})
+```
+
+## Security scanning
+
+### Dockerfile security
+
+```yaml .github/workflows/security-scan.yml
+name: Security Scan
+
+on:
+  push:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 0 * * *'  # Daily
+
+jobs:
+  scan-images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Build image
+        run: docker build -t iluminara/api-gateway:test ./services/api-gateway
+      
+      - name: Run Trivy scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'iluminara/api-gateway:test'
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+      
+      - name: Run Snyk scanner
+        uses: snyk/actions/docker@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          image: iluminara/api-gateway:test
+          args: --severity-threshold=high
+
+  scan-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run pip-audit
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt
+      
+      - name: Run Safety check
+        run: |
+          pip install safety
+          safety check -r requirements.txt
+
+  scan-code:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: python, javascript
+      
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+```
+
+## Deployment strategies
+
+### Blue-green deployment
+
+```bash scripts/blue-green-deploy.sh
+#!/bin/bash
+
+# Deploy green environment
+helm upgrade --install iluminara-green ./charts/iluminara \
+  --namespace iluminara-green \
+  --create-namespace \
+  --set global.imageTag=$NEW_VERSION \
+  --values ./charts/iluminara/values-production.yaml \
+  --wait
+
+# Run smoke tests on green
+./scripts/smoke-tests.sh https://green.iluminara.org
+
+# Switch traffic to green
+kubectl patch service iluminara-lb -n iluminara \
+  -p '{"spec":{"selector":{"version":"green"}}}'
+
+# Monitor for 10 minutes
+sleep 600
+
+# Check error rates
+ERROR_RATE=$(curl -s 'http://prometheus:9090/api/v1/query?query=rate(http_requests_total{status=~"5..",version="green"}[5m])' | jq '.data.result[0].value[1]')
+
+if (( $(echo "$ERROR_RATE > 0.01" | bc -l) )); then
+  echo "High error rate detected, rolling back"
+  kubectl patch service iluminara-lb -n iluminara \
+    -p '{"spec":{"selector":{"version":"blue"}}}'
+  exit 1
+fi
+
+# Delete blue environment
+helm uninstall iluminara-blue -n iluminara-blue
+
+echo "Deployment successful"
+```
+
+### Canary deployment
+
+```yaml k8s/canary-deployment.yaml
+apiVersion: flagger.app/v1beta1
+kind: Canary
+metadata:
+  name: api-gateway
+  namespace: iluminara
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-gateway
+  service:
+    port: 8080
+  analysis:
+    interval: 1m
+    threshold: 5
+    maxWeight: 50
+    stepWeight: 10
+    metrics:
+      - name: request-success-rate
+        thresholdRange:
+          min: 99
+        interval: 1m
+      - name: request-duration
+        thresholdRange:
+          max: 500
+        interval: 1m
+  webhooks:
+    - name: load-test
+      url: http://flagger-loadtester/
+      timeout: 5s
+      metadata:
+        cmd: "hey -z 1m -q 10 -c 2 http://api-gateway-canary:8080/health"
+```
+
+## Rollback procedures
+
+### Automated rollback
+
+```yaml .github/workflows/rollback.yml
+name: Rollback Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to rollback'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      revision:
+        description: 'Revision to rollback to (leave empty for previous)'
+        required: false
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets[format('KUBE_CONFIG_{0}', upper(github.event.inputs.environment))] }}
+      
+      - name: Rollback Helm release
+        run: |
+          if [ -z "${{ github.event.inputs.revision }}" ]; then
+            # Rollback to previous revision
+            helm rollback iluminara -n iluminara
+          else
+            # Rollback to specific revision
+            helm rollback iluminara ${{ github.event.inputs.revision }} -n iluminara
+          fi
+      
+      - name: Verify rollback
+        run: |
+          kubectl wait --for=condition=ready pod -l app=api-gateway -n iluminara --timeout=300s
+          ./scripts/smoke-tests.sh
+      
+      - name: Notify team
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: 'Rollback to revision ${{ github.event.inputs.revision }} completed'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+```
+
+## Environment management
+
+### Environment-specific values
+
+```yaml charts/iluminara/values-staging.yaml
+global:
+  environment: staging
+  imageTag: develop-latest
+
+apiGateway:
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+
+jepaService:
+  replicaCount: 1
+  resources:
+    requests:
+      nvidia.com/gpu: 1
+
+postgresql:
+  primary:
+    persistence:
+      size: 50Gi
+```
+
+```yaml charts/iluminara/values-production.yaml
+global:
+  environment: production
+  imageTag: main-latest
+
+apiGateway:
+  replicaCount: 5
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 5
+    maxReplicas: 20
+
+jepaService:
+  replicaCount: 3
+  resources:
+    requests:
+      nvidia.com/gpu: 1
+
+postgresql:
+  primary:
+    persistence:
+      size: 200Gi
+    resources:
+      requests:
+        cpu: 2000m
+        memory: 8Gi
+```
+
+## Smoke tests
+
+```bash scripts/smoke-tests.sh
+#!/bin/bash
+
+API_URL=$1
+
+echo "Running smoke tests against $API_URL"
+
+# Test health endpoint
+echo "Testing health endpoint..."
+HEALTH=$(curl -s -o /dev/null -w "%{http_code}" $API_URL/health)
+if [ $HEALTH -ne 200 ]; then
+  echo "Health check failed: $HEALTH"
+  exit 1
+fi
+
+# Test prediction endpoint
+echo "Testing prediction endpoint..."
+PREDICTION=$(curl -s -X POST $API_URL/api/v1/predict \
+  -H "Content-Type: application/json" \
+  -d '{"observation": [0.5], "horizon": 5}' \
+  -w "%{http_code}" -o /tmp/prediction.json)
+
+if [ $PREDICTION -ne 200 ]; then
+  echo "Prediction test failed: $PREDICTION"
+  exit 1
+fi
+
+# Verify response structure
+if ! jq -e '.action' /tmp/prediction.json > /dev/null; then
+  echo "Invalid prediction response structure"
+  exit 1
+fi
+
+echo "All smoke tests passed"
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Security hardening" icon="shield" href="/deployment/security">
+    Secure your deployment
+  </Card>
+  <Card title="Performance tuning" icon="gauge-high" href="/deployment/performance">
+    Optimize performance
+  </Card>
+  <Card title="Disaster recovery" icon="life-ring" href="/deployment/disaster-recovery">
+    Backup and recovery
+  </Card>
+  <Card title="Cost optimization" icon="dollar-sign" href="/deployment/cost-optimization">
+    Reduce infrastructure costs
+  </Card>
+</CardGroup>
