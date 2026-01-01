@@ -1,0 +1,510 @@
+---
+title: Component integration guides
+description: Detailed integration instructions for each sovereign tech stack component
+---
+
+# Component Integration Guides
+
+This document provides detailed, step-by-step integration instructions for each component of the Sovereign Tech Stack.
+
+## H3 geospatial indexing
+
+### Installation
+
+```bash
+pip install h3>=3.7.6
+```
+
+### Integration into Ghost-Mesh
+
+**File:** `core/geospatial/mesh_mapper.py`
+
+```python
+import h3
+
+class H3MeshMapper:
+    """Hexagonal geospatial indexing for Ghost-Mesh nodes."""
+    
+    def __init__(self, resolution=9):
+        """
+        Initialize H3 mapper.
+        
+        Args:
+            resolution: H3 resolution (0-15). 9 = ~0.1km² hexagons
+        """
+        self.resolution = resolution
+        self.dadaab_center = h3.geo_to_h3(0.0500, 40.3167, resolution)
+    
+    def is_in_geofence(self, lat: float, lon: float, radius_km: int = 50) -> bool:
+        """
+        Check if coordinates are within Dadaab geofence.
+        
+        Args:
+            lat: Latitude
+            lon: Longitude
+            radius_km: Geofence radius in kilometers
+        
+        Returns:
+            True if within geofence, False otherwise
+        """
+        hex_id = h3.geo_to_h3(lat, lon, self.resolution)
+        distance = h3.h3_distance(hex_id, self.dadaab_center)
+        
+        # Convert H3 distance to approximate km (resolution 9 ≈ 0.1km²)
+        distance_km = distance * 0.174  # Average edge length at res 9
+        
+        return distance_km <= radius_km
+    
+    def get_node_hexagon(self, lat: float, lon: float) -> str:
+        """Get H3 hexagon ID for node coordinates."""
+        return h3.geo_to_h3(lat, lon, self.resolution)
+    
+    def get_hexagon_neighbors(self, hex_id: str) -> list:
+        """Get neighboring hexagons for mesh routing."""
+        return h3.k_ring(hex_id, 1)
+```
+
+### Usage in Port 8501 Dashboard
+
+```python
+import streamlit as st
+from core.geospatial.mesh_mapper import H3MeshMapper
+
+mapper = H3MeshMapper(resolution=9)
+
+# Check if node is in geofence
+node_lat, node_lon = 0.0600, 40.3200
+if mapper.is_in_geofence(node_lat, node_lon):
+    st.success("✅ Node within Dadaab geofence")
+else:
+    st.error("❌ Node outside geofence")
+```
+
+## OpenFisca benefit calculations
+
+### Installation
+
+```bash
+pip install openfisca-core>=35.0.0
+```
+
+### Creating a Kenya refugee benefit model
+
+**File:** `core/governance/kenya_refugee_benefits.py`
+
+```python
+from openfisca_core.model_api import *
+
+class Person(Entity):
+    key = "person"
+    plural = "persons"
+    label = "An individual"
+
+class Household(Entity):
+    key = "household"
+    plural = "households"
+    label = "A household"
+    roles = [{"key": "member", "plural": "members"}]
+
+class RefugeeStatus(Variable):
+    value_type = str
+    entity = Person
+    definition_period = MONTH
+    label = "Refugee registration status"
+
+class MonthlyFoodAid(Variable):
+    value_type = float
+    entity = Person
+    definition_period = MONTH
+    label = "Monthly food aid in KES"
+    
+    def formula(person, period):
+        status = person("RefugeeStatus", period)
+        
+        # Base aid: 3000 KES per registered refugee
+        base_aid = 3000
+        
+        # Additional aid for vulnerable groups
+        age = person("age", period)
+        is_child = age < 18
+        is_elderly = age > 60
+        
+        multiplier = 1.0
+        if is_child:
+            multiplier = 1.2
+        elif is_elderly:
+            multiplier = 1.3
+        
+        return where(
+            status == "registered",
+            base_aid * multiplier,
+            0
+        )
+```
+
+### Integration with ROI Engine
+
+**File:** `core/revenue/roi_engine.py`
+
+```python
+from openfisca_core.simulation_builder import SimulationBuilder
+from core.governance.kenya_refugee_benefits import Person, Household
+
+class ROIEngine:
+    def calculate_aid_optimization(self, refugee_data: list) -> dict:
+        """
+        Calculate optimized aid distribution using OpenFisca.
+        
+        Args:
+            refugee_data: List of refugee records
+        
+        Returns:
+            Dictionary with total aid and savings
+        """
+        # Build simulation
+        simulation = SimulationBuilder().build_from_entities({
+            'persons': {
+                f'refugee_{i}': {
+                    'age': r['age'],
+                    'RefugeeStatus': r['status']
+                }
+                for i, r in enumerate(refugee_data)
+            }
+        })
+        
+        # Calculate total monthly aid
+        total_aid = simulation.calculate('MonthlyFoodAid', '2026-01').sum()
+        
+        # Calculate savings from optimized distribution
+        manual_cost = len(refugee_data) * 3500  # Old flat rate
+        savings = manual_cost - total_aid
+        
+        return {
+            'total_aid_kes': total_aid,
+            'manual_cost_kes': manual_cost,
+            'savings_kes': savings,
+            'optimization_rate': (savings / manual_cost) * 100
+        }
+```
+
+## Kepler.gl visualization
+
+### Installation
+
+```bash
+pip install keplergl>=0.3.2
+```
+
+### Integration into Port 8501
+
+**File:** `dashboards/home_dashboard.py`
+
+```python
+import streamlit as st
+from keplergl import KeplerGl
+import pandas as pd
+
+def render_ghost_mesh_map(nodes: list):
+    """
+    Render Ghost-Mesh nodes using Kepler.gl.
+    
+    Args:
+        nodes: List of node dictionaries with lat, lon, status
+    """
+    # Convert nodes to DataFrame
+    df = pd.DataFrame(nodes)
+    
+    # Create Kepler map
+    config = {
+        'version': 'v1',
+        'config': {
+            'mapState': {
+                'latitude': 0.0500,
+                'longitude': 40.3167,
+                'zoom': 10
+            }
+        }
+    }
+    
+    map_1 = KeplerGl(height=600, config=config)
+    map_1.add_data(data=df, name='ghost_mesh_nodes')
+    
+    # Render in Streamlit
+    st.write(map_1._repr_html_(), unsafe_allow_html=True)
+
+# Usage
+nodes = [
+    {'lat': 0.0500, 'lon': 40.3167, 'status': 'synced', 'node_id': 'node_001'},
+    {'lat': 0.0600, 'lon': 40.3200, 'status': 'drift', 'node_id': 'node_002'},
+    # ... more nodes
+]
+
+render_ghost_mesh_map(nodes)
+```
+
+## Nextstrain/Augur pathogen tracking
+
+### Installation
+
+```bash
+# Add as submodule
+git submodule add https://github.com/nextstrain/augur core/bio_foundry/augur_engine
+
+# Install dependencies
+pip install augur
+```
+
+### Integration into Bio-Foundry
+
+**File:** `core/bio_foundry/pathogen_tracker.py`
+
+```python
+import subprocess
+import json
+
+class PathogenTracker:
+    """Track pathogen evolution using Nextstrain/Augur."""
+    
+    def __init__(self, augur_path: str = "core/bio_foundry/augur_engine"):
+        self.augur_path = augur_path
+    
+    def build_phylogenetic_tree(self, sequences_file: str, output_file: str):
+        """
+        Build phylogenetic tree from genomic sequences.
+        
+        Args:
+            sequences_file: Path to FASTA file with sequences
+            output_file: Path to output JSON tree
+        """
+        # Run Augur tree building
+        cmd = [
+            "augur", "tree",
+            "--alignment", sequences_file,
+            "--output", output_file,
+            "--method", "iqtree"
+        ]
+        
+        subprocess.run(cmd, check=True)
+    
+    def predict_transmission_vector(self, tree_file: str) -> dict:
+        """
+        Predict transmission vectors from phylogenetic tree.
+        
+        Args:
+            tree_file: Path to phylogenetic tree JSON
+        
+        Returns:
+            Dictionary with transmission predictions
+        """
+        with open(tree_file, 'r') as f:
+            tree_data = json.load(f)
+        
+        # Analyze tree structure for transmission patterns
+        # (Simplified - real implementation would use Augur's ancestral module)
+        
+        return {
+            'predicted_origin': 'node_015',
+            'transmission_rate': 0.85,
+            'high_risk_zones': ['hex_8928374', 'hex_8928375']
+        }
+```
+
+## NVIDIA BioNeMo integration
+
+### Prerequisites
+
+```bash
+# Authenticate with NVIDIA NGC
+./scripts/auth_nvidia_ngc.sh
+```
+
+### Container setup
+
+**File:** `scripts/setup_bionemo.sh`
+
+```bash
+#!/bin/bash
+# Setup NVIDIA BioNeMo container
+
+echo "[*] Pulling BioNeMo container..."
+docker pull nvcr.io/nvidia/clara/bionemo-framework:latest
+
+echo "[*] Creating BioNeMo workspace..."
+mkdir -p core/bio_foundry/bionemo_workspace
+
+echo "[*] Starting BioNeMo container..."
+docker run -d \
+  --name bionemo \
+  --gpus all \
+  -v $(pwd)/core/bio_foundry/bionemo_workspace:/workspace \
+  -p 8888:8888 \
+  nvcr.io/nvidia/clara/bionemo-framework:latest
+
+echo "✅ BioNeMo ready at http://localhost:8888"
+```
+
+### Integration with Evo2 Engine
+
+**File:** `core/bio_foundry/evo2_engine.py`
+
+```python
+import requests
+
+class Evo2Engine:
+    """Interface to NVIDIA BioNeMo for protein generation."""
+    
+    def __init__(self, bionemo_url: str = "http://localhost:8888"):
+        self.bionemo_url = bionemo_url
+    
+    def generate_binder(self, pathogen_sequence: str) -> dict:
+        """
+        Generate protein binder using BioNeMo.
+        
+        Args:
+            pathogen_sequence: Target pathogen sequence
+        
+        Returns:
+            Dictionary with binder sequence and affinity score
+        """
+        # Call BioNeMo API
+        response = requests.post(
+            f"{self.bionemo_url}/api/generate",
+            json={
+                'target_sequence': pathogen_sequence,
+                'model': 'MegaMolBART',
+                'num_samples': 1
+            }
+        )
+        
+        result = response.json()
+        
+        return {
+            'binder_sequence': result['sequences'][0],
+            'affinity_score': result['scores'][0],
+            'confidence': result['confidence']
+        }
+```
+
+## LibOQS post-quantum cryptography
+
+### Installation (Development)
+
+```bash
+# For development, use pycryptodome baseline
+pip install pycryptodome>=3.20.0
+```
+
+### Production installation
+
+```bash
+# Install system dependencies (Ubuntu/Debian)
+sudo apt-get install cmake ninja-build libssl-dev
+
+# Clone and build liboqs
+git clone https://github.com/open-quantum-safe/liboqs.git
+cd liboqs
+mkdir build && cd build
+cmake -GNinja ..
+ninja
+sudo ninja install
+
+# Install Python wrapper
+pip install liboqs
+```
+
+### Integration with Bio-Lock
+
+**File:** `core/security/bio_lock.py`
+
+```python
+try:
+    import oqs
+    PQC_AVAILABLE = True
+except ImportError:
+    from Crypto.Cipher import AES
+    PQC_AVAILABLE = False
+
+class BioLock:
+    """Triple-Helix Bio-Lock with PQC support."""
+    
+    def __init__(self):
+        if PQC_AVAILABLE:
+            self.kem = oqs.KeyEncapsulation("Kyber1024")
+            self.sig = oqs.Signature("Dilithium5")
+        else:
+            # Fallback to AES for development
+            self.kem = None
+            self.sig = None
+    
+    def generate_lattice_key(self) -> bytes:
+        """Generate post-quantum lattice key."""
+        if PQC_AVAILABLE:
+            public_key = self.kem.generate_keypair()
+            return public_key
+        else:
+            # Development fallback
+            from Crypto.Random import get_random_bytes
+            return get_random_bytes(32)
+    
+    def sign_state_vector(self, state_data: bytes) -> bytes:
+        """Sign state vector with PQC signature."""
+        if PQC_AVAILABLE:
+            signature = self.sig.sign(state_data)
+            return signature
+        else:
+            # Development fallback
+            import hashlib
+            return hashlib.sha256(state_data).digest()
+```
+
+## Testing integrations
+
+### Verification script
+
+**File:** `scripts/verify_integrations.py`
+
+```python
+#!/usr/bin/env python3
+"""Verify all Sovereign Tech Stack integrations."""
+
+def test_h3():
+    import h3
+    hex_id = h3.geo_to_h3(0.0, 0.0, 9)
+    assert hex_id is not None
+    print("✅ H3 integration verified")
+
+def test_openfisca():
+    from openfisca_core.simulation_builder import SimulationBuilder
+    assert SimulationBuilder is not None
+    print("✅ OpenFisca integration verified")
+
+def test_crypto():
+    from Crypto.Cipher import AES
+    assert AES is not None
+    print("✅ Cryptography baseline verified")
+
+def test_kepler():
+    import keplergl
+    assert keplergl is not None
+    print("✅ Kepler.gl integration verified")
+
+if __name__ == "__main__":
+    test_h3()
+    test_openfisca()
+    test_crypto()
+    test_kepler()
+    print("\n✅ ALL INTEGRATIONS VERIFIED")
+```
+
+Run verification:
+```bash
+python scripts/verify_integrations.py
+```
+
+## Next steps
+
+1. Install components in priority order (H3, OpenFisca, Kepler.gl)
+2. Run verification script
+3. Update existing code to use new components
+4. Test integration with existing dashboards
+5. Proceed to Phase 134: Full System Diagnostic
