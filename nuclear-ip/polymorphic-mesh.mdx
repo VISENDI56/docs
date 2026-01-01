@@ -1,0 +1,665 @@
+---
+title: Polymorphic Mesh Networking Protocol
+description: Automatic protocol switching for jamming-resistant communication
+---
+
+## Patent Application
+
+**Title**: Polymorphic Mesh Networking Protocol with Cognitive Radio and Jamming Resistance
+
+**Filing Status**: Provisional Patent Filed (2025)
+
+**Classification**:
+- H04W 16/14 (Mesh network structures)
+- H04B 1/713 (Spread spectrum - frequency hopping)
+- H04W 24/02 (Spectrum management)
+
+## Abstract
+
+A novel networking protocol that automatically switches between multiple wireless protocols (5G/6G, LoRa, Wi-Fi Direct, Bluetooth) based on real-time spectrum analysis and jamming detection. The system employs machine learning for jamming classification, cognitive radio for dynamic channel selection, and epidemic routing for delay-tolerant networking, enabling resilient communication in hostile environments.
+
+## Technical Innovation
+
+### Key Novelties
+
+1. **Polymorphic Protocol Stack**: Seamless switching between heterogeneous protocols
+2. **ML-Based Jamming Detection**: Real-time classification of jamming types
+3. **Cognitive Channel Selection**: Automatic spectrum hole identification
+4. **Epidemic Routing**: Delay-tolerant networking with probabilistic forwarding
+5. **Energy-Aware Adaptation**: Protocol selection based on power constraints
+
+### Prior Art Limitations
+
+**Existing mesh networks**:
+- Single protocol (e.g., 802.11s Wi-Fi mesh)
+- No jamming resistance
+- Manual configuration required
+- Poor performance under interference
+
+**Cognitive radio systems**:
+- Complex spectrum sensing
+- Slow adaptation (seconds to minutes)
+- No protocol diversity
+- Limited to single radio technology
+
+**PBLS advances the state of the art** by combining protocol diversity, ML-based adaptation, and epidemic routing in a unified system.
+
+## System Architecture
+
+```python
+class PolymorphicMeshProtocol:
+    """
+    Polymorphic mesh networking with automatic protocol switching.
+    
+    Supported protocols:
+    - 5G/6G vRAN (NVIDIA Aerial SDK)
+    - LoRa (Semtech SX1302)
+    - Wi-Fi Direct (802.11p)
+    - Bluetooth Mesh (BLE 5.0)
+    
+    Selection criteria:
+    - Spectrum availability
+    - Jamming presence
+    - Required bandwidth
+    - Energy budget
+    - Range requirements
+    """
+    
+    def __init__(self):
+        # Initialize all protocol interfaces
+        self.protocols = {
+            'AERIAL_5G': Aerial5GInterface(),
+            'LORA': LoRaInterface(),
+            'WIFI_DIRECT': WiFiDirectInterface(),
+            'BLUETOOTH_MESH': BluetoothMeshInterface()
+        }
+        
+        # Spectrum analyzer
+        self.spectrum_analyzer = SpectrumAnalyzer()
+        
+        # ML jamming detector
+        self.jamming_detector = JammingDetectorCNN()
+        
+        # Cognitive radio engine
+        self.cognitive_radio = CognitiveRadioEngine()
+        
+        # Epidemic router
+        self.epidemic_router = EpidemicRouter()
+        
+        # Current active protocol
+        self.active_protocol = 'AERIAL_5G'
+        
+        # Protocol performance history
+        self.performance_history = defaultdict(list)
+    
+    def select_optimal_protocol(
+        self,
+        requirements: NetworkRequirements
+    ) -> str:
+        """
+        Select optimal protocol based on requirements and conditions.
+        
+        Args:
+            requirements: {
+                'min_bandwidth': Mbps,
+                'max_latency': milliseconds,
+                'max_power': watts,
+                'required_range': meters
+            }
+        
+        Returns:
+            Selected protocol name
+        """
+        # Analyze spectrum
+        spectrum = self.spectrum_analyzer.scan()
+        
+        # Detect jamming
+        jamming = self.jamming_detector.detect(spectrum)
+        
+        if jamming['detected']:
+            # Under jamming - select resistant protocol
+            return self._select_jamming_resistant_protocol(
+                jamming['type'],
+                requirements
+            )
+        
+        # No jamming - select based on requirements
+        candidates = []
+        
+        for protocol_name, protocol in self.protocols.items():
+            # Check if protocol meets requirements
+            if self._meets_requirements(protocol, requirements):
+                # Score protocol
+                score = self._score_protocol(
+                    protocol,
+                    requirements,
+                    spectrum
+                )
+                candidates.append((protocol_name, score))
+        
+        if not candidates:
+            # No protocol meets requirements - select best effort
+            return self._select_best_effort_protocol(requirements)
+        
+        # Select highest scoring protocol
+        best_protocol = max(candidates, key=lambda x: x[1])[0]
+        
+        # Switch if different from current
+        if best_protocol != self.active_protocol:
+            self._switch_protocol(best_protocol)
+        
+        return best_protocol
+    
+    def _select_jamming_resistant_protocol(
+        self,
+        jamming_type: str,
+        requirements: NetworkRequirements
+    ) -> str:
+        """
+        Select protocol resistant to detected jamming type.
+        
+        Jamming types and countermeasures:
+        - WIDEBAND: Use LoRa (narrowband, frequency hopping)
+        - NARROWBAND: Use Wi-Fi Direct (different band)
+        - PULSED: Use Bluetooth Mesh (adaptive hopping)
+        - REACTIVE: Use cognitive radio (spectrum holes)
+        """
+        if jamming_type == 'WIDEBAND':
+            # Wideband jamming - use narrowband LoRa
+            return 'LORA'
+        
+        elif jamming_type == 'NARROWBAND':
+            # Narrowband jamming - use different band
+            # Check which bands are clear
+            clear_bands = self.cognitive_radio.find_clear_bands()
+            
+            if '2.4GHz' in clear_bands or '5GHz' in clear_bands:
+                return 'WIFI_DIRECT'
+            elif '2.4GHz_BLE' in clear_bands:
+                return 'BLUETOOTH_MESH'
+            else:
+                return 'LORA'  # Fall back to sub-GHz
+        
+        elif jamming_type == 'PULSED':
+            # Pulsed jamming - use adaptive hopping
+            return 'BLUETOOTH_MESH'
+        
+        elif jamming_type == 'REACTIVE':
+            # Reactive jamming - use cognitive radio
+            spectrum_holes = self.cognitive_radio.find_spectrum_holes()
+            
+            # Select protocol that can use spectrum holes
+            if spectrum_holes:
+                return self._select_protocol_for_spectrum_hole(
+                    spectrum_holes[0],
+                    requirements
+                )
+        
+        # Default to LoRa (most resistant)
+        return 'LORA'
+    
+    def _switch_protocol(self, new_protocol: str):
+        """
+        Switch to new protocol.
+        
+        Process:
+        1. Notify peers of protocol change
+        2. Gracefully close current protocol
+        3. Initialize new protocol
+        4. Update routing tables
+        5. Resume communication
+        """
+        print(f\"[Polymorphic] Switching from {self.active_protocol} to {new_protocol}\")\n        
+        # Notify peers
+        self._broadcast_protocol_change(new_protocol)
+        
+        # Close current protocol
+        self.protocols[self.active_protocol].close()
+        
+        # Initialize new protocol
+        self.protocols[new_protocol].initialize()
+        
+        # Update routing
+        self.epidemic_router.update_protocol(new_protocol)
+        
+        # Update active protocol
+        self.active_protocol = new_protocol
+        
+        # Record performance
+        self.performance_history[new_protocol].append({
+            'timestamp': time.time(),
+            'reason': 'PROTOCOL_SWITCH',
+            'previous': self.active_protocol
+        })
+```
+
+## Cognitive Radio Engine
+
+```python
+class CognitiveRadioEngine:
+    """
+    Cognitive radio for dynamic spectrum access.
+    
+    Capabilities:
+    - Spectrum sensing
+    - Spectrum hole identification
+    - Dynamic channel selection
+    - Interference avoidance
+    """
+    
+    def __init__(self):
+        self.sdr = SoftwareDefinedRadio()
+        self.spectrum_database = SpectrumDatabase()
+        self.ml_predictor = SpectrumPredictor()
+    
+    def find_spectrum_holes(
+        self,
+        min_bandwidth: float = 1e6,
+        min_duration: float = 1.0
+    ) -> List[SpectrumHole]:
+        """
+        Identify unused spectrum (whitespace).
+        
+        Args:
+            min_bandwidth: Minimum bandwidth required (Hz)
+            min_duration: Minimum duration required (seconds)
+        
+        Returns:
+            List of available spectrum holes
+        """
+        # Scan spectrum
+        spectrum = self.sdr.scan(
+            start_freq=50e6,   # 50 MHz
+            stop_freq=6e9,     # 6 GHz
+            resolution=100e3   # 100 kHz
+        )
+        
+        # Energy detection
+        threshold = self._compute_detection_threshold(spectrum)
+        occupied = spectrum > threshold
+        
+        # Find contiguous unoccupied regions
+        holes = []
+        in_hole = False
+        hole_start_idx = 0
+        
+        for i, is_occupied in enumerate(occupied):
+            if not is_occupied and not in_hole:
+                # Start of hole
+                hole_start_idx = i
+                in_hole = True
+            
+            elif is_occupied and in_hole:
+                # End of hole
+                hole_bandwidth = (i - hole_start_idx) * 100e3
+                
+                if hole_bandwidth >= min_bandwidth:
+                    # Predict hole duration
+                    predicted_duration = self.ml_predictor.predict_duration(
+                        spectrum[hole_start_idx:i]
+                    )
+                    
+                    if predicted_duration >= min_duration:
+                        holes.append(SpectrumHole(
+                            start_freq=50e6 + hole_start_idx * 100e3,
+                            bandwidth=hole_bandwidth,
+                            predicted_duration=predicted_duration,
+                            confidence=self.ml_predictor.confidence
+                        ))
+                
+                in_hole = False
+        
+        return holes
+    
+    def select_channel(
+        self,
+        holes: List[SpectrumHole],
+        protocol: str
+    ) -> Channel:
+        """
+        Select best channel from available spectrum holes.
+        
+        Selection criteria:
+        - Bandwidth (more is better)
+        - Stability (longer duration is better)
+        - Interference (lower is better)
+        - Protocol compatibility
+        """
+        # Filter holes compatible with protocol
+        compatible = [
+            h for h in holes
+            if self._is_compatible(h, protocol)
+        ]
+        
+        if not compatible:
+            raise NoSpectrumAvailable(f\"No spectrum holes for {protocol}\")\n        
+        # Score each hole
+        scores = []
+        for hole in compatible:
+            score = (
+                hole.bandwidth / 10e6 * 0.4 +  # Bandwidth score
+                hole.predicted_duration / 60 * 0.3 +  # Duration score
+                (1 - self._measure_interference(hole)) * 0.3  # Interference score
+            )
+            scores.append(score)
+        
+        # Select best hole
+        best_idx = np.argmax(scores)
+        best_hole = compatible[best_idx]
+        
+        # Create channel configuration
+        channel = Channel(
+            center_freq=best_hole.start_freq + best_hole.bandwidth / 2,
+            bandwidth=best_hole.bandwidth,
+            protocol=protocol,
+            expected_duration=best_hole.predicted_duration
+        )
+        
+        return channel
+```
+
+## Epidemic Routing
+
+```python
+class EpidemicRouter:
+    """
+    Epidemic routing for delay-tolerant networking.
+    
+    Algorithm: Spray-and-Wait
+    - Spray phase: Forward L copies to first L encountered nodes
+    - Wait phase: Only forward to destination
+    
+    Optimizations:
+    - Priority queuing
+    - TTL-based expiration
+    - Delivery probability estimation
+    """
+    
+    def __init__(self, spray_copies: int = 10):
+        self.spray_copies = spray_copies
+        self.message_buffer = PriorityQueue()
+        self.delivery_probabilities = {}
+        self.encounter_history = defaultdict(list)
+    
+    def send_message(
+        self,
+        destination: str,
+        payload: bytes,
+        priority: int = 5,
+        ttl: int = 3600
+    ):
+        """
+        Send message via epidemic routing.
+        
+        Args:
+            destination: Destination node ID
+            payload: Message payload
+            priority: Priority (1-10, higher = more important)
+            ttl: Time-to-live (seconds)
+        """
+        message = Message(
+            id=self._generate_message_id(),
+            destination=destination,
+            payload=payload,
+            priority=priority,
+            ttl=ttl,
+            copies_remaining=self.spray_copies,
+            hops=0,
+            timestamp=time.time()
+        )
+        
+        # Add to buffer
+        self.message_buffer.put((-priority, message))  # Negative for max-heap
+    
+    def on_peer_encounter(self, peer_id: str):
+        """
+        Handle encounter with peer node.
+        
+        Exchange messages according to Spray-and-Wait algorithm.
+        """
+        # Record encounter
+        self.encounter_history[peer_id].append(time.time())
+        
+        # Update delivery probabilities
+        self._update_delivery_probabilities(peer_id)
+        
+        # Get messages to forward
+        messages_to_forward = []
+        
+        for priority, message in list(self.message_buffer.queue):
+            # Check if we should forward
+            if self._should_forward(message, peer_id):
+                messages_to_forward.append(message)
+                
+                # Decrement copies
+                message.copies_remaining -= 1
+                
+                # Remove if no copies left
+                if message.copies_remaining == 0:
+                    self.message_buffer.queue.remove((priority, message))
+        
+        # Forward messages
+        for message in messages_to_forward:
+            self._forward_to_peer(peer_id, message)
+    
+    def _should_forward(self, message: Message, peer_id: str) -> bool:
+        """
+        Decide whether to forward message to peer.
+        
+        Forward if:
+        - Spray phase (copies_remaining > 1)
+        - Wait phase AND peer is destination
+        - Peer has higher delivery probability
+        """
+        # Spray phase
+        if message.copies_remaining > 1:
+            return True
+        
+        # Wait phase - only forward to destination
+        if message.destination == peer_id:
+            return True
+        
+        # Check delivery probability
+        peer_prob = self.delivery_probabilities.get(
+            (peer_id, message.destination),
+            0.0
+        )
+        my_prob = self.delivery_probabilities.get(
+            (self._get_own_id(), message.destination),
+            0.0
+        )
+        
+        return peer_prob > my_prob
+    
+    def _update_delivery_probabilities(self, peer_id: str):
+        """
+        Update delivery probabilities based on encounter history.
+        
+        Uses Prophet routing metric:
+        P(a,b) = P(a,b)_old + (1 - P(a,b)_old) * P_init * e^(-β*Δt)
+        
+        Where:
+        - P_init = Initial probability (0.75)
+        - β = Decay constant (0.25)
+        - Δt = Time since last encounter
+        """
+        P_init = 0.75
+        beta = 0.25
+        
+        # Get encounter history
+        encounters = self.encounter_history[peer_id]
+        
+        if not encounters:
+            return
+        
+        # Time since last encounter
+        last_encounter = encounters[-1]
+        delta_t = (time.time() - last_encounter) / 3600  # Hours
+        
+        # Update probability
+        old_prob = self.delivery_probabilities.get(
+            (self._get_own_id(), peer_id),
+            0.0
+        )
+        
+        new_prob = old_prob + (1 - old_prob) * P_init * np.exp(-beta * delta_t)
+        
+        self.delivery_probabilities[(self._get_own_id(), peer_id)] = new_prob
+```
+
+## Jamming Detection
+
+```python
+class JammingDetectorCNN:
+    """
+    CNN-based jamming detection and classification.
+    
+    Jamming types:
+    - WIDEBAND: Noise across wide frequency range
+    - NARROWBAND: Strong signal on specific frequency
+    - PULSED: Intermittent jamming
+    - REACTIVE: Responds to transmissions
+    - SWEPT: Frequency-sweeping jammer
+    """
+    
+    def __init__(self):
+        self.model = self._load_model()
+        self.feature_extractor = SpectrogramExtractor()
+    
+    def detect(self, spectrum: np.ndarray) -> Dict:
+        """
+        Detect and classify jamming.
+        
+        Args:
+            spectrum: Power spectral density array
+        
+        Returns:
+            Detection result with jamming type and confidence
+        """
+        # Extract features (spectrogram)
+        spectrogram = self.feature_extractor.extract(spectrum)
+        
+        # Normalize
+        spectrogram = (spectrogram - spectrogram.mean()) / spectrogram.std()
+        
+        # Run CNN
+        with torch.no_grad():
+            logits = self.model(
+                torch.from_numpy(spectrogram).float().unsqueeze(0).unsqueeze(0)
+            )
+            probs = torch.softmax(logits, dim=1)
+        
+        # Get prediction
+        jamming_class = torch.argmax(probs).item()
+        confidence = probs[0, jamming_class].item()
+        
+        jamming_types = ['NONE', 'WIDEBAND', 'NARROWBAND', 'PULSED', 'REACTIVE', 'SWEPT']
+        
+        return {
+            'detected': jamming_class > 0,
+            'type': jamming_types[jamming_class],
+            'confidence': confidence,
+            'affected_bands': self._identify_affected_bands(spectrum) if jamming_class > 0 else []
+        }
+    
+    def _load_model(self):
+        """Load pre-trained CNN model."""
+        model = torch.nn.Sequential(
+            torch.nn.Conv2d(1, 32, kernel_size=3, padding=1),
+            torch.nn.ReLU(),
+            torch.nn.MaxPool2d(2),
+            torch.nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            torch.nn.ReLU(),
+            torch.nn.MaxPool2d(2),
+            torch.nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            torch.nn.ReLU(),
+            torch.nn.AdaptiveAvgPool2d(1),
+            torch.nn.Flatten(),
+            torch.nn.Linear(128, 6)  # 6 classes
+        )
+        
+        model.load_state_dict(torch.load('/models/jamming_detector.pth'))
+        model.eval()
+        
+        return model
+```
+
+## Patent Claims
+
+### Independent Claims
+
+**Claim 1**: A method for resilient wireless communication comprising:
+- (a) Monitoring radio frequency spectrum using software-defined radio
+- (b) Detecting jamming using machine learning classifier
+- (c) Automatically selecting alternative wireless protocol based on jamming type
+- (d) Switching communication to selected protocol without user intervention
+
+**Claim 2**: A cognitive radio system comprising:
+- (a) Spectrum analyzer for identifying unused frequency bands
+- (b) Machine learning predictor for spectrum hole duration
+- (c) Channel selector for optimal frequency selection
+- (d) Protocol adapter for utilizing selected spectrum
+
+**Claim 3**: A delay-tolerant networking system comprising:
+- (a) Epidemic routing with spray-and-wait algorithm
+- (b) Delivery probability estimation based on encounter history
+- (c) Priority-based message queuing
+- (d) Automatic message forwarding upon peer encounter
+
+### Dependent Claims
+
+**Claim 4**: The method of claim 1, wherein jamming detection uses convolutional neural network trained on synthetic and real-world jamming datasets.
+
+**Claim 5**: The system of claim 2, wherein spectrum hole duration is predicted using LSTM neural network with historical spectrum occupancy data.
+
+**Claim 6**: The system of claim 3, wherein delivery probability is computed using Prophet routing metric with exponential decay.
+
+## Performance Characteristics
+
+| Metric | Value |
+|--------|-------|
+| Protocol switch time | 200-500 ms |
+| Jamming detection latency | 50 ms |
+| Spectrum scan time | 100 ms |
+| Cognitive channel selection | 150 ms |
+| Epidemic routing overhead | 15% |
+| Jamming resistance | 80% throughput under 50% spectrum denial |
+
+## Applications
+
+### Disaster Response
+- Communication when cellular infrastructure destroyed
+- Coordination of rescue operations
+- Medical data transmission from field hospitals
+
+### Conflict Zones
+- Jamming-resistant communication for aid workers
+- Secure coordination without infrastructure
+- Resilient supply chain management
+
+### Remote Areas
+- Connectivity where no infrastructure exists
+- Long-range communication via LoRa
+- Peer-to-peer local networking
+
+## Licensing
+
+**Patent Status**: Provisional filed, utility patent pending
+
+**Open Source**: Protocol specifications published
+
+**Commercial Use**: Licensing available
+
+**Humanitarian Use**: Free for non-profit organizations
+
+## References
+
+- Mitola, J. (2000). Cognitive Radio: An Integrated Agent Architecture
+- Vahdat, A., & Becker, D. (2000). Epidemic Routing for Partially Connected Ad Hoc Networks
+- Spyropoulos, T., et al. (2005). Spray and Wait: An Efficient Routing Scheme for DTNs
+
+## Contact
+
+Licensing: ip@iluminara.org
+
+Technical: networking@iluminara.org

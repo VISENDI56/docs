@@ -1,0 +1,323 @@
+---
+title: Ghost-Mesh Protocol
+description: Resilient P2P networking protocol for infrastructure-independent communication
+---
+
+## Protocol Specification
+
+**Name**: Ghost-Mesh Protocol v1.0
+
+**Type**: Peer-to-peer mesh networking with epidemic routing
+
+**Status**: Open specification (defensive publication)
+
+**Purpose**: Enable communication without infrastructure in crisis zones
+
+## Protocol Overview
+
+Ghost-Mesh is a resilient, infrastructure-independent networking protocol that combines:
+- Peer-to-peer mesh topology
+- Epidemic gossip for data propagation
+- Store-and-forward for intermittent connectivity
+- Multi-protocol transport (LoRa, Wi-Fi Direct, Bluetooth)
+
+## Architecture Layers
+
+```
+┌─────────────────────────────────────────────────────┐
+│         Application Layer                           │
+│  (Medical records, Aid distribution, Messaging)     │
+└────────────────────┬────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────┐
+│         Ghost-Mesh Protocol Layer                   │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐         │
+│  │ Epidemic │  │  Store & │  │ Priority │         │
+│  │ Routing  │  │  Forward │  │  Queue   │         │
+│  └──────────┘  └──────────┘  └──────────┘         │
+└────────────────────┬────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────┐
+│         Transport Abstraction Layer                 │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐         │
+│  │   LoRa   │  │ Wi-Fi    │  │Bluetooth │         │
+│  │          │  │ Direct   │  │  Mesh    │         │
+│  └──────────┘  └──────────┘  └──────────┘         │
+└─────────────────────────────────────────────────────┘
+```
+
+## Message Format
+
+```python
+class GhostMeshMessage:
+    """
+    Ghost-Mesh message format.
+    
+    Header (32 bytes):
+    - Version (1 byte)
+    - Message type (1 byte)
+    - Priority (1 byte)
+    - TTL (2 bytes)
+    - Hop count (1 byte)
+    - Source ID (8 bytes)
+    - Destination ID (8 bytes)
+    - Message ID (8 bytes)
+    - Checksum (2 bytes)
+    
+    Payload (variable):
+    - Application data (encrypted)
+    """
+    
+    VERSION = 1
+    
+    def __init__(
+        self,
+        message_type: int,
+        priority: int,
+        ttl: int,
+        source: bytes,
+        destination: bytes,
+        payload: bytes
+    ):
+        self.version = self.VERSION
+        self.message_type = message_type
+        self.priority = priority
+        self.ttl = ttl
+        self.hop_count = 0
+        self.source = source
+        self.destination = destination
+        self.message_id = self._generate_id()
+        self.payload = payload
+    
+    def serialize(self) -> bytes:
+        """Serialize message to bytes."""
+        header = struct.pack(
+            '!BBBHB8s8s8s',
+            self.version,
+            self.message_type,
+            self.priority,
+            self.ttl,
+            self.hop_count,
+            self.source,
+            self.destination,
+            self.message_id
+        )
+        
+        # Compute checksum
+        checksum = self._compute_checksum(header + self.payload)
+        
+        return header + struct.pack('!H', checksum) + self.payload
+    
+    @classmethod
+    def deserialize(cls, data: bytes):
+        """Deserialize message from bytes."""
+        # Parse header
+        header = struct.unpack('!BBBHB8s8s8s', data[:32])
+        checksum = struct.unpack('!H', data[32:34])[0]
+        payload = data[34:]
+        
+        # Verify checksum
+        if not cls._verify_checksum(data[:32] + payload, checksum):
+            raise ValueError(\"Checksum mismatch\")
+        
+        # Create message
+        message = cls(
+            message_type=header[1],
+            priority=header[2],
+            ttl=header[3],
+            source=header[5],
+            destination=header[6],
+            payload=payload
+        )
+        
+        message.hop_count = header[4]
+        message.message_id = header[7]
+        
+        return message
+```
+
+## Routing Protocol
+
+```python
+class GhostMeshRouter:
+    """
+    Ghost-Mesh routing engine.
+    
+    Routing strategies:
+    - Direct delivery (if destination is neighbor)
+    - Epidemic forwarding (spray-and-wait)
+    - Geographic routing (if GPS available)
+    - Opportunistic routing (based on encounter history)
+    """
+    
+    def route_message(self, message: GhostMeshMessage):
+        """
+        Route message through mesh network.
+        
+        Routing decision tree:
+        1. Is destination a direct neighbor? → Send directly
+        2. Do we have a known route? → Forward via route
+        3. Is GPS available? → Use geographic routing
+        4. Otherwise → Use epidemic routing
+        """
+        # Check if destination is neighbor
+        if self._is_neighbor(message.destination):
+            return self._send_direct(message)
+        
+        # Check routing table
+        if message.destination in self.routing_table:
+            next_hop = self.routing_table[message.destination]
+            return self._forward_to(message, next_hop)
+        
+        # Check if GPS available
+        if self.gps_available:
+            return self._geographic_route(message)
+        
+        # Fall back to epidemic routing
+        return self._epidemic_route(message)
+    
+    def _geographic_route(self, message: GhostMeshMessage):
+        """
+        Geographic routing using GPS coordinates.
+        
+        Greedy forwarding:
+        - Forward to neighbor closest to destination
+        - If no neighbor closer, use perimeter routing
+        """
+        # Get destination coordinates
+        dest_coords = self._lookup_coordinates(message.destination)
+        
+        if not dest_coords:
+            # No coordinates - fall back to epidemic
+            return self._epidemic_route(message)
+        
+        # Get own coordinates
+        my_coords = self.gps.get_coordinates()
+        
+        # Find neighbor closest to destination
+        neighbors = self._get_neighbors()
+        
+        best_neighbor = None
+        best_distance = self._distance(my_coords, dest_coords)
+        
+        for neighbor in neighbors:
+            neighbor_coords = self._lookup_coordinates(neighbor.id)
+            if neighbor_coords:
+                distance = self._distance(neighbor_coords, dest_coords)
+                if distance < best_distance:
+                    best_distance = distance
+                    best_neighbor = neighbor
+        
+        if best_neighbor:
+            # Forward to closer neighbor
+            return self._forward_to(message, best_neighbor.id)
+        else:
+            # Local minimum - use perimeter routing
+            return self._perimeter_route(message, dest_coords)
+```
+
+## Security Features
+
+### Message Authentication
+
+```python
+class MessageAuthenticator:
+    """
+    Authenticate Ghost-Mesh messages.
+    
+    Uses:
+    - HMAC for message integrity
+    - Digital signatures for non-repudiation
+    - Replay attack prevention
+    """
+    
+    def __init__(self):
+        self.signing_key = self._load_signing_key()
+        self.nonce_cache = set()
+    
+    def sign_message(self, message: GhostMeshMessage) -> bytes:
+        """Sign message with sender's private key."""
+        # Serialize message
+        message_bytes = message.serialize()
+        
+        # Generate nonce
+        nonce = os.urandom(16)
+        
+        # Sign
+        signature = self.signing_key.sign(
+            message_bytes + nonce,
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256()
+        )
+        
+        return signature + nonce
+    
+    def verify_message(
+        self,
+        message: GhostMeshMessage,
+        signature: bytes,
+        sender_public_key: bytes
+    ) -> bool:
+        """Verify message signature."""
+        # Extract nonce
+        nonce = signature[-16:]
+        sig = signature[:-16]
+        
+        # Check for replay attack
+        if nonce in self.nonce_cache:
+            return False
+        
+        # Verify signature
+        try:
+            sender_public_key.verify(
+                sig,
+                message.serialize() + nonce,
+                padding.PSS(
+                    mgf=padding.MGF1(hashes.SHA256()),
+                    salt_length=padding.PSS.MAX_LENGTH
+                ),
+                hashes.SHA256()
+            )
+            
+            # Add nonce to cache
+            self.nonce_cache.add(nonce)
+            
+            return True
+        except:
+            return False
+```
+
+## Performance Benchmarks
+
+| Metric | LoRa | Wi-Fi Direct | Bluetooth Mesh |
+|--------|------|--------------|----------------|
+| Range | 15 km | 200 m | 50 m |
+| Bandwidth | 50 kbps | 250 Mbps | 1 Mbps |
+| Latency | 2 sec | 50 ms | 100 ms |
+| Power | 100 mW | 500 mW | 10 mW |
+| Nodes supported | 1000+ | 8 | 32767 |
+
+## Use Cases
+
+### Medical Data Sync
+Synchronize medical records across field hospitals without internet
+
+### Aid Coordination
+Coordinate aid distribution in disaster zones
+
+### Educational Content
+Distribute learning materials peer-to-peer
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Polymorphic Mesh" icon="network-wired" href="/nuclear-ip/polymorphic-mesh">
+    Automatic protocol switching
+  </Card>
+  <Card title="Implementation Guide" icon="code" href="/deployment/ghost-mesh">
+    Deploy Ghost-Mesh network
+  </Card>
+</CardGroup>

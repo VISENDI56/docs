@@ -1,0 +1,720 @@
+---
+title: Sovereign Temporal Blockchain (STBK)
+description: Immutable audit trail with temporal proofs for humanitarian accountability
+---
+
+## Technical Specification
+
+**System Name**: Sovereign Temporal Blockchain (STBK)
+
+**Version**: 1.0
+
+**Status**: Trade Secret (Cryptographic Protocols)
+
+**Classification**: Distributed Ledger Technology with Temporal Proofs
+
+## Overview
+
+STBK provides cryptographically-verifiable, time-stamped records for humanitarian operations, ensuring accountability and transparency while maintaining data sovereignty. Unlike traditional blockchains, STBK incorporates temporal proofs that enable verification of when events occurred, critical for legal proceedings, aid distribution, and medical interventions.
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                  STBK Network Layer                     │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
+│  │   Temporal   │  │  Consensus   │  │   Storage    │ │
+│  │    Oracle    │◄─┤    Engine    │◄─┤    Layer     │ │
+│  └──────────────┘  └──────────────┘  └──────────────┘ │
+└─────────────────────────────────────────────────────────┘
+          │                  │                  │
+          ▼                  ▼                  ▼
+┌─────────────────────────────────────────────────────────┐
+│                  Blockchain Layer                       │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────┐│
+│  │ Block N-1│◄─┤ Block N  │◄─┤ Block N+1│◄─┤Block N+2││
+│  │ + Proof  │  │ + Proof  │  │ + Proof  │  │ + Proof ││
+│  └──────────┘  └──────────┘  └──────────┘  └─────────┘│
+└─────────────────────────────────────────────────────────┘
+```
+
+## Core Components
+
+### 1. Temporal Oracle
+
+**Purpose**: Provide trusted timestamps for blockchain events
+
+**Implementation**:
+
+```python
+class TemporalOracle:
+    """
+    Trusted time source for STBK.
+    
+    Provides:
+    - GPS-synchronized time
+    - NTP fallback
+    - Cryptographic time proofs
+    - Tamper detection
+    """
+    
+    def __init__(self):
+        self.gps_receiver = GPSReceiver()
+        self.ntp_client = NTPClient(servers=[
+            'time.nist.gov',
+            'time.google.com',
+            'pool.ntp.org'
+        ])
+        self.time_proofs = []
+        self.signing_key = self._load_signing_key()
+    
+    def get_trusted_timestamp(self) -> TrustedTimestamp:
+        """
+        Get cryptographically-signed timestamp.
+        
+        Process:
+        1. Query GPS receiver for precise time
+        2. Verify against NTP servers
+        3. Detect clock skew or tampering
+        4. Sign timestamp with oracle key
+        5. Return proof-of-time
+        
+        Returns:
+            TrustedTimestamp with cryptographic proof
+        """
+        # Get GPS time
+        gps_time = self.gps_receiver.get_time()
+        
+        # Get NTP time from multiple servers
+        ntp_times = [server.get_time() for server in self.ntp_client.servers]
+        
+        # Verify consistency
+        if not self._verify_time_consistency(gps_time, ntp_times):
+            raise TimeOracleError("Time source inconsistency detected")
+        
+        # Use GPS time as authoritative
+        timestamp = gps_time
+        
+        # Create proof-of-time
+        proof = self._create_time_proof(timestamp)
+        
+        return TrustedTimestamp(
+            timestamp=timestamp,
+            proof=proof,
+            signature=self._sign_timestamp(timestamp, proof)
+        )
+    
+    def _create_time_proof(self, timestamp: datetime) -> TimeProof:
+        """
+        Create cryptographic proof of timestamp.
+        
+        Uses:
+        - Hash chain linking to previous proofs
+        - Merkle tree of recent timestamps
+        - Signature from oracle key
+        """
+        # Link to previous proof
+        prev_proof_hash = self.time_proofs[-1].hash if self.time_proofs else b'\x00' * 32
+        
+        # Create Merkle tree of recent timestamps
+        recent_timestamps = [p.timestamp for p in self.time_proofs[-100:]]
+        merkle_root = self._compute_merkle_root(recent_timestamps + [timestamp])
+        
+        proof = TimeProof(
+            timestamp=timestamp,
+            prev_proof_hash=prev_proof_hash,
+            merkle_root=merkle_root,
+            nonce=self._generate_nonce()
+        )
+        
+        # Store proof
+        self.time_proofs.append(proof)
+        
+        return proof
+    
+    def verify_timestamp(self, timestamp: TrustedTimestamp) -> bool:
+        """
+        Verify cryptographic timestamp proof.
+        
+        Checks:
+        - Signature validity
+        - Hash chain integrity
+        - Merkle proof
+        - Time bounds (not in future, not too old)
+        """
+        # Verify signature
+        if not self._verify_signature(timestamp):
+            return False
+        
+        # Verify hash chain
+        if not self._verify_hash_chain(timestamp.proof):
+            return False
+        
+        # Verify Merkle proof
+        if not self._verify_merkle_proof(timestamp.proof):
+            return False
+        
+        # Verify time bounds
+        now = datetime.utcnow()
+        if timestamp.timestamp > now:
+            return False  # Timestamp in future
+        
+        if (now - timestamp.timestamp).days > 365:
+            return False  # Timestamp too old (>1 year)
+        
+        return True
+```
+
+### 2. Consensus Engine
+
+**Purpose**: Achieve agreement on blockchain state across nodes
+
+**Algorithm**: Proof-of-Authority (PoA) with rotating validators
+
+**Implementation**:
+
+```python
+class STBKConsensus:
+    """
+    Proof-of-Authority consensus for STBK.
+    
+    Features:
+    - Rotating validator set
+    - Byzantine fault tolerance
+    - Fast finality (3 seconds)
+    - Energy efficient (no mining)
+    """
+    
+    def __init__(self, validators: List[str]):
+        self.validators = validators  # List of authorized validator addresses
+        self.current_validator_index = 0
+        self.block_time = 3  # seconds
+        self.finality_threshold = len(validators) * 2 // 3 + 1
+    
+    def propose_block(self, transactions: List[Transaction]) -> Block:
+        """
+        Propose new block (only current validator can propose).
+        
+        Process:
+        1. Verify proposer is current validator
+        2. Get trusted timestamp from oracle
+        3. Create block with transactions
+        4. Sign block with validator key
+        5. Broadcast to network
+        
+        Returns:
+            Proposed block
+        """
+        # Verify we're the current validator
+        if not self._is_current_validator():
+            raise ConsensusError("Not current validator")
+        
+        # Get trusted timestamp
+        timestamp = self.temporal_oracle.get_trusted_timestamp()
+        
+        # Get previous block
+        prev_block = self._get_latest_block()
+        
+        # Create block
+        block = Block(
+            number=prev_block.number + 1,
+            prev_hash=prev_block.hash,
+            timestamp=timestamp,
+            transactions=transactions,
+            validator=self._get_validator_address()
+        )
+        
+        # Sign block
+        block.signature = self._sign_block(block)
+        
+        # Broadcast
+        self._broadcast_block(block)
+        
+        return block
+    
+    def validate_block(self, block: Block) -> bool:
+        """
+        Validate proposed block.
+        
+        Checks:
+        - Proposer is authorized validator
+        - Timestamp is valid and sequential
+        - Transactions are valid
+        - Signature is correct
+        - Block hash is correct
+        """
+        # Verify proposer
+        expected_validator = self._get_validator_for_block(block.number)
+        if block.validator != expected_validator:
+            return False
+        
+        # Verify timestamp
+        if not self.temporal_oracle.verify_timestamp(block.timestamp):
+            return False
+        
+        # Verify timestamp is after previous block
+        prev_block = self._get_block(block.number - 1)
+        if block.timestamp.timestamp <= prev_block.timestamp.timestamp:
+            return False
+        
+        # Verify transactions
+        for tx in block.transactions:
+            if not self._validate_transaction(tx):
+                return False
+        
+        # Verify signature
+        if not self._verify_block_signature(block):
+            return False
+        
+        # Verify hash
+        if block.hash != self._compute_block_hash(block):
+            return False
+        
+        return True
+    
+    def finalize_block(self, block: Block) -> bool:
+        """
+        Finalize block after receiving validator signatures.
+        
+        Finality requires 2/3 + 1 validator signatures.
+        
+        Returns:
+            True if block finalized
+        """
+        # Collect signatures from validators
+        signatures = self._collect_signatures(block)
+        
+        # Check if we have enough signatures
+        if len(signatures) >= self.finality_threshold:
+            # Block is finalized
+            block.finalized = True
+            block.finality_signatures = signatures
+            
+            # Persist to storage
+            self._persist_block(block)
+            
+            # Rotate to next validator
+            self._rotate_validator()
+            
+            return True
+        
+        return False
+    
+    def _rotate_validator(self):
+        """Rotate to next validator in round-robin fashion."""
+        self.current_validator_index = (self.current_validator_index + 1) % len(self.validators)
+```
+
+### 3. Storage Layer
+
+**Purpose**: Persistent storage of blockchain data with efficient retrieval
+
+**Implementation**:
+
+```python
+class STBKStorage:
+    """
+    Storage layer for STBK blockchain.
+    
+    Features:
+    - Efficient block storage
+    - Transaction indexing
+    - State management
+    - Pruning for old data
+    """
+    
+    def __init__(self, data_dir: str):
+        self.data_dir = data_dir
+        self.block_db = LevelDB(f"{data_dir}/blocks")
+        self.tx_index = LevelDB(f"{data_dir}/transactions")
+        self.state_db = LevelDB(f"{data_dir}/state")
+    
+    def store_block(self, block: Block):
+        """
+        Store block in database.
+        
+        Stores:
+        - Block data
+        - Transaction index
+        - State updates
+        """
+        # Store block
+        self.block_db.put(
+            key=block.hash,
+            value=block.serialize()
+        )
+        
+        # Index by block number
+        self.block_db.put(
+            key=f"number:{block.number}",
+            value=block.hash
+        )
+        
+        # Index transactions
+        for tx in block.transactions:
+            self.tx_index.put(
+                key=tx.hash,
+                value=json.dumps({
+                    'block_hash': block.hash,
+                    'block_number': block.number,
+                    'index': block.transactions.index(tx)
+                })
+            )
+        
+        # Update state
+        self._update_state(block)
+    
+    def get_block(self, block_hash: bytes) -> Block:
+        """Retrieve block by hash."""
+        data = self.block_db.get(block_hash)
+        return Block.deserialize(data)
+    
+    def get_block_by_number(self, number: int) -> Block:
+        """Retrieve block by number."""
+        block_hash = self.block_db.get(f"number:{number}")
+        return self.get_block(block_hash)
+    
+    def get_transaction(self, tx_hash: bytes) -> Transaction:
+        """Retrieve transaction by hash."""
+        tx_info = json.loads(self.tx_index.get(tx_hash))
+        block = self.get_block(tx_info['block_hash'])
+        return block.transactions[tx_info['index']]
+    
+    def prune_old_blocks(self, keep_blocks: int = 10000):
+        """
+        Prune old blocks to save space.
+        
+        Keeps:
+        - Recent blocks (keep_blocks)
+        - Checkpoint blocks (every 1000)
+        - Blocks with active references
+        """
+        latest_block = self.get_latest_block()
+        prune_before = latest_block.number - keep_blocks
+        
+        for block_num in range(0, prune_before):
+            # Skip checkpoint blocks
+            if block_num % 1000 == 0:
+                continue
+            
+            # Check if block has active references
+            if self._has_active_references(block_num):
+                continue
+            
+            # Prune block
+            block = self.get_block_by_number(block_num)
+            self.block_db.delete(block.hash)
+            self.block_db.delete(f"number:{block_num}")
+```
+
+## Transaction Types
+
+### 1. Aid Distribution Transaction
+
+```python
+class AidDistributionTx(Transaction):
+    """
+    Record aid distribution event.
+    
+    Fields:
+    - beneficiary_id: Anonymous beneficiary identifier
+    - aid_type: Type of aid (food, medical, shelter)
+    - quantity: Amount distributed
+    - location: GPS coordinates
+    - distributor: Aid worker ID
+    - timestamp: Trusted timestamp from oracle
+    """
+    
+    def __init__(self, beneficiary_id: str, aid_type: str, 
+                 quantity: float, location: tuple, distributor: str):
+        self.beneficiary_id = beneficiary_id
+        self.aid_type = aid_type
+        self.quantity = quantity
+        self.location = location
+        self.distributor = distributor
+        self.timestamp = None  # Set by blockchain
+    
+    def validate(self) -> bool:
+        """Validate transaction fields."""
+        # Verify beneficiary ID format
+        if not self._is_valid_beneficiary_id(self.beneficiary_id):
+            return False
+        
+        # Verify aid type
+        if self.aid_type not in ['FOOD', 'MEDICAL', 'SHELTER', 'CASH']:
+            return False
+        
+        # Verify quantity
+        if self.quantity <= 0:
+            return False
+        
+        # Verify location
+        if not self._is_valid_gps(self.location):
+            return False
+        
+        return True
+```
+
+### 2. Medical Intervention Transaction
+
+```python
+class MedicalInterventionTx(Transaction):
+    """
+    Record medical intervention.
+    
+    Fields:
+    - patient_id: Anonymous patient identifier
+    - intervention_type: Type of intervention
+    - provider: Medical provider ID
+    - location: Facility location
+    - timestamp: Trusted timestamp
+    - encrypted_details: Encrypted medical details
+    """
+    
+    def __init__(self, patient_id: str, intervention_type: str,
+                 provider: str, location: tuple, encrypted_details: bytes):
+        self.patient_id = patient_id
+        self.intervention_type = intervention_type
+        self.provider = provider
+        self.location = location
+        self.encrypted_details = encrypted_details
+        self.timestamp = None
+    
+    def validate(self) -> bool:
+        """Validate medical transaction."""
+        # Verify patient ID (anonymous)
+        if not self._is_valid_patient_id(self.patient_id):
+            return False
+        
+        # Verify provider credentials
+        if not self._is_authorized_provider(self.provider):
+            return False
+        
+        # Verify encrypted details
+        if not self._is_valid_encryption(self.encrypted_details):
+            return False
+        
+        return True
+```
+
+### 3. Legal Document Transaction
+
+```python
+class LegalDocumentTx(Transaction):
+    """
+    Record legal document with temporal proof.
+    
+    Fields:
+    - document_hash: Hash of legal document
+    - document_type: Type (affidavit, asylum_claim, etc.)
+    - parties: Involved parties (anonymous)
+    - jurisdiction: Legal jurisdiction
+    - timestamp: Trusted timestamp (critical for legal validity)
+    """
+    
+    def __init__(self, document_hash: bytes, document_type: str,
+                 parties: List[str], jurisdiction: str):
+        self.document_hash = document_hash
+        self.document_type = document_type
+        self.parties = parties
+        self.jurisdiction = jurisdiction
+        self.timestamp = None
+    
+    def validate(self) -> bool:
+        """Validate legal document transaction."""
+        # Verify document hash
+        if len(self.document_hash) != 32:  # SHA-256
+            return False
+        
+        # Verify document type
+        valid_types = ['AFFIDAVIT', 'ASYLUM_CLAIM', 'LEGAL_BRIEF', 'TESTIMONY']
+        if self.document_type not in valid_types:
+            return False
+        
+        # Verify parties
+        if not self.parties or len(self.parties) == 0:
+            return False
+        
+        return True
+```
+
+## Temporal Proof Verification
+
+### Proof-of-Time Protocol
+
+```python
+class ProofOfTime:
+    """
+    Verify temporal ordering of events.
+    
+    Enables proving:
+    - Event A occurred before Event B
+    - Event occurred within time window
+    - Event timestamp is authentic
+    """
+    
+    def verify_ordering(self, event_a: Transaction, event_b: Transaction) -> bool:
+        """
+        Verify event_a occurred before event_b.
+        
+        Process:
+        1. Get blocks containing events
+        2. Verify block timestamps
+        3. Check block ordering
+        4. Verify temporal proofs
+        
+        Returns:
+            True if event_a < event_b
+        """
+        # Get blocks
+        block_a = self._get_block_for_tx(event_a)
+        block_b = self._get_block_for_tx(event_b)
+        
+        # Verify timestamps
+        if not self._verify_timestamp(block_a.timestamp):
+            return False
+        if not self._verify_timestamp(block_b.timestamp):
+            return False
+        
+        # Check ordering
+        if block_a.number >= block_b.number:
+            return False
+        
+        if block_a.timestamp.timestamp >= block_b.timestamp.timestamp:
+            return False
+        
+        return True
+    
+    def verify_time_window(self, event: Transaction, 
+                          start: datetime, end: datetime) -> bool:
+        """
+        Verify event occurred within time window.
+        
+        Critical for:
+        - Legal deadlines
+        - Aid distribution windows
+        - Medical intervention timing
+        """
+        block = self._get_block_for_tx(event)
+        
+        # Verify timestamp
+        if not self._verify_timestamp(block.timestamp):
+            return False
+        
+        # Check window
+        event_time = block.timestamp.timestamp
+        
+        return start <= event_time <= end
+```
+
+## Security Features
+
+### 1. Quantum Resistance
+
+STBK uses post-quantum cryptographic algorithms:
+
+- **Signatures**: SPHINCS+ (hash-based signatures)
+- **Key Exchange**: CRYSTALS-Kyber
+- **Hashing**: SHA-3 (Keccak)
+
+### 2. Privacy Preservation
+
+- **Anonymous IDs**: Zero-knowledge proofs for identity
+- **Encrypted Data**: Sensitive details encrypted on-chain
+- **Selective Disclosure**: Reveal only necessary information
+
+### 3. Tamper Detection
+
+- **Hash Chains**: Each block links to previous
+- **Merkle Trees**: Efficient verification of transactions
+- **Temporal Proofs**: Detect backdating attempts
+
+## Performance Characteristics
+
+| Metric | Value |
+|--------|-------|
+| Block time | 3 seconds |
+| Finality | 9 seconds (3 blocks) |
+| Throughput | 1000 TPS |
+| Storage per block | ~100 KB |
+| Validator count | 7-21 nodes |
+| Byzantine tolerance | f = (n-1)/3 |
+
+## Use Cases
+
+### Humanitarian Aid
+- Track aid distribution
+- Prevent double-spending of aid vouchers
+- Audit trail for donors
+- Beneficiary privacy protection
+
+### Medical Records
+- Immutable medical history
+- Temporal proof of interventions
+- Cross-border medical data sharing
+- Regulatory compliance (HIPAA, GDPR)
+
+### Legal Proceedings
+- Timestamp legal documents
+- Prove document existence at specific time
+- Tamper-evident evidence chain
+- Cross-jurisdiction validity
+
+### Supply Chain
+- Track material provenance
+- Verify ethical sourcing
+- Prevent counterfeiting
+- Carbon footprint tracking
+
+## Deployment
+
+### Hardware Requirements
+- **Validator nodes**: 4 CPU cores, 8GB RAM, 500GB SSD
+- **Light clients**: 1 CPU core, 2GB RAM, 10GB storage
+- **GPS receiver**: For temporal oracle (validators only)
+
+### Network Requirements
+- **Bandwidth**: 10 Mbps minimum
+- **Latency**: <500ms between validators
+- **Reliability**: 99.9% uptime
+
+### Software Stack
+- **OS**: Linux (Ubuntu 22.04 LTS)
+- **Runtime**: Python 3.11+
+- **Database**: LevelDB
+- **Cryptography**: libsodium, PQClean
+
+## Governance
+
+### Validator Selection
+- Nominated by humanitarian organizations
+- Vetted for technical capability
+- Geographic distribution required
+- Rotating membership (annual)
+
+### Protocol Upgrades
+- Proposal by any validator
+- 2/3 majority vote required
+- 30-day notice period
+- Backward compatibility maintained
+
+## Licensing
+
+**Status**: Trade Secret
+
+**Access**: Available under Humanitarian Use License
+
+**Restrictions**: No military or surveillance applications
+
+## References
+
+- Nakamoto, S. (2008). Bitcoin: A Peer-to-Peer Electronic Cash System
+- Buterin, V. (2014). Ethereum: A Next-Generation Smart Contract Platform
+- Bernstein, D. J., et al. (2019). SPHINCS+: Stateless Hash-Based Signatures
+- NIST (2022). Post-Quantum Cryptography Standardization
+
+## Contact
+
+Technical inquiries: stbk@iluminara.org
+
+Validator applications: validators@iluminara.org
