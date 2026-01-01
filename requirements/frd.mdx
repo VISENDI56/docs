@@ -1,73 +1,73 @@
 ---
-title: Functional requirements document
-description: Detailed system behaviors and functional logic for iLuminara-Core MVP
+title: Functional requirements
+description: System behaviors and functional logic for iLuminara-Core
 ---
 
-# Functional Requirements Document (FRD): iLuminara-Core MVP
+# Functional requirements
 
-**Version:** 1.0 (Phase 126 - Oracle Stable)  
-**Status:** Investment-Ready / Technical Freeze  
-**Architect:** Anthony Waganda (Director/Lead Engineer)
+**Version:** 1.0  
+**Status:** Production ready  
+**Lead:** Anthony Waganda
 
 ## Introduction
 
 ### Purpose
 
-The purpose of this Functional Requirements Document (FRD) is to detail the system behaviors, functional logic, and data processing rules required to implement the iLuminara-Core MVP. This document translates the high-level user stories from the PRD into specific, testable engineering requirements for the 11-Point Nuclear IP Stack.
+This document details the system behaviors, functional logic, and data processing rules for implementing iLuminara-Core. It translates high-level user stories into specific, testable engineering requirements.
 
 ### Scope
 
-This FRD covers the functional implementation of:
+This document covers:
 
-- **The Sovereign Kernel:** System-2 reasoning and Z3-Formal verification
-- **The Three-Port Dashboard:** Home (8501), Bio-Foundry (8502), Auth Fortress (8503)
-- **The Orchestration Layer:** Sovereign Bus, Atomic Heartbeat, and Hard-Link Compiler
-- **The Hardware Interface:** NVIDIA Blackwell B300 optimization and Ghost-Mesh telemetry
+- Core kernel with reasoning and formal verification
+- Three-port dashboard (8501, 8502, 8503)
+- Orchestration layer with state management and synchronization
+- Hardware interface for NVIDIA Blackwell B300 and mesh networking
 
 ## Functional requirements
 
-### Clinical intelligence and biosecurity (IP #01, #03)
+### Clinical intelligence and biosecurity
 
 #### FR-01: Genomic sequence ingestion
 
-**Description:** The system must accept raw genomic strings (FASTA/FASTQ format) via the Bio-Foundry interface.
+**Description:** Accept raw genomic strings (FASTA/FASTQ format) via the Bio-Foundry interface.
 
 **Input:** Alphanumeric string (A, T, G, C, N)
 
-**Validation:** Regex check `^[ATGCN]+$` to ensure valid nucleotide characters
+**Validation:** Regex check `^[ATGCN]+$` for valid nucleotide characters
 
 **Behavior:**
 - If valid, pass to Evo2 Engine
 - If invalid, return 400 Bad Request with "Invalid Sequence" error
 
-#### FR-02: Synthetic binder generation (System-2 reasoning)
+#### FR-02: Synthetic binder generation
 
-**Description:** The Evo2 Engine must generate a candidate protein binder sequence based on the input pathogen.
+**Description:** Generate candidate protein binder sequence based on input pathogen.
 
-**Performance:** Must complete inference within < 200ms on Blackwell B300 hardware
+**Performance:** Complete inference within 200ms on Blackwell B300 hardware
 
 **Output:** JSON object containing:
 - `binder_sequence`: String
 - `affinity_score`: Float (0.0 - 1.0)
-- `pqc_signature`: SHA-256 Hash of the result
+- `pqc_signature`: SHA-256 hash of result
 
-#### FR-03: Spatial-temporal pathogen prediction (HSTPU)
+#### FR-03: Spatial-temporal pathogen prediction
 
-**Description:** The system must predict the next 72-hour transmission vector based on current node coordinates.
+**Description:** Predict 72-hour transmission vector based on current node coordinates.
 
-**Input:** Current Node Lat/Lon, Local Infection Rate
+**Input:** Current node lat/lon, local infection rate
 
-**Logic:** Apply 4D Tensor calculation (Time + 3D Space)
+**Logic:** Apply 4D tensor calculation (time + 3D space)
 
-**Output:** Geospatial Polygon (GeoJSON) representing the high-risk zone
+**Output:** Geospatial polygon (GeoJSON) representing high-risk zone
 
-### Governance and Omni-Law Matrix (IP #02, #07, #08)
+### Governance and compliance
 
-#### FR-04: Jurisdictional geofencing (Z3-Gate)
+#### FR-04: Jurisdictional geofencing
 
-**Description:** Every data export or transmission must be verified against the active legal framework.
+**Description:** Verify every data export or transmission against active legal framework.
 
-**Constraint Logic:**
+**Constraint logic:**
 ```
 IF origin == "KENYA" AND destination != "KENYA" AND data_type == "PII" 
 THEN result = UNSAT
@@ -75,143 +75,143 @@ THEN result = UNSAT
 
 **Behavior:**
 - If SAT: Allow transmission
-- If UNSAT: Block transmission and log attempt in HSML Audit Log
+- If UNSAT: Block transmission and log attempt
 
-#### FR-05: Constitutional compilation (Hard-Link)
+#### FR-05: Compliance verification
 
-**Description:** The build pipeline must block any commit that violates the Z3 constraints.
+**Description:** Build pipeline must block any commit that violates constraints.
 
 **Trigger:** `git commit` or `launch_sovereign_os.sh`
 
 **Logic:** Run `verify_integrity_circuit()`
 
-**Output:** Pass/Fail boolean. A Fail prevents the OS from starting.
+**Output:** Pass/Fail boolean. Fail prevents system start.
 
-#### FR-06: Forensic audit logging (HSML)
+#### FR-06: Audit logging
 
-**Description:** All system decisions must be logged in an immutable format.
+**Description:** All system decisions must be logged in immutable format.
 
-**Data Fields:** Timestamp (ns), Node ID, Decision Hash, Z3 Proof
+**Data fields:** Timestamp (ns), Node ID, Decision Hash, Z3 Proof
 
 **Storage:** Append-only to `SOVEREIGN_AUDIT_LOG.md` or PABS Net
 
-### Security and authentication (IP #04, #06, #10)
+### Security and authentication
 
-#### FR-07: Triple-helix bio-lock authentication
+#### FR-07: Multi-factor authentication
 
-**Description:** Authentication requires a multi-factor verification involving biometric, hardware token, and lattice key.
+**Description:** Authentication requires multi-factor verification with biometric, hardware token, and lattice key.
 
 **Logic:**
-- Fetch current `lattice_vector` from Atomic Heartbeat
-- Compare User Token against `lattice_vector`
+- Fetch current `lattice_vector` from heartbeat
+- Compare user token against `lattice_vector`
 - Allow access only if match is within 18ms drift window
 
-#### FR-08: Ghost-Mesh anti-jamming
+#### FR-08: Mesh anti-jamming
 
-**Description:** The networking layer must detect signal degradation and switch protocols.
+**Description:** Networking layer must detect signal degradation and switch protocols.
 
-**Trigger:** Packet loss > 5% or Signal-to-Noise Ratio (SNR) < 10dB
+**Trigger:** Packet loss > 5% or SNR < 10dB
 
-**Action:** Switch from Standard TCP/IP to Simulated Sub-Terahertz Mesh Protocol
+**Action:** Switch from standard TCP/IP to sub-terahertz mesh protocol
 
-#### FR-09: Iron Dome input sanitization
+#### FR-09: Input sanitization
 
-**Description:** All user inputs (UI and API) must be sanitized before reaching the kernel.
+**Description:** All user inputs (UI and API) must be sanitized before reaching kernel.
 
 **Blocklist:** `rm`, `eval`, `exec`, `system`, `..`, `/etc/passwd`
 
 **Action:** Intercept and replace with null; trigger security alert
 
-#### FR-10: Sovereign sandbox execution
+#### FR-10: Sandbox execution
 
-**Description:** OS-level commands must be executed through a restrictive proxy.
+**Description:** OS-level commands must be executed through restrictive proxy.
 
 **Allowlist:** `git status`, `ls core`, `python3 --version`
 
-**Logic:** If command is not in Allowlist, return `ACCESS_DENIED`
+**Logic:** If command is not in allowlist, return `ACCESS_DENIED`
 
-### Logistics, revenue and operations (IP #05, #09, #11)
+### Operations and monitoring
 
 #### FR-11: Real-time ROI calculation
 
-**Description:** Calculate the economic impact of the system's operation dynamically.
+**Description:** Calculate economic impact of system operation dynamically.
 
 **Formula:** `(Manual_Cost_Per_Hour * Hours_Saved) + (Wastage_Reduction_Value)`
 
-**Trigger:** Every 5 seconds (Throttled) or upon specific transaction completion
+**Trigger:** Every 5 seconds (throttled) or upon transaction completion
 
-**Display:** Update "Daily Operational Savings" metric on Home Dashboard
+**Display:** Update "Daily Operational Savings" metric on dashboard
 
-#### FR-12: Context distillation (Edge optimization)
+#### FR-12: Edge optimization
 
 **Description:** Compress active model weights when hardware resources are constrained.
 
-**Trigger:** CPU Usage > 90% OR RAM Usage > 85%
+**Trigger:** CPU usage > 90% OR RAM usage > 85%
 
 **Action:** Switch from FP32/FP16 weights to FP4/INT8 quantized weights
 
 **Notification:** Alert user "Context Distillation Active - Performance Optimized"
 
-#### FR-13: Atomic heartbeat synchronization
+#### FR-13: Heartbeat synchronization
 
-**Description:** Synchronize state across all localized ports and nodes.
+**Description:** Synchronize state across all ports and nodes.
 
 **Frequency:** Every 18ms
 
 **Payload:** `timestamp_ns`, `state_hash`, `legal_status`
 
-**Behavior:** If local timestamp deviates > 2ms from Nexus mean, force update local clock
+**Behavior:** If local timestamp deviates > 2ms from mean, force update local clock
 
 ## Data processing rules
 
 ### Data residency
 
-**Rule:** All PII (Personally Identifiable Information) tagged with `residency: KENYA` must be stored encrypted at rest using AES-256-GCM + Kyber-1024.
+**Rule:** All PII tagged with `residency: KENYA` must be stored encrypted at rest using AES-256-GCM + Kyber-1024.
 
-**Rule:** Decryption keys for Kenyan PII must never leave the Nairobi-Dadaab Nexus geospatial bounds.
+**Rule:** Decryption keys for Kenyan PII must never leave the Nairobi-Dadaab geospatial bounds.
 
-### State management (Sovereign Bus)
+### State management
 
-**Rule:** `system_state.json` is the Single Source of Truth.
+**Rule:** `system_state.json` is the single source of truth.
 
-**Rule:** Writes to `system_state.json` are atomic and require a SHA-256 hash check of the previous state to prevent overwrite race conditions.
+**Rule:** Writes to `system_state.json` are atomic and require SHA-256 hash check of previous state to prevent race conditions.
 
-**Rule:** Dashboard UI components must read from `system_state.json` but never write directly; they must dispatch actions to the Kernel.
+**Rule:** Dashboard UI components must read from `system_state.json` but never write directly; they must dispatch actions to the kernel.
 
 ## Interface requirements
 
-### Port 8501 (Home Dashboard)
+### Port 8501 (Dashboard)
 
-**Map Widget:** Must render 50 nodes based on `core/geospatial/mesh_mapper.py` data. Colors must indicate status (Green=Synced, Red=Drift).
+**Map widget:** Render 50 nodes based on `core/geospatial/mesh_mapper.py` data. Colors indicate status (Green=Synced, Red=Drift).
 
-**Hardware Monitor:** Progress bars must reflect real-time psutil readings. Update frequency: 5s.
+**Hardware monitor:** Progress bars reflect real-time psutil readings. Update frequency: 5s.
 
 ### Port 8502 (Bio-Foundry)
 
-**Input Field:** Text area accepting max 10,000 characters.
+**Input field:** Text area accepting max 10,000 characters.
 
-**Visualization:** Plotly chart showing binder affinity over time (simulated generations).
+**Visualization:** Plotly chart showing binder affinity over time.
 
-### Port 8503 (Auth Fortress)
+### Port 8503 (Auth interface)
 
-**Polar Chart:** Must update geometry every 500ms (throttled for visibility) to visualize key rotation.
+**Polar chart:** Update geometry every 500ms to visualize key rotation.
 
-**Log Console:** Scrollable text area showing real-time PQC handshake attempts.
+**Log console:** Scrollable text area showing real-time handshake attempts.
 
 ## System constraints
 
 - **Hardware:** Must run on ARM64 (Jetson) or x86_64 (Blackwell) architecture
-- **Memory:** Max 32GB RAM usage for full stack (MVP optimized for 16GB)
-- **Network:** Must tolerate intermittent connectivity (Partition Tolerance)
+- **Memory:** Max 32GB RAM usage (optimized for 16GB)
+- **Network:** Must tolerate intermittent connectivity
 - **Legal:** Cannot execute if Z3 Solver binary is missing or corrupted
 
 ## Assumptions and dependencies
 
 **Assumptions:**
-- Python 3.10+ environment is available
-- User has sudo privileges for port management (`fuser -k`)
+- Python 3.10+ environment available
+- User has sudo privileges for port management
 
 **Dependencies:**
 - Z3 Theorem Prover (`z3-solver` pip package)
-- NVIDIA Drivers (for CUDA acceleration, though CPU fallback is supported)
+- NVIDIA drivers (CUDA acceleration with CPU fallback)
 - Mintlify for documentation rendering
