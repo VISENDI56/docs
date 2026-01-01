@@ -1,6 +1,6 @@
 ---
 title: Quick start
-description: Get iLuminara running in 5 minutes with the war room demo
+description: Get iLuminara running in 5 minutes
 ---
 
 ## Prerequisites
@@ -11,27 +11,44 @@ Install required dependencies:
 pip install streamlit pandas pydeck numpy Flask flask-cors
 ```
 
-## Live war room apps
+## Rapid deployment (Build-Rev 178)
 
-Experience iLuminara in action with our live Streamlit dashboards:
+Deploy iLuminara-Core with the Sovereign Governance Engine:
+
+```bash
+# 1. Initialize Apex-Tier Repository
+git clone --recursive https://github.com/VISENDI56/iLuminara-Core.git
+cd iLuminara-Core
+
+# 2. Deploy Sovereign Governance Engine
+chmod +x core/governance/fixer/isf_main.sh
+./core/governance/fixer/isf_main.sh --all --force
+
+# 3. Execute Z3 Formal Integrity Pulse
+python3 core/testing/apex_test.py
+```
+
+## Live applications
+
+Experience iLuminara with our live Streamlit dashboards:
 
 <CardGroup cols={3}>
   <Card
-    title="Command Console"
+    title="Command console"
     icon="tower-control"
     href="https://iluminara-war-room.streamlit.app"
   >
-    Strategic orchestration and crisis decision support
+    Strategic orchestration and decision support
   </Card>
   <Card
-    title="Transparency Audit"
+    title="Transparency audit"
     icon="file-contract"
     href="https://iluminara-audit.streamlit.app"
   >
-    Real-time ethical and compliance logs
+    Real-time compliance logs
   </Card>
   <Card
-    title="Field Validation"
+    title="Field validation"
     icon="clipboard-check"
     href="https://iluminara-field.streamlit.app"
   >
@@ -43,7 +60,7 @@ Experience iLuminara in action with our live Streamlit dashboards:
   **For local development:** Run `./launch_war_room.sh` to open all dashboards locally
 </Note>
 
-## Launch the war room demo
+## Launch the demo
 
 ### Option 1: Auto-launch (recommended)
 
@@ -52,10 +69,10 @@ chmod +x launch_war_room.sh
 ./launch_war_room.sh
 ```
 
-This single command will:
-- Generate fresh outbreak simulation data
+This command will:
+- Generate outbreak simulation data
 - Start all three dashboards
-- Automatically open all dashboards in Chrome
+- Open dashboards in browser
 
 ### Option 2: Manual launch
 
@@ -69,20 +86,20 @@ streamlit run dashboard.py
 
 Access the dashboard at `http://localhost:8501`
 
-## The demo sequence
+## Demo sequence
 
 <Steps>
   <Step title="Show online status">
-    Dashboard header shows "🟢 ONLINE" with Z-Score: 0.34 (GREEN) and Bond Status: LOCKED
+    Dashboard header shows online status with Z-Score and Bond Status
   </Step>
   <Step title="Disconnect WiFi">
-    Click WiFi off on your laptop. System still shows "🟢 ONLINE" - the internet is gone but the system still protects the camp
+    Disable WiFi. System continues operating offline
   </Step>
   <Step title="Generate outbreak">
-    Run `python edge_node/frenasa_engine/simulate_outbreak.py` and watch the simulation progress through 4 phases
+    Run `python edge_node/frenasa_engine/simulate_outbreak.py` to simulate outbreak progression
   </Step>
   <Step title="Refresh dashboard">
-    Press F5 and watch metrics update live: Z-Score jumps to 10.3, Cases: 11,776, Bond Status: PAYOUT_RELEASED
+    Press F5 to see updated metrics: Z-Score, Cases, Bond Status
   </Step>
 </Steps>
 
@@ -126,7 +143,7 @@ from governance_kernel.vector_ledger import SovereignGuardrail, SovereigntyViola
 
 guardrail = SovereignGuardrail()
 
-# Try to export health data to AWS during blackout
+# Validate data transfer
 try:
     guardrail.validate_action(
         action_type='Data_Transfer',
@@ -135,12 +152,11 @@ try:
     )
 except SovereigntyViolationError as e:
     print(e)
-    # Output: ❌ SOVEREIGNTY VIOLATION + legal citations
 ```
 
-## Validate the Sovereign Health Fortress
+## Validate deployment
 
-Run the complete fortress validation to ensure all security components are operational:
+Run the complete validation to ensure all components are operational:
 
 ```bash
 chmod +x scripts/validate_fortress.sh
@@ -148,23 +164,23 @@ chmod +x scripts/validate_fortress.sh
 ```
 
 **Validation phases:**
-1. ✅ Security Audit Layer (CodeQL, Gitleaks, Dependabot)
-2. ✅ Governance Kernel (SovereignGuardrail, Crypto Shredder)
-3. ✅ Edge Node & AI Agents
-4. ✅ Cloud Oracle
-5. ✅ Python Dependencies
-6. ✅ Environment Configuration
-7. ✅ Nuclear IP Stack Status
+1. ✅ Security audit layer (CodeQL, Gitleaks, Dependabot)
+2. ✅ Governance kernel (SovereignGuardrail, Crypto Shredder)
+3. ✅ Edge node and AI agents
+4. ✅ Cloud oracle
+5. ✅ Python dependencies
+6. ✅ Environment configuration
+7. ✅ IP stack status
 
 **Expected output:**
 ```
-🛡️ FORTRESS STATUS: OPERATIONAL
+🛡️ DEPLOYMENT STATUS: OPERATIONAL
 ✓ All critical components validated
 ✓ Security audit layer active
 ✓ Governance kernel operational
-✓ Nuclear IP stack initialized
+✓ IP stack initialized
 
-The Sovereign Health Fortress is ready for deployment.
+The system is ready for deployment.
 ```
 
 ## Next steps
@@ -175,7 +191,7 @@ The Sovereign Health Fortress is ready for deployment.
     icon="sitemap"
     href="/architecture/overview"
   >
-    Understand the four foundational pillars
+    Understand the foundational components
   </Card>
   <Card
     title="Deploy to production"

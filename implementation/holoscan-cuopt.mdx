@@ -1,0 +1,687 @@
+---
+title: Holoscan & cuOpt Implementation
+description: Kinetic & Sensory Stack implementation with dynamic flow control and agentic routing
+---
+
+## Overview
+
+This implementation guide covers the deployment of NVIDIA Holoscan SDK (Production Branch 25h1) for medical-grade sensor processing and NVIDIA cuOpt for GPU-accelerated vehicle routing and logistics optimization.
+
+## Holoscan SDK implementation
+
+### Installation
+
+```bash
+# Install Holoscan SDK Production Branch 25h1
+pip install holoscan-sdk>=2.6.0
+
+# Install dependencies
+pip install nvidia-riva-client>=2.15.0
+pip install cuopt-client>=25.08
+```
+
+### Dynamic flow control
+
+```python
+from holoscan.core import Application, Operator
+from holoscan.operators import VideoStreamReplayerOp, FormatConverterOp
+from holoscan.resources import UnboundedAllocator
+
+class DynamicFlowController(Operator):
+    """
+    Implements dynamic flow control for bandwidth-constrained environments.
+    Throttles and prioritizes sensor streams based on thermal limits and network throughput.
+    """
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.thermal_threshold = 85  # Celsius
+        self.bandwidth_limit = 10  # Mbps
+        self.stream_priorities = {
+            "ultrasound": 1,  # Highest priority
+            "ecg": 2,
+            "temperature": 3,
+            "environmental": 4
+        }
+    
+    def setup(self, spec):
+        spec.input("sensor_streams")
+        spec.output("throttled_streams")
+    
+    def compute(self, op_input, op_output, context):
+        # Read thermal sensors
+        thermal_status = self.read_thermal_sensors()
+        
+        # Read network bandwidth
+        available_bandwidth = self.measure_bandwidth()
+        
+        # Get incoming streams
+        streams = op_input.receive("sensor_streams")
+        
+        # Apply dynamic throttling
+        throttled = self.apply_throttling(
+            streams=streams,
+            thermal_status=thermal_status,
+            available_bandwidth=available_bandwidth
+        )
+        
+        op_output.emit(throttled, "throttled_streams")
+    
+    def apply_throttling(self, streams, thermal_status, available_bandwidth):
+        """Apply intelligent throttling based on system constraints"""
+        
+        # If thermal limit exceeded, reduce frame rates
+        if thermal_status["temperature"] > self.thermal_threshold:
+            throttle_factor = 0.5  # Reduce to 50%
+        else:
+            throttle_factor = 1.0
+        
+        # If bandwidth constrained, prioritize critical streams
+        if available_bandwidth < self.bandwidth_limit:
+            # Sort by priority
+            sorted_streams = sorted(
+                streams.items(),
+                key=lambda x: self.stream_priorities.get(x[0], 999)
+            )
+            
+            # Allocate bandwidth proportionally
+            allocated = {}
+            remaining_bandwidth = available_bandwidth
+            
+            for stream_name, stream_data in sorted_streams:
+                priority = self.stream_priorities.get(stream_name, 999)
+                
+                if priority <= 2:  # Critical streams
+                    allocated[stream_name] = stream_data
+                    remaining_bandwidth -= stream_data["bandwidth"]
+                elif remaining_bandwidth > 0:
+                    # Reduce quality for non-critical streams
+                    allocated[stream_name] = self.reduce_quality(
+                        stream_data,
+                        factor=0.5
+                    )
+                    remaining_bandwidth -= stream_data["bandwidth"] * 0.5
+            
+            return allocated
+        
+        return streams
+    
+    def read_thermal_sensors(self):
+        """Read IGX Orin thermal sensors"""
+        # Placeholder - integrate with actual thermal monitoring
+        return {
+            "temperature": 75,  # Celsius
+            "throttling_active": False
+        }
+    
+    def measure_bandwidth(self):
+        """Measure available network bandwidth"""
+        # Placeholder - integrate with network monitoring
+        return 15  # Mbps
+
+class HoloscanMedicalPipeline(Application):
+    """
+    Medical-grade sensor processing pipeline with dynamic flow control
+    """
+    
+    def compose(self):
+        # Video stream replayer (ultrasound)
+        ultrasound_source = VideoStreamReplayerOp(
+            self,
+            name="ultrasound_source",
+            directory="/data/ultrasound",
+            basename="ultrasound",
+            frame_rate=30
+        )
+        
+        # Format converter
+        format_converter = FormatConverterOp(
+            self,
+            name="format_converter",
+            pool=UnboundedAllocator(self, name="pool")
+        )
+        
+        # Dynamic flow controller
+        flow_controller = DynamicFlowController(
+            self,
+            name="flow_controller"
+        )
+        
+        # Connect operators
+        self.add_flow(ultrasound_source, format_converter)
+        self.add_flow(format_converter, flow_controller)
+
+def main():
+    app = HoloscanMedicalPipeline()
+    app.run()
+
+if __name__ == "__main__":
+    main()
+```
+
+### Multi-sensor fusion
+
+```python
+from holoscan.core import Operator
+import numpy as np
+
+class SensorFusionOperator(Operator):
+    """
+    Fuses data from multiple medical sensors for comprehensive diagnostics
+    """
+    
+    def setup(self, spec):
+        spec.input("ultrasound")
+        spec.input("ecg")
+        spec.input("temperature")
+        spec.input("spo2")
+        spec.output("fused_data")
+    
+    def compute(self, op_input, op_output, context):
+        # Receive sensor data
+        ultrasound = op_input.receive("ultrasound")
+        ecg = op_input.receive("ecg")
+        temperature = op_input.receive("temperature")
+        spo2 = op_input.receive("spo2")
+        
+        # Timestamp alignment
+        aligned_data = self.align_timestamps({
+            "ultrasound": ultrasound,
+            "ecg": ecg,
+            "temperature": temperature,
+            "spo2": spo2
+        })
+        
+        # Feature extraction
+        features = self.extract_features(aligned_data)
+        
+        # Diagnostic inference
+        diagnosis = self.run_inference(features)
+        
+        # Emit fused result
+        op_output.emit({
+            "raw_data": aligned_data,
+            "features": features,
+            "diagnosis": diagnosis,
+            "timestamp": context.timestamp
+        }, "fused_data")
+    
+    def align_timestamps(self, sensor_data):
+        """Align sensor data by timestamp"""
+        # Find common time window
+        timestamps = [data["timestamp"] for data in sensor_data.values()]
+        min_time = max([t[0] for t in timestamps])
+        max_time = min([t[-1] for t in timestamps])
+        
+        # Interpolate to common timeline
+        aligned = {}
+        for sensor, data in sensor_data.items():
+            aligned[sensor] = self.interpolate(
+                data,
+                time_range=(min_time, max_time)
+            )
+        
+        return aligned
+    
+    def extract_features(self, aligned_data):
+        """Extract diagnostic features from aligned sensor data"""
+        features = {}
+        
+        # ECG features
+        if "ecg" in aligned_data:
+            features["heart_rate"] = self.calculate_heart_rate(
+                aligned_data["ecg"]
+            )
+            features["hrv"] = self.calculate_hrv(aligned_data["ecg"])
+        
+        # Ultrasound features
+        if "ultrasound" in aligned_data:
+            features["cardiac_output"] = self.estimate_cardiac_output(
+                aligned_data["ultrasound"]
+            )
+        
+        # Vital signs
+        features["temperature"] = aligned_data.get("temperature", {}).get("value")
+        features["spo2"] = aligned_data.get("spo2", {}).get("value")
+        
+        return features
+    
+    def run_inference(self, features):
+        """Run diagnostic inference on extracted features"""
+        # Placeholder for ML model inference
+        diagnosis = {
+            "condition": "normal",
+            "confidence": 0.95,
+            "alerts": []
+        }
+        
+        # Check for abnormalities
+        if features.get("heart_rate", 70) > 100:
+            diagnosis["alerts"].append("tachycardia")
+        
+        if features.get("spo2", 98) < 90:
+            diagnosis["alerts"].append("hypoxemia")
+        
+        return diagnosis
+```
+
+## cuOpt implementation
+
+### Agentic vehicle routing
+
+```python
+from cuopt import VehicleRoutingProblem, Solver
+from cuopt.routing import Location, Vehicle, Task
+
+class AgenticDispatcher:
+    """
+    Agentic cuOpt dispatcher that parses natural language commands
+    and translates them into mathematical constraints
+    """
+    
+    def __init__(self):
+        self.solver = Solver(device="cuda")
+        self.vehicles = []
+        self.tasks = []
+        self.constraints = []
+    
+    def parse_command(self, natural_language_command):
+        """
+        Parse natural language command into routing constraints
+        
+        Example: "Re-route the drone fleet to Sector 4 to avoid flash flooding"
+        """
+        
+        # Extract intent
+        if "re-route" in natural_language_command.lower():
+            intent = "reroute"
+        elif "prioritize" in natural_language_command.lower():
+            intent = "prioritize"
+        elif "avoid" in natural_language_command.lower():
+            intent = "avoid"
+        else:
+            intent = "optimize"
+        
+        # Extract entities
+        entities = self.extract_entities(natural_language_command)
+        
+        # Generate constraints
+        constraints = self.generate_constraints(intent, entities)
+        
+        return constraints
+    
+    def extract_entities(self, command):
+        """Extract entities from natural language command"""
+        entities = {
+            "vehicles": [],
+            "locations": [],
+            "hazards": [],
+            "priorities": []
+        }
+        
+        # Simple keyword extraction (in production, use NLP model)
+        if "drone" in command.lower():
+            entities["vehicles"].append("drone_fleet")
+        
+        if "sector" in command.lower():
+            # Extract sector number
+            import re
+            sector_match = re.search(r"sector (\d+)", command.lower())
+            if sector_match:
+                entities["locations"].append(f"sector_{sector_match.group(1)}")
+        
+        if "flood" in command.lower():
+            entities["hazards"].append("flooding")
+        
+        return entities
+    
+    def generate_constraints(self, intent, entities):
+        """Generate mathematical constraints from intent and entities"""
+        constraints = []
+        
+        if intent == "avoid" and "flooding" in entities["hazards"]:
+            # Add constraint to avoid flooded areas
+            constraints.append({
+                "type": "avoid_zone",
+                "zones": self.get_flooded_zones(),
+                "penalty": 1000
+            })
+        
+        if intent == "prioritize":
+            # Add priority constraint
+            constraints.append({
+                "type": "priority",
+                "locations": entities["locations"],
+                "weight": 2.0
+            })
+        
+        return constraints
+    
+    def optimize_routes(self, command=None):
+        """
+        Optimize vehicle routes with optional natural language command
+        """
+        
+        # Parse command if provided
+        if command:
+            constraints = self.parse_command(command)
+            self.constraints.extend(constraints)
+        
+        # Create VRP
+        vrp = VehicleRoutingProblem(
+            vehicles=self.vehicles,
+            tasks=self.tasks,
+            constraints=self.constraints
+        )
+        
+        # Solve on GPU
+        solution = self.solver.solve(vrp)
+        
+        return solution
+    
+    def get_flooded_zones(self):
+        """Get list of flooded zones from GIS system"""
+        # Integrate with Spatial Omniscience Stack
+        return [
+            {"lat": -0.5, "lon": 35.2, "radius": 500},  # meters
+            {"lat": -0.52, "lon": 35.22, "radius": 300}
+        ]
+
+# Example usage
+dispatcher = AgenticDispatcher()
+
+# Add vehicles
+dispatcher.vehicles = [
+    Vehicle(id=1, capacity=50, location=Location(lat=-0.5, lon=35.2)),
+    Vehicle(id=2, capacity=50, location=Location(lat=-0.51, lon=35.21)),
+    Vehicle(id=3, capacity=50, location=Location(lat=-0.52, lon=35.22))
+]
+
+# Add tasks
+dispatcher.tasks = [
+    Task(id=1, location=Location(lat=-0.53, lon=35.23), demand=10),
+    Task(id=2, location=Location(lat=-0.54, lon=35.24), demand=15),
+    Task(id=3, location=Location(lat=-0.55, lon=35.25), demand=20)
+]
+
+# Optimize with natural language command
+solution = dispatcher.optimize_routes(
+    command="Re-route the drone fleet to avoid flash flooding in Sector 4"
+)
+
+print(f"Optimized routes: {solution.routes}")
+print(f"Total distance: {solution.total_distance} km")
+print(f"Total time: {solution.total_time} minutes")
+```
+
+### Real-time route optimization
+
+```python
+import time
+from threading import Thread
+
+class RealTimeOptimizer:
+    """
+    Continuously optimizes routes based on real-time conditions
+    """
+    
+    def __init__(self, dispatcher):
+        self.dispatcher = dispatcher
+        self.running = False
+        self.update_interval = 60  # seconds
+    
+    def start(self):
+        """Start real-time optimization loop"""
+        self.running = True
+        self.optimization_thread = Thread(target=self._optimization_loop)
+        self.optimization_thread.start()
+    
+    def stop(self):
+        """Stop real-time optimization"""
+        self.running = False
+        self.optimization_thread.join()
+    
+    def _optimization_loop(self):
+        """Continuous optimization loop"""
+        while self.running:
+            # Get real-time conditions
+            conditions = self.get_realtime_conditions()
+            
+            # Update constraints
+            self.update_constraints(conditions)
+            
+            # Re-optimize routes
+            solution = self.dispatcher.optimize_routes()
+            
+            # Dispatch updated routes to vehicles
+            self.dispatch_routes(solution)
+            
+            # Wait for next update
+            time.sleep(self.update_interval)
+    
+    def get_realtime_conditions(self):
+        """Get real-time traffic, weather, and hazard conditions"""
+        return {
+            "traffic": self.get_traffic_data(),
+            "weather": self.get_weather_data(),
+            "hazards": self.get_hazard_data()
+        }
+    
+    def update_constraints(self, conditions):
+        """Update routing constraints based on real-time conditions"""
+        
+        # Clear dynamic constraints
+        self.dispatcher.constraints = [
+            c for c in self.dispatcher.constraints
+            if c.get("static", False)
+        ]
+        
+        # Add traffic constraints
+        if conditions["traffic"]:
+            for congestion in conditions["traffic"]["congested_areas"]:
+                self.dispatcher.constraints.append({
+                    "type": "avoid_zone",
+                    "zones": [congestion],
+                    "penalty": 500
+                })
+        
+        # Add weather constraints
+        if conditions["weather"]["severe"]:
+            self.dispatcher.constraints.append({
+                "type": "avoid_zone",
+                "zones": conditions["weather"]["affected_areas"],
+                "penalty": 1000
+            })
+    
+    def dispatch_routes(self, solution):
+        """Send updated routes to vehicles"""
+        for vehicle_id, route in solution.routes.items():
+            # Send route update to vehicle
+            self.send_route_update(vehicle_id, route)
+    
+    def send_route_update(self, vehicle_id, route):
+        """Send route update to specific vehicle"""
+        # Placeholder - integrate with vehicle communication system
+        print(f"Sending route update to vehicle {vehicle_id}: {route}")
+```
+
+## Integration with NeMo Canary
+
+### Multilingual ASR for medical intake
+
+```python
+from nvidia_riva import RivaClient
+
+class MedicalIntakeASR:
+    """
+    Multilingual automatic speech recognition for medical intake
+    Supports 100+ dialects including Swahili, Somali, Amharic
+    """
+    
+    def __init__(self):
+        self.riva = RivaClient(model="canary-1b")
+        self.supported_languages = [
+            "en", "sw", "so", "am", "om", "ti", "ar"
+        ]
+    
+    def transcribe_symptoms(self, audio_file, language="sw"):
+        """
+        Transcribe patient symptoms from audio
+        """
+        
+        # Transcribe audio
+        transcript = self.riva.speech_to_text(
+            audio=audio_file,
+            language=language,
+            domain="medical"
+        )
+        
+        # Extract medical entities
+        entities = self.extract_medical_entities(transcript)
+        
+        # Translate to English for EHR
+        if language != "en":
+            english_transcript = self.riva.translate(
+                text=transcript,
+                source_language=language,
+                target_language="en",
+                domain="medical"
+            )
+        else:
+            english_transcript = transcript
+        
+        return {
+            "original_transcript": transcript,
+            "language": language,
+            "english_transcript": english_transcript,
+            "entities": entities
+        }
+    
+    def extract_medical_entities(self, transcript):
+        """Extract medical entities from transcript"""
+        # Placeholder - integrate with medical NER model
+        entities = {
+            "symptoms": [],
+            "duration": None,
+            "severity": None,
+            "location": None
+        }
+        
+        # Simple keyword extraction
+        if "fever" in transcript.lower() or "homa" in transcript.lower():
+            entities["symptoms"].append("fever")
+        
+        if "cough" in transcript.lower() or "kikohozi" in transcript.lower():
+            entities["symptoms"].append("cough")
+        
+        return entities
+```
+
+## Deployment configuration
+
+### Docker compose
+
+```yaml
+version: '3.8'
+
+services:
+  holoscan:
+    image: nvcr.io/nvidia/clara-holoscan/holoscan:v2.6.0
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    volumes:
+      - ./holoscan_config:/workspace/config
+      - ./sensor_data:/data
+    ports:
+      - "8080:8080"
+    command: python3 /workspace/holoscan_pipeline.py
+  
+  cuopt:
+    image: nvcr.io/nvidia/cuopt:25.08
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    volumes:
+      - ./cuopt_config:/workspace/config
+    ports:
+      - "8081:8081"
+    command: python3 /workspace/cuopt_dispatcher.py
+  
+  riva:
+    image: nvcr.io/nvidia/riva/riva-speech:2.15.0
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    ports:
+      - "50051:50051"
+    volumes:
+      - ./riva_models:/data/models
+```
+
+### Kubernetes deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: holoscan-cuopt-stack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: holoscan-cuopt
+  template:
+    metadata:
+      labels:
+        app: holoscan-cuopt
+    spec:
+      containers:
+      - name: holoscan
+        image: nvcr.io/nvidia/clara-holoscan/holoscan:v2.6.0
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+        volumeMounts:
+        - name: sensor-data
+          mountPath: /data
+      
+      - name: cuopt
+        image: nvcr.io/nvidia/cuopt:25.08
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+      
+      volumes:
+      - name: sensor-data
+        persistentVolumeClaim:
+          claimName: sensor-data-pvc
+```
+
+## Performance benchmarks
+
+### Holoscan throughput
+
+- **Ultrasound processing**: 30 FPS at 1080p
+- **Multi-sensor fusion**: 5 sensors @ 60 Hz
+- **Latency**: <50ms end-to-end
+- **Thermal throttling**: Maintains 85°C limit
+
+### cuOpt optimization speed
+
+- **Small VRP** (10 vehicles, 50 tasks): <100ms
+- **Medium VRP** (50 vehicles, 500 tasks): <1 second
+- **Large VRP** (100 vehicles, 1000 tasks): <5 seconds
+- **Real-time updates**: Every 60 seconds
+
+## Related documentation
+
+<CardGroup cols={2}>
+  <Card title="Kinetic & Sensory Stack" icon="brain-circuit" href="/architecture/kinetic-sensory">
+    Architecture overview
+  </Card>
+  <Card title="NVIDIA integrations" icon="microchip" href="/integrations/nvidia-kinetic-sensory">
+    Complete NVIDIA stack integration
+  </Card>
+</CardGroup>

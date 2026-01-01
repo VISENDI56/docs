@@ -1,0 +1,286 @@
+---
+title: Product requirements
+description: Product specification for iLuminara-Core MVP
+---
+
+# Product requirements
+
+**Version:** 1.0  
+**Status:** Production ready  
+**Lead:** Anthony Waganda
+
+## Product overview
+
+iLuminara-Core is a biosecurity and logistics platform designed for the Nairobi-Dadaab deployment. The system provides AI-powered clinical intelligence, automated compliance verification, and decentralized communication for humanitarian operations.
+
+## User stories
+
+### Clinical and biosecurity
+
+1. **Given** I am a field clinician, **When** I input a genomic sequence, **Then** the system generates a synthetic binder candidate within 200ms.
+
+2. **Given** a new pathogen variant appears, **When** the system analyzes spatial data, **Then** it predicts the transmission trajectory for the next 72 hours.
+
+3. **Given** I am analyzing patient data, **When** I request a diagnosis, **Then** the system provides a result with an 86.8% accuracy confidence score.
+
+4. **Given** a supply of vaccines, **When** temperature sensors detect a fluctuation, **Then** the system triggers a wastage alert to the nearest node.
+
+### Governance and compliance
+
+5. **Given** I am a data architect, **When** I attempt to export PII outside the Kenyan geofence, **Then** the system blocks the transaction and logs the attempt.
+
+6. **Given** a system update is available, **When** the build process runs, **Then** it verifies compliance with registered legal frameworks before deployment.
+
+7. **Given** a cross-border data request, **When** the request originates from outside authorized jurisdictions, **Then** the system automatically redacts sensitive data.
+
+8. **Given** an audit request, **When** an auditor queries the system, **Then** the logs provide a complete chain of custody for every decision.
+
+### Security and authentication
+
+9. **Given** I am an authorized user, **When** I attempt to log in, **Then** the system verifies my credentials using multi-factor authentication.
+
+10. **Given** a network disruption, **When** connectivity is degraded, **Then** the mesh network automatically switches to alternative communication paths.
+
+11. **Given** I am a system administrator, **When** I view the security status, **Then** I see current vulnerability status and active protections.
+
+12. **Given** an attempt to inject malicious code, **When** the command is sent to the kernel, **Then** the sandbox intercepts and terminates the process.
+
+13. **Given** the 18ms heartbeat cycle, **When** the clock phase drifts by more than 2ms, **Then** the sync engine forces a time-correction across the mesh.
+
+### Operations and monitoring
+
+14. **Given** I am an operator, **When** I view the dashboard, **Then** I see real-time operational metrics and cost savings.
+
+15. **Given** a supply chain disruption, **When** the system recalculates routes, **Then** it prioritizes cost-savings and displays updated metrics.
+
+16. **Given** a fleet of drones, **When** they request flight paths, **Then** the system optimizes for energy efficiency.
+
+17. **Given** a billing cycle, **When** the system processes a transaction, **Then** it appends the transaction hash to the audit log.
+
+### System administration
+
+18. **Given** I am a developer, **When** I trigger a security audit, **Then** the system scans all dependencies and returns a vulnerability report.
+
+19. **Given** high computational load, **When** CPU usage exceeds 90%, **Then** the system triggers resource optimization.
+
+20. **Given** a deployment to a new node, **When** the initialization script runs, **Then** it auto-configures mesh coordinates based on GPS telemetry.
+
+21. **Given** a UI render loop, **When** state updates too frequently, **Then** the throttler enforces a 5-second cooldown.
+
+## User flows
+
+### Flow A: Clinical diagnostic and verification
+
+1. Clinician enters pathogen sequence via Bio-Foundry interface
+2. System generates candidate binder using generative biology engine
+3. Result is passed to compliance verification
+4. System checks data residency constraints
+5. If valid, result is displayed; if invalid, result is redacted and flagged
+
+### Flow B: Secure authentication
+
+1. User accesses authentication interface
+2. System presents multi-factor challenge
+3. User provides credentials
+4. System validates against current authentication state
+5. Session token issued with 15-minute expiration
+
+### Flow C: System synchronization
+
+1. 18ms timer expires
+2. Synchronization process is called
+3. System validates hardware time, legal state, and agent memory
+4. State vector is signed and broadcast to mesh
+5. Dashboard visualizations refresh if throttling cooldown has passed
+
+## Interface design
+
+### Dashboard (Port 8501)
+
+**Purpose:** Command and control interface
+
+**Elements:**
+- Geospatial mesh map
+- Operational metrics
+- Hardware health monitor
+- Security status
+
+**Interactions:** Auto-refresh toggle, security audit trigger, system reset
+
+### Bio-Foundry (Port 8502)
+
+**Purpose:** Clinical intelligence interface
+
+**Elements:**
+- Sequence input field
+- Molecular viewer
+- Inference status indicator
+
+**Interactions:** Synthesize button, result viewer
+
+### Auth interface (Port 8503)
+
+**Purpose:** Security visualization
+
+**Elements:**
+- Authentication status display
+- Login form
+- Security log
+
+**Interactions:** Key mutation observer
+
+## Core features
+
+- **Reasoning kernel:** Deep inference for clinical decision support
+- **Compliance verification:** Automated legal framework checking
+- **Mesh networking:** Decentralized communication layer
+- **Revenue tracking:** Automated cost savings calculation
+- **Security hardening:** Input sanitization and kernel sandboxing
+- **Edge optimization:** Model compression for resource-constrained devices
+
+## Technical architecture
+
+- **Frontend:** Streamlit with Plotly visualizations
+- **Orchestrator:** State management across isolated processes
+- **Intelligence layer:** PyTorch / BioNeMo on CUDA
+- **Governance layer:** Z3 Theorem Prover for formal verification
+- **Security layer:** Post-quantum cryptography implementation
+
+## System components
+
+### State manager
+
+**Implementation:** File-based JSON store with hash locking
+
+**Responsibility:** Single source of truth for all interfaces
+
+### Compliance compiler
+
+**Implementation:** Pre-commit hooks and runtime decorators
+
+**Responsibility:** Ensures code passes verification before execution
+
+### Mesh network
+
+**Implementation:** Geospatial coordinate-based simulation
+
+**Responsibility:** 50-node cluster connectivity
+
+## API specifications
+
+### Heartbeat sync
+
+**Method:** POST `/api/v1/heartbeat/sync`
+
+**Payload:**
+```json
+{
+  \"node_id\": \"UUID\",
+  \"timestamp_ns\": 123456789,
+  \"state_hash\": \"SHA256\"
+}
+```
+
+**Response:**
+```json
+{
+  \"status\": \"SYNCED\",
+  \"drift_ms\": 0.01
+}
+```
+
+### Bio synthesis
+
+**Method:** POST `/api/v1/bio/synthesize`
+
+**Payload:**
+```json
+{
+  \"sequence\": \"ATGC...\",
+  \"constraint_profile\": \"KENYA_DPA\"
+}
+```
+
+**Response:**
+```json
+{
+  \"binder_affinity\": 0.98,
+  \"legal_proof\": \"SAT\"
+}
+```
+
+### Auth challenge
+
+**Method:** GET `/api/v1/auth/challenge`
+
+**Response:**
+```json
+{
+  \"lattice_vector\": [0.1, 0.5, ...],
+  \"expiration\": \"18ms\"
+}
+```
+
+## Data model
+
+### Node entity
+
+- `id`: UUID
+- `geo_lat`: Float
+- `geo_lon`: Float
+- `health_score`: Float (0-100)
+- `role`: Enum (CLINICAL, LOGISTICS, SENTINEL)
+
+### Law entity
+
+- `id`: String
+- `z3_constraint`: SMT-LIB2 String
+- `active`: Boolean
+
+### Transaction entity
+
+- `id`: UUID
+- `timestamp`: Int64 (Nanoseconds)
+- `roi_impact`: Float (USD)
+- `z3_proof_hash`: String
+
+## Security
+
+- **Zero-trust architecture:** All components must re-authenticate
+- **Post-quantum cryptography:** State vectors signed with ML-KEM-1024
+- **Sandboxing:** Whitelist-based command execution
+- **XSS/CSRF protection:** Hardened Streamlit configuration
+
+## Performance requirements
+
+- **Latency:** Max 18ms for heartbeat cycle
+- **Inference speed:** Bio-binder generation < 200ms on Blackwell B300
+- **UI responsiveness:** Dashboard render time < 100ms
+- **Throughput:** Handle 50 concurrent node syncs per second
+
+## Scalability
+
+- **Edge-first design:** No central cloud dependency
+- **Model distillation:** Compressed models for edge devices
+- **Geospatial sharding:** Data partitioned by territory
+
+## Testing
+
+- **Unit testing:** pytest for all Python classes
+- **Formal verification:** Z3 Solver consistency checks
+- **Integration testing:** Full vulnerability sweep
+- **Load testing:** 50-node sync storm simulation
+
+## Deployment
+
+- **Infrastructure:** GitHub Codespaces (Dev), NVIDIA Jetson Orin (Edge), NVIDIA Blackwell B300 (Production)
+- **Containerization:** Docker with pinned dependencies
+- **Orchestration:** Shell script for port mapping and process management
+- **CI/CD:** GitHub Actions pipeline with compliance verification
+
+## Maintenance
+
+- **Telemetry:** Live health monitoring via dashboard
+- **Updates:** Signed updates with verification
+- **Support:** Complete audit logs for debugging
+- **Self-healing:** Automatic time drift correction and process restart
