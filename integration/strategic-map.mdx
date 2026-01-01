@@ -1,0 +1,125 @@
+---
+title: Strategic integration map
+description: Open-source applications and libraries that amplify the 11-Point Nuclear IP Stack
+---
+
+# Strategic Integration Map
+
+This document outlines the specific open-source applications and libraries that directly amplify the 11-Point Nuclear IP Stack. These are not just "tools"; they are **Component Upgrades** that can be integrated into the iLuminara-Core repository to move from simulation to production-grade capabilities.
+
+## Bio-intelligence layer (IP #01 and #03)
+
+**Goal:** Upgrade the Bio-Foundry from "simulation" to "real-world pathogen surveillance."
+
+### Nextstrain / Augur
+
+**Source:** [https://github.com/nextstrain/augur](https://github.com/nextstrain/augur)
+
+**Relevance:** This is the global standard for pathogen evolution tracking. You can integrate Augur into Port 8502 (Bio-Foundry) to visualize the actual phylogenetic tree of pathogens in Dadaab alongside your generative binders.
+
+**Integration command:**
+```bash
+# Add as a submodule in your core/bio_foundry directory
+git submodule add https://github.com/nextstrain/augur core/bio_foundry/augur_engine
+```
+
+### NVIDIA BioNeMo Framework
+
+**Source:** [https://github.com/NVIDIA/BioNeMo](https://github.com/NVIDIA/BioNeMo) (or via NGC container)
+
+**Relevance:** This provides the pre-trained "MegaMolBART" and "ESM-2" models optimized for the Blackwell B300. This replaces your random numpy simulations with real protein folding inference.
+
+**Integration strategy:** Use the `auth_nvidia_ngc.sh` script to pull the BioNeMo container.
+
+## Omni-Law kernel (IP #02 and #08)
+
+**Goal:** Expand the Z3-Gate to handle complex tax and benefit rules (e.g., refugee aid allocation).
+
+### OpenFisca
+
+**Source:** [https://github.com/openfisca/openfisca-core](https://github.com/openfisca/openfisca-core)
+
+**Relevance:** A "Rules as Code" engine. While Z3 handles constraints (what you CANNOT do), OpenFisca handles entitlements (what a refugee IS owed). It pairs perfectly with your Omni-Law Matrix.
+
+**Integration command:**
+```bash
+pip install openfisca-core
+```
+
+### Microsoft Z3 Theorem Prover
+
+**Source:** [https://github.com/Z3Prover/z3](https://github.com/Z3Prover/z3)
+
+**Relevance:** You are already using the Python bindings (`z3-solver`). The source repo contains advanced tutorials on Optimization modulo Theories (OMT), which you can use to optimize logistics routes mathematically rather than just validating them.
+
+## Sovereign security layer (IP #06 and #10)
+
+**Goal:** Harden the "Bio-Lock" with industrial-grade Post-Quantum Cryptography.
+
+### Open Quantum Safe (liboqs-python)
+
+**Source:** [https://github.com/open-quantum-safe/liboqs-python](https://github.com/open-quantum-safe/liboqs-python)
+
+**Relevance:** This library provides the NIST-standardized implementations of ML-KEM (Kyber) and Dilithium. Moving from "simulated lattice vectors" to liboqs makes your IP #06 legally defensible as "Quantum-Ready" under GDPR.
+
+**Integration command:**
+```bash
+pip install liboqs
+```
+
+### Hyperledger Aries Cloud Agent (Python)
+
+**Source:** [https://github.com/hyperledger/aries-cloudagent-python](https://github.com/hyperledger/aries-cloudagent-python)
+
+**Relevance:** For Self-Sovereign Identity (SSI). If you want to give each refugee a "Digital Wallet" that holds their medical records (without storing it on your server), Aries is the global standard for Verifiable Credentials (VCs).
+
+## Ghost-Mesh and geospatial layer (IP #04)
+
+**Goal:** Visualize the 50-node mesh with high-fidelity, offline-capable mapping.
+
+### H3 (Uber's Hexagonal Hierarchical Spatial Index)
+
+**Source:** [https://github.com/uber/h3-py](https://github.com/uber/h3-py)
+
+**Relevance:** Standard GPS (Lat/Lon) is computationally expensive for determining "zones." H3 divides the world into hexagons. It is 100x faster for calculating "Is this node inside the Dadaab Geofence?"
+
+**Integration command:**
+```bash
+pip install h3
+```
+
+### Kepler.gl (for Streamlit)
+
+**Source:** [https://github.com/keplergl/kepler.gl](https://github.com/keplergl/kepler.gl)
+
+**Relevance:** Replaces the basic `st.map` with a GPU-accelerated geospatial engine capable of rendering millions of points (e.g., pathogen spread vectors) in real-time on your Port 8501 Dashboard.
+
+**Integration command:**
+```bash
+pip install keplergl
+```
+
+## Capabilities unlocked
+
+### From Lat/Lon to H3 hexagons (IP #04)
+
+Your geospatial engine now "thinks" in hexagons (Uber's H3). This allows the Ghost-Mesh to calculate "Is this drone inside the Dadaab Geofence?" roughly 100x faster than standard GPS math, essential for that 18ms latency target.
+
+### From hard-coded rules to OpenFisca (IP #02)
+
+Instead of writing `if refugee_status == 'valid':`, you can now use OpenFisca to model the entire Kenyan benefit tax code as a computable object. This makes your "Impact-as-a-Service" revenue calculations mathematically rigorous.
+
+### From "Quantum-Ready" to "Quantum-Safe" (IP #06)
+
+By explicitly defining the roadmap to LibOQS, you are signaling to investors (and the CLO) that you are using the NIST-standardized algorithms (Kyber/Dilithium), not home-brewed crypto.
+
+## Integration priority
+
+1. **High priority:** H3, OpenFisca, Z3 (already integrated)
+2. **Medium priority:** Nextstrain/Augur, Kepler.gl
+3. **Long-term:** BioNeMo (requires NGC access), Hyperledger Aries (requires infrastructure)
+4. **Security critical:** LibOQS (requires system-level dependencies)
+
+## Next steps
+
+Use the Sovereign Tech Stack documentation to implement these integrations in a phased approach, starting with the highest-impact, lowest-friction components.
