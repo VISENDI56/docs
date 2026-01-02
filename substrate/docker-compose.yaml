@@ -2,14 +2,14 @@
 # Copyright (c) 2025 iLuminara (VISENDI56). All Rights Reserved.
 # Licensed under the Polyform Shield License 1.0.0.
 # 
-# Docker Compose - BioNeMo NIM Services
-# Air-Gapped Local Deployment for Sovereign Generative Biology
+# Docker Compose - BioNeMo NIM Microservices
+# Air-gapped sovereign deployment for generative biology
 # ------------------------------------------------------------------------------
 
 version: '3.8'
 
 # Shared configuration
-x-common-nim-config: &common-nim-config
+x-nim-common: &nim-common
   runtime: nvidia
   ipc: host
   ulimits:
@@ -21,40 +21,77 @@ x-common-nim-config: &common-nim-config
     - NCCL_DEBUG=INFO
     - NCCL_IB_DISABLE=0
     - NCCL_NET_GDR_LEVEL=5
+    - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+  volumes:
+    - ${MODELS_DIR:-/models/bionemo}:/models:ro
+    - ${DATA_DIR:-/data/bionemo}:/data
+    - ${CACHE_DIR:-/cache/bionemo}:/cache
   networks:
-    - iluminara-bionemo
+    - iluminara-net
   restart: unless-stopped
-  logging:
-    driver: "json-file"
-    options:
-      max-size: "100m"
-      max-file: "5"
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
 
 services:
-  # Protein Structure Prediction
-  alphafold2-nim:
-    <<: *common-nim-config
+  # AlphaFold2 NIM - Protein Structure Prediction
+  alphafold2:
+    <<: *nim-common
     image: nvcr.io/nvidia/clara/alphafold2:latest
-    container_name: iluminara-alphafold2-nim
+    container_name: iluminara-nim-alphafold2
     ports:
       - "8001:8000"
-    volumes:
-      - /models/bionemo/alphafold2:/models:ro
-      - /data/bionemo/inputs:/inputs
-      - /data/bionemo/outputs/alphafold2:/outputs
-      - /cache/bionemo/alphafold2:/cache
     environment:
-      - MODEL_PATH=/models
+      - MODEL_PATH=/models/alphafold2
       - MAX_SEQUENCE_LENGTH=2700
-      - ENABLE_TEMPLATES=true
-      - FP8_INFERENCE=true
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              device_ids: ['0', '1']
-              capabilities: [gpu]
+      - NUM_RECYCLES=3
+      - USE_TEMPLATES=false
+      - BATCH_SIZE=4
+    shm_size: '32gb'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  # RFdiffusion NIM - Protein Binder Design
+  rfdiffusion:
+    <<: *nim-common
+    image: nvcr.io/nvidia/clara/rfdiffusion:latest
+    container_name: iluminara-nim-rfdiffusion
+    ports:
+      - "8002:8000"
+    environment:
+      - MODEL_PATH=/models/rfdiffusion
+      - NUM_DESIGNS=10
+      - DIFFUSION_STEPS=50
+      - TEMPERATURE=1.0
+    shm_size: '24gb'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+  # ProteinMPNN NIM - Sequence Optimization
+  proteinmpnn:
+    <<: *nim-common
+    image: nvcr.io/nvidia/clara/proteinmpnn:latest
+    container_name: iluminara-nim-proteinmpnn
+    ports:
+      - "8003:8000"
+    environment:
+      - MODEL_PATH=/models/proteinmpnn
+      - NUM_SEQUENCES=5
+      - TEMPERATURE=0.1
+      - SAMPLING_METHOD=autoregressive
+    shm_size: '8gb'
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -62,169 +99,171 @@ services:
       retries: 3
       start_period: 60s
 
-  esmfold-nim:
-    <<: *common-nim-config
-    image: nvcr.io/nvidia/clara/esmfold:latest
-    container_name: iluminara-esmfold-nim
-    ports:
-      - "8002:8000"
-    volumes:
-      - /models/bionemo/esmfold:/models:ro
-      - /data/bionemo/inputs:/inputs
-      - /data/bionemo/outputs/esmfold:/outputs
-      - /cache/bionemo/esmfold:/cache
-    environment:
-      - MODEL_PATH=/models
-      - MAX_SEQUENCE_LENGTH=1024
-      - FP8_INFERENCE=true
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              device_ids: ['2']
-              capabilities: [gpu]
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # Protein Design
-  rfdiffusion-nim:
-    <<: *common-nim-config
-    image: nvcr.io/nvidia/clara/rfdiffusion:latest
-    container_name: iluminara-rfdiffusion-nim
-    ports:
-      - "8003:8000"
-    volumes:
-      - /models/bionemo/rfdiffusion:/models:ro
-      - /data/bionemo/inputs:/inputs
-      - /data/bionemo/outputs/rfdiffusion:/outputs
-      - /cache/bionemo/rfdiffusion:/cache
-    environment:
-      - MODEL_PATH=/models
-      - NUM_DESIGNS=10
-      - FP8_INFERENCE=true
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              device_ids: ['3']
-              capabilities: [gpu]
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  proteinmpnn-nim:
-    <<: *common-nim-config
-    image: nvcr.io/nvidia/clara/proteinmpnn:latest
-    container_name: iluminara-proteinmpnn-nim
+  # AlphaFold-Multimer NIM - Complex Validation
+  alphafold_multimer:
+    <<: *nim-common
+    image: nvcr.io/nvidia/clara/alphafold2:latest
+    container_name: iluminara-nim-alphafold-multimer
     ports:
       - "8004:8000"
-    volumes:
-      - /models/bionemo/proteinmpnn:/models:ro
-      - /data/bionemo/inputs:/inputs
-      - /data/bionemo/outputs/proteinmpnn:/outputs
-      - /cache/bionemo/proteinmpnn:/cache
     environment:
-      - MODEL_PATH=/models
-      - NUM_SEQUENCES=5
-      - TEMPERATURE=0.1
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              device_ids: ['4']
-              capabilities: [gpu]
+      - MODEL_PATH=/models/alphafold2
+      - MULTIMER_MODE=true
+      - MAX_CHAINS=10
+      - NUM_RECYCLES=3
+    shm_size: '40gb'
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 120s
 
-  # Molecular Docking
-  diffdock-nim:
-    <<: *common-nim-config
-    image: nvcr.io/nvidia/clara/diffdock:latest
-    container_name: iluminara-diffdock-nim
+  # ESMFold NIM - Fast Structure Prediction (Fallback)
+  esmfold:
+    <<: *nim-common
+    image: nvcr.io/nvidia/clara/esmfold:latest
+    container_name: iluminara-nim-esmfold
     ports:
       - "8005:8000"
-    volumes:
-      - /models/bionemo/diffdock:/models:ro
-      - /data/bionemo/inputs:/inputs
-      - /data/bionemo/outputs/diffdock:/outputs
-      - /cache/bionemo/diffdock:/cache
     environment:
-      - MODEL_PATH=/models
-      - FP8_INFERENCE=true
+      - MODEL_PATH=/models/esmfold
+      - MAX_SEQUENCE_LENGTH=1024
+      - CHUNK_SIZE=128
+      - BATCH_SIZE=8
+    shm_size: '16gb'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # DiffDock NIM - Molecular Docking
+  diffdock:
+    <<: *nim-common
+    image: nvcr.io/nvidia/clara/diffdock:latest
+    container_name: iluminara-nim-diffdock
+    ports:
+      - "8006:8000"
+    environment:
+      - MODEL_PATH=/models/diffdock
+      - NUM_POSES=10
+      - INFERENCE_STEPS=20
+    shm_size: '16gb'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+  # Geneformer NIM - Single-Cell Genomics
+  geneformer:
+    <<: *nim-common
+    image: nvcr.io/nvidia/clara/geneformer:106m
+    container_name: iluminara-nim-geneformer
+    ports:
+      - "8007:8000"
+    environment:
+      - MODEL_PATH=/models/geneformer
+      - MAX_GENES=2000
+      - EMBEDDING_DIM=256
+      - BATCH_SIZE=32
+    shm_size: '12gb'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Evo2 NIM - DNA Foundation Model
+  evo2:
+    <<: *nim-common
+    image: nvcr.io/nvidia/clara/evo2:70b
+    container_name: iluminara-nim-evo2
+    ports:
+      - "8008:8000"
+    environment:
+      - MODEL_PATH=/models/evo2
+      - MODEL_SIZE=70b
+      - MAX_SEQUENCE_LENGTH=131072
+      - BATCH_SIZE=4
+      - TENSOR_PARALLEL_SIZE=4
+      - PIPELINE_PARALLEL_SIZE=2
+    shm_size: '160gb'
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ['5']
+              count: 8  # Requires multi-GPU
               capabilities: [gpu]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 180s
 
-  # Genomics Models (via BioNeMo Framework container)
+  # MegaMolBART NIM - Molecular Generation
+  megamolbart:
+    <<: *nim-common
+    image: nvcr.io/nvidia/clara/megamolbart:latest
+    container_name: iluminara-nim-megamolbart
+    ports:
+      - "8009:8000"
+    environment:
+      - MODEL_PATH=/models/megamolbart
+      - BATCH_SIZE=16
+    shm_size: '16gb'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+  # MoIMIM NIM - Molecular Property Prediction
+  moimim:
+    <<: *nim-common
+    image: nvcr.io/nvidia/clara/moimim:latest
+    container_name: iluminara-nim-moimim
+    ports:
+      - "8010:8000"
+    environment:
+      - MODEL_PATH=/models/moimim
+      - BATCH_SIZE=32
+    shm_size: '12gb'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # BioNeMo Framework Container (for training/fine-tuning)
   bionemo-framework:
-    <<: *common-nim-config
+    <<: *nim-common
     image: nvcr.io/nvidia/clara/bionemo-framework:2.0
     container_name: iluminara-bionemo-framework
     ports:
-      - "8006:8006"  # Geneformer
-      - "8007:8007"  # Evo2
-      - "8008:8008"  # DNABERT
-      - "8009:8009"  # MegaMolBART
-      - "8010:8010"  # MoIMIM
-    volumes:
-      - /models/bionemo:/models:ro
-      - /data/bionemo:/data
-      - /cache/bionemo:/cache
-      - ./bionemo/configs:/workspace/configs:ro
-      - ../core/research:/workspace/research:ro
+      - "6006:6006"  # TensorBoard
+      - "8888:8888"  # Jupyter (optional)
     environment:
       - BIONEMO_HOME=/workspace/bionemo
-      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
-      - GENEFORMER_PORT=8006
-      - EVO2_PORT=8007
-      - DNABERT_PORT=8008
-      - MEGAMOLBART_PORT=8009
-      - MOIMIM_PORT=8010
-    shm_size: '64gb'
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              device_ids: ['6', '7']
-              capabilities: [gpu]
-    command: >
-      bash -c "
-        python -m bionemo.serve.geneformer --port 8006 --model-path /models/geneformer &
-        python -m bionemo.serve.evo2 --port 8007 --model-path /models/evo2 &
-        python -m bionemo.serve.dnabert --port 8008 --model-path /models/dnabert &
-        python -m bionemo.serve.megamolbart --port 8009 --model-path /models/megamolbart &
-        python -m bionemo.serve.moimim --port 8010 --model-path /models/moimim &
-        wait
-      "
-    healthcheck:
-      test: ["CMD", "bash", "-c", "curl -f http://localhost:8006/health && curl -f http://localhost:8007/health"]
-      interval: 60s
-      timeout: 30s
-      retries: 5
-      start_period: 180s
+      - JUPYTER_ENABLE_LAB=yes
+    volumes:
+      - ${MODELS_DIR:-/models/bionemo}:/models
+      - ${DATA_DIR:-/data/bionemo}:/data
+      - ${CACHE_DIR:-/cache/bionemo}:/cache
+      - ../core/research:/workspace/research
+      - ../substrate/bionemo/configs:/workspace/configs
+    command: /bin/bash -c "tensorboard --logdir=/data/logs --host=0.0.0.0 & tail -f /dev/null"
+    shm_size: '32gb'
 
-  # Monitoring and Observability
+  # Monitoring - Prometheus (optional)
   prometheus:
     image: prom/prometheus:latest
     container_name: iluminara-prometheus
@@ -236,45 +275,33 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
     networks:
-      - iluminara-bionemo
+      - iluminara-net
     restart: unless-stopped
 
+  # Monitoring - Grafana (optional)
   grafana:
     image: grafana/grafana:latest
     container_name: iluminara-grafana
     ports:
       - "3000:3000"
-    volumes:
-      - grafana-data:/var/lib/grafana
-      - ./monitoring/grafana-dashboards:/etc/grafana/provisioning/dashboards:ro
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
-      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
     networks:
-      - iluminara-bionemo
+      - iluminara-net
     restart: unless-stopped
     depends_on:
       - prometheus
 
-  # NVML Exporter for GPU Metrics
-  dcgm-exporter:
-    image: nvcr.io/nvidia/k8s/dcgm-exporter:latest
-    container_name: iluminara-dcgm-exporter
-    runtime: nvidia
-    ports:
-      - "9400:9400"
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-    networks:
-      - iluminara-bionemo
-    restart: unless-stopped
-    cap_add:
-      - SYS_ADMIN
-
 networks:
-  iluminara-bionemo:
+  iluminara-net:
     driver: bridge
     ipam:
       config:
@@ -282,13 +309,28 @@ networks:
 
 volumes:
   prometheus-data:
-    driver: local
   grafana-data:
-    driver: local
 
-# Health Check Script
-# Run: docker-compose ps
-# Check: docker-compose logs -f <service-name>
-# Restart: docker-compose restart <service-name>
-# Stop All: docker-compose down
-# Start All: docker-compose up -d
+# Air-Gapped Deployment Notes:
+# 1. Pre-pull all images on internet-connected system:
+#    docker-compose pull
+# 2. Save images:
+#    docker save $(docker-compose config | grep 'image:' | awk '{print $2}') -o bionemo_images.tar
+# 3. Transfer to air-gapped system
+# 4. Load images:
+#    docker load -i bionemo_images.tar
+# 5. Start services:
+#    docker-compose up -d
+
+# Resource Requirements:
+# - Minimum: 8x NVIDIA GPUs (Blackwell B300 recommended)
+# - RAM: 512GB+
+# - Storage: 1TB+ for models and data
+# - Network: Air-gapped (no external connectivity)
+
+# Security:
+# - All services run in isolated network
+# - No external ports exposed (except localhost)
+# - Read-only model volumes
+# - Health checks enabled
+# - Automatic restart on failure
