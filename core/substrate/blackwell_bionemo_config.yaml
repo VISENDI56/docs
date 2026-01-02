@@ -1,0 +1,369 @@
+# ------------------------------------------------------------------------------
+# Copyright (c) 2025 iLuminara (VISENDI56). All Rights Reserved.
+# Licensed under the Polyform Shield License 1.0.0.
+# 
+# Blackwell B300 BioNeMo Configuration
+# Optimized for FP8 mixed precision and gigascale efficiency
+# ------------------------------------------------------------------------------
+
+# BioNeMo NIM Endpoints (Local Air-Gapped Deployment)
+nim_endpoints:
+  # Protein Structure Prediction
+  alphafold2:
+    url: "http://localhost:8001"
+    version: "2.3.2"
+    timeout: 300
+    max_retries: 3
+    enable_templates: true
+    
+  esmfold:
+    url: "http://localhost:8002"
+    version: "1.0.0"
+    timeout: 180
+    max_retries: 3
+    
+  # Protein Design
+  rfdiffusion:
+    url: "http://localhost:8003"
+    version: "1.1.0"
+    timeout: 600
+    max_retries: 2
+    
+  proteinmpnn:
+    url: "http://localhost:8004"
+    version: "1.0.1"
+    timeout: 120
+    max_retries: 3
+    
+  # Molecular Docking
+  diffdock:
+    url: "http://localhost:8005"
+    version: "1.0.0"
+    timeout: 300
+    max_retries: 2
+    
+  # Genomics Models
+  geneformer:
+    url: "http://localhost:8006"
+    version: "1.0.0"
+    timeout: 240
+    max_retries: 3
+    model_path: "/models/bionemo/geneformer"
+    
+  evo2:
+    url: "http://localhost:8007"
+    version: "70b"
+    timeout: 600
+    max_retries: 2
+    model_path: "/models/bionemo/evo2"
+    
+  dnabert:
+    url: "http://localhost:8008"
+    version: "2.0"
+    timeout: 180
+    max_retries: 3
+    model_path: "/models/bionemo/dnabert"
+    
+  # Small Molecules
+  megamolbart:
+    url: "http://localhost:8009"
+    version: "1.0.0"
+    timeout: 120
+    max_retries: 3
+    
+  moimim:
+    url: "http://localhost:8010"
+    version: "1.0.0"
+    timeout: 120
+    max_retries: 3
+
+# Blackwell B300 Optimization Settings
+blackwell:
+  # GPU Configuration
+  gpu:
+    device_ids: [0, 1, 2, 3, 4, 5, 6, 7]  # 8x Blackwell B300
+    compute_capability: "10.0"  # Blackwell
+    memory_per_gpu: "192GB"  # B300 HBM3e
+    nvlink_topology: "fully_connected"
+    
+  # FP8 Mixed Precision
+  precision:
+    enabled: true
+    compute_dtype: "fp8"
+    storage_dtype: "fp16"
+    master_weights_dtype: "fp32"
+    fp8_format: "e4m3"  # E4M3 for forward, E5M2 for backward
+    fp8_margin: 0
+    fp8_interval: 1
+    fp8_amax_history_len: 1024
+    fp8_amax_compute_algo: "max"
+    loss_scale: "dynamic"
+    
+  # Tensor Cores
+  tensor_cores:
+    enabled: true
+    allow_tf32: false  # Use FP8 instead
+    cudnn_benchmark: true
+    cudnn_deterministic: false
+    
+  # Memory Optimization
+  memory:
+    cuda_malloc_async: true
+    max_split_size_mb: 512
+    garbage_collection_threshold: 0.8
+    enable_memory_pooling: true
+    reserved_memory_fraction: 0.1
+    
+  # Kernel Optimization
+  kernels:
+    flash_attention: true
+    flash_attention_version: 2
+    memory_efficient_attention: true
+    fused_kernels: true
+    cuda_graphs: true
+    
+  # Communication (Multi-GPU)
+  communication:
+    backend: "nccl"
+    nccl_socket_ifname: "eth0"
+    nccl_ib_disable: 0
+    nccl_net_gdr_level: 5
+    nccl_p2p_level: "NVL"  # NVLink
+    nccl_algo: "Tree,Ring"
+    
+  # Power Management
+  power:
+    enable_monitoring: true
+    target_power_limit: 1000  # Watts per GPU
+    enable_dynamic_power: true
+    power_efficiency_mode: "balanced"  # "performance", "balanced", "efficiency"
+
+# Inference Configuration
+inference:
+  # Batch Processing
+  batch_size: 32
+  max_batch_size: 128
+  dynamic_batching: true
+  batch_timeout_ms: 100
+  
+  # Sequence Length
+  max_sequence_length: 2048
+  max_protein_length: 1024
+  max_dna_length: 10000
+  
+  # Caching
+  enable_kv_cache: true
+  cache_size_gb: 64
+  cache_eviction_policy: "lru"
+  
+  # Quantization
+  enable_int8_quantization: false  # Use FP8 instead
+  enable_weight_only_quantization: false
+
+# Training Configuration (for fine-tuning)
+training:
+  # Parallelism Strategy (5D)
+  parallelism:
+    tensor_parallel_size: 4
+    pipeline_parallel_size: 2
+    data_parallel_size: 8
+    sequence_parallel: true
+    expert_parallel_size: 1
+    
+  # FSDP Configuration
+  fsdp:
+    enabled: true
+    sharding_strategy: "FULL_SHARD"
+    cpu_offload: false
+    backward_prefetch: "BACKWARD_PRE"
+    forward_prefetch: true
+    limit_all_gathers: true
+    use_orig_params: false
+    
+  # Gradient Optimization
+  gradient:
+    accumulation_steps: 4
+    clipping_norm: 1.0
+    checkpointing: true
+    checkpointing_layers: [4, 8, 12, 16, 20, 24, 28, 32]
+    
+  # Optimizer
+  optimizer:
+    type: "adamw"
+    lr: 1.0e-4
+    weight_decay: 0.01
+    betas: [0.9, 0.999]
+    eps: 1.0e-8
+    fused: true
+    
+  # Learning Rate Schedule
+  lr_scheduler:
+    type: "cosine"
+    warmup_steps: 1000
+    total_steps: 100000
+    min_lr: 1.0e-6
+    
+  # Checkpointing
+  checkpoint:
+    save_interval: 1000
+    save_top_k: 3
+    monitor: "val_loss"
+    mode: "min"
+    async_save: true
+
+# Monitoring and Logging
+monitoring:
+  # NVML Power Monitoring
+  nvml:
+    enabled: true
+    sample_interval_ms: 1000
+    metrics:
+      - "power_usage"
+      - "temperature"
+      - "utilization"
+      - "memory_usage"
+      - "clock_speeds"
+      
+  # Performance Metrics
+  performance:
+    enabled: true
+    log_interval: 10
+    metrics:
+      - "throughput"
+      - "latency"
+      - "tokens_per_second"
+      - "flops_utilization"
+      
+  # Energy Efficiency
+  energy:
+    enabled: true
+    target_efficiency: "max_performance_per_watt"
+    log_carbon_footprint: true
+    solar_power_integration: true  # iLuminara solar substrate
+    
+  # Logging
+  logging:
+    level: "INFO"
+    format: "json"
+    output: "/var/log/bionemo/inference.log"
+    rotation: "daily"
+    retention_days: 30
+    structured_logging: true
+
+# Security and Sovereignty
+security:
+  # Air-Gapped Mode
+  air_gapped: true
+  disable_external_apis: true
+  disable_telemetry: true
+  
+  # Input Validation
+  input_validation:
+    enabled: true
+    max_sequence_length: 10000
+    allowed_characters: "ACDEFGHIKLMNPQRSTVWY"  # Amino acids + DNA
+    sanitize_inputs: true
+    
+  # Rate Limiting
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 100
+    burst_size: 20
+    
+  # Audit Logging
+  audit:
+    enabled: true
+    log_all_requests: true
+    log_all_responses: false  # Privacy
+    audit_log_path: "/var/log/bionemo/audit.log"
+
+# Integration with iLuminara Components
+iluminara_integration:
+  # Z3 Formal Verification
+  z3_gate:
+    enabled: true
+    verify_geometric_constraints: true
+    verify_binding_constraints: true
+    proof_output_dir: "/data/bionemo/z3_proofs"
+    
+  # Agentic Clinical
+  agentic_clinical:
+    enabled: true
+    triage_integration: true
+    response_agent_integration: true
+    
+  # Data Generation
+  data_gen:
+    synthetic_pathogen_data: "/data/synthetic/pathogens"
+    synthetic_genomic_data: "/data/synthetic/genomics"
+    
+  # Benchmarks
+  benchmarks:
+    outlier_detection_integration: true
+    efficiency_benchmarks: true
+    benchmark_output_dir: "/data/benchmarks/bionemo"
+    
+  # Solar Efficiency
+  solar_substrate:
+    enabled: true
+    power_monitoring: true
+    adaptive_compute: true
+    off_peak_training: true
+
+# Model Registry
+model_registry:
+  local_cache_dir: "/models/bionemo"
+  ngc_cache_dir: "/cache/ngc"
+  model_manifest: "/models/bionemo/registry.yaml"
+  auto_download: false  # Air-gapped
+  verify_checksums: true
+
+# Data Paths
+data:
+  input_dir: "/data/bionemo/inputs"
+  output_dir: "/data/bionemo/outputs"
+  checkpoint_dir: "/data/bionemo/checkpoints"
+  cache_dir: "/cache/bionemo"
+  temp_dir: "/tmp/bionemo"
+
+# Feature Flags
+features:
+  enable_protein_binder_pipeline: true
+  enable_genomic_triage_pipeline: true
+  enable_molecular_docking: true
+  enable_dna_analysis: true
+  enable_small_molecule_design: false  # Future
+  enable_antibody_design: false  # Future
+
+# Performance Tuning
+performance:
+  # Prefetching
+  prefetch_factor: 2
+  num_workers: 8
+  pin_memory: true
+  
+  # Async Operations
+  async_inference: true
+  async_io: true
+  
+  # Compilation
+  torch_compile: true
+  compile_mode: "max-autotune"
+  
+  # Profiling
+  enable_profiling: false
+  profiler_output_dir: "/data/profiling"
+
+# Fallback Configuration
+fallback:
+  # If NIM unavailable, fallback strategies
+  alphafold2_fallback: "esmfold"
+  enable_local_models: true
+  graceful_degradation: true
+
+# Version Information
+version:
+  config_version: "1.0.0"
+  bionemo_framework_version: "2.0"
+  iluminara_core_version: "1.0.0"
+  last_updated: "2026-01-02"
