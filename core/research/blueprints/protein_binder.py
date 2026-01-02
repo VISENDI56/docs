@@ -2,43 +2,45 @@
 # Copyright (c) 2025 iLuminara (VISENDI56). All Rights Reserved.
 # Licensed under the Polyform Shield License 1.0.0.
 # 
-# Bio-Threat Neutralization Pipeline - Protein Binder Design
-# Reference: NVIDIA BioNeMo Framework 2.x, NIM Microservices
-# https://docs.nvidia.com/bionemo/framework/latest/
+# Protein Binder Design Pipeline - Bio-Threat Neutralization
+# Reference: NVIDIA BioNeMo NIM Microservices Documentation
 # https://docs.nvidia.com/nim/bionemo/latest/
 # ------------------------------------------------------------------------------
 
 """
-Protein Binder Design Pipeline for Bio-Threat Neutralization
+Protein Binder Design Pipeline
 
-This module implements a sovereign, air-gapped pipeline for designing neutralizing
-protein binders against pathogenic threats using NVIDIA BioNeMo NIMs.
-
-Workflow:
+Implements sovereign bio-threat neutralization through generative protein design:
 1. Pathogen structure prediction (AlphaFold2/ESMFold)
 2. Binding pocket identification
 3. Binder hallucination (RFdiffusion)
 4. Sequence optimization (ProteinMPNN)
 5. Validation (AlphaFold-Multimer)
 
-All inference runs locally via NIM REST endpoints (no cloud APIs).
+All operations use local NIM endpoints for air-gapped deployment.
 """
 
 import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional, Any, Tuple
 from pathlib import Path
-import json
+from typing import Dict, List, Optional, Tuple, Any
+from datetime import datetime
 
-import requests
 import numpy as np
+import requests
+import httpx
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
+
+try:
+    import pynvml
+    NVML_AVAILABLE = True
+except ImportError:
+    NVML_AVAILABLE = False
 
 # Configure structured logging
 import structlog
@@ -46,738 +48,688 @@ import structlog
 logger = structlog.get_logger(__name__)
 
 
-class BinderDesignStage(Enum):
-    """Stages in the binder design pipeline"""
-    STRUCTURE_PREDICTION = "structure_prediction"
-    POCKET_IDENTIFICATION = "pocket_identification"
-    BINDER_HALLUCINATION = "binder_hallucination"
-    SEQUENCE_OPTIMIZATION = "sequence_optimization"
-    VALIDATION = "validation"
-    COMPLETE = "complete"
+class StructurePredictionModel(Enum):
+    """Available structure prediction models."""
+    ALPHAFOLD2 = "alphafold2"
+    ESMFOLD = "esmfold"
 
 
-@dataclass
-class PathogenStructure:
-    """Pathogen structure prediction result"""
-    sequence: str
-    structure_pdb: str
-    confidence: float
-    method: str  # "alphafold2" or "esmfold"
-    plddt_scores: List[float]
-    predicted_at: datetime = field(default_factory=datetime.now)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+class BinderDesignStatus(Enum):
+    """Status codes for binder design pipeline."""
+    INITIALIZED = "initialized"
+    PREDICTING_STRUCTURE = "predicting_structure"
+    IDENTIFYING_POCKETS = "identifying_pockets"
+    HALLUCINATING_BINDER = "hallucinating_binder"
+    OPTIMIZING_SEQUENCE = "optimizing_sequence"
+    VALIDATING = "validating"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
 
 @dataclass
 class BindingPocket:
-    """Identified binding pocket on pathogen"""
-    pocket_id: str
+    """Represents a potential binding pocket on target protein."""
     residue_indices: List[int]
-    center_coords: Tuple[float, float, float]
+    center_coords: np.ndarray
     volume: float
     druggability_score: float
-    surface_residues: List[str]
+    surface_area: float
 
 
 @dataclass
 class BinderCandidate:
-    """Designed binder candidate"""
-    binder_id: str
+    """Represents a designed binder candidate."""
     sequence: str
     structure_pdb: str
     binding_affinity: float
-    confidence: float
+    confidence_score: float
     design_method: str
-    target_pocket: BindingPocket
-    generated_at: datetime = field(default_factory=datetime.now)
+    validation_metrics: Dict[str, float] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
-class ValidationResult:
-    """Binder validation result"""
-    is_valid: bool
-    binding_score: float
-    structural_quality: float
-    predicted_complex_pdb: str
-    interface_residues: List[int]
-    validation_method: str
-    issues: List[str] = field(default_factory=list)
+class NeutralizationResult:
+    """Complete result from binder design pipeline."""
+    pathogen_id: str
+    target_epitope: str
+    binder_candidates: List[BinderCandidate]
+    top_binder: Optional[BinderCandidate]
+    pipeline_status: BinderDesignStatus
+    execution_time_seconds: float
+    energy_consumed_joules: float
+    error_message: Optional[str] = None
+    timestamp: datetime = field(default_factory=datetime.utcnow)
 
 
 class NIMClient:
-    """
-    Client for NVIDIA NIM microservices (local endpoints only)
-    
-    Reference: https://docs.nvidia.com/nim/bionemo/latest/deployment.html
-    Air-gapped deployment assumes NIMs running in Docker on localhost.
-    """
+    """Client for interacting with local NIM microservices."""
     
     def __init__(
         self,
-        alphafold2_url: str = "http://localhost:8001",
-        esmfold_url: str = "http://localhost:8002",
-        rfdiffusion_url: str = "http://localhost:8003",
-        proteinmpnn_url: str = "http://localhost:8004",
-        diffdock_url: str = "http://localhost:8005",
+        base_url: str = "http://localhost",
         timeout: int = 300,
-        max_retries: int = 3
+        max_retries: int = 3,
+        retry_delay: int = 5
     ):
         """
-        Initialize NIM client with local endpoints
+        Initialize NIM client.
         
         Args:
-            alphafold2_url: AlphaFold2 NIM endpoint
-            esmfold_url: ESMFold NIM endpoint
-            rfdiffusion_url: RFdiffusion NIM endpoint
-            proteinmpnn_url: ProteinMPNN NIM endpoint
-            diffdock_url: DiffDock NIM endpoint
+            base_url: Base URL for NIM services
             timeout: Request timeout in seconds
-            max_retries: Maximum retry attempts
+            max_retries: Maximum number of retry attempts
+            retry_delay: Delay between retries in seconds
         """
-        self.endpoints = {
-            "alphafold2": alphafold2_url,
-            "esmfold": esmfold_url,
-            "rfdiffusion": rfdiffusion_url,
-            "proteinmpnn": proteinmpnn_url,
-            "diffdock": diffdock_url
-        }
+        self.base_url = base_url
         self.timeout = timeout
         self.max_retries = max_retries
+        self.retry_delay = retry_delay
+        self.session = requests.Session()
         
-        logger.info("nim_client_initialized", endpoints=self.endpoints)
+        logger.info(
+            "nim_client_initialized",
+            base_url=base_url,
+            timeout=timeout
+        )
     
     async def predict_structure(
         self,
         sequence: str,
-        method: str = "alphafold2",
-        use_templates: bool = False
+        model: StructurePredictionModel = StructurePredictionModel.ALPHAFOLD2,
+        port: int = 8001
     ) -> Dict[str, Any]:
         """
-        Predict protein structure using AlphaFold2 or ESMFold NIM
+        Predict protein structure using AlphaFold2 or ESMFold NIM.
         
         Args:
-            sequence: Protein sequence (FASTA format)
-            method: "alphafold2" or "esmfold"
-            use_templates: Use template-based modeling (AlphaFold2 only)
+            sequence: Amino acid sequence
+            model: Structure prediction model to use
+            port: NIM service port
             
         Returns:
-            Structure prediction result
+            Dictionary containing PDB structure and confidence metrics
+            
+        Raises:
+            RuntimeError: If prediction fails after retries
         """
-        endpoint = self.endpoints.get(method)
-        if not endpoint:
-            raise ValueError(f"Unknown structure prediction method: {method}")
+        endpoint = f"{self.base_url}:{port}/v1/predict"
         
         payload = {
             "sequence": sequence,
-            "use_templates": use_templates
+            "model": model.value,
+            "return_pdb": True,
+            "return_plddt": True
         }
         
-        logger.info("structure_prediction_request", method=method, seq_length=len(sequence))
-        
-        try:
-            result = await self._post_with_retry(
-                f"{endpoint}/v1/predict",
-                payload
-            )
-            
-            logger.info("structure_prediction_success", method=method, confidence=result.get("confidence"))
-            return result
-            
-        except Exception as e:
-            logger.error("structure_prediction_failed", method=method, error=str(e))
-            
-            # Fallback to ESMFold if AlphaFold2 fails
-            if method == "alphafold2":
-                logger.warning("falling_back_to_esmfold")
-                return await self.predict_structure(sequence, method="esmfold")
-            
-            raise
+        for attempt in range(self.max_retries):
+            try:
+                logger.info(
+                    "structure_prediction_request",
+                    model=model.value,
+                    sequence_length=len(sequence),
+                    attempt=attempt + 1
+                )
+                
+                response = self.session.post(
+                    endpoint,
+                    json=payload,
+                    timeout=self.timeout
+                )
+                response.raise_for_status()
+                
+                result = response.json()
+                
+                logger.info(
+                    "structure_prediction_success",
+                    model=model.value,
+                    mean_plddt=result.get("mean_plddt", 0.0)
+                )
+                
+                return result
+                
+            except requests.exceptions.RequestException as e:
+                logger.warning(
+                    "structure_prediction_retry",
+                    model=model.value,
+                    attempt=attempt + 1,
+                    error=str(e)
+                )
+                
+                if attempt < self.max_retries - 1:
+                    await asyncio.sleep(self.retry_delay)
+                else:
+                    raise RuntimeError(
+                        f"Structure prediction failed after {self.max_retries} attempts: {e}"
+                    )
     
     async def design_binder(
         self,
         target_pdb: str,
-        pocket_residues: List[int],
-        num_designs: int = 10
+        binding_site_residues: List[int],
+        port: int = 8002
     ) -> Dict[str, Any]:
         """
-        Design binder using RFdiffusion NIM
+        Design binder using RFdiffusion NIM.
         
         Args:
-            target_pdb: Target protein structure (PDB format)
-            pocket_residues: Residue indices defining binding pocket
-            num_designs: Number of binder designs to generate
+            target_pdb: Target protein structure in PDB format
+            binding_site_residues: Residue indices defining binding site
+            port: NIM service port
             
         Returns:
-            Binder design results
+            Dictionary containing designed binder structure
         """
-        endpoint = self.endpoints["rfdiffusion"]
+        endpoint = f"{self.base_url}:{port}/v1/design"
         
         payload = {
             "target_pdb": target_pdb,
-            "pocket_residues": pocket_residues,
-            "num_designs": num_designs,
-            "design_mode": "binder_hallucination"
+            "binding_site": binding_site_residues,
+            "num_designs": 10,
+            "diffusion_steps": 50,
+            "temperature": 1.0
         }
         
-        logger.info("binder_design_request", num_designs=num_designs)
-        
-        try:
-            result = await self._post_with_retry(
-                f"{endpoint}/v1/design",
-                payload
-            )
-            
-            logger.info("binder_design_success", designs_generated=len(result.get("designs", [])))
-            return result
-            
-        except Exception as e:
-            logger.error("binder_design_failed", error=str(e))
-            raise
+        for attempt in range(self.max_retries):
+            try:
+                logger.info(
+                    "binder_design_request",
+                    binding_site_size=len(binding_site_residues),
+                    attempt=attempt + 1
+                )
+                
+                response = self.session.post(
+                    endpoint,
+                    json=payload,
+                    timeout=self.timeout
+                )
+                response.raise_for_status()
+                
+                result = response.json()
+                
+                logger.info(
+                    "binder_design_success",
+                    num_designs=len(result.get("designs", []))
+                )
+                
+                return result
+                
+            except requests.exceptions.RequestException as e:
+                logger.warning(
+                    "binder_design_retry",
+                    attempt=attempt + 1,
+                    error=str(e)
+                )
+                
+                if attempt < self.max_retries - 1:
+                    await asyncio.sleep(self.retry_delay)
+                else:
+                    raise RuntimeError(
+                        f"Binder design failed after {self.max_retries} attempts: {e}"
+                    )
     
     async def optimize_sequence(
         self,
         backbone_pdb: str,
-        fixed_residues: Optional[List[int]] = None
+        port: int = 8003
     ) -> Dict[str, Any]:
         """
-        Optimize binder sequence using ProteinMPNN NIM
+        Optimize sequence for given backbone using ProteinMPNN NIM.
         
         Args:
-            backbone_pdb: Binder backbone structure (PDB format)
-            fixed_residues: Residue indices to keep fixed
+            backbone_pdb: Protein backbone structure in PDB format
+            port: NIM service port
             
         Returns:
-            Optimized sequence results
+            Dictionary containing optimized sequences
         """
-        endpoint = self.endpoints["proteinmpnn"]
+        endpoint = f"{self.base_url}:{port}/v1/optimize"
         
         payload = {
             "backbone_pdb": backbone_pdb,
-            "fixed_residues": fixed_residues or [],
             "num_sequences": 5,
-            "temperature": 0.1
+            "temperature": 0.1,
+            "sampling_method": "autoregressive"
         }
         
-        logger.info("sequence_optimization_request")
-        
-        try:
-            result = await self._post_with_retry(
-                f"{endpoint}/v1/optimize",
-                payload
-            )
-            
-            logger.info("sequence_optimization_success", sequences_generated=len(result.get("sequences", [])))
-            return result
-            
-        except Exception as e:
-            logger.error("sequence_optimization_failed", error=str(e))
-            raise
+        for attempt in range(self.max_retries):
+            try:
+                logger.info(
+                    "sequence_optimization_request",
+                    attempt=attempt + 1
+                )
+                
+                response = self.session.post(
+                    endpoint,
+                    json=payload,
+                    timeout=self.timeout
+                )
+                response.raise_for_status()
+                
+                result = response.json()
+                
+                logger.info(
+                    "sequence_optimization_success",
+                    num_sequences=len(result.get("sequences", []))
+                )
+                
+                return result
+                
+            except requests.exceptions.RequestException as e:
+                logger.warning(
+                    "sequence_optimization_retry",
+                    attempt=attempt + 1,
+                    error=str(e)
+                )
+                
+                if attempt < self.max_retries - 1:
+                    await asyncio.sleep(self.retry_delay)
+                else:
+                    raise RuntimeError(
+                        f"Sequence optimization failed after {self.max_retries} attempts: {e}"
+                    )
     
     async def validate_complex(
         self,
         target_sequence: str,
-        binder_sequence: str
+        binder_sequence: str,
+        port: int = 8004
     ) -> Dict[str, Any]:
         """
-        Validate binder-target complex using AlphaFold-Multimer
+        Validate target-binder complex using AlphaFold-Multimer NIM.
         
         Args:
             target_sequence: Target protein sequence
             binder_sequence: Binder protein sequence
+            port: NIM service port
             
         Returns:
-            Complex validation results
+            Dictionary containing complex structure and validation metrics
         """
-        endpoint = self.endpoints["alphafold2"]
+        endpoint = f"{self.base_url}:{port}/v1/multimer"
         
         payload = {
             "sequences": [target_sequence, binder_sequence],
-            "mode": "multimer"
+            "return_pdb": True,
+            "return_pae": True,
+            "return_plddt": True
         }
         
-        logger.info("complex_validation_request")
-        
-        try:
-            result = await self._post_with_retry(
-                f"{endpoint}/v1/predict_multimer",
-                payload
-            )
-            
-            logger.info("complex_validation_success", confidence=result.get("confidence"))
-            return result
-            
-        except Exception as e:
-            logger.error("complex_validation_failed", error=str(e))
-            raise
-    
-    async def _post_with_retry(
-        self,
-        url: str,
-        payload: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """
-        POST request with retry logic
-        
-        Args:
-            url: Endpoint URL
-            payload: Request payload
-            
-        Returns:
-            Response JSON
-        """
         for attempt in range(self.max_retries):
             try:
-                response = requests.post(
-                    url,
+                logger.info(
+                    "complex_validation_request",
+                    attempt=attempt + 1
+                )
+                
+                response = self.session.post(
+                    endpoint,
                     json=payload,
-                    timeout=self.timeout,
-                    headers={"Content-Type": "application/json"}
+                    timeout=self.timeout
                 )
                 response.raise_for_status()
-                return response.json()
                 
-            except requests.exceptions.Timeout:
-                logger.warning("request_timeout", attempt=attempt + 1, url=url)
-                if attempt == self.max_retries - 1:
-                    raise
-                await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                result = response.json()
+                
+                logger.info(
+                    "complex_validation_success",
+                    mean_plddt=result.get("mean_plddt", 0.0),
+                    interface_pae=result.get("interface_pae", 0.0)
+                )
+                
+                return result
                 
             except requests.exceptions.RequestException as e:
-                logger.error("request_failed", attempt=attempt + 1, error=str(e))
-                if attempt == self.max_retries - 1:
-                    raise
-                await asyncio.sleep(2 ** attempt)
+                logger.warning(
+                    "complex_validation_retry",
+                    attempt=attempt + 1,
+                    error=str(e)
+                )
+                
+                if attempt < self.max_retries - 1:
+                    await asyncio.sleep(self.retry_delay)
+                else:
+                    raise RuntimeError(
+                        f"Complex validation failed after {self.max_retries} attempts: {e}"
+                    )
 
 
 class ProteinBinderPipeline:
     """
-    End-to-end pipeline for designing neutralizing protein binders
+    Sovereign protein binder design pipeline for bio-threat neutralization.
     
-    Integrates with:
-    - agentic_clinical/response_agent.py (trigger on Patient Zero flags)
-    - utils/data_gen (synthetic pathogen data)
-    - Z3-Gate (formal verification of geometric constraints)
+    Integrates multiple BioNeMo NIMs to design neutralizing binders against
+    pathogen targets in an air-gapped environment.
     """
     
     def __init__(
         self,
-        nim_client: Optional[NIMClient] = None,
-        output_dir: str = "/data/bionemo/outputs/binders",
-        enable_z3_verification: bool = True
+        nim_base_url: str = "http://localhost",
+        enable_power_monitoring: bool = True,
+        output_dir: Optional[Path] = None
     ):
         """
-        Initialize binder design pipeline
+        Initialize protein binder pipeline.
         
         Args:
-            nim_client: NIM client instance (creates default if None)
-            output_dir: Output directory for results
-            enable_z3_verification: Enable Z3 formal verification
+            nim_base_url: Base URL for NIM services
+            enable_power_monitoring: Enable NVML power monitoring
+            output_dir: Directory for output files
         """
-        self.nim_client = nim_client or NIMClient()
-        self.output_dir = Path(output_dir)
+        self.nim_client = NIMClient(base_url=nim_base_url)
+        self.enable_power_monitoring = enable_power_monitoring and NVML_AVAILABLE
+        self.output_dir = output_dir or Path("/data/bionemo/outputs/binders")
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.enable_z3_verification = enable_z3_verification
         
-        logger.info("pipeline_initialized", output_dir=str(self.output_dir))
+        if self.enable_power_monitoring:
+            try:
+                pynvml.nvmlInit()
+                self.gpu_handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+                logger.info("power_monitoring_enabled")
+            except Exception as e:
+                logger.warning("power_monitoring_failed", error=str(e))
+                self.enable_power_monitoring = False
+        
+        logger.info(
+            "pipeline_initialized",
+            nim_base_url=nim_base_url,
+            output_dir=str(self.output_dir)
+        )
+    
+    def _get_power_usage(self) -> float:
+        """Get current GPU power usage in watts."""
+        if not self.enable_power_monitoring:
+            return 0.0
+        
+        try:
+            power_mw = pynvml.nvmlDeviceGetPowerUsage(self.gpu_handle)
+            return power_mw / 1000.0  # Convert to watts
+        except Exception as e:
+            logger.warning("power_reading_failed", error=str(e))
+            return 0.0
+    
+    def _identify_binding_pockets(
+        self,
+        pdb_structure: str,
+        target_epitope: Optional[str] = None
+    ) -> List[BindingPocket]:
+        """
+        Identify potential binding pockets on target structure.
+        
+        Uses simple heuristic based on surface accessibility and residue clustering.
+        For production, integrate with Fpocket or similar tools.
+        
+        Args:
+            pdb_structure: Target structure in PDB format
+            target_epitope: Optional specific epitope region
+            
+        Returns:
+            List of identified binding pockets
+        """
+        # Simple heuristic: identify surface-exposed residue clusters
+        # In production, use geometric analysis or ML-based pocket detection
+        
+        logger.info("identifying_binding_pockets")
+        
+        # Placeholder implementation - returns mock pocket
+        # TODO: Integrate with geometric pocket detection (e.g., Fpocket, P2Rank)
+        pocket = BindingPocket(
+            residue_indices=list(range(100, 120)),  # Mock residues
+            center_coords=np.array([0.0, 0.0, 0.0]),
+            volume=500.0,
+            druggability_score=0.75,
+            surface_area=300.0
+        )
+        
+        logger.info(
+            "binding_pocket_identified",
+            num_residues=len(pocket.residue_indices),
+            druggability=pocket.druggability_score
+        )
+        
+        return [pocket]
     
     async def design_neutralizing_binder(
         self,
         pathogen_sequence: str,
         target_epitope: Optional[str] = None,
-        pathogen_name: str = "unknown_pathogen"
-    ) -> Dict[str, Any]:
+        pathogen_id: str = "unknown_pathogen",
+        use_esmfold_fallback: bool = True
+    ) -> NeutralizationResult:
         """
-        Design neutralizing binder against pathogen
+        Design neutralizing binder against pathogen target.
+        
+        Complete pipeline:
+        1. Predict pathogen structure
+        2. Identify binding pockets
+        3. Design binder candidates
+        4. Optimize sequences
+        5. Validate complexes
         
         Args:
-            pathogen_sequence: Pathogen protein sequence (FASTA)
-            target_epitope: Specific epitope to target (optional)
-            pathogen_name: Pathogen identifier
+            pathogen_sequence: Pathogen protein sequence (FASTA format)
+            target_epitope: Optional specific epitope to target
+            pathogen_id: Identifier for pathogen
+            use_esmfold_fallback: Use ESMFold if AlphaFold2 fails
             
         Returns:
-            Complete binder design results
+            NeutralizationResult with designed binders
         """
-        pipeline_id = f"binder_{pathogen_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        start_time = time.time()
+        start_power = self._get_power_usage()
+        status = BinderDesignStatus.INITIALIZED
         
-        logger.info("pipeline_started", pipeline_id=pipeline_id, pathogen=pathogen_name)
-        
-        results = {
-            "pipeline_id": pipeline_id,
-            "pathogen_name": pathogen_name,
-            "started_at": datetime.now().isoformat(),
-            "stages": {},
-            "final_binder": None,
-            "validation": None
-        }
+        logger.info(
+            "binder_design_started",
+            pathogen_id=pathogen_id,
+            sequence_length=len(pathogen_sequence)
+        )
         
         try:
-            # Stage 1: Structure Prediction
-            logger.info("stage_1_structure_prediction")
-            pathogen_structure = await self._predict_pathogen_structure(
-                pathogen_sequence,
-                pathogen_name
-            )
-            results["stages"]["structure_prediction"] = {
-                "status": "success",
-                "confidence": pathogen_structure.confidence,
-                "method": pathogen_structure.method
-            }
+            # Step 1: Predict pathogen structure
+            status = BinderDesignStatus.PREDICTING_STRUCTURE
             
-            # Stage 2: Pocket Identification
-            logger.info("stage_2_pocket_identification")
-            pockets = await self._identify_binding_pockets(
-                pathogen_structure,
-                target_epitope
-            )
-            results["stages"]["pocket_identification"] = {
-                "status": "success",
-                "pockets_found": len(pockets)
-            }
+            try:
+                structure_result = await self.nim_client.predict_structure(
+                    sequence=pathogen_sequence,
+                    model=StructurePredictionModel.ALPHAFOLD2,
+                    port=8001
+                )
+            except RuntimeError as e:
+                if use_esmfold_fallback:
+                    logger.warning(
+                        "alphafold2_failed_using_esmfold",
+                        error=str(e)
+                    )
+                    structure_result = await self.nim_client.predict_structure(
+                        sequence=pathogen_sequence,
+                        model=StructurePredictionModel.ESMFOLD,
+                        port=8005
+                    )
+                else:
+                    raise
             
-            # Select best pocket
+            target_pdb = structure_result["pdb"]
+            target_confidence = structure_result.get("mean_plddt", 0.0)
+            
+            # Step 2: Identify binding pockets
+            status = BinderDesignStatus.IDENTIFYING_POCKETS
+            pockets = self._identify_binding_pockets(target_pdb, target_epitope)
+            
+            if not pockets:
+                raise ValueError("No suitable binding pockets identified")
+            
+            # Use highest-scoring pocket
             best_pocket = max(pockets, key=lambda p: p.druggability_score)
-            logger.info("best_pocket_selected", pocket_id=best_pocket.pocket_id)
             
-            # Stage 3: Binder Hallucination
-            logger.info("stage_3_binder_hallucination")
-            binder_candidates = await self._hallucinate_binders(
-                pathogen_structure,
-                best_pocket
+            # Step 3: Design binder candidates
+            status = BinderDesignStatus.HALLUCINATING_BINDER
+            design_result = await self.nim_client.design_binder(
+                target_pdb=target_pdb,
+                binding_site_residues=best_pocket.residue_indices,
+                port=8002
             )
-            results["stages"]["binder_hallucination"] = {
-                "status": "success",
-                "candidates_generated": len(binder_candidates)
-            }
             
-            # Stage 4: Sequence Optimization
-            logger.info("stage_4_sequence_optimization")
-            optimized_binders = await self._optimize_binder_sequences(
-                binder_candidates
-            )
-            results["stages"]["sequence_optimization"] = {
-                "status": "success",
-                "optimized_count": len(optimized_binders)
-            }
+            binder_candidates = []
+            
+            # Step 4: Optimize sequences for each design
+            status = BinderDesignStatus.OPTIMIZING_SEQUENCE
+            for design in design_result.get("designs", [])[:3]:  # Top 3 designs
+                backbone_pdb = design["pdb"]
+                
+                optimization_result = await self.nim_client.optimize_sequence(
+                    backbone_pdb=backbone_pdb,
+                    port=8003
+                )
+                
+                # Step 5: Validate each optimized sequence
+                status = BinderDesignStatus.VALIDATING
+                for seq_data in optimization_result.get("sequences", [])[:2]:  # Top 2 sequences
+                    binder_sequence = seq_data["sequence"]
+                    
+                    validation_result = await self.nim_client.validate_complex(
+                        target_sequence=pathogen_sequence,
+                        binder_sequence=binder_sequence,
+                        port=8004
+                    )
+                    
+                    # Calculate binding affinity estimate from PAE
+                    interface_pae = validation_result.get("interface_pae", 100.0)
+                    binding_affinity = -1.0 * (30.0 - interface_pae)  # Lower PAE = better binding
+                    
+                    candidate = BinderCandidate(
+                        sequence=binder_sequence,
+                        structure_pdb=validation_result["pdb"],
+                        binding_affinity=binding_affinity,
+                        confidence_score=validation_result.get("mean_plddt", 0.0),
+                        design_method="RFdiffusion+ProteinMPNN",
+                        validation_metrics={
+                            "interface_pae": interface_pae,
+                            "mean_plddt": validation_result.get("mean_plddt", 0.0),
+                            "target_confidence": target_confidence
+                        },
+                        metadata={
+                            "pocket_druggability": best_pocket.druggability_score,
+                            "pocket_volume": best_pocket.volume
+                        }
+                    )
+                    
+                    binder_candidates.append(candidate)
             
             # Select top binder
-            top_binder = max(optimized_binders, key=lambda b: b.confidence)
-            
-            # Stage 5: Validation
-            logger.info("stage_5_validation")
-            validation = await self._validate_binder(
-                pathogen_structure,
-                top_binder
-            )
-            results["stages"]["validation"] = {
-                "status": "success",
-                "is_valid": validation.is_valid,
-                "binding_score": validation.binding_score
-            }
-            
-            # Z3 Formal Verification (if enabled)
-            if self.enable_z3_verification:
-                logger.info("z3_verification")
-                z3_result = await self._verify_geometric_constraints(
-                    pathogen_structure,
-                    top_binder,
-                    validation
+            if binder_candidates:
+                top_binder = max(
+                    binder_candidates,
+                    key=lambda c: c.confidence_score * (1.0 / (1.0 + c.validation_metrics["interface_pae"]))
                 )
-                results["z3_verification"] = z3_result
+            else:
+                top_binder = None
+            
+            status = BinderDesignStatus.COMPLETED
+            
+            # Calculate energy consumption
+            end_time = time.time()
+            end_power = self._get_power_usage()
+            execution_time = end_time - start_time
+            avg_power = (start_power + end_power) / 2.0
+            energy_joules = avg_power * execution_time
+            
+            result = NeutralizationResult(
+                pathogen_id=pathogen_id,
+                target_epitope=target_epitope or "auto_detected",
+                binder_candidates=binder_candidates,
+                top_binder=top_binder,
+                pipeline_status=status,
+                execution_time_seconds=execution_time,
+                energy_consumed_joules=energy_joules
+            )
             
             # Save results
-            results["final_binder"] = {
-                "binder_id": top_binder.binder_id,
-                "sequence": top_binder.sequence,
-                "confidence": top_binder.confidence,
-                "binding_affinity": top_binder.binding_affinity
-            }
-            results["validation"] = {
-                "is_valid": validation.is_valid,
-                "binding_score": validation.binding_score,
-                "structural_quality": validation.structural_quality
-            }
+            self._save_results(result)
             
-            # Write outputs
-            await self._save_results(pipeline_id, results, top_binder, validation)
+            logger.info(
+                "binder_design_completed",
+                pathogen_id=pathogen_id,
+                num_candidates=len(binder_candidates),
+                execution_time=execution_time,
+                energy_joules=energy_joules
+            )
             
-            logger.info("pipeline_completed", pipeline_id=pipeline_id, success=True)
+            return result
             
         except Exception as e:
-            logger.error("pipeline_failed", pipeline_id=pipeline_id, error=str(e))
-            results["error"] = str(e)
-            results["status"] = "failed"
-        
-        results["completed_at"] = datetime.now().isoformat()
-        return results
+            logger.error(
+                "binder_design_failed",
+                pathogen_id=pathogen_id,
+                status=status.value,
+                error=str(e)
+            )
+            
+            end_time = time.time()
+            execution_time = end_time - start_time
+            
+            return NeutralizationResult(
+                pathogen_id=pathogen_id,
+                target_epitope=target_epitope or "unknown",
+                binder_candidates=[],
+                top_binder=None,
+                pipeline_status=BinderDesignStatus.FAILED,
+                execution_time_seconds=execution_time,
+                energy_consumed_joules=0.0,
+                error_message=str(e)
+            )
     
-    async def _predict_pathogen_structure(
-        self,
-        sequence: str,
-        pathogen_name: str
-    ) -> PathogenStructure:
-        """Predict pathogen structure using AlphaFold2/ESMFold"""
+    def _save_results(self, result: NeutralizationResult) -> None:
+        """Save binder design results to disk."""
         try:
-            # Try AlphaFold2 first
-            result = await self.nim_client.predict_structure(
-                sequence,
-                method="alphafold2"
-            )
-            method = "alphafold2"
-        except Exception as e:
-            logger.warning("alphafold2_failed_using_esmfold", error=str(e))
-            result = await self.nim_client.predict_structure(
-                sequence,
-                method="esmfold"
-            )
-            method = "esmfold"
-        
-        return PathogenStructure(
-            sequence=sequence,
-            structure_pdb=result["pdb"],
-            confidence=result["confidence"],
-            method=method,
-            plddt_scores=result.get("plddt_scores", []),
-            metadata={"pathogen_name": pathogen_name}
-        )
-    
-    async def _identify_binding_pockets(
-        self,
-        structure: PathogenStructure,
-        target_epitope: Optional[str] = None
-    ) -> List[BindingPocket]:
-        """Identify binding pockets on pathogen surface"""
-        # Simple heuristic-based pocket detection
-        # In production, could use GNN-based methods or fpocket
-        
-        logger.info("identifying_pockets", method="heuristic")
-        
-        # Mock pocket identification (replace with actual implementation)
-        pockets = [
-            BindingPocket(
-                pocket_id="pocket_1",
-                residue_indices=list(range(50, 80)),
-                center_coords=(10.5, 20.3, 15.7),
-                volume=500.0,
-                druggability_score=0.85,
-                surface_residues=["GLU52", "ARG55", "TYR60"]
-            ),
-            BindingPocket(
-                pocket_id="pocket_2",
-                residue_indices=list(range(120, 145)),
-                center_coords=(15.2, 18.9, 22.1),
-                volume=450.0,
-                druggability_score=0.78,
-                surface_residues=["ASP122", "LYS125", "PHE130"]
-            )
-        ]
-        
-        return pockets
-    
-    async def _hallucinate_binders(
-        self,
-        pathogen_structure: PathogenStructure,
-        pocket: BindingPocket,
-        num_designs: int = 10
-    ) -> List[BinderCandidate]:
-        """Generate binder candidates using RFdiffusion"""
-        result = await self.nim_client.design_binder(
-            target_pdb=pathogen_structure.structure_pdb,
-            pocket_residues=pocket.residue_indices,
-            num_designs=num_designs
-        )
-        
-        candidates = []
-        for i, design in enumerate(result.get("designs", [])):
-            candidates.append(BinderCandidate(
-                binder_id=f"binder_{i+1}",
-                sequence=design["sequence"],
-                structure_pdb=design["pdb"],
-                binding_affinity=design.get("predicted_affinity", 0.0),
-                confidence=design.get("confidence", 0.0),
-                design_method="rfdiffusion",
-                target_pocket=pocket
-            ))
-        
-        return candidates
-    
-    async def _optimize_binder_sequences(
-        self,
-        candidates: List[BinderCandidate]
-    ) -> List[BinderCandidate]:
-        """Optimize binder sequences using ProteinMPNN"""
-        optimized = []
-        
-        for candidate in candidates:
-            try:
-                result = await self.nim_client.optimize_sequence(
-                    backbone_pdb=candidate.structure_pdb
+            output_path = self.output_dir / f"{result.pathogen_id}_{result.timestamp.isoformat()}"
+            output_path.mkdir(parents=True, exist_ok=True)
+            
+            # Save top binder sequence
+            if result.top_binder:
+                fasta_path = output_path / "top_binder.fasta"
+                record = SeqRecord(
+                    Seq(result.top_binder.sequence),
+                    id=f"{result.pathogen_id}_binder",
+                    description=f"Neutralizing binder | Affinity: {result.top_binder.binding_affinity:.2f}"
                 )
+                SeqIO.write(record, fasta_path, "fasta")
                 
-                # Use best optimized sequence
-                best_seq = result["sequences"][0]
-                candidate.sequence = best_seq["sequence"]
-                candidate.confidence = best_seq.get("confidence", candidate.confidence)
-                
-                optimized.append(candidate)
-                
-            except Exception as e:
-                logger.warning("sequence_optimization_failed", binder_id=candidate.binder_id, error=str(e))
-                # Keep original if optimization fails
-                optimized.append(candidate)
-        
-        return optimized
-    
-    async def _validate_binder(
-        self,
-        pathogen_structure: PathogenStructure,
-        binder: BinderCandidate
-    ) -> ValidationResult:
-        """Validate binder using AlphaFold-Multimer"""
-        result = await self.nim_client.validate_complex(
-            target_sequence=pathogen_structure.sequence,
-            binder_sequence=binder.sequence
-        )
-        
-        # Calculate structural quality metrics
-        plddt_scores = result.get("plddt_scores", [])
-        structural_quality = np.mean(plddt_scores) if plddt_scores else 0.0
-        
-        # Check validation criteria
-        is_valid = (
-            result.get("confidence", 0.0) > 0.7 and
-            structural_quality > 70.0 and
-            result.get("interface_score", 0.0) > 0.5
-        )
-        
-        issues = []
-        if result.get("confidence", 0.0) <= 0.7:
-            issues.append("Low complex confidence")
-        if structural_quality <= 70.0:
-            issues.append("Poor structural quality")
-        
-        return ValidationResult(
-            is_valid=is_valid,
-            binding_score=result.get("interface_score", 0.0),
-            structural_quality=structural_quality,
-            predicted_complex_pdb=result.get("pdb", ""),
-            interface_residues=result.get("interface_residues", []),
-            validation_method="alphafold_multimer",
-            issues=issues
-        )
-    
-    async def _verify_geometric_constraints(
-        self,
-        pathogen_structure: PathogenStructure,
-        binder: BinderCandidate,
-        validation: ValidationResult
-    ) -> Dict[str, Any]:
-        """
-        Verify geometric constraints using Z3 formal verification
-        
-        Integrates with core/governance/solver/omni_law_verifier.py
-        """
-        # Mock Z3 verification (integrate with actual Z3-Gate)
-        logger.info("z3_verification_started")
-        
-        # Example constraints:
-        # 1. Binder-target distance constraints
-        # 2. Angle constraints for binding interface
-        # 3. Steric clash detection
-        
-        z3_result = {
-            "verified": True,
-            "constraints_checked": [
-                "distance_constraints",
-                "angle_constraints",
-                "steric_clashes"
-            ],
-            "violations": [],
-            "proof": "Z3_PROOF_HASH_PLACEHOLDER"
-        }
-        
-        logger.info("z3_verification_completed", verified=z3_result["verified"])
-        return z3_result
-    
-    async def _save_results(
-        self,
-        pipeline_id: str,
-        results: Dict[str, Any],
-        binder: BinderCandidate,
-        validation: ValidationResult
-    ) -> None:
-        """Save pipeline results to disk"""
-        output_path = self.output_dir / pipeline_id
-        output_path.mkdir(parents=True, exist_ok=True)
-        
-        # Save JSON results
-        with open(output_path / "results.json", "w") as f:
-            json.dump(results, f, indent=2, default=str)
-        
-        # Save binder sequence (FASTA)
-        binder_record = SeqRecord(
-            Seq(binder.sequence),
-            id=binder.binder_id,
-            description=f"Neutralizing binder | Confidence: {binder.confidence:.3f}"
-        )
-        SeqIO.write(binder_record, output_path / "binder.fasta", "fasta")
-        
-        # Save binder structure (PDB)
-        with open(output_path / "binder.pdb", "w") as f:
-            f.write(binder.structure_pdb)
-        
-        # Save complex structure (PDB)
-        with open(output_path / "complex.pdb", "w") as f:
-            f.write(validation.predicted_complex_pdb)
-        
-        logger.info("results_saved", output_path=str(output_path))
+                # Save structure
+                pdb_path = output_path / "top_binder_complex.pdb"
+                with open(pdb_path, "w") as f:
+                    f.write(result.top_binder.structure_pdb)
+            
+            logger.info(
+                "results_saved",
+                output_path=str(output_path)
+            )
+            
+        except Exception as e:
+            logger.error("result_save_failed", error=str(e))
 
 
-# Integration hook for agentic_clinical/response_agent.py
-async def design_binder_for_threat(
-    pathogen_sequence: str,
-    pathogen_name: str,
-    clinical_context: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
-    """
-    Entry point for agentic clinical response agents
-    
-    Args:
-        pathogen_sequence: Pathogen sequence from Patient Zero sample
-        pathogen_name: Identified pathogen name
-        clinical_context: Clinical context from triage
-        
-    Returns:
-        Binder design results for therapeutic response
-    """
+# Example usage for integration testing
+async def main():
+    """Example usage of protein binder pipeline."""
     pipeline = ProteinBinderPipeline()
     
-    logger.info(
-        "clinical_binder_design_triggered",
-        pathogen=pathogen_name,
-        context=clinical_context
-    )
+    # Example pathogen sequence (SARS-CoV-2 RBD)
+    pathogen_sequence = "MFVFLVLLPLVSSQCVNLTTRTQLPPAYTNSFTRGVYYPDKVFRSSVLHSTQDLFLPFFSNVTWFHAIHVSGTNGTKRFDNPVLPFNDGVYFASTEKSNIIRGWIFGTTLDSKTQSLLIVNNATNVVIKVCEFQFCNDPFLGVYYHKNNKSWMESEFRVYSSANNCTFEYVSQPFLMDLEGKQGNFKNLREFVFKNIDGYFKIYSKHTPINLVRDLPQGFSALEPLVDLPIGINITRFQTLLALHRSYLTPGDSSSGWTAGAAAYYVGYLQPRTFLLKYNENGTITDAVDCALDPLSETKCTLKSFTVEKGIYQTSNFRVQPTESIVRFPNITNLCPFGEVFNATRFASVYAWNRKRISNCVADYSVLYNSASFSTFKCYGVSPTKLNDLCFTNVYADSFVIRGDEVRQIAPGQTGKIADYNYKLPDDFTGCVIAWNSNNLDSKVGGNYNYLYRLFRKSNLKPFERDISTEIYQAGSTPCNGVEGFNCYFPLQSYGFQPTNGVGYQPYRVVVLSFELLHAPATVCGPKKSTNLVKNKCVNF"
     
     result = await pipeline.design_neutralizing_binder(
         pathogen_sequence=pathogen_sequence,
-        pathogen_name=pathogen_name
+        target_epitope="RBD",
+        pathogen_id="SARS-CoV-2"
     )
     
-    return result
+    if result.top_binder:
+        print(f"Top binder sequence: {result.top_binder.sequence}")
+        print(f"Binding affinity: {result.top_binder.binding_affinity:.2f}")
+        print(f"Confidence: {result.top_binder.confidence_score:.2f}")
+    else:
+        print(f"Design failed: {result.error_message}")
 
 
 if __name__ == "__main__":
-    # Example usage
-    async def main():
-        # Mock pathogen sequence (Marburg virus glycoprotein fragment)
-        pathogen_seq = "MKTIIALSYIFCLVKAQKDQYQKDQYQKDQYQKDQYQKDQYQKDQYQKDQYQKDQYQKDQYQKDQYQ"
-        
-        pipeline = ProteinBinderPipeline()
-        result = await pipeline.design_neutralizing_binder(
-            pathogen_sequence=pathogen_seq,
-            pathogen_name="marburg_virus_gp",
-            target_epitope="RBD"
-        )
-        
-        print(json.dumps(result, indent=2, default=str))
-    
     asyncio.run(main())
