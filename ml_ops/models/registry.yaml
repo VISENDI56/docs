@@ -1,0 +1,306 @@
+# ------------------------------------------------------------------------------
+# Copyright (c) 2025 iLuminara (VISENDI56). All Rights Reserved.
+# Licensed under the Polyform Shield License 1.0.0.
+# 
+# Sovereign Arsenal - BioNeMo Model Registry
+# Air-gapped deployment manifest for generative biology models
+# ------------------------------------------------------------------------------
+
+# Model Registry Metadata
+registry:
+  name: "iLuminara Sovereign Arsenal"
+  version: "1.0.0"
+  last_updated: "2025-01-02"
+  deployment_mode: "air_gapped"
+  base_path: "/models/bionemo"
+
+# Protein Structure Prediction Models
+protein_structure:
+  alphafold2:
+    name: "AlphaFold2"
+    version: "2.3.2"
+    source: "nvcr.io/nvidia/clara/alphafold2:latest"
+    local_path: "/models/bionemo/alphafold2"
+    model_type: "structure_prediction"
+    input_type: "protein_sequence"
+    output_type: "pdb_structure"
+    max_sequence_length: 2700
+    parameters: "~200M"
+    memory_requirement_gb: 40
+    nim_port: 8001
+    nim_endpoint: "/v1/predict"
+    checksum_sha256: "placeholder_checksum_alphafold2"
+    description: "Highly accurate protein structure prediction"
+    citation: "Jumper et al., Nature 2021"
+    license: "Apache 2.0"
+    tags: ["structure", "protein", "prediction", "alphafold"]
+    
+  esmfold:
+    name: "ESMFold"
+    version: "1.0.0"
+    source: "nvcr.io/nvidia/clara/esmfold:latest"
+    local_path: "/models/bionemo/esmfold"
+    model_type: "structure_prediction"
+    input_type: "protein_sequence"
+    output_type: "pdb_structure"
+    max_sequence_length: 1024
+    parameters: "~700M"
+    memory_requirement_gb: 16
+    nim_port: 8005
+    nim_endpoint: "/v1/predict"
+    checksum_sha256: "placeholder_checksum_esmfold"
+    description: "Fast protein structure prediction from ESM-2 embeddings"
+    citation: "Lin et al., Science 2023"
+    license: "MIT"
+    tags: ["structure", "protein", "prediction", "esm", "fast"]
+
+# Protein Design Models
+protein_design:
+  rfdiffusion:
+    name: "RFdiffusion"
+    version: "1.1.0"
+    source: "nvcr.io/nvidia/clara/rfdiffusion:latest"
+    local_path: "/models/bionemo/rfdiffusion"
+    model_type: "protein_design"
+    input_type: "target_structure"
+    output_type: "designed_structure"
+    parameters: "~500M"
+    memory_requirement_gb: 24
+    nim_port: 8002
+    nim_endpoint: "/v1/design"
+    checksum_sha256: "placeholder_checksum_rfdiffusion"
+    description: "Diffusion-based protein binder and scaffold design"
+    citation: "Watson et al., Nature 2023"
+    license: "BSD-3-Clause"
+    tags: ["design", "protein", "diffusion", "binder"]
+    
+  proteinmpnn:
+    name: "ProteinMPNN"
+    version: "1.0.1"
+    source: "nvcr.io/nvidia/clara/proteinmpnn:latest"
+    local_path: "/models/bionemo/proteinmpnn"
+    model_type: "sequence_design"
+    input_type: "protein_backbone"
+    output_type: "optimized_sequence"
+    parameters: "~50M"
+    memory_requirement_gb: 8
+    nim_port: 8003
+    nim_endpoint: "/v1/optimize"
+    checksum_sha256: "placeholder_checksum_proteinmpnn"
+    description: "Message passing neural network for sequence optimization"
+    citation: "Dauparas et al., Science 2022"
+    license: "MIT"
+    tags: ["design", "protein", "sequence", "optimization"]
+
+# Molecular Docking Models
+molecular_docking:
+  diffdock:
+    name: "DiffDock"
+    version: "1.0.0"
+    source: "nvcr.io/nvidia/clara/diffdock:latest"
+    local_path: "/models/bionemo/diffdock"
+    model_type: "molecular_docking"
+    input_type: "protein_ligand"
+    output_type: "docked_poses"
+    parameters: "~300M"
+    memory_requirement_gb: 16
+    nim_port: 8006
+    nim_endpoint: "/v1/dock"
+    checksum_sha256: "placeholder_checksum_diffdock"
+    description: "Diffusion-based molecular docking for drug discovery"
+    citation: "Corso et al., ICLR 2023"
+    license: "MIT"
+    tags: ["docking", "drug_discovery", "diffusion"]
+
+# Protein Language Models
+protein_language_models:
+  esm2:
+    name: "ESM-2"
+    version: "3B"
+    source: "nvcr.io/nvidia/clara/esm2:3b"
+    local_path: "/models/bionemo/esm2"
+    model_type: "protein_language_model"
+    input_type: "protein_sequence"
+    output_type: "embeddings"
+    parameters: "3B"
+    memory_requirement_gb: 24
+    max_sequence_length: 1024
+    embedding_dim: 2560
+    checksum_sha256: "placeholder_checksum_esm2"
+    description: "Evolutionary Scale Modeling protein language model"
+    citation: "Lin et al., Science 2023"
+    license: "MIT"
+    tags: ["language_model", "protein", "embeddings", "esm"]
+    
+  amplify:
+    name: "AMPLIFY"
+    version: "1.0.0"
+    source: "nvcr.io/nvidia/clara/amplify:latest"
+    local_path: "/models/bionemo/amplify"
+    model_type: "protein_language_model"
+    input_type: "protein_sequence"
+    output_type: "embeddings"
+    parameters: "~1B"
+    memory_requirement_gb: 16
+    checksum_sha256: "placeholder_checksum_amplify"
+    description: "Attention-based protein language model"
+    license: "Apache 2.0"
+    tags: ["language_model", "protein", "attention"]
+
+# Genomics Models
+genomics:
+  evo2:
+    name: "Evo2"
+    version: "70B"
+    source: "nvcr.io/nvidia/clara/evo2:70b"
+    local_path: "/models/bionemo/evo2"
+    model_type: "dna_foundation_model"
+    input_type: "dna_sequence"
+    output_type: "embeddings_predictions"
+    parameters: "70B"
+    memory_requirement_gb: 160
+    max_sequence_length: 131072  # 128k context
+    nim_port: 8008
+    nim_endpoint: "/v1/analyze"
+    checksum_sha256: "placeholder_checksum_evo2"
+    description: "Long-context DNA foundation model for genomic analysis"
+    citation: "Nguyen et al., 2024"
+    license: "Apache 2.0"
+    tags: ["genomics", "dna", "foundation_model", "long_context"]
+    requires_multi_gpu: true
+    
+  geneformer:
+    name: "Geneformer"
+    version: "106M"
+    source: "nvcr.io/nvidia/clara/geneformer:106m"
+    local_path: "/models/bionemo/geneformer"
+    model_type: "single_cell_foundation_model"
+    input_type: "gene_expression"
+    output_type: "cell_embeddings"
+    parameters: "106M"
+    memory_requirement_gb: 12
+    max_genes: 2000
+    embedding_dim: 256
+    nim_port: 8007
+    nim_endpoint: "/v1/embed"
+    checksum_sha256: "placeholder_checksum_geneformer"
+    description: "Transformer for single-cell transcriptomics"
+    citation: "Theodoris et al., Nature 2023"
+    license: "Apache 2.0"
+    tags: ["genomics", "single_cell", "transcriptomics", "transformer"]
+    
+  dnabert:
+    name: "DNABERT"
+    version: "2.0"
+    source: "nvcr.io/nvidia/clara/dnabert:2.0"
+    local_path: "/models/bionemo/dnabert"
+    model_type: "dna_language_model"
+    input_type: "dna_sequence"
+    output_type: "embeddings"
+    parameters: "~117M"
+    memory_requirement_gb: 8
+    max_sequence_length: 512
+    checksum_sha256: "placeholder_checksum_dnabert"
+    description: "BERT-based DNA sequence understanding"
+    citation: "Zhou et al., Bioinformatics 2023"
+    license: "MIT"
+    tags: ["genomics", "dna", "bert", "language_model"]
+
+# Small Molecule Models
+small_molecule:
+  megamolbart:
+    name: "MegaMolBART"
+    version: "1.0.0"
+    source: "nvcr.io/nvidia/clara/megamolbart:latest"
+    local_path: "/models/bionemo/megamolbart"
+    model_type: "molecular_generation"
+    input_type: "smiles"
+    output_type: "generated_molecules"
+    parameters: "~400M"
+    memory_requirement_gb: 16
+    nim_port: 8009
+    nim_endpoint: "/v1/generate"
+    checksum_sha256: "placeholder_checksum_megamolbart"
+    description: "Large-scale molecular generation and optimization"
+    citation: "Irwin et al., 2022"
+    license: "Apache 2.0"
+    tags: ["small_molecule", "generation", "smiles", "bart"]
+    
+  moimim:
+    name: "MoIMIM"
+    version: "1.0.0"
+    source: "nvcr.io/nvidia/clara/moimim:latest"
+    local_path: "/models/bionemo/moimim"
+    model_type: "molecular_property_prediction"
+    input_type: "molecular_graph"
+    output_type: "properties"
+    parameters: "~200M"
+    memory_requirement_gb: 12
+    nim_port: 8010
+    nim_endpoint: "/v1/predict"
+    checksum_sha256: "placeholder_checksum_moimim"
+    description: "Molecular property prediction with masked modeling"
+    license: "Apache 2.0"
+    tags: ["small_molecule", "property_prediction", "graph"]
+
+# Model Collections for Specific Tasks
+collections:
+  bio_threat_neutralization:
+    name: "Bio-Threat Neutralization Pipeline"
+    models:
+      - alphafold2
+      - esmfold
+      - rfdiffusion
+      - proteinmpnn
+    description: "Complete pipeline for designing neutralizing binders"
+    
+  genomic_triage:
+    name: "Genomic Triage Pipeline"
+    models:
+      - geneformer
+      - evo2
+      - dnabert
+    description: "Comprehensive genomic analysis for clinical triage"
+    
+  drug_discovery:
+    name: "Drug Discovery Pipeline"
+    models:
+      - diffdock
+      - megamolbart
+      - moimim
+      - esm2
+    description: "End-to-end drug discovery workflow"
+
+# Download Instructions (Air-Gapped)
+download_instructions:
+  internet_connected_system:
+    - "Install NGC CLI: wget --content-disposition https://ngc.nvidia.com/downloads/ngccli_linux.zip && unzip ngccli_linux.zip"
+    - "Configure NGC: ngc config set"
+    - "Download models: ngc registry model download-version <model_source>"
+    - "Example: ngc registry model download-version nvidia/clara/alphafold2:latest"
+    
+  transfer_to_airgapped:
+    - "Package models: tar -czf bionemo_models.tar.gz /models/bionemo/"
+    - "Transfer: rsync -avz --progress bionemo_models.tar.gz airgapped-system:/tmp/"
+    - "Extract: tar -xzf /tmp/bionemo_models.tar.gz -C /"
+    
+  verification:
+    - "Verify checksums: sha256sum -c checksums.txt"
+    - "Test model loading: python -m ml_ops.models.model_downloader --verify"
+
+# Deployment Configuration
+deployment:
+  container_runtime: "docker"
+  gpu_required: true
+  min_gpu_memory_gb: 40
+  recommended_gpu: "NVIDIA Blackwell B300"
+  network_mode: "air_gapped"
+  storage_requirement_gb: 500
+  
+# Maintenance
+maintenance:
+  update_frequency: "quarterly"
+  security_scan_required: true
+  model_validation_required: true
+  backup_required: true
+  backup_location: "/backup/models/bionemo"

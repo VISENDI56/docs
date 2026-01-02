@@ -1,0 +1,336 @@
+# ------------------------------------------------------------------------------
+# Copyright (c) 2025 iLuminara (VISENDI56). All Rights Reserved.
+# Licensed under the Polyform Shield License 1.0.0.
+# 
+# Docker Compose - BioNeMo NIM Microservices
+# Air-gapped sovereign deployment for generative biology
+# ------------------------------------------------------------------------------
+
+version: '3.8'
+
+# Shared configuration
+x-nim-common: &nim-common
+  runtime: nvidia
+  ipc: host
+  ulimits:
+    memlock: -1
+    stack: 67108864
+  environment:
+    - NVIDIA_VISIBLE_DEVICES=all
+    - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0,1,2,3,4,5,6,7}
+    - NCCL_DEBUG=INFO
+    - NCCL_IB_DISABLE=0
+    - NCCL_NET_GDR_LEVEL=5
+    - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+  volumes:
+    - ${MODELS_DIR:-/models/bionemo}:/models:ro
+    - ${DATA_DIR:-/data/bionemo}:/data
+    - ${CACHE_DIR:-/cache/bionemo}:/cache
+  networks:
+    - iluminara-net
+  restart: unless-stopped
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+
+services:
+  # AlphaFold2 NIM - Protein Structure Prediction
+  alphafold2:
+    <<: *nim-common
+    image: nvcr.io/nvidia/clara/alphafold2:latest
+    container_name: iluminara-nim-alphafold2
+    ports:
+      - "8001:8000"
+    environment:
+      - MODEL_PATH=/models/alphafold2
+      - MAX_SEQUENCE_LENGTH=2700
+      - NUM_RECYCLES=3
+      - USE_TEMPLATES=false
+      - BATCH_SIZE=4
+    shm_size: '32gb'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  # RFdiffusion NIM - Protein Binder Design
+  rfdiffusion:
+    <<: *nim-common
+    image: nvcr.io/nvidia/clara/rfdiffusion:latest
+    container_name: iluminara-nim-rfdiffusion
+    ports:
+      - "8002:8000"
+    environment:
+      - MODEL_PATH=/models/rfdiffusion
+      - NUM_DESIGNS=10
+      - DIFFUSION_STEPS=50
+      - TEMPERATURE=1.0
+    shm_size: '24gb'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+  # ProteinMPNN NIM - Sequence Optimization
+  proteinmpnn:
+    <<: *nim-common
+    image: nvcr.io/nvidia/clara/proteinmpnn:latest
+    container_name: iluminara-nim-proteinmpnn
+    ports:
+      - "8003:8000"
+    environment:
+      - MODEL_PATH=/models/proteinmpnn
+      - NUM_SEQUENCES=5
+      - TEMPERATURE=0.1
+      - SAMPLING_METHOD=autoregressive
+    shm_size: '8gb'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # AlphaFold-Multimer NIM - Complex Validation
+  alphafold_multimer:
+    <<: *nim-common
+    image: nvcr.io/nvidia/clara/alphafold2:latest
+    container_name: iluminara-nim-alphafold-multimer
+    ports:
+      - "8004:8000"
+    environment:
+      - MODEL_PATH=/models/alphafold2
+      - MULTIMER_MODE=true
+      - MAX_CHAINS=10
+      - NUM_RECYCLES=3
+    shm_size: '40gb'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  # ESMFold NIM - Fast Structure Prediction (Fallback)
+  esmfold:
+    <<: *nim-common
+    image: nvcr.io/nvidia/clara/esmfold:latest
+    container_name: iluminara-nim-esmfold
+    ports:
+      - "8005:8000"
+    environment:
+      - MODEL_PATH=/models/esmfold
+      - MAX_SEQUENCE_LENGTH=1024
+      - CHUNK_SIZE=128
+      - BATCH_SIZE=8
+    shm_size: '16gb'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # DiffDock NIM - Molecular Docking
+  diffdock:
+    <<: *nim-common
+    image: nvcr.io/nvidia/clara/diffdock:latest
+    container_name: iluminara-nim-diffdock
+    ports:
+      - "8006:8000"
+    environment:
+      - MODEL_PATH=/models/diffdock
+      - NUM_POSES=10
+      - INFERENCE_STEPS=20
+    shm_size: '16gb'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+  # Geneformer NIM - Single-Cell Genomics
+  geneformer:
+    <<: *nim-common
+    image: nvcr.io/nvidia/clara/geneformer:106m
+    container_name: iluminara-nim-geneformer
+    ports:
+      - "8007:8000"
+    environment:
+      - MODEL_PATH=/models/geneformer
+      - MAX_GENES=2000
+      - EMBEDDING_DIM=256
+      - BATCH_SIZE=32
+    shm_size: '12gb'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Evo2 NIM - DNA Foundation Model
+  evo2:
+    <<: *nim-common
+    image: nvcr.io/nvidia/clara/evo2:70b
+    container_name: iluminara-nim-evo2
+    ports:
+      - "8008:8000"
+    environment:
+      - MODEL_PATH=/models/evo2
+      - MODEL_SIZE=70b
+      - MAX_SEQUENCE_LENGTH=131072
+      - BATCH_SIZE=4
+      - TENSOR_PARALLEL_SIZE=4
+      - PIPELINE_PARALLEL_SIZE=2
+    shm_size: '160gb'
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 8  # Requires multi-GPU
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 180s
+
+  # MegaMolBART NIM - Molecular Generation
+  megamolbart:
+    <<: *nim-common
+    image: nvcr.io/nvidia/clara/megamolbart:latest
+    container_name: iluminara-nim-megamolbart
+    ports:
+      - "8009:8000"
+    environment:
+      - MODEL_PATH=/models/megamolbart
+      - BATCH_SIZE=16
+    shm_size: '16gb'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+  # MoIMIM NIM - Molecular Property Prediction
+  moimim:
+    <<: *nim-common
+    image: nvcr.io/nvidia/clara/moimim:latest
+    container_name: iluminara-nim-moimim
+    ports:
+      - "8010:8000"
+    environment:
+      - MODEL_PATH=/models/moimim
+      - BATCH_SIZE=32
+    shm_size: '12gb'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # BioNeMo Framework Container (for training/fine-tuning)
+  bionemo-framework:
+    <<: *nim-common
+    image: nvcr.io/nvidia/clara/bionemo-framework:2.0
+    container_name: iluminara-bionemo-framework
+    ports:
+      - "6006:6006"  # TensorBoard
+      - "8888:8888"  # Jupyter (optional)
+    environment:
+      - BIONEMO_HOME=/workspace/bionemo
+      - JUPYTER_ENABLE_LAB=yes
+    volumes:
+      - ${MODELS_DIR:-/models/bionemo}:/models
+      - ${DATA_DIR:-/data/bionemo}:/data
+      - ${CACHE_DIR:-/cache/bionemo}:/cache
+      - ../core/research:/workspace/research
+      - ../substrate/bionemo/configs:/workspace/configs
+    command: /bin/bash -c "tensorboard --logdir=/data/logs --host=0.0.0.0 & tail -f /dev/null"
+    shm_size: '32gb'
+
+  # Monitoring - Prometheus (optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: iluminara-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - iluminara-net
+    restart: unless-stopped
+
+  # Monitoring - Grafana (optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: iluminara-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      - iluminara-net
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+networks:
+  iluminara-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+volumes:
+  prometheus-data:
+  grafana-data:
+
+# Air-Gapped Deployment Notes:
+# 1. Pre-pull all images on internet-connected system:
+#    docker-compose pull
+# 2. Save images:
+#    docker save $(docker-compose config | grep 'image:' | awk '{print $2}') -o bionemo_images.tar
+# 3. Transfer to air-gapped system
+# 4. Load images:
+#    docker load -i bionemo_images.tar
+# 5. Start services:
+#    docker-compose up -d
+
+# Resource Requirements:
+# - Minimum: 8x NVIDIA GPUs (Blackwell B300 recommended)
+# - RAM: 512GB+
+# - Storage: 1TB+ for models and data
+# - Network: Air-gapped (no external connectivity)
+
+# Security:
+# - All services run in isolated network
+# - No external ports exposed (except localhost)
+# - Read-only model volumes
+# - Health checks enabled
+# - Automatic restart on failure
