@@ -2,20 +2,22 @@
 # Copyright (c) 2025 iLuminara (VISENDI56). All Rights Reserved.
 # Licensed under the Polyform Shield License 1.0.0.
 # 
-# Bio-Threat Response Agent - Wrapper for BioNeMo Pipelines
-# Integrates with existing agentic_clinical triage system
+# Bio-Threat Response Agent - Sovereign Therapeutic Design
+# Integrates protein binder and genomic triage pipelines
 # ------------------------------------------------------------------------------
 
 """
 Bio-Threat Response Agent
 
-Wrapper agent that orchestrates protein binder design and genomic triage
-pipelines in response to Patient Zero flags and bio-threat detection.
+Autonomous agent for bio-threat neutralization and patient triage.
+Coordinates BioNeMo pipelines for rapid therapeutic design and clinical decision support.
 
-Integrates with:
-- core/research/blueprints/protein_binder.py
-- core/research/blueprints/genomic_triage.py
-- agentic_clinical/copilot_hub.py (existing triage agents)
+Capabilities:
+- Patient Zero detection and response
+- Neutralizing binder design
+- Genomic triage and risk assessment
+- Clinical intervention recommendations
+- Integration with existing triage agents
 """
 
 import asyncio
@@ -23,457 +25,638 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional, Any
 from pathlib import Path
-import json
+from typing import Dict, List, Optional, Any, Tuple
 
+import numpy as np
 import structlog
 
 # Import BioNeMo pipelines
 import sys
 sys.path.append(str(Path(__file__).parent.parent))
 
-from research.blueprints.protein_binder import (
+from core.research.blueprints.protein_binder import (
     ProteinBinderPipeline,
-    design_binder_for_threat
+    NeutralizationResult,
+    BinderDesignStatus
 )
-from research.blueprints.genomic_triage import (
+from core.research.blueprints.genomic_triage import (
     GenomicTriagePipeline,
-    triage_patient_genomics,
-    SingleCellData
+    GenomicTriageResult,
+    TriageLevel,
+    ImmuneStatus
 )
 
 logger = structlog.get_logger(__name__)
 
 
 class ThreatLevel(Enum):
-    """Bio-threat severity levels"""
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    CRITICAL = "critical"
+    """Bio-threat severity classification."""
     PANDEMIC = "pandemic"
+    OUTBREAK = "outbreak"
+    CLUSTER = "cluster"
+    ISOLATED = "isolated"
+    CONTAINED = "contained"
 
 
-class ResponseAction(Enum):
-    """Response actions"""
-    MONITOR = "monitor"
-    ISOLATE = "isolate"
-    TREAT = "treat"
-    DESIGN_THERAPEUTIC = "design_therapeutic"
-    EMERGENCY_PROTOCOL = "emergency_protocol"
+class ResponseStatus(Enum):
+    """Response pipeline status."""
+    MONITORING = "monitoring"
+    ANALYZING = "analyzing"
+    DESIGNING_THERAPEUTICS = "designing_therapeutics"
+    TRIAGING_PATIENTS = "triaging_patients"
+    INTERVENTION_READY = "intervention_ready"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
 
 @dataclass
-class BioThreatAlert:
-    """Bio-threat alert from Patient Zero detection"""
-    alert_id: str
+class PatientZeroProfile:
+    """Profile of index patient (Patient Zero)."""
     patient_id: str
-    threat_type: str  # "viral", "bacterial", "unknown"
-    pathogen_name: Optional[str]
     pathogen_sequence: Optional[str]
-    threat_level: ThreatLevel
-    detection_timestamp: datetime
-    clinical_data: Dict[str, Any] = field(default_factory=dict)
-    genomic_data: Optional[Dict[str, Any]] = None
+    gene_expression_data: Optional[np.ndarray]
+    gene_names: Optional[List[str]]
+    dna_sequence: Optional[str]
+    clinical_symptoms: List[str]
+    exposure_history: Dict[str, Any]
+    timestamp: datetime = field(default_factory=datetime.utcnow)
 
 
 @dataclass
-class ResponsePlan:
-    """Generated response plan"""
-    plan_id: str
-    alert_id: str
+class BioThreatResponse:
+    """Complete bio-threat response package."""
+    threat_id: str
     threat_level: ThreatLevel
-    recommended_actions: List[ResponseAction]
-    therapeutic_design: Optional[Dict[str, Any]] = None
-    genomic_triage: Optional[Dict[str, Any]] = None
-    containment_strategy: List[str] = field(default_factory=list)
-    monitoring_protocol: List[str] = field(default_factory=list)
-    estimated_response_time: float = 0.0  # hours
-    confidence: float = 0.0
-    generated_at: datetime = field(default_factory=datetime.now)
+    patient_zero: PatientZeroProfile
+    neutralization_result: Optional[NeutralizationResult]
+    triage_result: Optional[GenomicTriageResult]
+    response_status: ResponseStatus
+    therapeutic_candidates: List[str]
+    clinical_interventions: List[str]
+    affected_patients: List[str]
+    containment_measures: List[str]
+    execution_time_seconds: float
+    total_energy_joules: float
+    timestamp: datetime = field(default_factory=datetime.utcnow)
+    error_message: Optional[str] = None
 
 
 class BioThreatResponseAgent:
     """
-    Orchestrates bio-threat response using BioNeMo pipelines
+    Autonomous agent for bio-threat response and therapeutic design.
     
-    Triggered by:
-    - Patient Zero flags from agentic_clinical/copilot_hub.py
-    - Outbreak detection from surveillance systems
-    - Manual escalation from clinicians
+    Coordinates protein binder design and genomic triage pipelines
+    to provide rapid response to emerging biological threats.
     """
     
     def __init__(
         self,
-        protein_binder_pipeline: Optional[ProteinBinderPipeline] = None,
-        genomic_triage_pipeline: Optional[GenomicTriagePipeline] = None,
-        output_dir: str = "/data/bionemo/outputs/threat_response",
-        enable_auto_response: bool = False
+        config_path: Optional[Path] = None,
+        enable_auto_response: bool = True,
+        output_dir: Optional[Path] = None
     ):
         """
-        Initialize bio-threat response agent
+        Initialize bio-threat response agent.
         
         Args:
-            protein_binder_pipeline: Protein binder design pipeline
-            genomic_triage_pipeline: Genomic triage pipeline
-            output_dir: Output directory for response plans
-            enable_auto_response: Enable automatic therapeutic design
+            config_path: Path to configuration file
+            enable_auto_response: Enable automatic response on Patient Zero detection
+            output_dir: Directory for output files
         """
-        self.binder_pipeline = protein_binder_pipeline or ProteinBinderPipeline()
-        self.triage_pipeline = genomic_triage_pipeline or GenomicTriagePipeline()
-        self.output_dir = Path(output_dir)
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.config_path = config_path or Path("/core/substrate/blackwell_bionemo_config.yaml")
         self.enable_auto_response = enable_auto_response
+        self.output_dir = output_dir or Path("/data/bionemo/outputs/responses")
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize pipelines
+        self.binder_pipeline = ProteinBinderPipeline()
+        self.triage_pipeline = GenomicTriagePipeline()
+        
+        # Response tracking
+        self.active_responses: Dict[str, BioThreatResponse] = {}
+        self.response_history: List[BioThreatResponse] = []
         
         logger.info(
-            "bio_threat_response_agent_initialized",
-            output_dir=str(self.output_dir),
-            auto_response=enable_auto_response
+            "bio_threat_agent_initialized",
+            auto_response=enable_auto_response,
+            output_dir=str(self.output_dir)
         )
     
-    async def respond_to_threat(
+    def _assess_threat_level(
         self,
-        alert: BioThreatAlert
-    ) -> ResponsePlan:
+        patient_zero: PatientZeroProfile,
+        triage_result: Optional[GenomicTriageResult] = None
+    ) -> ThreatLevel:
         """
-        Generate comprehensive response plan for bio-threat
+        Assess bio-threat severity level.
         
         Args:
-            alert: Bio-threat alert
+            patient_zero: Patient Zero profile
+            triage_result: Optional genomic triage result
             
         Returns:
-            Response plan with therapeutic design and triage
+            ThreatLevel classification
         """
-        plan_id = f"response_{alert.alert_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        
-        logger.info(
-            "threat_response_initiated",
-            plan_id=plan_id,
-            alert_id=alert.alert_id,
-            threat_level=alert.threat_level.value
-        )
-        
-        start_time = datetime.now()
-        
-        try:
-            # Determine response actions based on threat level
-            recommended_actions = self._determine_actions(alert)
-            
-            # Initialize response plan
-            response_plan = ResponsePlan(
-                plan_id=plan_id,
-                alert_id=alert.alert_id,
-                threat_level=alert.threat_level,
-                recommended_actions=recommended_actions
-            )
-            
-            # Execute response pipelines in parallel
-            tasks = []
-            
-            # 1. Therapeutic Design (if pathogen identified)
-            if alert.pathogen_sequence and ResponseAction.DESIGN_THERAPEUTIC in recommended_actions:
-                logger.info("initiating_therapeutic_design")
-                tasks.append(self._design_therapeutic(alert))
-            
-            # 2. Genomic Triage (if genomic data available)
-            if alert.genomic_data and ResponseAction.TREAT in recommended_actions:
-                logger.info("initiating_genomic_triage")
-                tasks.append(self._perform_genomic_triage(alert))
-            
-            # Execute pipelines
-            if tasks:
-                results = await asyncio.gather(*tasks, return_exceptions=True)
-                
-                # Process results
-                for result in results:
-                    if isinstance(result, Exception):
-                        logger.error("pipeline_failed", error=str(result))
-                        continue
-                    
-                    if "binder" in result:
-                        response_plan.therapeutic_design = result
-                    elif "triage" in result:
-                        response_plan.genomic_triage = result
-            
-            # 3. Generate containment strategy
-            response_plan.containment_strategy = self._generate_containment_strategy(
-                alert,
-                response_plan
-            )
-            
-            # 4. Generate monitoring protocol
-            response_plan.monitoring_protocol = self._generate_monitoring_protocol(
-                alert,
-                response_plan
-            )
-            
-            # Calculate response time and confidence
-            elapsed_time = (datetime.now() - start_time).total_seconds() / 3600.0
-            response_plan.estimated_response_time = elapsed_time
-            response_plan.confidence = self._calculate_confidence(response_plan)
-            
-            # Save response plan
-            await self._save_response_plan(response_plan)
-            
-            logger.info(
-                "threat_response_completed",
-                plan_id=plan_id,
-                confidence=response_plan.confidence,
-                response_time_hours=elapsed_time
-            )
-            
-            return response_plan
-            
-        except Exception as e:
-            logger.error("threat_response_failed", plan_id=plan_id, error=str(e))
-            raise
-    
-    def _determine_actions(self, alert: BioThreatAlert) -> List[ResponseAction]:
-        """Determine recommended actions based on threat level"""
-        actions = []
-        
-        if alert.threat_level == ThreatLevel.LOW:
-            actions = [ResponseAction.MONITOR]
-        elif alert.threat_level == ThreatLevel.MEDIUM:
-            actions = [ResponseAction.MONITOR, ResponseAction.ISOLATE]
-        elif alert.threat_level == ThreatLevel.HIGH:
-            actions = [
-                ResponseAction.ISOLATE,
-                ResponseAction.TREAT,
-                ResponseAction.DESIGN_THERAPEUTIC
-            ]
-        elif alert.threat_level in [ThreatLevel.CRITICAL, ThreatLevel.PANDEMIC]:
-            actions = [
-                ResponseAction.EMERGENCY_PROTOCOL,
-                ResponseAction.ISOLATE,
-                ResponseAction.TREAT,
-                ResponseAction.DESIGN_THERAPEUTIC
-            ]
-        
-        return actions
-    
-    async def _design_therapeutic(self, alert: BioThreatAlert) -> Dict[str, Any]:
-        """Design neutralizing therapeutic using protein binder pipeline"""
-        logger.info("designing_therapeutic", pathogen=alert.pathogen_name)
-        
-        result = await self.binder_pipeline.design_neutralizing_binder(
-            pathogen_sequence=alert.pathogen_sequence,
-            pathogen_name=alert.pathogen_name or "unknown_pathogen"
-        )
-        
-        return {"binder": result}
-    
-    async def _perform_genomic_triage(self, alert: BioThreatAlert) -> Dict[str, Any]:
-        """Perform genomic triage using genomic triage pipeline"""
-        logger.info("performing_genomic_triage", patient_id=alert.patient_id)
-        
-        # Convert genomic data to SingleCellData
-        genomic_data = alert.genomic_data
-        sc_data = SingleCellData(
-            cell_ids=genomic_data.get("cell_ids", []),
-            gene_expression=genomic_data.get("gene_expression", []),
-            gene_names=genomic_data.get("gene_names", []),
-            patient_id=alert.patient_id
-        )
-        
-        result = await self.triage_pipeline.analyze_patient_genomics(
-            single_cell_data=sc_data,
-            dna_sequence=genomic_data.get("dna_sequence"),
-            clinical_context=alert.clinical_data
-        )
-        
-        return {"triage": result}
-    
-    def _generate_containment_strategy(
-        self,
-        alert: BioThreatAlert,
-        plan: ResponsePlan
-    ) -> List[str]:
-        """Generate containment strategy"""
-        strategy = []
-        
-        if alert.threat_level in [ThreatLevel.HIGH, ThreatLevel.CRITICAL, ThreatLevel.PANDEMIC]:
-            strategy.extend([
-                "Immediate patient isolation in negative pressure room",
-                "Contact tracing for all exposed individuals (72-hour window)",
-                "PPE protocol: Level 3 biosafety for all healthcare workers",
-                "Quarantine all close contacts for 14 days"
-            ])
-        
-        if plan.therapeutic_design:
-            strategy.append(
-                f"Prepare neutralizing binder for emergency use authorization: "
-                f"{plan.therapeutic_design.get('binder', {}).get('final_binder', {}).get('binder_id', 'N/A')}"
-            )
-        
-        if alert.threat_level == ThreatLevel.PANDEMIC:
-            strategy.extend([
-                "Activate emergency operations center",
-                "Coordinate with WHO and CDC",
-                "Implement community-wide surveillance",
-                "Prepare mass vaccination/treatment protocols"
-            ])
-        
-        return strategy
-    
-    def _generate_monitoring_protocol(
-        self,
-        alert: BioThreatAlert,
-        plan: ResponsePlan
-    ) -> List[str]:
-        """Generate monitoring protocol"""
-        protocol = [
-            "Vital signs monitoring every 4 hours",
-            "Daily clinical assessment",
-            "Serial viral load testing (if applicable)"
+        # Critical symptoms indicating high threat
+        critical_symptoms = [
+            "respiratory_failure",
+            "cytokine_storm",
+            "multi_organ_failure",
+            "hemorrhagic_fever",
+            "neurological_symptoms"
         ]
         
-        if plan.genomic_triage:
-            triage_result = plan.genomic_triage.get("triage", {})
-            if triage_result.get("triage_priority") in ["critical", "high"]:
-                protocol.extend([
-                    "Continuous cardiac monitoring",
-                    "Hourly respiratory assessment",
-                    "Serial inflammatory marker testing (CRP, IL-6, ferritin)",
-                    "Daily single-cell RNA-seq for immune profiling"
-                ])
+        has_critical_symptoms = any(
+            symptom in patient_zero.clinical_symptoms
+            for symptom in critical_symptoms
+        )
         
-        protocol.append("Weekly genomic surveillance for viral evolution")
+        # High transmission indicators
+        high_transmission = (
+            "airborne" in str(patient_zero.exposure_history) or
+            "respiratory" in str(patient_zero.clinical_symptoms)
+        )
         
-        return protocol
-    
-    def _calculate_confidence(self, plan: ResponsePlan) -> float:
-        """Calculate confidence in response plan"""
-        confidence = 0.5  # Base confidence
-        
-        # Increase confidence if therapeutic designed
-        if plan.therapeutic_design:
-            binder_confidence = plan.therapeutic_design.get("binder", {}).get(
-                "final_binder", {}
-            ).get("confidence", 0.0)
-            confidence += binder_confidence * 0.3
-        
-        # Increase confidence if genomic triage performed
-        if plan.genomic_triage:
-            triage_confidence = plan.genomic_triage.get("triage", {}).get(
-                "risk_score", 0.0
+        # Genomic risk factors
+        high_genomic_risk = False
+        if triage_result:
+            high_genomic_risk = (
+                triage_result.triage_level in [TriageLevel.CRITICAL, TriageLevel.HIGH] or
+                triage_result.immune_profile.cytokine_storm_risk > 0.7
             )
-            confidence += (1 - triage_confidence) * 0.2  # Lower risk = higher confidence
         
-        return min(confidence, 1.0)
+        # Determine threat level
+        if has_critical_symptoms and high_transmission and high_genomic_risk:
+            return ThreatLevel.PANDEMIC
+        elif (has_critical_symptoms and high_transmission) or high_genomic_risk:
+            return ThreatLevel.OUTBREAK
+        elif has_critical_symptoms or high_transmission:
+            return ThreatLevel.CLUSTER
+        else:
+            return ThreatLevel.ISOLATED
     
-    async def _save_response_plan(self, plan: ResponsePlan) -> None:
-        """Save response plan to disk"""
-        output_path = self.output_dir / plan.plan_id
-        output_path.mkdir(parents=True, exist_ok=True)
+    def _generate_containment_measures(
+        self,
+        threat_level: ThreatLevel,
+        patient_zero: PatientZeroProfile
+    ) -> List[str]:
+        """
+        Generate containment measures based on threat level.
         
-        # Convert to JSON-serializable format
-        plan_dict = {
-            "plan_id": plan.plan_id,
-            "alert_id": plan.alert_id,
-            "threat_level": plan.threat_level.value,
-            "recommended_actions": [a.value for a in plan.recommended_actions],
-            "therapeutic_design": plan.therapeutic_design,
-            "genomic_triage": plan.genomic_triage,
-            "containment_strategy": plan.containment_strategy,
-            "monitoring_protocol": plan.monitoring_protocol,
-            "estimated_response_time_hours": plan.estimated_response_time,
-            "confidence": plan.confidence,
-            "generated_at": plan.generated_at.isoformat()
+        Args:
+            threat_level: Assessed threat level
+            patient_zero: Patient Zero profile
+            
+        Returns:
+            List of containment measures
+        """
+        measures = []
+        
+        if threat_level == ThreatLevel.PANDEMIC:
+            measures.extend([
+                "IMMEDIATE: Activate pandemic response protocol",
+                "Implement regional quarantine measures",
+                "Deploy rapid testing infrastructure",
+                "Mobilize emergency medical resources",
+                "Coordinate with public health authorities",
+                "Initiate contact tracing at scale"
+            ])
+        elif threat_level == ThreatLevel.OUTBREAK:
+            measures.extend([
+                "Isolate affected area",
+                "Implement enhanced surveillance",
+                "Deploy mobile testing units",
+                "Establish isolation facilities",
+                "Initiate contact tracing"
+            ])
+        elif threat_level == ThreatLevel.CLUSTER:
+            measures.extend([
+                "Quarantine exposed individuals",
+                "Enhanced monitoring of contacts",
+                "Restrict movement in affected area"
+            ])
+        else:
+            measures.extend([
+                "Isolate patient",
+                "Monitor close contacts",
+                "Standard infection control"
+            ])
+        
+        # Add pathogen-specific measures
+        if patient_zero.pathogen_sequence:
+            measures.append("Sequence-based diagnostic development")
+            measures.append("Pathogen characterization and surveillance")
+        
+        return measures
+    
+    async def respond_to_patient_zero(
+        self,
+        patient_zero: PatientZeroProfile,
+        priority: str = "critical"
+    ) -> BioThreatResponse:
+        """
+        Execute comprehensive bio-threat response for Patient Zero.
+        
+        Coordinates:
+        1. Genomic triage analysis
+        2. Threat level assessment
+        3. Neutralizing binder design (if pathogen identified)
+        4. Clinical intervention recommendations
+        5. Containment measures
+        
+        Args:
+            patient_zero: Patient Zero profile
+            priority: Response priority level
+            
+        Returns:
+            BioThreatResponse with complete analysis and recommendations
+        """
+        start_time = asyncio.get_event_loop().time()
+        threat_id = f"THREAT_{patient_zero.patient_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+        status = ResponseStatus.MONITORING
+        
+        logger.info(
+            "patient_zero_response_initiated",
+            threat_id=threat_id,
+            patient_id=patient_zero.patient_id,
+            priority=priority
+        )
+        
+        try:
+            total_energy = 0.0
+            
+            # Step 1: Genomic triage analysis
+            status = ResponseStatus.TRIAGING_PATIENTS
+            triage_result = None
+            
+            if (patient_zero.gene_expression_data is not None and
+                patient_zero.gene_names is not None):
+                
+                logger.info("executing_genomic_triage", threat_id=threat_id)
+                
+                triage_result = await self.triage_pipeline.analyze_patient_genomics(
+                    patient_id=patient_zero.patient_id,
+                    gene_expression_matrix=patient_zero.gene_expression_data,
+                    gene_names=patient_zero.gene_names,
+                    dna_sequence=patient_zero.dna_sequence
+                )
+                
+                total_energy += triage_result.energy_consumed_joules
+                
+                logger.info(
+                    "genomic_triage_complete",
+                    threat_id=threat_id,
+                    triage_level=triage_result.triage_level.value,
+                    immune_status=triage_result.immune_profile.status.value
+                )
+            
+            # Step 2: Assess threat level
+            status = ResponseStatus.ANALYZING
+            threat_level = self._assess_threat_level(patient_zero, triage_result)
+            
+            logger.info(
+                "threat_level_assessed",
+                threat_id=threat_id,
+                threat_level=threat_level.value
+            )
+            
+            # Step 3: Design neutralizing therapeutics (if pathogen identified)
+            status = ResponseStatus.DESIGNING_THERAPEUTICS
+            neutralization_result = None
+            therapeutic_candidates = []
+            
+            if patient_zero.pathogen_sequence:
+                logger.info(
+                    "designing_neutralizing_binder",
+                    threat_id=threat_id
+                )
+                
+                neutralization_result = await self.binder_pipeline.design_neutralizing_binder(
+                    pathogen_sequence=patient_zero.pathogen_sequence,
+                    pathogen_id=patient_zero.patient_id,
+                    use_esmfold_fallback=True
+                )
+                
+                total_energy += neutralization_result.energy_consumed_joules
+                
+                if neutralization_result.top_binder:
+                    therapeutic_candidates.append(
+                        f"Neutralizing binder: {neutralization_result.top_binder.sequence[:50]}... "
+                        f"(Affinity: {neutralization_result.top_binder.binding_affinity:.2f})"
+                    )
+                    
+                    logger.info(
+                        "therapeutic_design_complete",
+                        threat_id=threat_id,
+                        num_candidates=len(neutralization_result.binder_candidates)
+                    )
+            
+            # Step 4: Compile clinical interventions
+            status = ResponseStatus.INTERVENTION_READY
+            clinical_interventions = []
+            
+            if triage_result:
+                clinical_interventions.extend(triage_result.recommended_interventions)
+            
+            # Add threat-level specific interventions
+            if threat_level in [ThreatLevel.PANDEMIC, ThreatLevel.OUTBREAK]:
+                clinical_interventions.insert(0, "URGENT: Activate emergency response protocol")
+                clinical_interventions.insert(1, "Deploy rapid diagnostic testing")
+            
+            if neutralization_result and neutralization_result.top_binder:
+                clinical_interventions.append(
+                    "Fast-track therapeutic candidate for in vitro validation"
+                )
+                clinical_interventions.append(
+                    "Initiate preclinical safety assessment"
+                )
+            
+            # Step 5: Generate containment measures
+            containment_measures = self._generate_containment_measures(
+                threat_level, patient_zero
+            )
+            
+            # Step 6: Compile response
+            status = ResponseStatus.COMPLETED
+            end_time = asyncio.get_event_loop().time()
+            execution_time = end_time - start_time
+            
+            response = BioThreatResponse(
+                threat_id=threat_id,
+                threat_level=threat_level,
+                patient_zero=patient_zero,
+                neutralization_result=neutralization_result,
+                triage_result=triage_result,
+                response_status=status,
+                therapeutic_candidates=therapeutic_candidates,
+                clinical_interventions=clinical_interventions,
+                affected_patients=[patient_zero.patient_id],
+                containment_measures=containment_measures,
+                execution_time_seconds=execution_time,
+                total_energy_joules=total_energy
+            )
+            
+            # Track response
+            self.active_responses[threat_id] = response
+            self.response_history.append(response)
+            
+            # Save response
+            self._save_response(response)
+            
+            logger.info(
+                "patient_zero_response_complete",
+                threat_id=threat_id,
+                threat_level=threat_level.value,
+                execution_time=execution_time,
+                total_energy=total_energy
+            )
+            
+            return response
+            
+        except Exception as e:
+            logger.error(
+                "patient_zero_response_failed",
+                threat_id=threat_id,
+                status=status.value,
+                error=str(e)
+            )
+            
+            end_time = asyncio.get_event_loop().time()
+            execution_time = end_time - start_time
+            
+            return BioThreatResponse(
+                threat_id=threat_id,
+                threat_level=ThreatLevel.ISOLATED,
+                patient_zero=patient_zero,
+                neutralization_result=None,
+                triage_result=None,
+                response_status=ResponseStatus.FAILED,
+                therapeutic_candidates=[],
+                clinical_interventions=["Manual review required"],
+                affected_patients=[patient_zero.patient_id],
+                containment_measures=["Standard isolation protocol"],
+                execution_time_seconds=execution_time,
+                total_energy_joules=0.0,
+                error_message=str(e)
+            )
+    
+    async def monitor_outbreak(
+        self,
+        threat_id: str,
+        new_patients: List[PatientZeroProfile]
+    ) -> BioThreatResponse:
+        """
+        Monitor and update response for ongoing outbreak.
+        
+        Args:
+            threat_id: Existing threat identifier
+            new_patients: List of newly identified patients
+            
+        Returns:
+            Updated BioThreatResponse
+        """
+        if threat_id not in self.active_responses:
+            logger.warning(
+                "threat_not_found",
+                threat_id=threat_id
+            )
+            raise ValueError(f"Threat {threat_id} not found in active responses")
+        
+        logger.info(
+            "outbreak_monitoring_update",
+            threat_id=threat_id,
+            new_patients=len(new_patients)
+        )
+        
+        # Get existing response
+        response = self.active_responses[threat_id]
+        
+        # Update affected patients
+        response.affected_patients.extend([p.patient_id for p in new_patients])
+        
+        # Re-assess threat level if escalating
+        if len(response.affected_patients) > 10:
+            if response.threat_level == ThreatLevel.CLUSTER:
+                response.threat_level = ThreatLevel.OUTBREAK
+                logger.warning(
+                    "threat_level_escalated",
+                    threat_id=threat_id,
+                    new_level=ThreatLevel.OUTBREAK.value
+                )
+        
+        if len(response.affected_patients) > 100:
+            if response.threat_level == ThreatLevel.OUTBREAK:
+                response.threat_level = ThreatLevel.PANDEMIC
+                logger.critical(
+                    "pandemic_declared",
+                    threat_id=threat_id
+                )
+        
+        # Update containment measures
+        response.containment_measures = self._generate_containment_measures(
+            response.threat_level,
+            response.patient_zero
+        )
+        
+        # Save updated response
+        self._save_response(response)
+        
+        return response
+    
+    def _save_response(self, response: BioThreatResponse) -> None:
+        """Save bio-threat response to disk."""
+        try:
+            output_path = self.output_dir / f"{response.threat_id}"
+            output_path.mkdir(parents=True, exist_ok=True)
+            
+            # Save response report
+            report_path = output_path / "response_report.txt"
+            with open(report_path, "w") as f:
+                f.write("=" * 70 + "\n")
+                f.write("BIO-THREAT RESPONSE REPORT\n")
+                f.write("=" * 70 + "\n\n")
+                
+                f.write(f"Threat ID: {response.threat_id}\n")
+                f.write(f"Threat Level: {response.threat_level.value.upper()}\n")
+                f.write(f"Status: {response.response_status.value}\n")
+                f.write(f"Timestamp: {response.timestamp.isoformat()}\n\n")
+                
+                f.write(f"Patient Zero: {response.patient_zero.patient_id}\n")
+                f.write(f"Affected Patients: {len(response.affected_patients)}\n\n")
+                
+                if response.triage_result:
+                    f.write("GENOMIC TRIAGE ANALYSIS\n")
+                    f.write("-" * 70 + "\n")
+                    f.write(f"Triage Level: {response.triage_result.triage_level.value}\n")
+                    f.write(f"Immune Status: {response.triage_result.immune_profile.status.value}\n")
+                    f.write(f"Cytokine Storm Risk: {response.triage_result.immune_profile.cytokine_storm_risk:.2%}\n\n")
+                
+                if response.neutralization_result:
+                    f.write("THERAPEUTIC DESIGN\n")
+                    f.write("-" * 70 + "\n")
+                    f.write(f"Binder Candidates: {len(response.neutralization_result.binder_candidates)}\n")
+                    if response.neutralization_result.top_binder:
+                        f.write(f"Top Binder Affinity: {response.neutralization_result.top_binder.binding_affinity:.2f}\n")
+                        f.write(f"Confidence: {response.neutralization_result.top_binder.confidence_score:.2%}\n\n")
+                
+                f.write("CLINICAL INTERVENTIONS\n")
+                f.write("-" * 70 + "\n")
+                for intervention in response.clinical_interventions:
+                    f.write(f"  • {intervention}\n")
+                f.write("\n")
+                
+                f.write("CONTAINMENT MEASURES\n")
+                f.write("-" * 70 + "\n")
+                for measure in response.containment_measures:
+                    f.write(f"  • {measure}\n")
+                f.write("\n")
+                
+                f.write("THERAPEUTIC CANDIDATES\n")
+                f.write("-" * 70 + "\n")
+                for candidate in response.therapeutic_candidates:
+                    f.write(f"  • {candidate}\n")
+                f.write("\n")
+                
+                f.write(f"Execution Time: {response.execution_time_seconds:.2f} seconds\n")
+                f.write(f"Energy Consumed: {response.total_energy_joules:.2f} joules\n")
+            
+            logger.info(
+                "response_saved",
+                threat_id=response.threat_id,
+                output_path=str(output_path)
+            )
+            
+        except Exception as e:
+            logger.error(
+                "response_save_failed",
+                threat_id=response.threat_id,
+                error=str(e)
+            )
+    
+    def get_active_threats(self) -> List[BioThreatResponse]:
+        """Get list of active bio-threats."""
+        return list(self.active_responses.values())
+    
+    def get_threat_summary(self) -> Dict[str, Any]:
+        """Get summary of all threats."""
+        return {
+            "active_threats": len(self.active_responses),
+            "total_responses": len(self.response_history),
+            "threat_levels": {
+                level.value: sum(
+                    1 for r in self.active_responses.values()
+                    if r.threat_level == level
+                )
+                for level in ThreatLevel
+            },
+            "total_affected_patients": sum(
+                len(r.affected_patients)
+                for r in self.active_responses.values()
+            )
         }
-        
-        with open(output_path / "response_plan.json", "w") as f:
-            json.dump(plan_dict, f, indent=2, default=str)
-        
-        logger.info("response_plan_saved", output_path=str(output_path))
 
 
-# Integration hooks for existing agentic_clinical system
-
-async def handle_patient_zero_alert(
-    patient_id: str,
-    pathogen_sequence: Optional[str] = None,
-    pathogen_name: Optional[str] = None,
-    clinical_data: Optional[Dict[str, Any]] = None,
-    genomic_data: Optional[Dict[str, Any]] = None,
-    threat_level: str = "high"
-) -> Dict[str, Any]:
+# Integration with existing triage agents
+async def integrate_with_triage_agent(
+    patient_data: Dict[str, Any],
+    triage_agent_endpoint: str = "http://localhost:5000/triage"
+) -> BioThreatResponse:
     """
-    Entry point for Patient Zero alerts from agentic_clinical/copilot_hub.py
+    Integration point for existing agentic_clinical triage agents.
     
     Args:
-        patient_id: Patient identifier
-        pathogen_sequence: Identified pathogen sequence
-        pathogen_name: Pathogen name
-        clinical_data: Clinical context
-        genomic_data: Patient genomic data
-        threat_level: Threat severity
+        patient_data: Patient data from triage agent
+        triage_agent_endpoint: Triage agent API endpoint
         
     Returns:
-        Response plan
+        BioThreatResponse if bio-threat detected
     """
-    # Create alert
-    alert = BioThreatAlert(
-        alert_id=f"alert_{patient_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-        patient_id=patient_id,
-        threat_type="viral" if pathogen_sequence else "unknown",
-        pathogen_name=pathogen_name,
-        pathogen_sequence=pathogen_sequence,
-        threat_level=ThreatLevel[threat_level.upper()],
-        detection_timestamp=datetime.now(),
-        clinical_data=clinical_data or {},
-        genomic_data=genomic_data
+    agent = BioThreatResponseAgent()
+    
+    # Convert patient data to PatientZeroProfile
+    patient_zero = PatientZeroProfile(
+        patient_id=patient_data.get("patient_id", "unknown"),
+        pathogen_sequence=patient_data.get("pathogen_sequence"),
+        gene_expression_data=patient_data.get("gene_expression"),
+        gene_names=patient_data.get("gene_names"),
+        dna_sequence=patient_data.get("dna_sequence"),
+        clinical_symptoms=patient_data.get("symptoms", []),
+        exposure_history=patient_data.get("exposure_history", {})
     )
     
-    # Initialize response agent
+    # Execute response
+    response = await agent.respond_to_patient_zero(patient_zero)
+    
+    return response
+
+
+# Example usage
+async def main():
+    """Example usage of bio-threat response agent."""
     agent = BioThreatResponseAgent(enable_auto_response=True)
     
-    logger.info(
-        "patient_zero_alert_received",
-        patient_id=patient_id,
-        threat_level=threat_level
+    # Mock Patient Zero
+    patient_zero = PatientZeroProfile(
+        patient_id="PATIENT_ZERO_001",
+        pathogen_sequence="MKTII" + "A" * 500,  # Mock pathogen sequence
+        gene_expression_data=np.random.lognormal(0, 1, (1000, 2000)),
+        gene_names=[f"GENE_{i}" for i in range(2000)],
+        dna_sequence="".join(np.random.choice(list("ACGT"), 10000)),
+        clinical_symptoms=["fever", "respiratory_distress", "cytokine_storm"],
+        exposure_history={"location": "outbreak_zone", "exposure_date": "2025-01-01"}
     )
     
-    # Generate response
-    response_plan = await agent.respond_to_threat(alert)
+    # Execute response
+    response = await agent.respond_to_patient_zero(patient_zero)
     
-    return {
-        "plan_id": response_plan.plan_id,
-        "threat_level": response_plan.threat_level.value,
-        "actions": [a.value for a in response_plan.recommended_actions],
-        "confidence": response_plan.confidence,
-        "containment_strategy": response_plan.containment_strategy,
-        "monitoring_protocol": response_plan.monitoring_protocol
-    }
+    print(f"\nThreat ID: {response.threat_id}")
+    print(f"Threat Level: {response.threat_level.value}")
+    print(f"Status: {response.response_status.value}")
+    print(f"\nClinical Interventions: {len(response.clinical_interventions)}")
+    print(f"Containment Measures: {len(response.containment_measures)}")
+    print(f"Therapeutic Candidates: {len(response.therapeutic_candidates)}")
 
 
 if __name__ == "__main__":
-    # Example usage
-    async def main():
-        # Mock Patient Zero alert
-        alert = BioThreatAlert(
-            alert_id="alert_001",
-            patient_id="patient_zero_001",
-            threat_type="viral",
-            pathogen_name="novel_coronavirus",
-            pathogen_sequence="MKTIIALSYIFCLVKAQKDQYQKDQYQKDQYQ",
-            threat_level=ThreatLevel.CRITICAL,
-            detection_timestamp=datetime.now(),
-            clinical_data={"symptoms": ["fever", "cough", "dyspnea"]},
-            genomic_data={
-                "cell_ids": [f"cell_{i}" for i in range(100)],
-                "gene_expression": [[0.5] * 1000 for _ in range(100)],
-                "gene_names": [f"GENE_{i}" for i in range(1000)]
-            }
-        )
-        
-        agent = BioThreatResponseAgent(enable_auto_response=True)
-        response = await agent.respond_to_threat(alert)
-        
-        print(f"Response Plan ID: {response.plan_id}")
-        print(f"Threat Level: {response.threat_level.value}")
-        print(f"Confidence: {response.confidence:.3f}")
-        print(f"Actions: {[a.value for a in response.recommended_actions]}")
-    
     asyncio.run(main())
