@@ -1,0 +1,335 @@
+# ------------------------------------------------------------------------------
+# Copyright (c) 2025 iLuminara (VISENDI56). All Rights Reserved.
+# Licensed under the Polyform Shield License 1.0.0.
+# 
+# Sovereign Arsenal - BioNeMo Model Registry
+# Air-Gapped Model Manifest for Generative Biology
+# ------------------------------------------------------------------------------
+
+# Model Registry Version
+registry_version: "1.0.0"
+last_updated: "2026-01-02"
+
+# Local Cache Configuration
+cache:
+  base_dir: "/models/bionemo"
+  ngc_cache: "/cache/ngc"
+  checksum_verification: true
+  auto_download: false  # Air-gapped mode
+
+# Protein Structure Prediction Models
+protein_structure:
+  alphafold2:
+    name: "AlphaFold2"
+    version: "2.3.2"
+    source: "nvcr.io/nvidia/clara/alphafold2:latest"
+    local_path: "/models/bionemo/alphafold2"
+    model_size: "3.5GB"
+    parameters: "21M"
+    description: "Protein structure prediction with atomic accuracy"
+    capabilities:
+      - "monomer_prediction"
+      - "multimer_prediction"
+      - "template_based_modeling"
+    input_format: "fasta"
+    output_format: "pdb"
+    max_sequence_length: 2700
+    gpu_memory_required: "16GB"
+    inference_time_estimate: "5-30 min"
+    checksum_sha256: "placeholder_checksum_alphafold2"
+    nim_endpoint: "http://localhost:8001"
+    
+  esmfold:
+    name: "ESMFold"
+    version: "1.0.0"
+    source: "nvcr.io/nvidia/clara/esmfold:latest"
+    local_path: "/models/bionemo/esmfold"
+    model_size: "15GB"
+    parameters: "700M"
+    description: "Fast protein structure prediction from ESM-2"
+    capabilities:
+      - "monomer_prediction"
+      - "fast_inference"
+    input_format: "fasta"
+    output_format: "pdb"
+    max_sequence_length: 1024
+    gpu_memory_required: "24GB"
+    inference_time_estimate: "1-5 min"
+    checksum_sha256: "placeholder_checksum_esmfold"
+    nim_endpoint: "http://localhost:8002"
+
+# Protein Design Models
+protein_design:
+  rfdiffusion:
+    name: "RFdiffusion"
+    version: "1.1.0"
+    source: "nvcr.io/nvidia/clara/rfdiffusion:latest"
+    local_path: "/models/bionemo/rfdiffusion"
+    model_size: "2.8GB"
+    parameters: "61M"
+    description: "Protein binder hallucination via diffusion"
+    capabilities:
+      - "binder_design"
+      - "de_novo_design"
+      - "motif_scaffolding"
+    input_format: "pdb"
+    output_format: "pdb"
+    max_sequence_length: 500
+    gpu_memory_required: "12GB"
+    inference_time_estimate: "10-60 min"
+    checksum_sha256: "placeholder_checksum_rfdiffusion"
+    nim_endpoint: "http://localhost:8003"
+    
+  proteinmpnn:
+    name: "ProteinMPNN"
+    version: "1.0.1"
+    source: "nvcr.io/nvidia/clara/proteinmpnn:latest"
+    local_path: "/models/bionemo/proteinmpnn"
+    model_size: "500MB"
+    parameters: "8M"
+    description: "Sequence design for protein backbones"
+    capabilities:
+      - "sequence_optimization"
+      - "fixed_backbone_design"
+    input_format: "pdb"
+    output_format: "fasta"
+    max_sequence_length: 1000
+    gpu_memory_required: "4GB"
+    inference_time_estimate: "1-5 min"
+    checksum_sha256: "placeholder_checksum_proteinmpnn"
+    nim_endpoint: "http://localhost:8004"
+
+# Molecular Docking Models
+molecular_docking:
+  diffdock:
+    name: "DiffDock"
+    version: "1.0.0"
+    source: "nvcr.io/nvidia/clara/diffdock:latest"
+    local_path: "/models/bionemo/diffdock"
+    model_size: "1.2GB"
+    parameters: "25M"
+    description: "Molecular docking via diffusion"
+    capabilities:
+      - "protein_ligand_docking"
+      - "binding_pose_prediction"
+    input_format: "pdb+sdf"
+    output_format: "pdb"
+    gpu_memory_required: "8GB"
+    inference_time_estimate: "5-15 min"
+    checksum_sha256: "placeholder_checksum_diffdock"
+    nim_endpoint: "http://localhost:8005"
+
+# Genomics Foundation Models
+genomics:
+  geneformer:
+    name: "Geneformer"
+    version: "1.0.0"
+    source: "bionemo-framework"
+    local_path: "/models/bionemo/geneformer"
+    model_size: "10GB"
+    parameters: "106M"
+    description: "Single-cell RNA-seq foundation model"
+    capabilities:
+      - "cell_type_classification"
+      - "cell_embedding"
+      - "gene_network_inference"
+    input_format: "h5ad"
+    output_format: "embeddings"
+    max_cells: 100000
+    gpu_memory_required: "32GB"
+    inference_time_estimate: "5-20 min"
+    checksum_sha256: "placeholder_checksum_geneformer"
+    nim_endpoint: "http://localhost:8006"
+    fine_tuning:
+      enabled: true
+      recommended_data_size: "10k+ cells"
+      training_time_estimate: "2-8 hours"
+    
+  evo2:
+    name: "Evo2"
+    version: "70b"
+    source: "bionemo-framework"
+    local_path: "/models/bionemo/evo2"
+    model_size: "140GB"
+    parameters: "70B"
+    description: "DNA foundation model for genomic analysis"
+    capabilities:
+      - "dna_sequence_generation"
+      - "variant_effect_prediction"
+      - "regulatory_element_detection"
+    input_format: "fasta"
+    output_format: "embeddings+predictions"
+    max_sequence_length: 131072  # 128k context
+    gpu_memory_required: "192GB"  # Requires 8x Blackwell B300
+    inference_time_estimate: "10-60 min"
+    checksum_sha256: "placeholder_checksum_evo2"
+    nim_endpoint: "http://localhost:8007"
+    parallelism:
+      tensor_parallel: 4
+      pipeline_parallel: 2
+    
+  dnabert:
+    name: "DNABERT-2"
+    version: "2.0"
+    source: "bionemo-framework"
+    local_path: "/models/bionemo/dnabert"
+    model_size: "3GB"
+    parameters: "117M"
+    description: "DNA sequence understanding via BERT"
+    capabilities:
+      - "promoter_prediction"
+      - "splice_site_detection"
+      - "variant_classification"
+    input_format: "fasta"
+    output_format: "embeddings+predictions"
+    max_sequence_length: 512
+    gpu_memory_required: "8GB"
+    inference_time_estimate: "1-5 min"
+    checksum_sha256: "placeholder_checksum_dnabert"
+    nim_endpoint: "http://localhost:8008"
+
+# Protein Language Models
+protein_language:
+  esm2:
+    name: "ESM-2"
+    version: "3B"
+    source: "bionemo-framework"
+    local_path: "/models/bionemo/esm2"
+    model_size: "12GB"
+    parameters: "3B"
+    description: "Protein language model for embeddings"
+    capabilities:
+      - "protein_embeddings"
+      - "contact_prediction"
+      - "function_prediction"
+    input_format: "fasta"
+    output_format: "embeddings"
+    max_sequence_length: 1024
+    gpu_memory_required: "24GB"
+    inference_time_estimate: "1-5 min"
+    checksum_sha256: "placeholder_checksum_esm2"
+    
+  amplify:
+    name: "AMPLIFY"
+    version: "1.0"
+    source: "bionemo-framework"
+    local_path: "/models/bionemo/amplify"
+    model_size: "8GB"
+    parameters: "350M"
+    description: "Antimicrobial peptide design"
+    capabilities:
+      - "amp_design"
+      - "activity_prediction"
+    input_format: "fasta"
+    output_format: "fasta+scores"
+    max_sequence_length: 100
+    gpu_memory_required: "16GB"
+    inference_time_estimate: "5-15 min"
+    checksum_sha256: "placeholder_checksum_amplify"
+
+# Small Molecule Models
+small_molecules:
+  megamolbart:
+    name: "MegaMolBART"
+    version: "1.0.0"
+    source: "bionemo-framework"
+    local_path: "/models/bionemo/megamolbart"
+    model_size: "4GB"
+    parameters: "406M"
+    description: "Molecular generation and optimization"
+    capabilities:
+      - "molecule_generation"
+      - "property_prediction"
+      - "retrosynthesis"
+    input_format: "smiles"
+    output_format: "smiles"
+    gpu_memory_required: "16GB"
+    inference_time_estimate: "1-10 min"
+    checksum_sha256: "placeholder_checksum_megamolbart"
+    nim_endpoint: "http://localhost:8009"
+    
+  moimim:
+    name: "MoIMIM"
+    version: "1.0.0"
+    source: "bionemo-framework"
+    local_path: "/models/bionemo/moimim"
+    model_size: "2GB"
+    parameters: "86M"
+    description: "Molecular property prediction"
+    capabilities:
+      - "admet_prediction"
+      - "toxicity_prediction"
+      - "solubility_prediction"
+    input_format: "smiles"
+    output_format: "predictions"
+    gpu_memory_required: "8GB"
+    inference_time_estimate: "1-5 min"
+    checksum_sha256: "placeholder_checksum_moimim"
+    nim_endpoint: "http://localhost:8010"
+
+# Download Instructions
+download_instructions:
+  air_gapped_sync:
+    description: "Manual NGC model synchronization for air-gapped deployment"
+    steps:
+      - "On internet-connected system: ngc config set"
+      - "Download models: ngc registry model download-version <model>"
+      - "Transfer to air-gapped system via secure file transfer"
+      - "Verify checksums: sha256sum -c checksums.txt"
+      - "Load into local cache: cp -r models/* /models/bionemo/"
+    
+  automated_script:
+    script_path: "./model_downloader.sh"
+    description: "Automated download script (requires internet)"
+    usage: "./model_downloader.sh --models all --verify-checksums"
+
+# Model Priorities for Initial Deployment
+deployment_priorities:
+  critical:
+    - "alphafold2"
+    - "esmfold"
+    - "geneformer"
+  high:
+    - "rfdiffusion"
+    - "proteinmpnn"
+    - "evo2"
+  medium:
+    - "diffdock"
+    - "dnabert"
+    - "esm2"
+  low:
+    - "megamolbart"
+    - "moimim"
+    - "amplify"
+
+# Total Storage Requirements
+storage_summary:
+  total_size: "~200GB"
+  breakdown:
+    protein_structure: "18.5GB"
+    protein_design: "3.3GB"
+    molecular_docking: "1.2GB"
+    genomics: "153GB"
+    protein_language: "20GB"
+    small_molecules: "6GB"
+  recommended_storage: "500GB SSD"
+
+# Compatibility Matrix
+compatibility:
+  cuda_version: "12.3+"
+  pytorch_version: "2.1+"
+  python_version: "3.11+"
+  gpu_architectures:
+    - "Blackwell (compute 10.0)"
+    - "Hopper (compute 9.0)"
+    - "Ada (compute 8.9)"
+  operating_systems:
+    - "Ubuntu 22.04 LTS"
+    - "RHEL 8+"
+
+# Maintenance Schedule
+maintenance:
+  model_updates: "quarterly"
+  checksum_verification: "monthly"
+  performance_benchmarking: "monthly"
+  security_audits: "quarterly"
