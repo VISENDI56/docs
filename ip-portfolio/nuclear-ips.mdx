@@ -84,7 +84,156 @@ class OmniLawMatrix:
 
 ---
 
-## IP #03: BioNeMo SaMD
+## IP #03: Acorn Protocol (Somatic Stance Listener)
+
+**Continuous Biometric Authentication & Duress Detection**
+
+The Acorn Protocol has evolved from a simple biometric check to a **Continuous Somatic Stance Listener** that monitors the Director's physical presence and physiological state.
+
+**Key Specifications**:
+- **Biometric Modalities**: Heart rate variability, gait analysis, posture detection
+- **Hardware Integration**: NVIDIA Blackwell B300 sensor suite
+- **Response Time**: <50ms duress detection
+- **Fail-Safe**: Automatic Z3-Gate "Safe-State" lockdown on somatic absence
+
+**Phase III Evolution**:
+
+<AccordionGroup>
+  <Accordion title="The Logic">
+    The system monitors the "Somatic Signature" of the Director (heart rate variability, gait, and posture via the B300's sensor suite).
+  </Accordion>
+  <Accordion title="The Constraint">
+    If the physical presence is removed or the "Somatic Signature" indicates duress (anxiety-regulated output via IP-04), the Z3-Gate immediately reverts to a "Safe-State," locking down all clinical diagnostics.
+  </Accordion>
+</AccordionGroup>
+
+**Technical Implementation**:
+```python
+class AcornProtocol:
+    """
+    Continuous Somatic Stance Listener for Director authentication.
+    """
+    def __init__(self):
+        self.biometric_sensors = BlackwellSensorSuite()
+        self.z3_gate = Z3FormalGate()
+        self.silent_flux = SilentFlux()
+        self.baseline_signature = None
+    
+    def calibrate_director_baseline(self, director_id):
+        """
+        Calibrate baseline somatic signature for Director.
+        
+        Args:
+            director_id: Unique Director identifier
+        
+        Returns:
+            Baseline somatic signature
+        """
+        # Collect baseline biometrics
+        hrv_baseline = self.biometric_sensors.measure_hrv(duration=60)
+        gait_baseline = self.biometric_sensors.analyze_gait(samples=100)
+        posture_baseline = self.biometric_sensors.detect_posture()
+        
+        self.baseline_signature = {
+            'director_id': director_id,
+            'hrv': hrv_baseline,
+            'gait': gait_baseline,
+            'posture': posture_baseline,
+            'timestamp': time.time()
+        }
+        
+        return self.baseline_signature
+    
+    def read_somatic_signature(self):
+        """
+        Read current somatic signature and detect anomalies.
+        
+        Returns:
+            Current somatic signature with duress indicators
+        """
+        # Read current biometrics
+        current_hrv = self.biometric_sensors.measure_hrv(duration=5)
+        current_gait = self.biometric_sensors.analyze_gait(samples=10)
+        current_posture = self.biometric_sensors.detect_posture()
+        
+        # Detect somatic absence
+        if current_hrv is None or current_gait is None:
+            return None  # Total somatic absence
+        
+        # Calculate deviation from baseline
+        hrv_deviation = abs(current_hrv - self.baseline_signature['hrv'])
+        gait_deviation = self._calculate_gait_deviation(
+            current_gait, 
+            self.baseline_signature['gait']
+        )
+        
+        # Detect duress
+        duress_detected = (
+            hrv_deviation > 0.3 or  # 30% HRV deviation
+            gait_deviation > 0.4 or  # 40% gait deviation
+            current_posture == 'PRONE'  # Director on ground
+        )
+        
+        if duress_detected:
+            # Trigger anxiety-regulated output via Silent Flux
+            self.silent_flux.activate_duress_mode()
+            
+            # Revert Z3-Gate to Safe-State
+            self.z3_gate.enter_safe_state()
+        
+        return {
+            'hrv': current_hrv,
+            'gait': current_gait,
+            'posture': current_posture,
+            'duress_detected': duress_detected,
+            'hrv_deviation': hrv_deviation,
+            'gait_deviation': gait_deviation,
+            'location': self.biometric_sensors.get_gps_location()
+        }
+    
+    def verify_command_stance(self):
+        """
+        Verify Director is in proper Command Stance for high-risk operations.
+        
+        Returns:
+            Boolean indicating Command Stance verification
+        """
+        signature = self.read_somatic_signature()
+        
+        if signature is None:
+            return False  # Somatic absence
+        
+        # Command Stance requirements
+        command_stance_verified = (
+            signature['posture'] == 'STANDING' and
+            signature['hrv_deviation'] < 0.2 and
+            signature['gait_deviation'] < 0.2 and
+            not signature['duress_detected']
+        )
+        
+        return command_stance_verified
+```
+
+**Integration with Genesis Summoner**:
+
+The Acorn Protocol provides the "Director DNA" component of the triple-helix Genesis Key:
+
+```python
+# Genesis Key derivation
+director_dna = acorn.read_somatic_signature()
+law_dna = omni_law.get_compliance_state()
+hardware_dna = blackwell_tpm.read_puf()
+
+genesis_key = hmac.new(
+    key=director_dna,
+    msg=law_dna + hardware_dna,
+    digestmod=hashlib.sha3_512
+).digest()
+```
+
+---
+
+## IP #04: BioNeMo SaMD
 
 **Generative Biology Integration**
 
