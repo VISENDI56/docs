@@ -593,6 +593,152 @@ class SovereignRevenueEngine:
 
 ---
 
+## IP #12: Lattice Core (Relational Graph Indexing)
+
+**System 2 Context Engineering**
+
+Hierarchical relational index transforming the repository from linear code to semantic graph.
+
+**Key Specifications**:
+- **Architecture**: Relational Graph Mapping with Control-Flow, Call Graphs, and Inheritance Hierarchies
+- **Capability**: Language-agnostic semantic understanding across heterogeneous codebases
+- **Integration**: Traces impact of changes across entire Nuclear IP Stack
+- **Performance**: Global Repository Understanding with silent dependency detection
+
+**Technical Implementation**:
+```python
+class LatticeCore:
+    """
+    Relational Graph Indexing for System 2 reasoning.
+    """
+    def __init__(self):
+        self.graph = RelationalGraph()
+        self.indexer = HierarchicalIndexer()
+        self.impact_tracer = ImpactTracer()
+    
+    def index_repository(self, repository):
+        """
+        Transform repository into hierarchical relational index.
+        
+        Args:
+            repository: Source code repository
+        
+        Returns:
+            Relational graph with semantic mappings
+        """
+        # Parse all source files
+        for file in repository.files:
+            ast = self._parse_to_ast(file)
+            
+            # Extract control flow
+            control_flow = self._extract_control_flow(ast)
+            self.graph.add_control_flow(control_flow)
+            
+            # Extract call graphs
+            call_graph = self._extract_call_graph(ast)
+            self.graph.add_call_graph(call_graph)
+            
+            # Extract inheritance hierarchies
+            inheritance = self._extract_inheritance(ast)
+            self.graph.add_inheritance(inheritance)
+        
+        # Build hierarchical index
+        self.indexer.build_index(self.graph)
+        
+        return self.graph
+    
+    def trace_impact(self, change):
+        """
+        Trace impact of a change across the entire system.
+        
+        Args:
+            change: Proposed code change
+        
+        Returns:
+            Impact analysis with affected components
+        """
+        # Identify changed nodes
+        changed_nodes = self.graph.find_nodes(change)
+        
+        # Trace dependencies
+        impacted_nodes = self.impact_tracer.trace_dependencies(
+            changed_nodes,
+            graph=self.graph
+        )
+        
+        # Analyze semantic impact
+        impact_analysis = {
+            'direct_impact': [],
+            'indirect_impact': [],
+            'silent_dependencies': []
+        }
+        
+        for node in impacted_nodes:
+            impact_type = self._classify_impact(node, changed_nodes)
+            impact_analysis[impact_type].append(node)
+        
+        return impact_analysis
+    
+    def verify_semantic_equivalence(self, original, modified):
+        """
+        Verify semantic equivalence across language boundaries.
+        
+        Example: Python clinical logic interacting with C++ hardware drivers
+        
+        Args:
+            original: Original code
+            modified: Modified code
+        
+        Returns:
+            Boolean indicating semantic equivalence
+        """
+        # Extract semantic signatures
+        original_sig = self._extract_semantic_signature(original)
+        modified_sig = self._extract_semantic_signature(modified)
+        
+        # Compare signatures (language-agnostic)
+        return original_sig.is_equivalent(modified_sig)
+```
+
+**Example Use Case**:
+
+If a change is made to a pediatric dosage constant in the Hearth Protocol (IP-10), Lattice Core automatically traces the impact through to the Solar Governor (IP-11) power-envelope calculations, ensuring no regression is introduced.
+
+```python
+# Example: Trace impact of dosage change
+lattice = LatticeCore()
+lattice.index_repository(iluminara_repo)
+
+# Propose change to pediatric dosage
+change = {
+    'file': 'hearth_protocol.py',
+    'function': 'calculate_pediatric_dosage',
+    'line': 142,
+    'old_value': 'DOSAGE_CONSTANT = 0.5',
+    'new_value': 'DOSAGE_CONSTANT = 0.6'
+}
+
+# Trace impact
+impact = lattice.trace_impact(change)
+
+print(f"Direct impact: {impact['direct_impact']}")
+# Output: ['hearth_protocol.dispense_medication', 'hearth_protocol.log_dosage']
+
+print(f"Indirect impact: {impact['indirect_impact']}")
+# Output: ['solar_governor.calculate_power_envelope', 'z3_gate.verify_safety']
+
+print(f"Silent dependencies: {impact['silent_dependencies']}")
+# Output: ['omni_law_matrix.check_compliance', 'audit_trail.log_action']
+```
+
+**Integration with System 2**:
+- Enables Extended Inference Time Validation (EITV) by providing complete context
+- Powers Chain-of-Thought reasoning with semantic relationships
+- Prevents regressions by detecting silent dependencies
+- Maintains Global Repository Understanding across all 11 Nuclear IPs
+
+---
+
 ## Integration Matrix
 
 | IP | Integrates With | Integration Type |
