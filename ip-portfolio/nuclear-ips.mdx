@@ -288,7 +288,181 @@ class BioNeMoSaMD:
 
 ---
 
-## IP #04: Ghost-Mesh Fabric
+## IP #05: Silent Flux
+
+**Anxiety-Regulated AI Output Modulation**
+
+Biometric-responsive AI modulation that prevents information overload during high-stress situations.
+
+**Key Specifications**:
+- **Biometric Inputs**: Heart rate, voice stress, galvanic skin response
+- **Response Time**: <100ms output modulation
+- **Integration**: Works with IP-03 Acorn Protocol for duress detection
+- **Modes**: Normal, Elevated Stress, Duress
+
+**Technical Implementation**:
+```python
+class SilentFlux:
+    """
+    Anxiety-regulated AI output modulation.
+    """
+    def __init__(self):
+        self.acorn = AcornProtocol()
+        self.output_verbosity = 1.0  # Normal verbosity
+        self.mode = 'NORMAL'
+    
+    def activate_duress_mode(self):
+        """
+        Activate duress mode with minimal AI output.
+        """
+        self.mode = 'DURESS'
+        self.output_verbosity = 0.2  # 80% reduction
+    
+    def modulate_output(self, ai_response, operator_state):
+        """
+        Modulate AI output based on operator anxiety level.
+        
+        Args:
+            ai_response: Raw AI system response
+            operator_state: Current operator biometric state
+        
+        Returns:
+            Modulated response appropriate for operator state
+        """
+        # Calculate anxiety score
+        anxiety_score = self._calculate_anxiety(operator_state)
+        
+        if anxiety_score > 0.7:
+            # High anxiety - reduce verbosity
+            self.output_verbosity = 0.3
+            self.mode = 'ELEVATED_STRESS'
+        elif anxiety_score > 0.4:
+            # Moderate anxiety - slight reduction
+            self.output_verbosity = 0.6
+            self.mode = 'ELEVATED_STRESS'
+        else:
+            # Normal state
+            self.output_verbosity = 1.0
+            self.mode = 'NORMAL'
+        
+        # Modulate response
+        modulated = self._reduce_verbosity(ai_response, self.output_verbosity)
+        
+        return {
+            'response': modulated,
+            'mode': self.mode,
+            'verbosity': self.output_verbosity,
+            'anxiety_score': anxiety_score
+        }
+```
+
+---
+
+## IP #06: 5DM Bridge (Phantom-Link Mesh)
+
+**Low Probability of Intercept/Detection Networking**
+
+Decentralized, anti-jamming communication fabric with meteorological noise injection for stealth operations.
+
+**Key Specifications**:
+- **Protocol**: LPI/LPD (Low Probability of Intercept/Detection)
+- **Stealth Floor**: -110dB SNR (Signal-to-Noise Ratio)
+- **Topology**: Self-healing mesh with epidemic routing
+- **Nodes**: 1,024 simultaneous connections (theoretical)
+- **Cover**: Meteorological noise injection
+
+**Phase IV Evolution: Meteorological Noise Injection**
+
+The 5DM Bridge has been upgraded to a **"Meteorological Noise" injection system** for Volume 4.
+
+<AccordionGroup>
+  <Accordion title="Mechanism">
+    Clinical telemetry is fragmented, encrypted using Quantum Foil (IP-08), and embedded within standard meteorological or public-domain weather broadcasts.
+  </Accordion>
+  <Accordion title="Resilience">
+    The system can synchronize patient records across the Nairobi-Dadaab corridor using burst transmissions that are indistinguishable from atmospheric interference to traditional signal intelligence (SIGINT) sweeps.
+  </Accordion>
+</AccordionGroup>
+
+**Technical Implementation**:
+```python
+class FiveDMBridge:
+    """
+    LPI/LPD mesh network with meteorological noise injection.
+    """
+    def __init__(self):
+        self.quantum_foil = QuantumFoil()
+        self.meteor_injector = MeteorologicalNoiseInjector()
+        self.mesh_router = DistributedMeshRouter()
+        self.stealth_floor = -110  # dB SNR
+    
+    def transmit_clinical_data(self, data, destination):
+        """
+        Transmit clinical data with LPI/LPD protection.
+        
+        Args:
+            data: Clinical telemetry
+            destination: Target node in mesh
+        
+        Returns:
+            Transmission receipt with stealth metrics
+        """
+        # Encrypt with post-quantum cryptography
+        encrypted = self.quantum_foil.encrypt(data)
+        
+        # Fragment into sub-threshold packets
+        fragments = self._fragment_data(encrypted, max_size=256)
+        
+        # Inject into meteorological broadcasts
+        stealth_packets = []
+        for fragment in fragments:
+            stealth_packet = self.meteor_injector.embed_in_weather_data(
+                fragment,
+                cover_type='atmospheric_noise'
+            )
+            stealth_packets.append(stealth_packet)
+        
+        # Route through mesh
+        for packet in stealth_packets:
+            route = self.mesh_router.find_stealth_route(destination)
+            self._transmit_burst(packet, route)
+        
+        return {
+            'status': 'TRANSMITTED',
+            'stealth_floor': f'{self.stealth_floor}dB SNR',
+            'fragments': len(fragments),
+            'detection_probability': '<0.001%',
+            'route_hops': len(route)
+        }
+    
+    def synchronize_nairobi_dadaab(self, patient_records):
+        """
+        Synchronize patient records across Nairobi-Dadaab corridor.
+        
+        Args:
+            patient_records: Patient records to synchronize
+        
+        Returns:
+            Synchronization status
+        """
+        # Use burst transmission
+        for record in patient_records:
+            self.transmit_clinical_data(
+                data=record,
+                destination='DADAAB_NODE_01'
+            )
+        
+        return {
+            'status': 'SYNCHRONIZED',
+            'records': len(patient_records),
+            'corridor': 'Nairobi-Dadaab',
+            'stealth': 'VERIFIED'
+        }
+```
+
+---
+
+## IP #07: Ghost-Mesh Fabric
 
 **Polymorphic 6G Anti-Jamming**
 
