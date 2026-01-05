@@ -102,6 +102,48 @@ updates:
       time: "02:00"
 ```
 
+## Post-quantum cryptography (PQC) stack
+
+In 2026, "standard encryption" is a liability for long-term health records. iLuminara implements **NIST FIPS 203/204** post-quantum cryptography:
+
+| Layer | Algorithm | Purpose | NIST Standard |
+|-------|-----------|---------|---------------|
+| **Identity** | ML-DSA-65 (Dilithium) | Tamper-proof digital signatures for every medical record | FIPS 204 |
+| **Secrets** | ML-KEM-768 (Kyber) | Quantum-safe key encapsulation for data-at-rest | FIPS 203 |
+| **Integrity** | BLAKE3 | Ultra-fast hashing for the Sovereign Audit Trail | - |
+
+### Cryptographic hardening
+
+```python
+from governance_kernel.pqc_sealer import PQCSealer
+from kyber import Kyber768
+from dilithium import Dilithium3
+
+# Initialize PQC sealer
+sealer = PQCSealer(
+    kem_algorithm=Kyber768,
+    signature_algorithm=Dilithium3
+)
+
+# Seal medical record with post-quantum cryptography
+sealed_record = sealer.seal_evidence(
+    data=patient_record,
+    metadata={"patient_id": "PAT_001", "jurisdiction": "KDPA_KE"}
+)
+
+# Generate audit bundle with PQC signatures
+audit_bundle = sealer.generate_audit_bundle(
+    records=[sealed_record],
+    authority="UNHCR_Dadaab"
+)
+```
+
+**Compliance:**
+- NIST FIPS 203 (ML-KEM Key Encapsulation)
+- NIST FIPS 204 (ML-DSA Digital Signatures)
+- GDPR Art. 32 (State-of-the-art security measures)
+- HIPAA §164.312(a)(2)(iv) (Encryption and decryption)
+
 ## Nuclear IP Stack
 
 ### IP-02: Crypto Shredder
