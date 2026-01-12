@@ -1,0 +1,374 @@
+# ------------------------------------------------------------------------------
+# Copyright (c) 2025 iLuminara (VISENDI56). All Rights Reserved.
+# Licensed under the Polyform Shield License 1.0.0.
+# 
+# Blackwell B300 BioNeMo Configuration
+# Optimized for sovereign generative biology with NIM microservices
+# ------------------------------------------------------------------------------
+
+# System Configuration
+system:
+  name: "iLuminara-BioNeMo-Blackwell"
+  version: "1.0.0"
+  deployment_mode: "air_gapped"
+  gpu_architecture: "blackwell_b300"
+  
+# Compute Resources
+compute:
+  # GPU Configuration
+  gpu:
+    device_ids: [0, 1, 2, 3, 4, 5, 6, 7]  # 8x Blackwell B300
+    memory_per_gpu_gb: 192
+    total_memory_gb: 1536
+    nvlink_enabled: true
+    nvlink_bandwidth_gbps: 1800
+    
+  # Precision Settings (Blackwell FP8 optimization)
+  precision:
+    default: "fp8"
+    fallback: "fp16"
+    fp8_format: "e4m3"  # E4M3 for forward pass, E5M2 for gradients
+    fp8_margin: 0
+    fp8_interval: 1
+    fp8_amax_history_len: 1024
+    fp8_amax_compute_algo: "max"
+    mixed_precision_enabled: true
+    
+  # Memory Management
+  memory:
+    cuda_malloc_async: true
+    pytorch_cuda_alloc_conf: "max_split_size_mb:512,expandable_segments:True"
+    unified_memory_enabled: false
+    memory_pool_enabled: true
+    
+  # Parallelism Configuration (5D)
+  parallelism:
+    tensor_model_parallel_size: 4
+    pipeline_model_parallel_size: 2
+    data_parallel_size: 8
+    sequence_parallel_enabled: true
+    expert_model_parallel_size: 1
+    
+  # CUDA Optimization
+  cuda:
+    graphs_enabled: true
+    flash_attention_enabled: true
+    memory_efficient_attention: true
+    cudnn_benchmark: true
+    cudnn_deterministic: false
+    
+# NIM Microservices Configuration
+nim_services:
+  base_url: "http://localhost"
+  timeout_seconds: 300
+  max_retries: 3
+  retry_delay_seconds: 5
+  
+  # AlphaFold2 NIM
+  alphafold2:
+    enabled: true
+    port: 8001
+    endpoint: "/v1/predict"
+    model_path: "/models/bionemo/alphafold2"
+    batch_size: 4
+    max_sequence_length: 2700
+    use_templates: false
+    num_recycles: 3
+    
+  # ESMFold NIM (fallback)
+  esmfold:
+    enabled: true
+    port: 8005
+    endpoint: "/v1/predict"
+    model_path: "/models/bionemo/esmfold"
+    batch_size: 8
+    max_sequence_length: 1024
+    chunk_size: 128
+    
+  # RFdiffusion NIM
+  rfdiffusion:
+    enabled: true
+    port: 8002
+    endpoint: "/v1/design"
+    model_path: "/models/bionemo/rfdiffusion"
+    num_designs: 10
+    diffusion_steps: 50
+    temperature: 1.0
+    
+  # ProteinMPNN NIM
+  proteinmpnn:
+    enabled: true
+    port: 8003
+    endpoint: "/v1/optimize"
+    model_path: "/models/bionemo/proteinmpnn"
+    num_sequences: 5
+    temperature: 0.1
+    sampling_method: "autoregressive"
+    
+  # AlphaFold-Multimer NIM
+  alphafold_multimer:
+    enabled: true
+    port: 8004
+    endpoint: "/v1/multimer"
+    model_path: "/models/bionemo/alphafold2"
+    max_chains: 10
+    num_recycles: 3
+    
+  # DiffDock NIM
+  diffdock:
+    enabled: true
+    port: 8006
+    endpoint: "/v1/dock"
+    model_path: "/models/bionemo/diffdock"
+    num_poses: 10
+    inference_steps: 20
+    
+  # Geneformer NIM
+  geneformer:
+    enabled: true
+    port: 8007
+    endpoint: "/v1/embed"
+    model_path: "/models/bionemo/geneformer"
+    batch_size: 32
+    max_genes: 2000
+    embedding_dim: 256
+    
+  # Evo2 NIM
+  evo2:
+    enabled: true
+    port: 8008
+    endpoint: "/v1/analyze"
+    model_path: "/models/bionemo/evo2"
+    model_size: "70b"
+    batch_size: 4
+    max_sequence_length: 131072  # 128k context
+    
+  # MegaMolBART NIM
+  megamolbart:
+    enabled: true
+    port: 8009
+    endpoint: "/v1/generate"
+    model_path: "/models/bionemo/megamolbart"
+    batch_size: 16
+    
+  # MoIMIM NIM
+  moimim:
+    enabled: true
+    port: 8010
+    endpoint: "/v1/predict"
+    model_path: "/models/bionemo/moimim"
+    batch_size: 32
+
+# BioNeMo Framework Configuration
+bionemo_framework:
+  container_image: "nvcr.io/nvidia/clara/bionemo-framework:2.0"
+  workspace: "/workspace/bionemo"
+  data_dir: "/data/bionemo"
+  models_dir: "/models/bionemo"
+  cache_dir: "/cache/bionemo"
+  
+  # Training Configuration
+  training:
+    # FSDP Settings
+    fsdp:
+      enabled: true
+      sharding_strategy: "FULL_SHARD"
+      cpu_offload: false
+      backward_prefetch: "BACKWARD_PRE"
+      forward_prefetch: true
+      limit_all_gathers: true
+      
+    # Optimization
+    optimizer:
+      type: "adamw"
+      lr: 1.0e-4
+      weight_decay: 0.01
+      betas: [0.9, 0.999]
+      eps: 1.0e-8
+      
+    # Learning Rate Schedule
+    lr_scheduler:
+      type: "cosine"
+      warmup_steps: 1000
+      total_steps: 100000
+      min_lr: 1.0e-6
+      
+    # Checkpointing
+    checkpoint:
+      save_interval: 1000
+      save_top_k: 3
+      monitor: "val_loss"
+      mode: "min"
+      async_save: true
+      
+    # Gradient Settings
+    gradient:
+      accumulation_steps: 4
+      clipping_norm: 1.0
+      checkpointing_enabled: true
+      
+  # Inference Configuration
+  inference:
+    batch_size: 8
+    num_workers: 4
+    prefetch_factor: 2
+    pin_memory: true
+    use_cuda_graphs: true
+
+# Pipeline Configuration
+pipelines:
+  # Protein Binder Design
+  protein_binder:
+    enabled: true
+    structure_prediction_model: "alphafold2"
+    use_esmfold_fallback: true
+    pocket_detection_method: "geometric"
+    num_binder_designs: 10
+    num_sequence_optimizations: 5
+    validation_threshold: 0.7
+    output_dir: "/data/bionemo/outputs/binders"
+    
+  # Genomic Triage
+  genomic_triage:
+    enabled: true
+    geneformer_model: "geneformer-106m"
+    evo2_model: "evo2-70b"
+    num_cell_clusters: 10
+    outlier_threshold: 3.0
+    cytokine_storm_threshold: 0.7
+    output_dir: "/data/bionemo/outputs/triage"
+
+# Integration with iLuminara Components
+integration:
+  # Z3-Gate Formal Verification
+  z3_gate:
+    enabled: true
+    verify_geometric_constraints: true
+    verify_sequence_constraints: true
+    verification_timeout_seconds: 60
+    
+  # Agentic Clinical Integration
+  agentic_clinical:
+    enabled: true
+    triage_agent_endpoint: "http://localhost:5000/triage"
+    response_agent_endpoint: "http://localhost:5000/response"
+    auto_trigger_on_patient_zero: true
+    
+  # GNN Acceleration (cuEquivariance)
+  gnn_acceleration:
+    enabled: true
+    use_cuequivariance: true
+    segmented_tensor_products: true
+    max_degree: 3
+    
+  # Outlier Detection
+  outlier_detection:
+    enabled: true
+    integration_mode: "hybrid"
+    gnn_backend: "cuequivariance"
+    
+  # Data Generation
+  data_generation:
+    enabled: true
+    synthetic_pathogen_generation: true
+    synthetic_genomic_generation: true
+    augmentation_enabled: true
+
+# Monitoring and Observability
+monitoring:
+  # Power Monitoring (NVML)
+  power:
+    enabled: true
+    sampling_interval_seconds: 1.0
+    log_to_file: true
+    log_path: "/data/logs/power_usage.log"
+    alert_threshold_watts: 5000
+    
+  # Performance Metrics
+  performance:
+    enabled: true
+    track_latency: true
+    track_throughput: true
+    track_memory_usage: true
+    track_gpu_utilization: true
+    
+  # Logging
+  logging:
+    level: "INFO"
+    format: "json"
+    output: "stdout"
+    file_path: "/data/logs/bionemo.log"
+    rotation: "daily"
+    retention_days: 30
+    
+  # Metrics Export
+  metrics:
+    enabled: true
+    prometheus_port: 9090
+    export_interval_seconds: 10
+
+# Security and Governance
+security:
+  # Air-Gapped Mode
+  air_gapped:
+    enabled: true
+    block_external_requests: true
+    allowed_internal_networks: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+    
+  # Input Validation
+  validation:
+    max_sequence_length: 100000
+    allowed_sequence_chars: "ACDEFGHIKLMNPQRSTVWY"  # Amino acids
+    allowed_dna_chars: "ACGTN"
+    sanitize_inputs: true
+    
+  # Rate Limiting
+  rate_limiting:
+    enabled: true
+    max_requests_per_minute: 100
+    max_concurrent_requests: 10
+    
+  # Audit Logging
+  audit:
+    enabled: true
+    log_all_requests: true
+    log_all_responses: false
+    audit_log_path: "/data/logs/audit.log"
+
+# Efficiency and Sustainability
+efficiency:
+  # Solar Power Integration
+  solar:
+    enabled: true
+    priority_mode: "solar_first"
+    battery_threshold_percent: 20
+    grid_fallback_enabled: true
+    
+  # Energy Optimization
+  energy:
+    dynamic_voltage_scaling: true
+    idle_gpu_power_down: true
+    batch_consolidation: true
+    off_peak_training: true
+    
+  # Carbon Tracking
+  carbon:
+    enabled: true
+    grid_carbon_intensity_gco2_kwh: 400
+    target_pue: 1.2
+    report_interval_hours: 24
+
+# Data Paths
+data:
+  inputs: "/data/bionemo/inputs"
+  outputs: "/data/bionemo/outputs"
+  checkpoints: "/data/bionemo/checkpoints"
+  cache: "/cache/bionemo"
+  logs: "/data/logs"
+  
+# Model Registry
+models:
+  registry_path: "/models/bionemo/registry.yaml"
+  auto_download: false  # Disabled for air-gapped
+  verify_checksums: true
+  cache_models: true
